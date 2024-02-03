@@ -49,7 +49,7 @@ class LoginController : public Controller {
 		void boot( void ){
 
 			if( nullptr != this->m_web_resource && nullptr != this->m_web_resource->m_db_conn ){
-				this->login_credentials = this->m_web_resource->m_db_conn->get_login_credential_table();
+				this->m_web_resource->m_db_conn->get_login_credential_table(&this->login_credentials);
 			}
 			if( nullptr != this->m_route_handler ){
 				this->m_route_handler->register_route( EW_SERVER_LOGIN_ROUTE, [&]() { this->handleLoginRoute(); } );
@@ -131,7 +131,7 @@ class LoginController : public Controller {
       bool _is_posted = false;
       bool _is_error = true;
 
-			this->login_credentials = this->m_web_resource->m_db_conn->get_login_credential_table();
+      this->m_web_resource->m_db_conn->get_login_credential_table(&this->login_credentials);
 
       if ( this->m_web_resource->m_server->hasArg("usrnm") && this->m_web_resource->m_server->hasArg("pswd") ) {
 

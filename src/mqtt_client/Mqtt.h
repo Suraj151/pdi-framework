@@ -12,13 +12,8 @@ created Date    : 1st June 2019
 #ifndef EW_MQTT_CLIENT_SERVICE_H
 #define EW_MQTT_CLIENT_SERVICE_H
 
-#include <Esp.h>
-#include <interface/WiFiInterface.h>
-#include <interface/WiFiClientInterface.h>
-#include <utility/Utility.h>
-#include <utility/Log.h>
+#include <interface/pdi.h>
 #include "Mqtt_msg.h"
-// #include <utility/queue/queue.h>
 
 typedef enum {
 	MQTT_PUBLISH_RECV,

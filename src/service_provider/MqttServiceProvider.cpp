@@ -68,7 +68,8 @@ void MqttServiceProvider::handleMqttPublish(){
   #endif
   if( !this->m_mqtt_client.is_mqtt_connected() ) return;
 
-  mqtt_pubsub_config_table _mqtt_pubsub_configs = __database_service.get_mqtt_pubsub_config_table();
+  mqtt_pubsub_config_table _mqtt_pubsub_configs;
+  __database_service.get_mqtt_pubsub_config_table(&_mqtt_pubsub_configs);
   uint8_t mac[6];
   char macStr[18] = { 0 };
   wifi_get_macaddr(STATION_IF, mac);
@@ -94,7 +95,7 @@ void MqttServiceProvider::handleMqttPublish(){
           #else
 
             *_payload += "Hello from Esp Client : ";
-            *_payload += ESP.getChipId();
+            *_payload += __i_dvc_ctrl.getDeviceId();
           #endif
 
           memset( this->m_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
@@ -134,7 +135,8 @@ void MqttServiceProvider::handleMqttSubScribe(){
   #endif
   if( !this->m_mqtt_client.is_mqtt_connected() ) return;
 
-  mqtt_pubsub_config_table _mqtt_pubsub_configs = __database_service.get_mqtt_pubsub_config_table();
+  mqtt_pubsub_config_table _mqtt_pubsub_configs;
+  __database_service.get_mqtt_pubsub_config_table(&_mqtt_pubsub_configs);
 
   for (uint8_t i = 0; i < MQTT_MAX_SUBSCRIBE_TOPIC; i++) {
 
@@ -169,16 +171,20 @@ void MqttServiceProvider::stop(){
 void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
 
 
-  mqtt_general_config_table _mqtt_general_configs = __database_service.get_mqtt_general_config_table();
-  mqtt_pubsub_config_table _mqtt_pubsub_configs = __database_service.get_mqtt_pubsub_config_table();
+  mqtt_general_config_table _mqtt_general_configs;
+  mqtt_pubsub_config_table _mqtt_pubsub_configs;
+  __database_service.get_mqtt_general_config_table(&_mqtt_general_configs);
+  __database_service.get_mqtt_pubsub_config_table(&_mqtt_pubsub_configs);
 
   if( MQTT_GENERAL_CONFIG == _mqtt_config_type || MQTT_LWT_CONFIG == _mqtt_config_type ){
 
     this->m_mqtt_client.DeleteClient();
     int _stat = __task_scheduler.setTimeout( [&]() {
 
-      mqtt_general_config_table _mqtt_general_configs = __database_service.get_mqtt_general_config_table();
-      mqtt_lwt_config_table _mqtt_lwt_configs = __database_service.get_mqtt_lwt_config_table();
+      mqtt_general_config_table _mqtt_general_configs;
+      mqtt_lwt_config_table _mqtt_lwt_configs;
+      __database_service.get_mqtt_general_config_table(&_mqtt_general_configs);
+      __database_service.get_mqtt_lwt_config_table(&_mqtt_lwt_configs);
 
       uint8_t mac[6];
       char macStr[18] = { 0 };
@@ -199,7 +205,7 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
         __task_scheduler.clearInterval( this->m_mqtt_timer_cb_id );
         this->m_mqtt_timer_cb_id = 0;
       }
-    }, MQTT_INITIALIZE_DURATION );
+    }, MQTT_INITIALIZE_DURATION, __i_dvc_ctrl.millis_now() );
   }else if( MQTT_PUBSUB_CONFIG == _mqtt_config_type ){
 
     for ( uint16_t i = 0; i < this->m_mqtt_client.m_mqttClient.subscribed_topics.size(); i++) {
@@ -306,10 +312,12 @@ void MqttServiceProvider::handleMqttDataCb( uint32_t *args, const char* topic, u
  */
 void MqttServiceProvider::printMqttConfigLogs(){
 
-  mqtt_general_config_table _mqtt_general_configs = __database_service.get_mqtt_general_config_table();
-  mqtt_lwt_config_table _mqtt_lwt_configs = __database_service.get_mqtt_lwt_config_table();
-  mqtt_pubsub_config_table _mqtt_pubsub_configs = __database_service.get_mqtt_pubsub_config_table();
-
+  mqtt_general_config_table _mqtt_general_configs;
+  mqtt_lwt_config_table _mqtt_lwt_configs;
+  mqtt_pubsub_config_table _mqtt_pubsub_configs;
+  __database_service.get_mqtt_general_config_table(&_mqtt_general_configs);
+  __database_service.get_mqtt_lwt_config_table(&_mqtt_lwt_configs);
+  __database_service.get_mqtt_pubsub_config_table(&_mqtt_pubsub_configs);
 
   Logln(F("\nMqtt General Configs :"));
   Log( _mqtt_general_configs.host ); Log("\t");

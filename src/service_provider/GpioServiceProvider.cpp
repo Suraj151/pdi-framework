@@ -62,10 +62,10 @@ void GpioServiceProvider::begin( iWiFiInterface* _wifi, iWiFiClientInterface* _w
   this->m_wifi_client = _wifi_client;
 
   this->handleGpioModes();
-  this->m_gpio_config_copy = __database_service.get_gpio_config_table();
+  __database_service.get_gpio_config_table(&this->m_gpio_config_copy);
 
-  __task_scheduler.setInterval( [&]() { this->handleGpioOperations(); }, GPIO_OPERATION_DURATION );
-  __task_scheduler.setInterval( [&]() { this->enable_update_gpio_table_from_copy(); }, GPIO_TABLE_UPDATE_DURATION );
+  __task_scheduler.setInterval( [&]() { this->handleGpioOperations(); }, GPIO_OPERATION_DURATION, __i_dvc_ctrl.millis_now() );
+  __task_scheduler.setInterval( [&]() { this->enable_update_gpio_table_from_copy(); }, GPIO_TABLE_UPDATE_DURATION, __i_dvc_ctrl.millis_now() );
 }
 
 /**
@@ -330,11 +330,11 @@ void GpioServiceProvider::handleGpioOperations(){
       }
       case DIGITAL_WRITE:{
         // Log( F("writing "));Log( this->getGpioFromPinMap( _pin ) );Log( F(" pin to "));Logln( this->m_gpio_config_copy.gpio_readings[_pin]);
-        digitalWrite( this->getGpioFromPinMap( _pin ), this->m_gpio_config_copy.gpio_readings[_pin] );
+        __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, this->getGpioFromPinMap( _pin ), this->m_gpio_config_copy.gpio_readings[_pin] );
         break;
       }
       case DIGITAL_READ:{
-        this->m_gpio_config_copy.gpio_readings[_pin] = digitalRead( this->getGpioFromPinMap( _pin ) );
+        this->m_gpio_config_copy.gpio_readings[_pin] = __i_dvc_ctrl.gpioRead(DIGITAL_READ, this->getGpioFromPinMap( _pin ) );
         break;
       }
       case DIGITAL_BLINK:{
@@ -349,12 +349,12 @@ void GpioServiceProvider::handleGpioOperations(){
         break;
       }
       case ANALOG_WRITE:{
-        analogWrite( this->getGpioFromPinMap( _pin ), this->m_gpio_config_copy.gpio_readings[_pin] );
+        __i_dvc_ctrl.gpioWrite(ANALOG_WRITE, this->getGpioFromPinMap( _pin ), this->m_gpio_config_copy.gpio_readings[_pin] );
         break;
       }
       case ANALOG_READ:{
         if( MAX_DIGITAL_GPIO_PINS <= _pin  ){
-          this->m_gpio_config_copy.gpio_readings[_pin] = analogRead( A0 );
+          this->m_gpio_config_copy.gpio_readings[_pin] = __i_dvc_ctrl.gpioRead(ANALOG_READ, A0 );
         }
         break;
       }
@@ -381,7 +381,7 @@ void GpioServiceProvider::handleGpioOperations(){
         default: break;
       }
 
-      uint32_t _now = millis();
+      uint32_t _now = __i_dvc_ctrl.millis_now();
       if( _is_alert_condition && ( __gpio_alert_track.is_last_alert_succeed ?
         GPIO_ALERT_DURATION_FOR_SUCCEED < ( _now - __gpio_alert_track.last_alert_millis ) :
         GPIO_ALERT_DURATION_FOR_FAILED < ( _now - __gpio_alert_track.last_alert_millis )
@@ -428,7 +428,8 @@ void GpioServiceProvider::enable_update_gpio_table_from_copy(){
  */
 void GpioServiceProvider::handleGpioModes( int _gpio_config_type ){
 
-  gpio_config_table _gpio_configs = __database_service.get_gpio_config_table();
+  gpio_config_table _gpio_configs;
+  __database_service.get_gpio_config_table(&_gpio_configs);
 
   for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
 

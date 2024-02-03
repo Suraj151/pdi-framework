@@ -101,7 +101,8 @@ void EmailServiceProvider::handleEmail(){
 //  */
 // template <typename T> bool EmailServiceProvider::sendMail ( T mail_body ){
 //
-//   email_config_table _email_config = __database_service.get_email_config_table();
+//   email_config_table _email_config;
+//   __database_service.get_email_config_table(&_email_config);
 //
 //   bool ret = false;
 //
@@ -149,7 +150,8 @@ void EmailServiceProvider::handleEmail(){
  */
 bool EmailServiceProvider::sendMail( String &mail_body ){
 
-  email_config_table _email_config = __database_service.get_email_config_table();
+  email_config_table _email_config;
+  __database_service.get_email_config_table(&_email_config);
 
   bool ret = false;
 
@@ -197,7 +199,8 @@ bool EmailServiceProvider::sendMail( String &mail_body ){
  */
 bool EmailServiceProvider::sendMail( char *mail_body ){
 
-  email_config_table _email_config = __database_service.get_email_config_table();
+  email_config_table _email_config;
+  __database_service.get_email_config_table(&_email_config);
 
   bool ret = false;
 
@@ -245,7 +248,8 @@ bool EmailServiceProvider::sendMail( char *mail_body ){
  */
 bool EmailServiceProvider::sendMail( PGM_P mail_body ){
 
-  email_config_table _email_config = __database_service.get_email_config_table();
+  email_config_table _email_config;
+  __database_service.get_email_config_table(&_email_config);
 
   bool ret = false;
 
@@ -288,7 +292,8 @@ bool EmailServiceProvider::sendMail( PGM_P mail_body ){
  */
 void EmailServiceProvider::printEmailConfigLogs(){
 
-  email_config_table _email_config = __database_service.get_email_config_table();
+  email_config_table _email_config;
+  __database_service.get_email_config_table(&_email_config);
 
   Logln(F("\nEmail Configs :"));
   // Logln(F("ssid\tpassword\tlocal\tgateway\tsubnet"));

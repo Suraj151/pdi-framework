@@ -13,7 +13,6 @@ created Date    : 1st June 2019
 
 #include "Controller.h"
 #include <webserver/pages/WiFiConfigPage.h>
-#include <utility/FactoryReset.h>
 
 /**
  * WiFiConfigController class
@@ -47,7 +46,7 @@ class WiFiConfigController : public Controller {
 		void boot( void ){
 
 			if( nullptr != this->m_web_resource && nullptr != this->m_web_resource->m_db_conn ){
-				this->wifi_configs = this->m_web_resource->m_db_conn->get_wifi_config_table();
+        this->m_web_resource->m_db_conn->get_wifi_config_table(&this->wifi_configs);
 			}
 			if( nullptr != this->m_route_handler ){
 				this->m_route_handler->register_route( EW_SERVER_WIFI_CONFIG_ROUTE, [&]() { this->handleWiFiConfigRoute(); }, AUTH_MIDDLEWARE );
@@ -155,7 +154,7 @@ class WiFiConfigController : public Controller {
 				return;
 			}
 
-			this->wifi_configs = this->m_web_resource->m_db_conn->get_wifi_config_table();
+			this->m_web_resource->m_db_conn->get_wifi_config_table(&this->wifi_configs);
 
       bool _is_posted = false;
       bool _is_error = true;
@@ -241,7 +240,8 @@ class WiFiConfigController : public Controller {
       this->m_web_resource->m_server->send( HTTP_OK, EW_HTML_CONTENT, _page );
       delete[] _page;
       if( _is_posted && !_is_error ){
-        __factory_reset.restart_device( 100 );
+        __i_dvc_ctrl.wait(100);
+        __i_dvc_ctrl.restartDevice();
       }
     }
 

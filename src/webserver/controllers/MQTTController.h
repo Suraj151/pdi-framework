@@ -97,7 +97,8 @@ class MqttController : public Controller {
       strcat_P( _page, EW_SERVER_HEADER_HTML );
       strcat_P( _page, EW_SERVER_MQTT_GENERAL_PAGE_TOP );
 
-      mqtt_general_config_table _mqtt_general_configs = this->m_web_resource->m_db_conn->get_mqtt_general_config_table();
+      mqtt_general_config_table _mqtt_general_configs;
+      this->m_web_resource->m_db_conn->get_mqtt_general_config_table(&_mqtt_general_configs);
 
       char _port[10],_keepalive[10];memset( _port, 0, 10 );memset( _keepalive, 0, 10 );
       __appendUintToBuff( _port, "%d", _mqtt_general_configs.port, 8 );
@@ -174,7 +175,8 @@ class MqttController : public Controller {
 
         mqtt_general_config_table* _mqtt_general_configs = new mqtt_general_config_table;
         memset( (void*)_mqtt_general_configs, 0, sizeof(mqtt_general_config_table) );
-        // mqtt_general_config_table _mqtt_general_configs = this->m_db_conn->get_mqtt_general_config_table();
+        // mqtt_general_config_table _mqtt_general_configs;
+        // this->m_db_conn->get_mqtt_general_config_table(&_mqtt_general_configs);
 
         _mqtt_host.toCharArray( _mqtt_general_configs->host, _mqtt_host.length()+1 );
         _mqtt_general_configs->port = (int)_mqtt_port.toInt();
@@ -220,7 +222,8 @@ class MqttController : public Controller {
       strcat_P( _page, EW_SERVER_HEADER_HTML );
       strcat_P( _page, EW_SERVER_MQTT_LWT_PAGE_TOP );
 
-      mqtt_lwt_config_table _mqtt_lwt_configs = this->m_web_resource->m_db_conn->get_mqtt_lwt_config_table();
+      mqtt_lwt_config_table _mqtt_lwt_configs;
+      this->m_web_resource->m_db_conn->get_mqtt_lwt_config_table(&_mqtt_lwt_configs);
 
       char* _qos_options[] = {"0", "1", "2"};
 
@@ -325,7 +328,8 @@ class MqttController : public Controller {
       strcat_P( _page, EW_SERVER_HEADER_HTML );
       strcat_P( _page, EW_SERVER_MQTT_PUBSUB_PAGE_TOP );
 
-      mqtt_pubsub_config_table _mqtt_pubsub_configs = this->m_web_resource->m_db_conn->get_mqtt_pubsub_config_table();
+      mqtt_pubsub_config_table _mqtt_pubsub_configs;
+      this->m_web_resource->m_db_conn->get_mqtt_pubsub_config_table(&_mqtt_pubsub_configs);
 
       char* _qos_options[] = {"0", "1", "2"};
       char _topic_name[10], _topic_label[10];memset(_topic_name, 0, 10);memset(_topic_label, 0, 10);

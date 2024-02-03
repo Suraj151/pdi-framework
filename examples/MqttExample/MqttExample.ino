@@ -63,9 +63,12 @@ void subscribe_callback( uint32_t *args, const char* topic, uint32_t topic_len, 
 void configure_mqtt(){
 
   // take mqtt tables from database
-  mqtt_general_config_table _mqtt_general_configs = __database_service.get_mqtt_general_config_table();
-  mqtt_pubsub_config_table _mqtt_pubsub_configs = __database_service.get_mqtt_pubsub_config_table();
-  mqtt_lwt_config_table _mqtt_lwt_configs = __database_service.get_mqtt_lwt_config_table();
+  mqtt_general_config_table _mqtt_general_configs;
+  mqtt_lwt_config_table _mqtt_lwt_configs;
+  mqtt_pubsub_config_table _mqtt_pubsub_configs;
+  __database_service.get_mqtt_general_config_table(&_mqtt_general_configs);
+  __database_service.get_mqtt_lwt_config_table(&_mqtt_lwt_configs);
+  __database_service.get_mqtt_pubsub_config_table(&_mqtt_pubsub_configs);
 
   // copy general configs in mqtt general table
   memcpy( _mqtt_general_configs.host, MQTT_HOST, strlen( MQTT_HOST ) );
@@ -98,7 +101,7 @@ void configure_mqtt(){
   __mqtt_service.setMqttSubscribeDataCallback( subscribe_callback );
 
   // start mqtt service with new configuration immediate after this call. e.g. here after 10 ms
-  __task_scheduler.setTimeout( [&]() { __mqtt_service.handleMqttConfigChange(); }, 10 );
+  __task_scheduler.setTimeout( [&]() { __mqtt_service.handleMqttConfigChange(); }, 10, millis() );
 }
 
 

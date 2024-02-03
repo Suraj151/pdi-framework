@@ -50,7 +50,7 @@ class StudentTable : public DatabaseTable<student_table> {
      * register tables to database
      */
     void boot(){
-      this->register_table( STUDENT_TABLE_ADDRESS, &_student_table_defaults );
+      this->register_table( STUDENT_TABLE_ADDRESS );
     }
 
     /**
@@ -58,8 +58,8 @@ class StudentTable : public DatabaseTable<student_table> {
      *
      * @return student_table
      */
-    student_table get(){
-      return this->get_table(STUDENT_TABLE_ADDRESS);
+    bool get( student_table* _table ){
+      return this->get_table( _table, STUDENT_TABLE_ADDRESS );
     }
 
     /**
@@ -133,7 +133,7 @@ void setup() {
 	__student_table.set(&_students_data);
 
 	// add task of print stdudent table every 5000 milliseconds
-	__task_scheduler.setInterval( printStudents, MILLISECOND_DURATION_5000 );
+	__task_scheduler.setInterval( printStudents, MILLISECOND_DURATION_5000, millis() );
 }
 
 void loop() {
@@ -146,7 +146,8 @@ void loop() {
 void printStudents(){
 
 	//get student table from database
-	auto _students_data = __student_table.get();
+	student_table _students_data;
+	__student_table.get(_students_data);
 
 	Serial.println(F("\n**************************Adding Database Example Log**************************"));
 	Serial.println( F("Student table : \nname\t\tage\tsex\n") );

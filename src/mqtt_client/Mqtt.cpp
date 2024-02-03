@@ -215,11 +215,11 @@ void MQTTClient::mqtt_client_recv(){
     Log(F("MQTT: recieved packets :"));
     for (int i = 0; i < len; i++) {
       Log_format( this->m_mqttClient.mqtt_state.in_buffer[i], HEX ); Log(" ");
-      delay(0);
+      __i_dvc_ctrl.wait(0);
     }
     Logln();
     #endif
-    delay(0);
+    __i_dvc_ctrl.wait(0);
 
     if ( len < MQTT_BUF_SIZE && len > 0 ) {
 
@@ -581,7 +581,7 @@ void MQTTClient::MQTT_Task(){
               for (int i = 0; i < dataLen; i++) {
                 // Log_format( dataBuffer[i], HEX ); Log(" ");
                 Log( (char)dataBuffer[i] ); Log(" ");
-                delay(0);
+                __i_dvc_ctrl.wait(0);
               }
               Logln();
               #endif
@@ -616,7 +616,7 @@ void MQTTClient::MQTT_Task(){
           }
           break;
     }
-    delay(0); // yield purpose
+    __i_dvc_ctrl.wait(0); // yield purpose
 }
 
 void MQTTClient::mqtt_client_delete(){
@@ -1064,7 +1064,7 @@ void MQTTClient::mqtt_timer(){
     if ( this->m_mqttClient.sendTimeout > 0 ){
       this->m_mqttClient.sendTimeout --;
     }
-    delay(0); // yield purpose
+    __i_dvc_ctrl.wait(0); // yield purpose
 }
 
 void MQTTClient::Connect(){
@@ -1248,7 +1248,7 @@ uint16_t MQTTClient::readPacket( uint8_t *buffer, uint16_t maxlen, int16_t timeo
       }
     }
     timeout -= MQTT_CLIENT_READINTERVAL_MS;
-    delay(MQTT_CLIENT_READINTERVAL_MS);
+    __i_dvc_ctrl.wait(MQTT_CLIENT_READINTERVAL_MS);
   }
   return len;
 }

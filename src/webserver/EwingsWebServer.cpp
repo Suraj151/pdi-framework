@@ -19,7 +19,7 @@ created Date    : 1st June 2019
  */
 EwWebServer::EwWebServer():
   m_wifi(nullptr),
-  m_server(&__wifi_server_interface)
+  m_server(&__i_wifi_server)
 {
 }
 

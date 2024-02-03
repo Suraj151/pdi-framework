@@ -89,6 +89,24 @@ enum GPIO_ALERT_CHANNEL {
 };
 
 struct gpio_configs {
+
+  // Default Constructor
+  gpio_configs(){
+    clear();
+  }
+
+  // Clear members method
+  void clear(){
+    memset(gpio_mode, OFF, MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS);
+    memset(gpio_readings, 0, MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS);
+    memset(gpio_alert_comparator, EQUAL, MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS);
+    memset(gpio_alert_channel, NO_ALERT, MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS);
+    memset(gpio_alert_values, 0, MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS);
+    memset(gpio_host, 0, GPIO_HOST_BUF_SIZE);
+    gpio_port = 80;
+    gpio_post_frequency = GPIO_DATA_POST_FREQ;
+  }
+
   uint8_t gpio_mode[MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS];
   uint16_t gpio_readings[MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS];
   uint8_t gpio_alert_comparator[MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS];
@@ -99,9 +117,9 @@ struct gpio_configs {
   int gpio_post_frequency;
 };
 
-const gpio_configs PROGMEM _gpio_config_defaults = {
-  {OFF}, {0}, {EQUAL}, {NO_ALERT}, {0}, "", 80, GPIO_DATA_POST_FREQ
-};
+// const gpio_configs PROGMEM _gpio_config_defaults = {
+//   {OFF}, {0}, {EQUAL}, {NO_ALERT}, {0}, "", 80, GPIO_DATA_POST_FREQ
+// };
 
 const int gpio_config_size = sizeof(gpio_configs) + 5;
 

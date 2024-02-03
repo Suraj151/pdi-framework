@@ -73,8 +73,6 @@ class HomeController : public Controller {
       if( _enable_flash )
       concat_flash_message_div( _page, _message, _alert_type );
       if( _enable_header_footer ) strcat_P( _page, EW_SERVER_FOOTER_HTML );
-      // Log(F("free stack :"));Logln(ESP.getFreeContStack());
-      // Log(F("free heap :"));Logln(ESP.getFreeHeap());
     }
 
 		/**

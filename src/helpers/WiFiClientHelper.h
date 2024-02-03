@@ -11,7 +11,7 @@ created Date    : 1st June 2019
 #ifndef _WIFI_CLIENT_HELPER_H_
 #define _WIFI_CLIENT_HELPER_H_
 
-#include <interface/iWiFiClientInterface.h>
+#include <interface/pdi.h>
 #include <config/Config.h>
 #include <utility/Utility.h>
 

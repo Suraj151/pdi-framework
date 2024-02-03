@@ -14,7 +14,7 @@ extern "C" void preinit() {
 #ifdef ENABLE_NAPT_FEATURE_LWIP_V2
   WiFiInterface::preinitWiFiOff();
 #endif
-  ESP.eraseConfig();
+  __i_dvc_ctrl.eraseConfig();
 	uint8_t sta_mac[6];
   wifi_get_macaddr(STATION_IF, sta_mac);
   sta_mac[0] +=2;
@@ -52,7 +52,8 @@ void WiFiServiceProvider::begin( iWiFiInterface* _wifi ){
   }
 
   this->m_wifi = _wifi;
-  wifi_config_table _wifi_credentials = __database_service.get_wifi_config_table();
+  wifi_config_table _wifi_credentials;
+  __database_service.get_wifi_config_table( &_wifi_credentials );
 
   // this->m_wifi->mode(WIFI_AP_STA);
   this->m_wifi->setSleepMode(WIFI_NONE_SLEEP);  // WIFI_NONE_SLEEP = 0, WIFI_LIGHT_SLEEP = 1, WIFI_MODEM_SLEEP = 2
@@ -67,11 +68,11 @@ void WiFiServiceProvider::begin( iWiFiInterface* _wifi ){
     this->reconfigure_wifi_access_point();
     #endif
     this->handleInternetConnectivity();
-  }, WIFI_CONNECTIVITY_CHECK_DURATION );
+  }, WIFI_CONNECTIVITY_CHECK_DURATION, __i_dvc_ctrl.millis_now() );
 
   // __task_scheduler.setInterval( [&]() {
   //   this->handleInternetConnectivity();
-  // }, INTERNET_CONNECTIVITY_CHECK_DURATION );
+  // }, INTERNET_CONNECTIVITY_CHECK_DURATION, __i_dvc_ctrl.millis_now() );
   _ClearObject(&_wifi_credentials);
 }
 
@@ -91,7 +92,7 @@ void WiFiServiceProvider::handleInternetConnectivity(){
   if( !this->m_wifi->localIP().isSet() || !this->m_wifi->isConnected() ){
 
     memset( &__status_wifi, 0, sizeof(__status_wifi_t) );
-    __status_wifi.last_internet_millis = millis();
+    __status_wifi.last_internet_millis = __i_dvc_ctrl.millis_now();
   }else{
 
     bool ping_ret = __ping_service.ping();
@@ -99,22 +100,22 @@ void WiFiServiceProvider::handleInternetConnectivity(){
 
     if( ping_ret && ping_resp ){
 
-      __status_wifi.last_internet_millis = millis();
+      __status_wifi.last_internet_millis = __i_dvc_ctrl.millis_now();
     }
     __status_wifi.internet_available = ping_ret && ping_resp;
 
     #ifdef ENABLE_INTERNET_BASED_CONNECTIONS
-    if( !__status_wifi.internet_available && (millis()-__status_wifi.last_internet_millis) >= SWITCHING_DURATION_FOR_NO_INTERNET_CONNECTION ){
+    if( !__status_wifi.internet_available && (__i_dvc_ctrl.millis_now()-__status_wifi.last_internet_millis) >= SWITCHING_DURATION_FOR_NO_INTERNET_CONNECTION ){
 
       memcpy( __status_wifi.ignore_bssid, this->m_wifi->BSSID(), 6 );
       this->m_wifi->disconnect(false);
-      __status_wifi.last_internet_millis = millis();
+      __status_wifi.last_internet_millis = __i_dvc_ctrl.millis_now();
 
       __task_scheduler.setTimeout( [&]() {
         this->m_wifi->scanNetworksAsync( [&](int _scanCount) {
           this->scan_aps_and_configure_wifi_station_async(_scanCount);
         }, false);
-      }, 500 );
+      }, 500, __i_dvc_ctrl.millis_now() );
 
       __task_scheduler.setTimeout( [&]() {
         #ifdef EW_SERIAL_LOG
@@ -122,18 +123,19 @@ void WiFiServiceProvider::handleInternetConnectivity(){
         #endif
         memset( __status_wifi.ignore_bssid, 0, 6 );
         if( !this->m_wifi->localIP().isSet() || !this->m_wifi->isConnected() ){
-          wifi_config_table _wifi_credentials = __database_service.get_wifi_config_table();
+          wifi_config_table _wifi_credentials;
+          __database_service.get_wifi_config_table( &_wifi_credentials );
           this->configure_wifi_station( &_wifi_credentials );
           _ClearObject(&_wifi_credentials);
         }
-      }, 2*INTERNET_CONNECTIVITY_CHECK_DURATION );
+      }, 2*INTERNET_CONNECTIVITY_CHECK_DURATION, __i_dvc_ctrl.millis_now() );
     }
     #endif
   }
 
   #ifdef EW_SERIAL_LOG
   Log( __status_wifi.internet_available ); Log( F(" : ") );
-  Logln( (millis()-__status_wifi.last_internet_millis) );
+  Logln( (__i_dvc_ctrl.millis_now()-__status_wifi.last_internet_millis) );
   #endif
 }
 
@@ -208,7 +210,7 @@ bool WiFiServiceProvider::configure_wifi_station( wifi_config_table* _wifi_crede
   uint8_t _wait = 1;
   while ( ! this->m_wifi->isConnected() ) {
 
-    delay(999);
+    __i_dvc_ctrl.wait(999);
     if( _wait%7 == 0 ){
       #ifdef EW_SERIAL_LOG
         Log(F("\ntrying reconnect"));
@@ -267,21 +269,22 @@ void WiFiServiceProvider::reconfigure_wifi_access_point( void ){
   #ifdef EW_SERIAL_LOG
   Logln( F("Handeling reconfigure AP.") );
   #endif
-  wifi_config_table _wifi_credentials = __database_service.get_wifi_config_table();
+  wifi_config_table _wifi_credentials;
+  __database_service.get_wifi_config_table( &_wifi_credentials );
   bool _ap_change = false;
 
   if( !this->m_wifi->localIP().isSet() || !this->m_wifi->isConnected() ){
 
-    // if( __are_arrays_equal( (char*)_wifi_credentials.ap_local_ip, (char*)_wifi_config_defaults.ap_local_ip, 4 ) ){
+    // if( __are_arrays_equal( (char*)_wifi_credentials.ap_local_ip, (char*)DEFAULT_AP_LOCAL_IP, 4 ) ){
     if(
-      _wifi_credentials.ap_local_ip[0] != _wifi_config_defaults.ap_local_ip[0] ||
-      _wifi_credentials.ap_local_ip[1] != _wifi_config_defaults.ap_local_ip[1] ||
-      _wifi_credentials.ap_local_ip[2] != _wifi_config_defaults.ap_local_ip[2] ||
-      _wifi_credentials.ap_local_ip[3] != _wifi_config_defaults.ap_local_ip[3]
+      _wifi_credentials.ap_local_ip[0] != DEFAULT_AP_LOCAL_IP[0] ||
+      _wifi_credentials.ap_local_ip[1] != DEFAULT_AP_LOCAL_IP[1] ||
+      _wifi_credentials.ap_local_ip[2] != DEFAULT_AP_LOCAL_IP[2] ||
+      _wifi_credentials.ap_local_ip[3] != DEFAULT_AP_LOCAL_IP[3]
     ){
 
-      memcpy_P( _wifi_credentials.ap_local_ip, _wifi_config_defaults.ap_local_ip, 4);
-      memcpy_P( _wifi_credentials.ap_gateway, _wifi_config_defaults.ap_gateway, 4);
+      memcpy( _wifi_credentials.ap_local_ip, DEFAULT_AP_LOCAL_IP, 4);
+      memcpy( _wifi_credentials.ap_gateway, DEFAULT_AP_GATEWAY, 4);
 
       __database_service.set_wifi_config_table(&_wifi_credentials);
       _ap_change = true;
@@ -293,15 +296,15 @@ void WiFiServiceProvider::reconfigure_wifi_access_point( void ){
 
     if(
       (( gateway_IP[3] - sta_subnet_ip[3] ) == 1 &&
-      ( sta_subnet_ip[0] == _wifi_config_defaults.ap_gateway[0] ) &&
-      ( sta_subnet_ip[1] == _wifi_config_defaults.ap_gateway[1] )) &&
+      ( sta_subnet_ip[0] == DEFAULT_AP_GATEWAY[0] ) &&
+      ( sta_subnet_ip[1] == DEFAULT_AP_GATEWAY[1] )) &&
       (( _wifi_credentials.ap_gateway[2] - sta_subnet_ip[2] ) != 1 ||
       ( _wifi_credentials.ap_gateway[3] != sta_subnet_ip[3]+1 ))
     ){
 
       _wifi_credentials.ap_local_ip[0] = sta_subnet_ip[0];
       _wifi_credentials.ap_local_ip[1] = sta_subnet_ip[1];
-      _wifi_credentials.ap_local_ip[2] = (sta_subnet_ip[2]+1) < 255 ? (sta_subnet_ip[2]+1) : _wifi_config_defaults.ap_local_ip[2];
+      _wifi_credentials.ap_local_ip[2] = (sta_subnet_ip[2]+1) < 255 ? (sta_subnet_ip[2]+1) : DEFAULT_AP_LOCAL_IP[2];
       _wifi_credentials.ap_local_ip[3] = sta_subnet_ip[3]+1;
 
       memcpy( _wifi_credentials.ap_gateway, _wifi_credentials.ap_local_ip, 4 );
@@ -319,10 +322,11 @@ void WiFiServiceProvider::reconfigure_wifi_access_point( void ){
     // this->m_wifi->enableAP(false);
 
     __task_scheduler.setTimeout( [&](){
-      wifi_config_table __wifi_credentials = __database_service.get_wifi_config_table();
+      wifi_config_table __wifi_credentials;
+      __database_service.get_wifi_config_table(&__wifi_credentials);
       this->configure_wifi_access_point(&__wifi_credentials);
       _ClearObject(&__wifi_credentials);
-    }, 1);
+    }, 1, __i_dvc_ctrl.millis_now());
   }
   _ClearObject(&_wifi_credentials);
 }
@@ -478,13 +482,15 @@ bool WiFiServiceProvider::scan_within_station( char* ssid, uint8_t* bssid ){
  */
 void WiFiServiceProvider::scan_aps_and_configure_wifi_station_async( int _scanCount ){
 
-  wifi_config_table _wifi_credentials = __database_service.get_wifi_config_table();
+  wifi_config_table _wifi_credentials;
+  __database_service.get_wifi_config_table(&_wifi_credentials);
   if( this->scan_within_station_async( _wifi_credentials.sta_ssid, this->m_temp_mac, _scanCount ) ) {
     __task_scheduler.setTimeout([&](){
-      wifi_config_table __wifi_credentials = __database_service.get_wifi_config_table();
+      wifi_config_table __wifi_credentials;
+      __database_service.get_wifi_config_table(&__wifi_credentials);
       this->configure_wifi_station( &__wifi_credentials, this->m_temp_mac );
       _ClearObject(&__wifi_credentials);
-    }, 1);
+    }, 1, __i_dvc_ctrl.millis_now());
   }
   _ClearObject(&_wifi_credentials);
 }
@@ -498,13 +504,15 @@ void WiFiServiceProvider::scan_aps_and_configure_wifi_station( ){
   // #ifdef EW_SERIAL_LOG
   //   Logln(F("scanning connected stations for wifi config.."));
   // #endif
-  wifi_config_table _wifi_credentials = __database_service.get_wifi_config_table();
+  wifi_config_table _wifi_credentials;
+  __database_service.get_wifi_config_table(&_wifi_credentials);
   if( this->scan_within_station( _wifi_credentials.sta_ssid, this->m_temp_mac) ){
     __task_scheduler.setTimeout([&](){
-      wifi_config_table __wifi_credentials = __database_service.get_wifi_config_table();
+      wifi_config_table __wifi_credentials;
+      __database_service.get_wifi_config_table(&__wifi_credentials);
       this->configure_wifi_station( &__wifi_credentials, this->m_temp_mac );
       _ClearObject(&__wifi_credentials);
-    }, 1);
+    }, 1, __i_dvc_ctrl.millis_now());
   }
   _ClearObject(&_wifi_credentials);
 }
@@ -564,7 +572,8 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
  */
 void WiFiServiceProvider::printWiFiConfigLogs(){
 
-  wifi_config_table _table = __database_service.get_wifi_config_table();
+  wifi_config_table _table;
+  __database_service.get_wifi_config_table(&_table);
   char _ip_address[20];
 
   Logln(F("\nWiFi Configs :"));

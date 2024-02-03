@@ -50,14 +50,27 @@ created Date    : 1st June 2019
 #define DEVICE_IOT_MQTT_WILL_TOPIC            "disconnect"
 
 struct device_iot_configs {
+  
+  // Default Constructor
+  device_iot_configs(){
+    clear();
+  }
+
+  // Clear members method
+  void clear(){
+    memset(device_iot_host, 0, DEVICE_IOT_HOST_BUF_SIZE);
+    memset(device_iot_token, 0, DEVICE_IOT_CONFIG_TOKEN_MAX_SIZE);
+    memset(device_iot_topic, 0, DEVICE_IOT_CONFIG_TOPIC_MAX_SIZE);
+  }
+
   char device_iot_host[DEVICE_IOT_HOST_BUF_SIZE];
   char device_iot_token[DEVICE_IOT_CONFIG_TOKEN_MAX_SIZE];
   char device_iot_topic[DEVICE_IOT_CONFIG_TOPIC_MAX_SIZE];
 };
 
-const device_iot_configs PROGMEM _device_iot_config_defaults = {
-  {0},{0},{0}
-};
+// const device_iot_configs PROGMEM _device_iot_config_defaults = {
+//   {0},{0},{0}
+// };
 
 const int device_iot_config_size = sizeof(device_iot_configs) + 5;
 

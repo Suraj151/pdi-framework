@@ -40,7 +40,7 @@ void OtaServiceProvider::begin_ota( iWiFiClientInterface *_wifi_client, iHttpCli
   this->m_wifi_client = _wifi_client;
   this->m_http_client = _http_client;
 
-  __task_scheduler.setInterval( [&]() {  this->handleOta();  }, OTA_API_CHECK_DURATION );
+  __task_scheduler.setInterval( [&]() {  this->handleOta();  }, OTA_API_CHECK_DURATION, __i_dvc_ctrl.millis_now() );
 }
 
 /**
@@ -60,7 +60,7 @@ void OtaServiceProvider::handleOta(){
     #ifdef EW_SERIAL_LOG
     Logln( F("\nOTA Done ....Rebooting ") );
     #endif
-    ESP.restart();
+    __i_dvc_ctrl.restartDevice();
   }
 }
 
@@ -76,8 +76,10 @@ http_ota_status OtaServiceProvider::handle(){
      return BEGIN_FAILED;
    }
 
-   ota_config_table _ota_configs = __database_service.get_ota_config_table();
-   global_config_table _global_configs = __database_service.get_global_config_table();
+   ota_config_table _ota_configs;
+   global_config_table _global_configs;
+   __database_service.get_global_config_table(&_global_configs);
+   __database_service.get_ota_config_table(&_ota_configs);
 
    String _macstr = WiFi.macAddress();
    String _firmware_version_url = String(_ota_configs.ota_host);
@@ -198,7 +200,8 @@ http_ota_status OtaServiceProvider::handle(){
  */
 void OtaServiceProvider::printOtaConfigLogs(){
 
-  ota_config_table _ota_configs = __database_service.get_ota_config_table();
+  ota_config_table _ota_configs;
+  __database_service.get_ota_config_table(&_ota_configs);
 
   Logln(F("\nOTA Configs :"));
   Log(_ota_configs.ota_host); Log("\t");

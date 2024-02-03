@@ -22,7 +22,7 @@ std::vector<esp_now_device_t> esp_now_device_table;
 ESPNOWServiceProvider::ESPNOWServiceProvider():
   m_wifi(nullptr)
 {
-  this->flushPeersToDefaults();
+  // this->flushPeersToDefaults();
 }
 
 /**
@@ -185,7 +185,7 @@ void esp_now_recv_cb(uint8_t *macaddr, uint8_t *data, uint8_t len){
      if( __are_arrays_equal( (char*)esp_now_peers[i].mac, (char*)macaddr, 6 ) ){
 
        esp_now_peers[i].state = ESP_NOW_STATE_DATA_AVAILABLE;
-       esp_now_peers[i].last_receive = millis();
+       esp_now_peers[i].last_receive = __i_dvc_ctrl.millis_now();
        memset(esp_now_peers[i].buffer, 0, ESP_NOW_MAX_BUFF_SIZE);
        memcpy( esp_now_peers[i].buffer, data, len<ESP_NOW_MAX_BUFF_SIZE?len:ESP_NOW_MAX_BUFF_SIZE );
        esp_now_peers[i].data_length = len;
@@ -201,7 +201,7 @@ void esp_now_recv_cb(uint8_t *macaddr, uint8_t *data, uint8_t len){
          if( esp_now_peers[i].state == ESP_NOW_STATE_EMPTY ){
 
            esp_now_peers[i].state = ESP_NOW_STATE_RECV_AVAILABLE;
-           esp_now_peers[i].last_receive = millis();
+           esp_now_peers[i].last_receive = __i_dvc_ctrl.millis_now();
            memcpy( esp_now_peers[i].mac, macaddr, 6 );
            esp_now_peers[i].buffer = new uint8_t[ESP_NOW_MAX_BUFF_SIZE];
            memset(esp_now_peers[i].buffer, 0, ESP_NOW_MAX_BUFF_SIZE);
@@ -239,6 +239,8 @@ void ESPNOWServiceProvider::beginEspNow( iWiFiInterface* _wifi ){
   #endif
   this->m_wifi= _wifi;
 
+  this->flushPeersToDefaults();
+
   if( esp_now_init()==0 ){
 
     #ifdef EW_SERIAL_LOG
@@ -257,6 +259,8 @@ void ESPNOWServiceProvider::beginEspNow( iWiFiInterface* _wifi ){
 }
 
 void ESPNOWServiceProvider::scanPeers(void) {
+
+  if( nullptr == this->m_wifi ) return;
 
   uint8_t number_client= wifi_softap_get_station_num(); // Count of stations which are connected to ESP8266 soft-AP
   struct station_info * stat_info = wifi_softap_get_station_info();
@@ -324,6 +328,8 @@ void ESPNOWServiceProvider::scanPeers(void) {
 
 void ESPNOWServiceProvider::handlePeers(void) {
 
+  if( nullptr == this->m_wifi ) return;
+
   #ifdef EW_SERIAL_LOG
   Log(F("\nespnow: handeling peers : "));
   Logln(this->m_wifi->channel());
@@ -344,14 +350,16 @@ void ESPNOWServiceProvider::broadcastConfigData(void){
 
     memset( (void*)payload, 0, sizeof(esp_now_payload_t));
 
-    WiFiMode_t _wifi_mode = this->m_wifi->getMode();
+    WiFiMode_t _wifi_mode = (WiFiMode_t)this->m_wifi->getMode();
     if( WIFI_AP == _wifi_mode || WIFI_AP_STA == _wifi_mode ){
 
       payload->mesh_level = this->m_wifi->softAPIP()[2];
     }
 
-    global_config_table _global_configs = __database_service.get_global_config_table();
-    wifi_config_table _wifi_configs = __database_service.get_wifi_config_table();
+    global_config_table _global_configs;
+    wifi_config_table _wifi_configs;
+    __database_service.get_global_config_table(&_global_configs);
+    __database_service.get_wifi_config_table(&_wifi_configs);
     // memcpy( reinterpret_cast<global_config>(payload->global_config), reinterpret_cast<global_config>(_global_configs), sizeof(global_config_table) );
     memcpy( &payload->global_config, &_global_configs, sizeof(global_config_table) );
     memcpy( &payload->ssid, &_wifi_configs.sta_ssid, WIFI_CONFIGS_BUF_SIZE );
@@ -426,6 +434,8 @@ void ESPNOWServiceProvider::printPeers(void) {
 }
 
 void ESPNOWServiceProvider::receiveFromPeers(void) {
+
+  if( nullptr == this->m_wifi ) return;
 
   for (uint8_t i = 0; i < ESP_NOW_MAX_PEER; i++) {
 
@@ -635,7 +645,7 @@ bool ESPNOWServiceProvider::addInPeers(uint8_t *mac_addr, uint8_t role, uint8_t 
           esp_now_peers[i].buffer = new uint8_t[ESP_NOW_MAX_BUFF_SIZE];
           memset(esp_now_peers[i].buffer, 0, ESP_NOW_MAX_BUFF_SIZE);
           esp_now_peers[i].data_length = 0;
-          esp_now_peers[i].last_receive = millis();
+          esp_now_peers[i].last_receive = __i_dvc_ctrl.millis_now();
 
           return true;
         }
@@ -690,7 +700,7 @@ void ESPNOWServiceProvider::flushPeersToDefaults(void) {
 
 void ESPNOWServiceProvider::setPeerToDefaults(uint8_t _peer_index) {
 
-  if ( _peer_index < ESP_NOW_MAX_PEER ) {
+  if ( _peer_index < ESP_NOW_MAX_PEER && nullptr != this->m_wifi ) {
 
       memset((char*)esp_now_peers[_peer_index].mac,0,6);
       esp_now_peers[_peer_index].role=ESP_NOW_ROLE_COMBO;

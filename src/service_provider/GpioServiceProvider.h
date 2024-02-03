@@ -61,7 +61,7 @@ class DigitalBlinker {
      */
     void blink() {
 
-      digitalWrite(this->m_pin, !digitalRead(this->m_pin));
+      __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE,this->m_pin, !__i_dvc_ctrl.gpioRead(DIGITAL_READ,this->m_pin));
     }
 
     void setConfig(uint8_t pin, uint32_t duration) {

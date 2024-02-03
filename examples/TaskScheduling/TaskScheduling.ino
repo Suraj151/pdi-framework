@@ -50,17 +50,17 @@ void setup() {
 
 	// run timeout task one time at 1000 milliseconds after EwStack initialization
 	// dont worry about clearing timeout tasks, they will die automatically after their one time execution
-	__task_scheduler.setTimeout( timeout_task, MILLISECOND_DURATION_1000 );
+	__task_scheduler.setTimeout( timeout_task, MILLISECOND_DURATION_1000, millis() );
 
 	// run interval task every 3000 milliseconds after EwStack initialization
 	// shcedular provide unique id for each task to update task later in runtime if we want
-	variable_time_task_id = __task_scheduler.setInterval( interval_task, MILLISECOND_DURATION_1000*3 );
+	variable_time_task_id = __task_scheduler.setInterval( interval_task, MILLISECOND_DURATION_1000*3, millis() );
 
 	// adding timeout task which will update above interval task duration after 15000 milliseconds
-	__task_scheduler.setTimeout( update_interval_task, MILLISECOND_DURATION_5000*3 );
+	__task_scheduler.setTimeout( update_interval_task, MILLISECOND_DURATION_5000*3, millis() );
 
 	// adding timeout task which will clear above interval task duration after 30000 milliseconds
-	__task_scheduler.setTimeout( clear_interval_task, MILLISECOND_DURATION_5000*6 );
+	__task_scheduler.setTimeout( clear_interval_task, MILLISECOND_DURATION_5000*6, millis() );
 }
 
 void loop() {

@@ -11,7 +11,6 @@ created Date    : 1st June 2019
 #ifndef __EWINGS_UTILITY_H__
 #define __EWINGS_UTILITY_H__
 
-#include <Esp.h>
 #include <config/Config.h>
 
 #ifdef ENABLE_TIMER_TASK_SCHEDULER
@@ -20,7 +19,7 @@ created Date    : 1st June 2019
 #include "TaskScheduler.h"
 #endif
 
-#include "FactoryReset.h"
+#include "iUtilityInterface.h"
 #include "DataTypeConversions.h"
 #include "StringOperations.h"
 #include "queue/queue.h"
@@ -56,8 +55,9 @@ template <typename T> T PROGMEM_getAnything (const T * sce)
  * @param	cost Struct* _object
  */
 template <typename Struct> void _ClearObject (const Struct * _object) {
-  for (unsigned int i = 0; i < sizeof((*_object)); i++)
+  for (unsigned int i = 0; i < sizeof((*_object)); i++){
     *((char*) & (*_object) + i) = 0;
+  }
 }
 
 

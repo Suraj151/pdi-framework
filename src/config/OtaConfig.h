@@ -24,13 +24,25 @@ created Date    : 1st June 2019
 #define ALLOW_OTA_CONFIG_MODIFICATION
 
 struct ota_configs {
+
+  // Default Constructor
+  ota_configs(){
+    clear();
+  }
+
+  // Clear members method
+  void clear(){
+    memset(ota_host, 0, OTA_HOST_BUF_SIZE);
+    ota_port = 80;
+  }
+
   char ota_host[OTA_HOST_BUF_SIZE];
   int ota_port;
 };
 
-const ota_configs PROGMEM _ota_config_defaults = {
-  {0}, 80
-};
+// const ota_configs PROGMEM _ota_config_defaults = {
+//   {0}, 80
+// };
 
 const int ota_config_size = sizeof(ota_configs) + 5;
 

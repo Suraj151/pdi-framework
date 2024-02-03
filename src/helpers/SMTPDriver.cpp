@@ -76,7 +76,7 @@ void SMTPdriver::readResponse(){
 		this->m_responseReaderStatus = SMTP_RESPONSE_WAITING;
 	}
 
-	if( millis() - this->m_lastReceive >= this->m_timeOut ){
+	if( __i_dvc_ctrl.millis_now() - this->m_lastReceive >= this->m_timeOut ){
 		this->m_responseReaderStatus = SMTP_RESPONSE_TIMEOUT;
 		return;
 	}
@@ -110,34 +110,34 @@ void SMTPdriver::readResponse(){
             if(this->m_responseBufferIndex < SMTP_RESPONSE_BUFFER_SIZE) {
         			this->m_responseBuffer[this->m_responseBufferIndex++] = (char)this->m_client->read();
             }
-            if( millis() - this->m_lastReceive >= this->m_timeOut ){
+            if( (__i_dvc_ctrl.millis_now() - this->m_lastReceive) >= this->m_timeOut ){
           		this->m_responseReaderStatus = SMTP_RESPONSE_TIMEOUT;
           		return;
           	}
-            delay(0);
+            __i_dvc_ctrl.wait(0);
           }
   				this->m_responseReaderStatus = SMTP_RESPONSE_FINISHED;
   				return;
   			}
   		}
-      delay(0);
+      __i_dvc_ctrl.wait(0);
   	}
   }
-  delay(0);
+  __i_dvc_ctrl.wait(0);
 }
 
 void SMTPdriver::flushClient(){
   if( nullptr != this->m_client ){
     this->m_client->flush();
-    uint32_t _now = millis();
-  	while(this->m_client->read() > -1 && (millis()-_now) < SMTP_DEFAULT_TIMEOUT );
+    uint32_t _now = __i_dvc_ctrl.millis_now();
+  	while(this->m_client->read() > -1 && (__i_dvc_ctrl.millis_now()-_now) < SMTP_DEFAULT_TIMEOUT );
   }
 }
 
 void SMTPdriver::startReadResponse( uint16_t _timeOut ) {
 
   this->m_responseBufferIndex = 0;
-	this->m_lastReceive = millis();
+	this->m_lastReceive = __i_dvc_ctrl.millis_now();
 	this->m_responseReaderStatus = SMTP_RESPONSE_STARTING;
 	this->m_timeOut = _timeOut;
   if( nullptr != this->m_responseBuffer ){
@@ -197,7 +197,7 @@ bool SMTPdriver::sendCommandAndExpect( char *command, char *expectedResponse, ui
     }else{
 
       this->flushClient();
-      this->m_client->println( command );
+      this->m_client->writeln( command );
       status = this->waitForExpectedResponse( expectedResponse, _timeOut );
     }
   }
@@ -218,7 +218,7 @@ int SMTPdriver::sendCommandAndGetCode( PGM_P command, uint16_t _timeOut ){
 
       this->flushClient();
       if( strlen_P(command) > 0 )
-      this->m_client->println( command );
+      this->m_client->writeln( command );
       this->waitForResponse( _timeOut );
 
       if( nullptr != this->m_responseBuffer ){
@@ -246,7 +246,7 @@ int SMTPdriver::sendCommandAndGetCode( char *command, uint16_t _timeOut ){
 
       this->flushClient();
       if( strlen(command) > 0 )
-      this->m_client->println( command );
+      this->m_client->writeln( command );
       this->waitForResponse( _timeOut );
 
       if( nullptr != this->m_responseBuffer ){
@@ -351,15 +351,15 @@ bool SMTPdriver::sendDataCommand(){
 void SMTPdriver::sendDataHeader( char *sender, char *recipient, char *subject ){
 
   if( nullptr != this->m_client ){
-    this->m_client->print(SMTP_COMMAND_DATA_HEADER_TO);
-    this->m_client->println(recipient);
+    this->m_client->write(SMTP_COMMAND_DATA_HEADER_TO);
+    this->m_client->writeln(recipient);
 
-    this->m_client->print(SMTP_COMMAND_DATA_HEADER_FROM);
-    this->m_client->println(sender);
+    this->m_client->write(SMTP_COMMAND_DATA_HEADER_FROM);
+    this->m_client->writeln(sender);
 
-    this->m_client->print(SMTP_COMMAND_DATA_HEADER_SUBJECT);
-    this->m_client->println(subject);
-    this->m_client->print(SMTP_COMMAND_CRLF);
+    this->m_client->write(SMTP_COMMAND_DATA_HEADER_SUBJECT);
+    this->m_client->writeln(subject);
+    this->m_client->write(SMTP_COMMAND_CRLF);
   }
 }
 
@@ -371,9 +371,9 @@ bool SMTPdriver::sendDataBody( String &body ){
 	Logln(body);
 	#endif
   if( nullptr != this->m_client ){
-    // this->m_client->println( body );
+    // this->m_client->writeln( body );
     sendPacket( this->m_client, (uint8_t*)body.c_str(), body.length()+1 );
-    this->m_client->println();
+    this->m_client->writeln();
     respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA_TERMINATOR );
   }
   return respcode < SMTP_STATUS_SERVICE_UNAVAILABLE;
@@ -387,9 +387,9 @@ bool SMTPdriver::sendDataBody( char *body ){
 	Logln(body);
 	#endif
   if( nullptr != this->m_client ){
-    // this->m_client->println( body );
+    // this->m_client->writeln( body );
     sendPacket( this->m_client, (uint8_t*)body, strlen(body) );
-    this->m_client->println();
+    this->m_client->writeln();
     respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA_TERMINATOR );
   }
   return respcode < SMTP_STATUS_SERVICE_UNAVAILABLE;
@@ -403,7 +403,7 @@ bool SMTPdriver::sendDataBody( PGM_P body ){
 	Logln(body);
 	#endif
   if( nullptr != this->m_client ){
-    this->m_client->println( body );
+    this->m_client->writeln( body );
     respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA_TERMINATOR );
   }
   return respcode < SMTP_STATUS_SERVICE_UNAVAILABLE;

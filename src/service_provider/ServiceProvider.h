@@ -12,11 +12,7 @@ created Date    : 1st June 2019
 #define _SERVICE_PROVIDER_H_
 
 
-#include <interface/WiFiInterface.h>
-#include <interface/WiFiClientInterface.h>
-#include <interface/HttpClientInterface.h>
-#include <interface/iDeviceIotInterface.h>
-
+#include <interface/pdi.h>
 #include <config/Config.h>
 #include <utility/Utility.h>
 #include <database/DefaultDatabase.h>
@@ -41,6 +37,13 @@ class ServiceProvider{
 		 * ServiceProvider destructor
 		 */
     ~ServiceProvider(){
+    }
+
+    /**
+     * init service
+     */
+    virtual bool initService(){
+      return true;
     }
 };
 

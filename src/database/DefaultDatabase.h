@@ -11,23 +11,24 @@ created Date    : 1st June 2019
 #ifndef _DEFAULT_DATABASE_H_
 #define _DEFAULT_DATABASE_H_
 
-#include <config/Config.h>
-#include "DatabaseTable.h"
-#include "GlobalTable.h"
-#include "LoginTable.h"
-#include "WiFiTable.h"
-#include "OtaTable.h"
+#include <database/core/DatabaseTable.h>
+#include "tables/GlobalTable.h"
+#include "tables/LoginTable.h"
+#include "tables/WiFiTable.h"
+#include "tables/OtaTable.h"
 #ifdef ENABLE_GPIO_SERVICE
-#include "GpioTable.h"
+#include "tables/GpioTable.h"
 #endif
 #ifdef ENABLE_MQTT_SERVICE
-#include "MqttTables.h"
+#include "tables/MqttGeneralTable.h"
+#include "tables/MqttLwtTable.h"
+#include "tables/MqttPubSubTable.h"
 #endif
 #ifdef ENABLE_EMAIL_SERVICE
-#include "EmailTable.h"
+#include "tables/EmailTable.h"
 #endif
 #ifdef ENABLE_DEVICE_IOT
-#include "DeviceIotTable.h"
+#include "tables/DeviceIotTable.h"
 #endif
 
 
@@ -53,27 +54,27 @@ class DefaultDatabase {
     void init_default_database();
     void clear_default_tables();
 
-    global_config_table get_global_config_table();
-    login_credential_table get_login_credential_table();
-    wifi_config_table get_wifi_config_table();
-    ota_config_table get_ota_config_table();
+    bool get_global_config_table( global_config_table* _table );
+    bool get_login_credential_table( login_credential_table* _table );
+    bool get_wifi_config_table( wifi_config_table* _table );
+    bool get_ota_config_table( ota_config_table* _table );
 
     #ifdef ENABLE_GPIO_SERVICE
-    gpio_config_table get_gpio_config_table();
+    bool get_gpio_config_table( gpio_config_table* _table );
     #endif
 
     #ifdef ENABLE_MQTT_SERVICE
-    mqtt_general_config_table get_mqtt_general_config_table();
-    mqtt_lwt_config_table get_mqtt_lwt_config_table();
-    mqtt_pubsub_config_table get_mqtt_pubsub_config_table();
+    bool get_mqtt_general_config_table( mqtt_general_config_table* _table );
+    bool get_mqtt_lwt_config_table( mqtt_lwt_config_table* _table );
+    bool get_mqtt_pubsub_config_table( mqtt_pubsub_config_table* _table );
     #endif
 
     #ifdef ENABLE_EMAIL_SERVICE
-    email_config_table get_email_config_table();
+    bool get_email_config_table( email_config_table* _table );
     #endif
 
     #ifdef ENABLE_DEVICE_IOT
-    device_iot_config_table get_device_iot_config_table();
+    bool get_device_iot_config_table( device_iot_config_table* _table );
     #endif
 
     void set_global_config_table( global_config_table* _table );

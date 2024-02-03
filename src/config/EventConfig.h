@@ -22,7 +22,7 @@ created Date    : 1st June 2019
 */
 typedef enum event_name{
 
-  EVENT_WIFI_STA_CONNECTED = EVENT_STAMODE_CONNECTED,
+  EVENT_WIFI_STA_CONNECTED = 0,
   EVENT_WIFI_STA_DISCONNECTED,
   EVENT_WIFI_STA_AUTHMODE_CHANGE,
   EVENT_WIFI_STA_GOT_IP,
@@ -38,9 +38,21 @@ typedef enum event_name{
 /**
 * event listener struct type for event
 */
-struct event_listener_t {
+typedef struct event_listener {
+  
+  // Default Constructor
+  event_listener(){
+    clear();
+  }
+
+  // Clear members method
+  void clear(){
+    _event = 0;
+    _event_handler = nullptr;
+  }
+
   int _event;
   CallBackVoidPointerArgFn _event_handler;
-};
+} event_listener_t;
 
 #endif

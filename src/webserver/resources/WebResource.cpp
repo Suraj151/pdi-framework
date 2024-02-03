@@ -13,7 +13,7 @@ created Date    : 1st June 2019
 /**
  * WebResourceProvider constructor
  */
-WebResourceProvider::WebResourceProvider():
+WebResourceProvider::WebResourceProvider() : 
   m_wifi(nullptr),
   m_server(nullptr),
   m_db_conn(nullptr)
@@ -23,7 +23,8 @@ WebResourceProvider::WebResourceProvider():
 /**
  * WebResourceProvider destructor
  */
-WebResourceProvider::~WebResourceProvider(){
+WebResourceProvider::~WebResourceProvider()
+{
   this->m_server = nullptr;
   this->m_db_conn = nullptr;
   this->m_wifi = nullptr;
@@ -35,8 +36,8 @@ WebResourceProvider::~WebResourceProvider(){
  * @param iWiFiServerInterface* _server
  * @param iWiFiInterface*   _wifi
  */
-void WebResourceProvider::collect_resource( iWiFiInterface *_wifi, iWiFiServerInterface *_server ){
-
+void WebResourceProvider::collect_resource(iWiFiInterface *_wifi, iWiFiServerInterface *_server)
+{
   this->m_server = _server;
   this->m_db_conn = &__database_service;
   this->m_wifi = _wifi;

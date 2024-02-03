@@ -17,62 +17,61 @@ class Controller;
 /**
  * define controller structure here
  */
-struct struct_controllers {
-	Controller* controller;
-	struct_controllers(Controller* _c):controller(_c){}
+struct struct_controllers
+{
+	Controller *controller;
+	struct_controllers(Controller *_c) : controller(_c) {}
 };
 
 /**
  * Controller class
  */
-class Controller {
+class Controller
+{
 
-	public:
+public:
+	/**
+	 * Controller constructor
+	 */
+	Controller();
+	/**
+	 * Controller constructor
+	 */
+	Controller(const char *_controller_name);
+	/**
+	 * Controller destructor
+	 */
+	~Controller();
 
-		/**
-		 * Controller constructor
-		 */
-		Controller();
-		/**
-		 * Controller constructor
-		 */
-		Controller(const char* _controller_name);
-		/**
-		 * Controller destructor
-		 */
-		~Controller();
+	/**
+	 * Register Controller
+	 */
+	void register_controller(Controller *that);
 
-		/**
-		 * Register Controller
-		 */
-		void register_controller(Controller* that);
+	/**
+	 * override boot
+	 */
+	virtual void boot() = 0;
 
-		/**
-		 * override boot
-		 */
-		virtual void boot() = 0;
+	/**
+	 * @var	std::vector<struct_controllers>	m_controllers
+	 */
+	static std::vector<struct_controllers> m_controllers;
 
-		/**
-     * @var	std::vector<struct_controllers>	m_controllers
-     */
-    static std::vector<struct_controllers> m_controllers;
+	/**
+	 * @var	const char*	m_controller_name
+	 */
+	const char *m_controller_name;
 
-		/**
-     * @var	const char*	m_controller_name
-     */
-    const char						*m_controller_name;
-
-	protected:
-
-		/**
-		 * @var	WebResourceProvider*	m_web_resource
-		 */
-		WebResourceProvider		*m_web_resource;
-		/**
-		 * @var	RouteHandler*	m_route_handler
-		 */
-		RouteHandler					*m_route_handler;
+protected:
+	/**
+	 * @var	WebResourceProvider*	m_web_resource
+	 */
+	WebResourceProvider *m_web_resource;
+	/**
+	 * @var	RouteHandler*	m_route_handler
+	 */
+	RouteHandler *m_route_handler;
 };
-
 
 #endif

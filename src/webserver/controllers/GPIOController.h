@@ -61,7 +61,7 @@ class GpioController : public Controller {
 	      this->m_route_handler->register_route( EW_SERVER_GPIO_MONITOR_ROUTE, [&]() { this->handleGpioMonitorRoute(); }, AUTH_MIDDLEWARE );
 	      this->m_route_handler->register_route( EW_SERVER_GPIO_ANALOG_MONITOR_ROUTE, [&]() { this->handleAnalogMonitor(); } );
 			}
-			// this->gpio_configs = this->m_web_resource->m_db_conn->get_gpio_config_table();
+			// this->m_web_resource->m_db_conn->get_gpio_config_table(&this->gpio_configs);
 		}
 
 		/**
@@ -249,8 +249,6 @@ class GpioController : public Controller {
       if( _enable_flash )
       concat_flash_message_div( _page, HTML_SUCCESS_FLASH, ALERT_SUCCESS );
       strcat_P( _page, EW_SERVER_FOOTER_HTML );
-      // Log(F("free stack :"));Logln(ESP.getFreeContStack());
-      // Log(F("free heap :"));Logln(ESP.getFreeHeap());
     }
 
 		/**

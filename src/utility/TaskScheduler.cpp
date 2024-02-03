@@ -8,7 +8,7 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
-#include <config/Config.h>
+#include <config/Common.h>
 
 #ifndef ENABLE_TIMER_TASK_SCHEDULER
 
@@ -17,13 +17,16 @@ created Date    : 1st June 2019
 /**
  * TaskScheduler constructor
  */
-TaskScheduler::TaskScheduler(){
+TaskScheduler::TaskScheduler() : m_util(nullptr),
+								 m_max_tasks(25)
+{
 }
 
 /**
  * TaskScheduler destructor
  */
-TaskScheduler::~TaskScheduler(){
+TaskScheduler::~TaskScheduler()
+{
 }
 
 /**
@@ -33,9 +36,9 @@ TaskScheduler::~TaskScheduler(){
  * @param	uint32_t	_duration
  * @param	unsigned long|0	_last_millis
  */
-TaskScheduler::TaskScheduler( CallBackVoidArgFn _task_fn, uint32_t _duration, int _task_priority, unsigned long _last_millis ){
-
-	this->register_task( _task_fn, _duration, _task_priority, _last_millis );
+TaskScheduler::TaskScheduler(CallBackVoidArgFn _task_fn, uint32_t _duration, int _task_priority, unsigned long _last_millis)
+{
+	this->register_task(_task_fn, _duration, _task_priority, _last_millis);
 }
 
 /**
@@ -46,8 +49,9 @@ TaskScheduler::TaskScheduler( CallBackVoidArgFn _task_fn, uint32_t _duration, in
  * @param		uint32_t	_duration
  * @return	int
  */
-int TaskScheduler::setTimeout( CallBackVoidArgFn _task_fn, uint32_t _duration, int _task_priority ){
-	return this->register_task( _task_fn, _duration, _task_priority, millis(), 1 );
+int TaskScheduler::setTimeout(CallBackVoidArgFn _task_fn, uint32_t _duration, unsigned long _now_millis, int _task_priority)
+{
+	return this->register_task(_task_fn, _duration, _task_priority, _now_millis, 1);
 }
 
 /**
@@ -58,8 +62,9 @@ int TaskScheduler::setTimeout( CallBackVoidArgFn _task_fn, uint32_t _duration, i
  * @param		uint32_t	_duration
  * @return	int
  */
-int TaskScheduler::setInterval( CallBackVoidArgFn _task_fn, uint32_t _duration, int _task_priority ){
-	return this->register_task( _task_fn, _duration, _task_priority, millis() );
+int TaskScheduler::setInterval(CallBackVoidArgFn _task_fn, uint32_t _duration, unsigned long _now_millis, int _task_priority)
+{
+	return this->register_task(_task_fn, _duration, _task_priority, _now_millis);
 }
 
 /**
@@ -73,20 +78,21 @@ int TaskScheduler::setInterval( CallBackVoidArgFn _task_fn, uint32_t _duration, 
  * @param		int|-1	_max_attempts
  * @return	int
  */
-int TaskScheduler::updateInterval( int _task_id, CallBackVoidArgFn _task_fn, uint32_t _duration, int _task_priority, unsigned long _last_millis, int _max_attempts ){
-
-	int _registered_index = this->is_registered_task( _task_id );
-	if( _registered_index > -1 ){
-
+int TaskScheduler::updateInterval(int _task_id, CallBackVoidArgFn _task_fn, uint32_t _duration, int _task_priority, unsigned long _last_millis, int _max_attempts)
+{
+	int _registered_index = this->is_registered_task(_task_id);
+	if (_registered_index > -1)
+	{
 		this->m_tasks[_registered_index]._task = _task_fn;
 		this->m_tasks[_registered_index]._duration = _duration;
 		this->m_tasks[_registered_index]._task_priority = _task_priority;
 		this->m_tasks[_registered_index]._last_millis = _last_millis == 0 ? this->m_tasks[_registered_index]._last_millis : _last_millis;
 		this->m_tasks[_registered_index]._max_attempts = _max_attempts;
 		return _task_id;
-	}else{
-
-		return this->register_task( _task_fn, _duration, _task_priority,_last_millis, _max_attempts );
+	}
+	else
+	{
+		return this->register_task(_task_fn, _duration, _task_priority, _last_millis, _max_attempts);
 	}
 }
 
@@ -97,8 +103,9 @@ int TaskScheduler::updateInterval( int _task_id, CallBackVoidArgFn _task_fn, uin
  * @param		int	_id
  * @return	bool
  */
-bool TaskScheduler::clearTimeout( int _id ){
-	return this->remove_task( _id );
+bool TaskScheduler::clearTimeout(int _id)
+{
+	return this->remove_task(_id);
 }
 
 /**
@@ -108,8 +115,9 @@ bool TaskScheduler::clearTimeout( int _id ){
  * @param		int	_id
  * @return	bool
  */
-bool TaskScheduler::clearInterval( int _id ){
-	return this->remove_task( _id );
+bool TaskScheduler::clearInterval(int _id)
+{
+	return this->remove_task(_id);
 }
 
 /**
@@ -122,10 +130,10 @@ bool TaskScheduler::clearInterval( int _id ){
  * @param		int|-1	_max_attempts
  * @return	int
  */
-int TaskScheduler::register_task( CallBackVoidArgFn _task_fn, uint32_t _duration, int _task_priority, unsigned long _last_millis, int _max_attempts ){
-
-	if( this->m_tasks.size() < MAX_SCHEDULABLE_TASKS ){
-
+int TaskScheduler::register_task(CallBackVoidArgFn _task_fn, uint32_t _duration, int _task_priority, unsigned long _last_millis, int _max_attempts)
+{
+	if (this->m_tasks.size() < this->m_max_tasks)
+	{
 		task_t _new_task;
 		_new_task._task = _task_fn;
 		_new_task._duration = _duration;
@@ -145,54 +153,67 @@ int TaskScheduler::register_task( CallBackVoidArgFn _task_fn, uint32_t _duration
  * this function must be called every millisecond in loop for proper task handles.
  *
  */
-void TaskScheduler::handle_tasks(){
+void TaskScheduler::handle_tasks()
+{
+
+	if( nullptr == m_util )
+	{
+		return;
+	}
 
 	uint16_t _task_count = this->m_tasks.size();
 	uint16_t _priority_indices[_task_count];
 
-  for (uint16_t i = 0; i < _task_count; i++) _priority_indices[i] = i;
-  for (uint16_t i = 0; i < _task_count; i++) {
-    for (uint16_t j = i + 1; j < _task_count; j++) {
-      if ( this->m_tasks[i]._task_priority < this->m_tasks[j]._task_priority ) {
-        std::swap(_priority_indices[i], _priority_indices[j]);
-      }
-    }
-  }
+	for (uint16_t i = 0; i < _task_count; i++)
+		_priority_indices[i] = i;
+	for (uint16_t i = 0; i < _task_count; i++)
+	{
+		for (uint16_t j = i + 1; j < _task_count; j++)
+		{
+			if (this->m_tasks[i]._task_priority < this->m_tasks[j]._task_priority)
+			{
+				std::swap(_priority_indices[i], _priority_indices[j]);
+			}
+		}
+	}
 
-	for ( uint16_t i = 0; i < _task_count; i++) {
+	for (uint16_t i = 0; i < _task_count; i++)
+	{
+		unsigned long _last_start_ms = m_util->millis_now();
 
-		unsigned long _tast_start_ms = millis();
+		if (_last_start_ms < this->m_tasks[_priority_indices[i]]._last_millis)
+		{
+			this->m_tasks[_priority_indices[i]]._last_millis = _last_start_ms;
+		}
 
-		if( _tast_start_ms < this->m_tasks[_priority_indices[i]]._last_millis ){
-      this->m_tasks[_priority_indices[i]]._last_millis = _tast_start_ms;
-    }
-
-    if( ( _tast_start_ms - this->m_tasks[_priority_indices[i]]._last_millis ) > this->m_tasks[_priority_indices[i]]._duration ){
-
-			if( nullptr != this->m_tasks[_priority_indices[i]]._task ){
+		if ((_last_start_ms - this->m_tasks[_priority_indices[i]]._last_millis) > this->m_tasks[_priority_indices[i]]._duration)
+		{
+			if (nullptr != this->m_tasks[_priority_indices[i]]._task)
+			{
 				this->m_tasks[_priority_indices[i]]._task();
 			}
-      this->m_tasks[_priority_indices[i]]._last_millis = _tast_start_ms;
-			this->m_tasks[_priority_indices[i]]._max_attempts = this->m_tasks[_priority_indices[i]]._max_attempts > 0 ?
-			this->m_tasks[_priority_indices[i]]._max_attempts-1:this->m_tasks[_priority_indices[i]]._max_attempts;
+			this->m_tasks[_priority_indices[i]]._last_millis = _last_start_ms;
+			this->m_tasks[_priority_indices[i]]._max_attempts = this->m_tasks[_priority_indices[i]]._max_attempts > 0 ? this->m_tasks[_priority_indices[i]]._max_attempts - 1 : this->m_tasks[_priority_indices[i]]._max_attempts;
 
-			unsigned long _task_end_ms = millis();
-			this->m_tasks[_priority_indices[i]]._task_exec_millis = _task_end_ms > _tast_start_ms ? ( _task_end_ms - _tast_start_ms ) : 0;
-    }
+			unsigned long _task_end_ms = m_util->millis_now();
+			this->m_tasks[_priority_indices[i]]._task_exec_millis = _task_end_ms > _last_start_ms ? (_task_end_ms - _last_start_ms) : 0;
+		}
 	}
 	this->remove_expired_tasks();
+	//__i_dvc_ctrl.wait(0);
 }
 
 /**
  * this function removes expired callback task from lists
  */
-void TaskScheduler::remove_expired_tasks(){
-
-	for ( uint16_t i = 0; i < this->m_tasks.size(); i++) {
-
-		if( this->m_tasks[i]._max_attempts == 0 ){
-			this->m_tasks.erase( this->m_tasks.begin() + i );
-    }
+void TaskScheduler::remove_expired_tasks()
+{
+	for (uint16_t i = 0; i < this->m_tasks.size(); i++)
+	{
+		if (this->m_tasks[i]._max_attempts == 0)
+		{
+			this->m_tasks.erase(this->m_tasks.begin() + i);
+		}
 	}
 }
 
@@ -203,14 +224,16 @@ void TaskScheduler::remove_expired_tasks(){
  * @param		int	_id
  * @return	int
  */
-int TaskScheduler::is_registered_task( int _id ){
-
-	for ( uint16_t i = 0; i < this->m_tasks.size(); i++) {
-
-		if( this->m_tasks[i]._task_id == _id ){
+int TaskScheduler::is_registered_task(int _id)
+{
+	for (uint16_t i = 0; i < this->m_tasks.size(); i++)
+	{
+		if (this->m_tasks[i]._task_id == _id)
+		{
 			return i;
-    }
-	}return -1;
+		}
+	}
+	return -1;
 }
 
 /**
@@ -220,12 +243,13 @@ int TaskScheduler::is_registered_task( int _id ){
  * @param		int	_id
  * @return	bool
  */
-bool TaskScheduler::remove_task( int _id ){
-
+bool TaskScheduler::remove_task(int _id)
+{
 	bool _removed = false;
-	for ( uint16_t i = 0; i < this->m_tasks.size(); i++) {
-
-		if( this->m_tasks[i]._task_id == _id ){
+	for (uint16_t i = 0; i < this->m_tasks.size(); i++)
+	{
+		if (this->m_tasks[i]._task_id == _id)
+		{
 			// removing task create bug if this function will call inside another task
 			// hence making its max attempts to 0 which will considered as expired task
 			// this->m_tasks.erase( this->m_tasks.begin() + i );
@@ -234,8 +258,9 @@ bool TaskScheduler::remove_task( int _id ){
 			this->m_tasks[i]._max_attempts = 0;
 			this->m_tasks[i]._task = nullptr;
 			_removed = true;
-    }
-	}return _removed;
+		}
+	}
+	return _removed;
 }
 
 /**
@@ -243,19 +268,42 @@ bool TaskScheduler::remove_task( int _id ){
  *
  * @return	int
  */
-int TaskScheduler::get_unique_task_id( ){
-
-	for ( int _id = 1; _id < MAX_SCHEDULABLE_TASKS; _id++) {
-
+int TaskScheduler::get_unique_task_id()
+{
+	for (int _id = 1; _id < this->m_max_tasks; _id++)
+	{
 		bool _id_used = false;
-		for ( int i = 0; i < this->m_tasks.size(); i++) {
-
-			if( this->m_tasks[i]._task_id == _id ){
+		for (int i = 0; i < this->m_tasks.size(); i++)
+		{
+			if (this->m_tasks[i]._task_id == _id)
+			{
 				_id_used = true;
-	    }
+			}
 		}
-		if( !_id_used ) return _id;
-	} return -1;
+		if (!_id_used)
+			return _id;
+	}
+	return -1;
+}
+
+/**
+ * this function set the maximum number of tasks that scheduler can handle
+ *
+ * @return	none
+ */
+void TaskScheduler::setMaxTasksLimit(uint8_t maxtasks)
+{
+	m_max_tasks = maxtasks;
+}
+
+/**
+ * this function set the utility interface needed by scheduler
+ *
+ * @return	none
+ */
+void TaskScheduler::setUtilityInterface(iUtilityInterface *util)
+{
+	m_util = util;
 }
 
 #ifdef EW_SERIAL_LOG
@@ -263,7 +311,8 @@ int TaskScheduler::get_unique_task_id( ){
  * this function prints task logs.
  *
  */
-void TaskScheduler::printTaskSchedulerLogs(){
+void TaskScheduler::printTaskSchedulerLogs()
+{
 
 	Logln(F("\nTasks : "));
 	Log(F("id\t"));
@@ -272,14 +321,20 @@ void TaskScheduler::printTaskSchedulerLogs(){
 	Log(F("last_ms\t\t"));
 	Log(F("execute_ms\t"));
 	Log(F("max_attempts\n"));
-	for ( int i = 0; i < this->m_tasks.size(); i++) {
-
-    Log(this->m_tasks[i]._task_id);Log("\t");
-		Log(this->m_tasks[i]._task_priority);Log("\t\t");
-		Log(this->m_tasks[i]._duration);Log("\t\t");
-		Log(this->m_tasks[i]._last_millis);Log("\t\t");
-		Log(this->m_tasks[i]._task_exec_millis);Log("\t\t");
-		Log(this->m_tasks[i]._max_attempts);Logln();
+	for (int i = 0; i < this->m_tasks.size(); i++)
+	{
+		Log(this->m_tasks[i]._task_id);
+		Log("\t");
+		Log(this->m_tasks[i]._task_priority);
+		Log("\t\t");
+		Log(this->m_tasks[i]._duration);
+		Log("\t\t");
+		Log(this->m_tasks[i]._last_millis);
+		Log("\t\t");
+		Log(this->m_tasks[i]._task_exec_millis);
+		Log("\t\t");
+		Log(this->m_tasks[i]._max_attempts);
+		Logln();
 	}
 }
 #endif

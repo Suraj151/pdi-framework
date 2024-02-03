@@ -67,7 +67,8 @@ class EwSessionHandler{
         return;
 			}
 
-      login_credential_table _login_credentials = __web_resource.m_db_conn->get_login_credential_table();
+      login_credential_table _login_credentials;
+      __web_resource.m_db_conn->get_login_credential_table(&_login_credentials);
       memset( _str, 0, _max_size );
       strcat( _str, _login_credentials.session_name );
       strcat( _str, _stat ? "=1": "=0" );

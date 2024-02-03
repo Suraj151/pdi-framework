@@ -92,7 +92,7 @@ bool sendPacket( iWiFiClientInterface *client, uint8_t *buffer, uint16_t len ) {
         status = false;
         break;
       }
-      delay(0);
+      __i_dvc_ctrl.wait(0);
     }
   }
 
@@ -137,7 +137,7 @@ uint16_t readPacket( iWiFiClientInterface *client, uint8_t *buffer, uint16_t max
         }
       }
       timeout -= 1;
-      delay(1);
+      __i_dvc_ctrl.wait(1);
     }
   }
   // #ifdef EW_SERIAL_LOG

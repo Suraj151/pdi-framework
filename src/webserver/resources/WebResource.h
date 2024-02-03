@@ -11,8 +11,7 @@ created Date    : 1st June 2019
 #ifndef _WEB_RESOURCE_PROVIDER_
 #define _WEB_RESOURCE_PROVIDER_
 
-#include <interface/WiFiInterface.h>
-#include <interface/WiFiServerInterface.h>
+#include <interface/pdi.h>
 #include <utility/Utility.h>
 #include <database/DefaultDatabase.h>
 #include <webserver/routes/Routes.h>
@@ -32,7 +31,8 @@ static const char EW_HTML_CONTENT[] PROGMEM = "text/html";
 /**
  * @enum http return codes
  */
-enum HTTP_RETURN_CODE {
+enum HTTP_RETURN_CODE
+{
   HTTP_OK = 200,
   HTTP_UNAUTHORIZED = 401,
   HTTP_NOT_FOUND = 404,
@@ -42,36 +42,35 @@ enum HTTP_RETURN_CODE {
 /**
  * WebResourceProvider class
  */
-class WebResourceProvider {
+class WebResourceProvider
+{
 
-  public:
+public:
+  /**
+   * WebResourceProvider constructor
+   */
+  WebResourceProvider();
+  /**
+   * WebResourceProvider destructor
+   */
+  ~WebResourceProvider();
 
-    /**
-		 * WebResourceProvider constructor
-		 */
-    WebResourceProvider();
-    /**
-		 * WebResourceProvider destructor
-		 */
-    ~WebResourceProvider();
-
-    void collect_resource( iWiFiInterface *_wifi, iWiFiServerInterface *_server );
+  void collect_resource(iWiFiInterface *_wifi, iWiFiServerInterface *_server);
 
   // protected:
 
-    /**
-		 * @var	iWiFiInterface*  m_wifi
-		 */
-    iWiFiInterface        *m_wifi;
-    /**
-		 * @var	iWiFiServerInterface*	m_server
-		 */
-    iWiFiServerInterface  *m_server;
-    /**
-		 * @var	DefaultDatabase*  m_db_conn
-		 */
-    DefaultDatabase       *m_db_conn;
-
+  /**
+   * @var	iWiFiInterface*  m_wifi
+   */
+  iWiFiInterface *m_wifi;
+  /**
+   * @var	iWiFiServerInterface*	m_server
+   */
+  iWiFiServerInterface *m_server;
+  /**
+   * @var	DefaultDatabase*  m_db_conn
+   */
+  DefaultDatabase *m_db_conn;
 };
 
 extern WebResourceProvider __web_resource;

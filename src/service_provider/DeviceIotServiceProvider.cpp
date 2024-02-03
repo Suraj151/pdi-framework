@@ -51,7 +51,7 @@ void DeviceIotServiceProvider::init( iWiFiInterface *_wifi, iWiFiClientInterface
   this->m_wifi = _wifi;
   this->m_wifi_client = _wifi_client;
 
-  // __task_scheduler.setInterval( [&]() { this->handleDeviceIotConfigRequest(); }, HTTP_REQUEST_DURATION );
+  // __task_scheduler.setInterval( [&]() { this->handleDeviceIotConfigRequest(); }, HTTP_REQUEST_DURATION, __i_dvc_ctrl.millis_now() );
   this->m_device_config_request_cb_id = __task_scheduler.updateInterval(
     this->m_device_config_request_cb_id,
     [&]() {
@@ -62,7 +62,7 @@ void DeviceIotServiceProvider::init( iWiFiInterface *_wifi, iWiFiClientInterface
 
   #ifdef ENABLE_LED_INDICATION
   this->beginWifiStatusLed();
-  __task_scheduler.setInterval( [&]() { this->handleWifiStatusLed(); }, 2.5*MILLISECOND_DURATION_1000 );
+  __task_scheduler.setInterval( [&]() { this->handleWifiStatusLed(); }, 2.5*MILLISECOND_DURATION_1000, __i_dvc_ctrl.millis_now() );
   #endif
 
   // clear all mqtt old configs
@@ -136,7 +136,7 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
     return;
   }
 
-  this->m_device_iot_configs = __database_service.get_device_iot_config_table();
+  __database_service.get_device_iot_config_table(&this->m_device_iot_configs);
   // strcat_P( this->m_device_iot_configs.device_iot_host, DEVICE_IOT_CONFIG_REQ_URL );
   memset( __http_service.m_host, 0, HTTP_HOST_ADDR_MAX_SIZE);
   strcpy( __http_service.m_host, this->m_device_iot_configs.device_iot_host );
@@ -201,9 +201,9 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
                 this->handleConnectivityCheck();
               },
               this->m_mqtt_keep_alive*MILLISECOND_DURATION_1000, DEFAULT_TASK_PRIORITY,
-              ( millis() + MQTT_INITIALIZE_DURATION )
+              ( __i_dvc_ctrl.millis_now() + MQTT_INITIALIZE_DURATION )
             );
-            __task_scheduler.setTimeout( [&]() { this->configureMQTT(); }, 1 );
+            __task_scheduler.setTimeout( [&]() { this->configureMQTT(); }, 1, __i_dvc_ctrl.millis_now() );
             this->m_token_validity = true;
 
           }else{
@@ -253,9 +253,12 @@ void DeviceIotServiceProvider::handleConnectivityCheck(){
  */
 void DeviceIotServiceProvider::configureMQTT(){
 
-  mqtt_general_config_table _mqtt_general_configs = __database_service.get_mqtt_general_config_table();
-  mqtt_pubsub_config_table _mqtt_pubsub_configs = __database_service.get_mqtt_pubsub_config_table();
-  mqtt_lwt_config_table _mqtt_lwt_configs = __database_service.get_mqtt_lwt_config_table();
+  mqtt_general_config_table _mqtt_general_configs;
+  mqtt_lwt_config_table _mqtt_lwt_configs;
+  mqtt_pubsub_config_table _mqtt_pubsub_configs;
+  __database_service.get_mqtt_general_config_table(&_mqtt_general_configs);
+  __database_service.get_mqtt_lwt_config_table(&_mqtt_lwt_configs);
+  __database_service.get_mqtt_pubsub_config_table(&_mqtt_pubsub_configs);
 
   memset( &_mqtt_general_configs, 0, sizeof(mqtt_general_config_table));
   memset( &_mqtt_pubsub_configs, 0, sizeof(mqtt_pubsub_config_table));
@@ -282,7 +285,7 @@ void DeviceIotServiceProvider::configureMQTT(){
   __database_service.set_mqtt_lwt_config_table( &_mqtt_lwt_configs );
   __database_service.set_mqtt_pubsub_config_table( &_mqtt_pubsub_configs );
 
-  __task_scheduler.setTimeout( [&]() { __mqtt_service.handleMqttConfigChange(); }, 1 );
+  __task_scheduler.setTimeout( [&]() { __mqtt_service.handleMqttConfigChange(); }, 1, __i_dvc_ctrl.millis_now() );
 }
 
 /**
@@ -389,7 +392,7 @@ void DeviceIotServiceProvider::handleSensorData(){
     _payload += "\"},\"payload\":";
     this->m_device_iot->dataHook(_payload);
     _payload += ",\"tail\":{}}";
-    __task_scheduler.setTimeout( [&]() { __mqtt_service.handleMqttPublish(); }, 1 );
+    __task_scheduler.setTimeout( [&]() { __mqtt_service.handleMqttPublish(); }, 1, __i_dvc_ctrl.millis_now() );
 
     memset( __mqtt_service.m_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
     if( _payload.length()+1 < MQTT_PAYLOAD_BUF_SIZE ){
@@ -411,7 +414,7 @@ void DeviceIotServiceProvider::beginWifiStatusLed( int _wifi_led ){
 
   this->m_wifi_led = _wifi_led;
   pinMode( _wifi_led, OUTPUT );
-  digitalWrite( this->m_wifi_led, HIGH );
+  __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, this->m_wifi_led, HIGH );
 }
 
 void DeviceIotServiceProvider::handleWifiStatusLed(){
@@ -430,16 +433,16 @@ void DeviceIotServiceProvider::handleWifiStatusLed(){
     #ifdef EW_SERIAL_LOG
     Logln( F("WiFi not connected.") );
     #endif
-    digitalWrite( this->m_wifi_led, LOW );
+    __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, this->m_wifi_led, LOW );
   }else{
 
     if( this->m_token_validity ){
 
-      digitalWrite( this->m_wifi_led, HIGH );
-      delay(40);
-      digitalWrite( this->m_wifi_led, LOW );
+      __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, this->m_wifi_led, HIGH );
+      __i_dvc_ctrl.wait(40);
+      __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, this->m_wifi_led, LOW );
     }else{
-      digitalWrite( this->m_wifi_led, HIGH );
+      __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, this->m_wifi_led, HIGH );
     }
   }
 
@@ -452,7 +455,8 @@ void DeviceIotServiceProvider::handleWifiStatusLed(){
  */
 void DeviceIotServiceProvider::printDeviceIotConfigLogs(){
 
-  device_iot_config_table _device_iot_configs = __database_service.get_device_iot_config_table();
+  device_iot_config_table _device_iot_configs;
+  __database_service.get_device_iot_config_table(&_device_iot_configs);
 
   Logln(F("\nDevice IOT Configs :"));
   Log(_device_iot_configs.device_iot_host); Logln("\n");

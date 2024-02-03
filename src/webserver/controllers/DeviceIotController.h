@@ -62,7 +62,8 @@ class DeviceIotController : public Controller {
       strcat_P( _page, EW_SERVER_HEADER_HTML );
       strcat_P( _page, EW_SERVER_DEVICE_REGISTER_CONFIG_PAGE_TOP );
 
-      device_iot_config_table _device_iot_configs = this->m_web_resource->m_db_conn->get_device_iot_config_table();
+      device_iot_config_table _device_iot_configs;
+	  this->m_web_resource->m_db_conn->get_device_iot_config_table(&_device_iot_configs);
 
 			concat_tr_input_html_tags( _page, PSTR("Registry Host:"), PSTR("dhst"), _device_iot_configs.device_iot_host, DEVICE_IOT_HOST_BUF_SIZE-1 );
       strcat_P( _page, EW_SERVER_FOOTER_WITH_OTP_MONITOR_HTML );
@@ -91,7 +92,8 @@ class DeviceIotController : public Controller {
           Logln();
         #endif
 
-        device_iot_config_table _device_iot_configs = this->m_web_resource->m_db_conn->get_device_iot_config_table();
+        device_iot_config_table _device_iot_configs;
+		this->m_web_resource->m_db_conn->get_device_iot_config_table(&_device_iot_configs);
         _device_iot_host.toCharArray( _device_iot_configs.device_iot_host, _device_iot_host.length()+1 );
         this->m_web_resource->m_db_conn->set_device_iot_config_table( &_device_iot_configs);
 

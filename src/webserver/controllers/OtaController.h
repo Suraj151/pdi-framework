@@ -63,7 +63,8 @@ class OtaController : public Controller {
       strcat_P( _page, EW_SERVER_HEADER_HTML );
       strcat_P( _page, EW_SERVER_OTA_CONFIG_PAGE_TOP );
 
-      ota_config_table _ota_configs = this->m_web_resource->m_db_conn->get_ota_config_table();
+      ota_config_table _ota_configs;
+	  this->m_web_resource->m_db_conn->get_ota_config_table(&_ota_configs);
 
       char _port[10];memset( _port, 0, 10 );
       __appendUintToBuff( _port, "%d", _ota_configs.ota_port, 8 );
@@ -117,7 +118,8 @@ class OtaController : public Controller {
           Logln();
         #endif
 
-        ota_config_table _ota_configs = this->m_web_resource->m_db_conn->get_ota_config_table();
+        ota_config_table _ota_configs;
+		this->m_web_resource->m_db_conn->get_ota_config_table(&_ota_configs);
 
         _ota_host.toCharArray( _ota_configs.ota_host, _ota_host.length()+1 );
         _ota_configs.ota_port = (int)_ota_port.toInt();

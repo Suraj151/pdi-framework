@@ -16,7 +16,7 @@ created Date    : 1st June 2019
 /**
  * TimerTaskScheduler constructor
  */
-TimerTaskScheduler::TimerTaskScheduler(){
+TimerTaskScheduler::TimerTaskScheduler(): m_max_tasks(25){
 }
 
 /**
@@ -45,8 +45,8 @@ TimerTaskScheduler::TimerTaskScheduler( CallBackVoidArgFn _task_fn, uint32_t _du
  * @param		uint32_t	_duration
  * @return	int
  */
-int TimerTaskScheduler::setTimeout( CallBackVoidArgFn _task_fn, uint32_t _duration, int _task_priority ){
-	return this->register_task( _task_fn, _duration, _task_priority, millis(), 1 );
+int TimerTaskScheduler::setTimeout( CallBackVoidArgFn _task_fn, uint32_t _duration, unsigned long _now_millis, int _task_priority ){
+	return this->register_task( _task_fn, _duration, _task_priority, _now_millis, 1 );
 }
 
 /**
@@ -57,8 +57,8 @@ int TimerTaskScheduler::setTimeout( CallBackVoidArgFn _task_fn, uint32_t _durati
  * @param		uint32_t	_duration
  * @return	int
  */
-int TimerTaskScheduler::setInterval( CallBackVoidArgFn _task_fn, uint32_t _duration, int _task_priority ){
-	return this->register_task( _task_fn, _duration, _task_priority, millis() );
+int TimerTaskScheduler::setInterval( CallBackVoidArgFn _task_fn, uint32_t _duration, unsigned long _now_millis, int _task_priority ){
+	return this->register_task( _task_fn, _duration, _task_priority, _now_millis );
 }
 
 /**
@@ -119,7 +119,7 @@ bool TimerTaskScheduler::clearInterval( int _id ){
  */
 int TimerTaskScheduler::register_task( CallBackVoidArgFn _task_fn, uint32_t _duration, int _task_priority, unsigned long _last_millis, int _max_attempts ){
 
-	if( this->m_tasks.size() < MAX_SCHEDULABLE_TASKS ){
+	if( this->m_tasks.size() < this->m_max_tasks ){
 
 		int _task_id = this->get_unique_task_id();
 		Serial.print(F("creating task : "));
@@ -144,7 +144,7 @@ void TimerTaskScheduler::handle_tasks(){
 		this->m_tasks[i].start();
 	}
 	this->remove_expired_tasks();
-	delay(0);
+	//__i_dvc_ctrl.wait(0);
 }
 
 /**
@@ -211,7 +211,7 @@ bool TimerTaskScheduler::remove_task( int _id ){
  */
 int TimerTaskScheduler::get_unique_task_id( ){
 
-	for ( int _id = 1; _id < MAX_SCHEDULABLE_TASKS; _id++) {
+	for ( int _id = 1; _id < this->m_max_tasks; _id++) {
 
 		bool _id_used = false;
 		for ( int i = 0; i < this->m_tasks.size(); i++) {

@@ -15,10 +15,13 @@ created Date    : 1st June 2019
 /**
  * begin crash handler
  */
-void beginCrashHandler(){
+void beginCrashHandler()
+{
 
 	SPIFFS.begin();
-	__task_scheduler.setInterval( [&]() { handleCrashData(); }, CRASH_HANDLER_DURATION );
+	__task_scheduler.setInterval([&]()
+								 { handleCrashData(); },
+								 CRASH_HANDLER_DURATION, __i_dvc_ctrl.millis_now());
 }
 
 // #ifdef EW_SERIAL_LOG
@@ -63,32 +66,37 @@ void beginCrashHandler(){
 /**
  * This function returns saved crashdump file as a string
  */
-void handleCrashData(){
+void handleCrashData()
+{
 
-  String _filename = "";
-  Dir dir = SPIFFS.openDir("/");
-  while (dir.next()) {
-    _filename += dir.fileName();
-    _filename +=  String("\tsize : ");
-    _filename += dir.fileSize();
-    _filename += String("\n");
-  }
+	String _filename = "";
+	Dir dir = SPIFFS.openDir("/");
+	while (dir.next())
+	{
+		_filename += dir.fileName();
+		_filename += String("\tsize : ");
+		_filename += dir.fileSize();
+		_filename += String("\n");
+	}
 
 	uint16_t _size = 0;
 	String _filepath = CRASHFILEPATH;
 	String _filedata = "";
-	readCrashFileToBuffer( _filepath, _filedata, _size );
-	if( _filename.length() && _size ){
+	readCrashFileToBuffer(_filepath, _filedata, _size);
+	if (_filename.length() && _size)
+	{
 
 		_filedata += "\n\nRegards,\n";
 		_filedata += WiFi.macAddress();
 		bool _candeletefile = false;
-		#ifdef ENABLE_EMAIL_SERVICE
-		if( __email_service.sendMail( _filedata ) ){
+#ifdef ENABLE_EMAIL_SERVICE
+		if (__email_service.sendMail(_filedata))
+		{
 			_candeletefile = true;
 		}
-		#endif
-		if( _size > CRASHFILEMAXSIZE || _candeletefile ){
+#endif
+		if (_size > CRASHFILEMAXSIZE || _candeletefile)
+		{
 
 			clearCrashFile();
 		}
@@ -98,46 +106,50 @@ void handleCrashData(){
 /**
  * This function returns saved crashdump file as a string
  */
-void readCrashFileToBuffer(String &_filepath, String &_filedata, uint16_t &_size){
+void readCrashFileToBuffer(String &_filepath, String &_filedata, uint16_t &_size)
+{
 
 	File _file = SPIFFS.open(_filepath, "r");
 
-	if ( _file ){
-
+	if (_file)
+	{
 		_size = _file.size();
-		char *_buffer = new char[_size+1];
+		char *_buffer = new char[_size + 1];
 
-		if( nullptr != _buffer ){
-
+		if (nullptr != _buffer)
+		{
 			_size = _file.readBytes(_buffer, _size);
 			_file.close();
 			_buffer[_size] = 0;
 
 			_filedata = String(_buffer);
-			delete []_buffer;
+			delete[] _buffer;
 		}
 	}
 }
 
-
 /**
  * This function saves crashdump to spiff
  */
-void saveCrashToSpiffs(struct rst_info *rst_info, uint32_t stack, uint32_t stack_end,Print& outputDev ){
+void saveCrashToSpiffs(struct rst_info *rst_info, uint32_t stack, uint32_t stack_end, Print &outputDev)
+{
 
-	ESP.wdtFeed();
+	__i_dvc_ctrl.deviceWdtFeed();
 	outputDev.printf("\nRestart reason : %d\n", rst_info->reason);
 	outputDev.printf("Exception (%d):\n", rst_info->exccause);
 	outputDev.printf("epc1=0x%08x epc2=0x%08x epc3=0x%08x excvaddr=0x%08x depc=0x%08x\n\n", rst_info->epc1, rst_info->epc2, rst_info->epc3, rst_info->excvaddr, rst_info->depc);
 	outputDev.println(">>>stack>>>\n");
+
 	int16_t stackLength = stack_end - stack;
 	uint32_t stackTrace;
-	for (int16_t i = 0; i < stackLength; i += 0x10){
+
+	for (int16_t i = 0; i < stackLength; i += 0x10)
+	{
 		outputDev.printf("%08x: ", stack + i);
 		for (byte j = 0; j < 4; j++)
 		{
-			uint32_t* byteptr = (uint32_t*) (stack + i+j*4);
-			stackTrace=*byteptr;
+			uint32_t *byteptr = (uint32_t *)(stack + i + j * 4);
+			stackTrace = *byteptr;
 			outputDev.printf("%08x ", stackTrace);
 		}
 		outputDev.println();
@@ -145,49 +157,53 @@ void saveCrashToSpiffs(struct rst_info *rst_info, uint32_t stack, uint32_t stack
 	outputDev.println("\n<<<stack<<<");
 }
 
-
 /**
  * This function is called automatically if ESP suffers an exception
  * It should be kept quick / consise to be able to execute before hardware wdt may kick in
  */
-extern "C" void custom_crash_callback(struct rst_info * rst_info, uint32_t stack, uint32_t stack_end ){
+extern "C" void custom_crash_callback(struct rst_info *rst_info, uint32_t stack, uint32_t stack_end)
+{
 
-	class StringPrinter2 : public Print {
-  	public:
-  	  String str = "";
-  	  StringPrinter2(){}
-  	  virtual size_t write(const uint8_t character){str+=character;}
-  	  virtual size_t write(const uint8_t *buffer, size_t size){
-  		  String buff=String((const char *)buffer);
-  		  buff.remove(size);
-  	    str+=buff;
-  	  }
+	class StringPrinter2 : public Print
+	{
+	public:
+		String str = "";
+		StringPrinter2() {}
+		virtual size_t write(const uint8_t character) { str += character; return 1; }
+		virtual size_t write(const uint8_t *buffer, size_t size)
+		{
+			String buff = String((const char *)buffer);
+			buff.remove(size);
+			str += buff;
+			return size;
+		}
 	} strprinter2;
 
 	saveCrashToSpiffs(rst_info, stack, stack_end, strprinter2);
 	File _file = SPIFFS.open(CRASHFILEPATH, "a");
-	if(!_file){
+	if (!_file)
+	{
 		_file = SPIFFS.open(CRASHFILEPATH, "w");
 	}
-	if(_file) {
-		unsigned int w = _file.write((uint8_t*)strprinter2.str.c_str(), strprinter2.str.length());
+	if (_file)
+	{
+		unsigned int w = _file.write((uint8_t *)strprinter2.str.c_str(), strprinter2.str.length());
 		_file.close();
 	}
 
-	#ifdef EW_SERIAL_LOG
-  Plain_Log( F("\nStack Trace saved to file : ") );
+#ifdef EW_SERIAL_LOG
+	Plain_Log(F("\nStack Trace saved to file : "));
 	Plain_Logln(CRASHFILEPATH);
-  #endif
+#endif
 }
-
 
 /**
  * Clear crash information saved in SPIFFS
  * In fact only crash counter is cleared
  * The crash data are not deleted
  */
-void clearCrashFile(void){
-
+void clearCrashFile(void)
+{
 	String fn = String(F(CRASHFILEPATH));
 	SPIFFS.remove(fn);
 }

@@ -45,13 +45,36 @@ enum MQTT_CONFIG_TYPE {
   MQTT_PUBSUB_CONFIG,
 };
 
-typedef struct {
+typedef struct mqtt_sub_topics{
+
+  // Default Constructor
+  mqtt_sub_topics(){
+    clear();
+  }
+
+  // Clear members method
+  void clear(){
+    memset(topic, 0, MQTT_TOPIC_BUF_SIZE);
+    qos = 0;
+  }
 
   char topic[MQTT_TOPIC_BUF_SIZE];
   uint8_t qos;
 } mqtt_sub_topics_t;
 
-typedef struct {
+typedef struct mqtt_pub_topics{
+
+  // Default Constructor
+  mqtt_pub_topics(){
+    clear();
+  }
+
+  // Clear members method
+  void clear(){
+    memset(topic, 0, MQTT_TOPIC_BUF_SIZE);
+    qos = 0;
+    retain = 0;
+  }
 
   char topic[MQTT_TOPIC_BUF_SIZE];
   uint8_t qos;
@@ -59,6 +82,23 @@ typedef struct {
 } mqtt_pub_topics_t;
 
 struct mqtt_general_configs {
+
+  // Default Constructor
+  mqtt_general_configs(){
+    clear();
+  }
+
+  // Clear members method
+  void clear(){
+    memset(host, 0, MQTT_HOST_BUF_SIZE);
+    port = MQTT_DEFAULT_PORT;
+    security = 0;
+    memset(client_id, 0, MQTT_CLIENT_ID_BUF_SIZE);
+    memset(username, 0, MQTT_USERNAME_BUF_SIZE);
+    memset(password, 0, MQTT_PASSWORD_BUF_SIZE);
+    keepalive = MQTT_DEFAULT_KEEPALIVE;
+    clean_session = 1;
+  }
 
   char host[MQTT_HOST_BUF_SIZE];
   int port;
@@ -72,6 +112,19 @@ struct mqtt_general_configs {
 
 struct mqtt_lwt_configs {
 
+  // Default Constructor
+  mqtt_lwt_configs(){
+    clear();
+  }
+
+  // Clear members method
+  void clear(){
+    memset(will_topic, 0, MQTT_TOPIC_BUF_SIZE);
+    memset(will_message, 0, MQTT_WILL_MSG_BUF_SIZE);
+    will_qos = 0;
+    will_retain = 0;
+  }
+
   char will_topic[MQTT_TOPIC_BUF_SIZE];
   char will_message[MQTT_WILL_MSG_BUF_SIZE];
   int will_qos;
@@ -80,34 +133,44 @@ struct mqtt_lwt_configs {
 
 struct mqtt_pubsub_configs {
 
+  // Default Constructor
+  mqtt_pubsub_configs(){
+    clear();
+  }
+
+  // Clear members method
+  void clear(){
+    publish_frequency = 0;
+  }
+
   mqtt_pub_topics_t publish_topics[MQTT_MAX_PUBLISH_TOPIC];
   mqtt_sub_topics_t subscribe_topics[MQTT_MAX_SUBSCRIBE_TOPIC];
   int publish_frequency;
 };
 
-const mqtt_sub_topics_t PROGMEM _mqtt_sub_topic_defaults = {
-  "", 0
-};
+// const mqtt_sub_topics_t PROGMEM _mqtt_sub_topic_defaults = {
+//   "", 0
+// };
 
-const mqtt_pub_topics_t PROGMEM _mqtt_pub_topic_defaults = {
-  "", 0, 0
-};
+// const mqtt_pub_topics_t PROGMEM _mqtt_pub_topic_defaults = {
+//   "", 0, 0
+// };
 
-const mqtt_general_configs PROGMEM _mqtt_general_config_defaults = {
-  "", MQTT_DEFAULT_PORT, 0, "", "", "", MQTT_DEFAULT_KEEPALIVE, 1
-};
+// const mqtt_general_configs PROGMEM _mqtt_general_config_defaults = {
+//   "", MQTT_DEFAULT_PORT, 0, "", "", "", MQTT_DEFAULT_KEEPALIVE, 1
+// };
 
-const mqtt_lwt_configs PROGMEM _mqtt_lwt_config_defaults = {
-  "", "", 0, 0
-};
+// const mqtt_lwt_configs PROGMEM _mqtt_lwt_config_defaults = {
+//   "", "", 0, 0
+// };
 
 // const mqtt_pubsub_configs PROGMEM _mqtt_pubsub_config_defaults = {
 //   {_mqtt_pub_topic_defaults}, {_mqtt_sub_topic_defaults}, 0
 // };
 
-const mqtt_pubsub_configs PROGMEM _mqtt_pubsub_config_defaults = {
-  NULL, NULL, 0
-};
+// const mqtt_pubsub_configs PROGMEM _mqtt_pubsub_config_defaults = {
+//   NULL, NULL, 0
+// };
 
 
 const int mqtt_general_config_size = sizeof(mqtt_general_configs) + 5;

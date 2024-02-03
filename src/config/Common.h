@@ -10,10 +10,7 @@ created Date    : 1st June 2019
 #ifndef _COMMON_CONFIG_H_
 #define _COMMON_CONFIG_H_
 
-#include <Arduino.h>
-extern "C" {
-  #include "user_interface.h"
-}
+#include <utility/DataTypeDef.h>
 
 /**
  * @define common time durations
@@ -42,7 +39,7 @@ extern "C" {
 /**
  * enable/disable device iot feature here
  */
-// #define ENABLE_DEVICE_IOT
+#define ENABLE_DEVICE_IOT
 
 /**
  * enable/disable serial log
@@ -57,7 +54,7 @@ extern "C" {
 /**
  * enable/disable exception notifier
  */
-// #define ENABLE_EXCEPTION_NOTIFIER
+#define ENABLE_EXCEPTION_NOTIFIER
 
 /**
  * ignore free relay connections created by same ssid
@@ -83,13 +80,6 @@ extern "C" {
  * enable/disable esp now feature here
  */
 // #define ENABLE_ESP_NOW
-
-/**
- * @define flash key parameters for reset factory
- */
-#define FLASH_KEY_PIN             D3
-#define FLASH_KEY_PRESS_DURATION  MILLISECOND_DURATION_1000
-#define FLASH_KEY_PRESS_COUNT_THR 5
 
 /**
  * @define wifi & internet connectivity check cycle durations
@@ -139,12 +129,5 @@ extern "C" {
 #define MAX_SCHEDULABLE_TASKS	25
 #define MAX_FACTORY_RESET_CALLBACKS	MAX_SCHEDULABLE_TASKS
 #define MAX_EVENT_CALLBACK_TASKS	MAX_SCHEDULABLE_TASKS
-
-/**
- * Define required callback type
- */
-typedef std::function<void(int)> CallBackIntArgFn;
-typedef std::function<void(void)> CallBackVoidArgFn;
-typedef std::function<void(void*)> CallBackVoidPointerArgFn;
 
 #endif

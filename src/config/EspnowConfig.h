@@ -11,9 +11,6 @@ created Date    : 1st June 2019
 #define _ESPNOW_CONFIG_H_
 
 #include "Common.h"
-extern "C" {
-#include <espnow.h>
-}
 
 // #define ESP_NOW_KEY                  "jo bole so nihal"
 #define ESP_NOW_KEY                     "lets kill people"
@@ -36,13 +33,13 @@ enum esp_now_state {
 };
 
 typedef struct {
-  uint8 mac[6];
+  uint8_t mac[6];
   uint8_t mesh_level;
 } esp_now_device_t;
 
 typedef struct {
-  uint8 mac[6];
-  esp_now_role role;
+  uint8_t mac[6];
+  uint8_t role;
   uint8_t channel;
   esp_now_state state;
   uint8_t* buffer;

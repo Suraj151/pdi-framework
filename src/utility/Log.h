@@ -18,16 +18,16 @@ created Date    : 1st June 2019
 
 #ifdef EW_SERIAL_LOG
 
-#define LogBegin(x)           Serial.begin(x)
-#define Log(x)                {yield();Serial.print(x);}
-#define Logln(x)		          {yield();Serial.println(x);}
-#define Log_format(x,t)       {yield();Serial.print(x,t);}
-#define Logln_format(x,t)     {yield();Serial.println(x,t);}
+#define LogBegin(x)             Serial.begin(x)
+#define Log(x)                  {yield();Serial.print(x);}
+#define Logln(x)		        {yield();Serial.println(x);}
+#define Log_format(x,t)         {yield();Serial.print(x,t);}
+#define Logln_format(x,t)       {yield();Serial.println(x,t);}
 
-#define Plain_Log(x)                {Serial.print(x);}
-#define Plain_Logln(x)		          {Serial.println(x);}
-#define Plain_Log_format(x,t)       {Serial.print(x,t);}
-#define Plain_Logln_format(x,t)     {Serial.println(x,t);}
+#define Plain_Log(x)            {Serial.print(x);}
+#define Plain_Logln(x)		    {Serial.println(x);}
+#define Plain_Log_format(x,t)   {Serial.print(x,t);}
+#define Plain_Logln_format(x,t) {Serial.println(x,t);}
 
 #else
 

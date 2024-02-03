@@ -14,7 +14,7 @@ created Date    : 1st June 2019
  * HttpServiceProvider constructor.
  */
 HttpServiceProvider::HttpServiceProvider():
-  m_http_client(&__http_client_interface),
+  m_http_client(&__i_http_client),
   m_port(80),
   m_retry(HTTP_REQUEST_RETRY)
 {

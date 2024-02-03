@@ -87,47 +87,47 @@ void DefaultDatabase::clear_default_tables(){
 /**
  * get/fetch global config table from database.
  *
- * @return global_config_table
+ * @return status
  */
-global_config_table DefaultDatabase::get_global_config_table(){
-  return __global_table.get();
+bool DefaultDatabase::get_global_config_table( global_config_table* _table ){
+  return __global_table.get(_table);
 }
 
 /**
  * get/fetch login credential table from database.
  *
- * @return login_credential_table
+ * @return status
  */
-login_credential_table DefaultDatabase::get_login_credential_table(){
-  return __login_table.get();
+bool DefaultDatabase::get_login_credential_table( login_credential_table* _table ){
+  return __login_table.get(_table);
 }
 
 /**
  * get/fetch wifi config table from database.
  *
- * @return wifi_config_table
+ * @return status
  */
-wifi_config_table DefaultDatabase::get_wifi_config_table(){
-  return __wifi_table.get();
+bool DefaultDatabase::get_wifi_config_table( wifi_config_table* _table ){
+  return __wifi_table.get(_table);
 }
 
 /**
  * get/fetch ota(over the air update) config table from database.
  *
- * @return ota_config_table
+ * @return status
  */
-ota_config_table DefaultDatabase::get_ota_config_table(){
-  return __ota_table.get();
+bool DefaultDatabase::get_ota_config_table( ota_config_table* _table ){
+  return __ota_table.get(_table);
 }
 
 #ifdef ENABLE_GPIO_SERVICE
 /**
  * get/fetch gpio config table from database.
  *
- * @return gpio_config_table
+ * @return status
  */
-gpio_config_table DefaultDatabase::get_gpio_config_table(){
-  return __gpio_table.get();
+bool DefaultDatabase::get_gpio_config_table( gpio_config_table* _table ){
+  return __gpio_table.get(_table);
 }
 #endif
 
@@ -135,28 +135,28 @@ gpio_config_table DefaultDatabase::get_gpio_config_table(){
 /**
  * get/fetch mqtt general config table from database.
  *
- * @return mqtt_general_config_table
+ * @return status
  */
-mqtt_general_config_table DefaultDatabase::get_mqtt_general_config_table(){
-  return __mqtt_general_table.get();
+bool DefaultDatabase::get_mqtt_general_config_table( mqtt_general_config_table* _table ){
+  return __mqtt_general_table.get(_table);
 }
 
 /**
  * get/fetch mqtt lwt config table from database.
  *
- * @return mqtt_lwt_config_table
+ * @return status
  */
-mqtt_lwt_config_table DefaultDatabase::get_mqtt_lwt_config_table(){
-  return __mqtt_lwt_table.get();
+bool DefaultDatabase::get_mqtt_lwt_config_table( mqtt_lwt_config_table* _table ){
+  return __mqtt_lwt_table.get(_table);
 }
 
 /**
  * get/fetch mqtt pubsub config table from database.
  *
- * @return mqtt_pubsub_config_table
+ * @return status
  */
-mqtt_pubsub_config_table DefaultDatabase::get_mqtt_pubsub_config_table(){
-  return __mqtt_pubsub_table.get();
+bool DefaultDatabase::get_mqtt_pubsub_config_table( mqtt_pubsub_config_table* _table ){
+  return __mqtt_pubsub_table.get(_table);
 }
 #endif
 
@@ -164,10 +164,10 @@ mqtt_pubsub_config_table DefaultDatabase::get_mqtt_pubsub_config_table(){
 /**
  * get/fetch email config table from database.
  *
- * @return email_config_table
+ * @return status
  */
-email_config_table DefaultDatabase::get_email_config_table(){
-  return __email_table.get();
+bool DefaultDatabase::get_email_config_table( email_config_table* _table ){
+  return __email_table.get(_table);
 }
 #endif
 
@@ -175,10 +175,10 @@ email_config_table DefaultDatabase::get_email_config_table(){
 /**
  * get/fetch device iot config table from database.
  *
- * @return device_iot_config_table
+ * @return status
  */
-device_iot_config_table DefaultDatabase::get_device_iot_config_table(){
-  return __device_iot_table.get();
+bool DefaultDatabase::get_device_iot_config_table( device_iot_config_table* _table ){
+  return __device_iot_table.get(_table);
 }
 #endif
 

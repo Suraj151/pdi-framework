@@ -13,9 +13,7 @@ created Date    : 1st June 2019
 
 #include <config/Config.h>
 
-#include <interface/WiFiInterface.h>
-#include <interface/WiFiClientInterface.h>
-#include <interface/HttpClientInterface.h>
+#include <interface/pdi.h>
 
 #ifdef ENABLE_EWING_HTTP_SERVER
 #include <webserver/EwingsWebServer.h>
@@ -27,6 +25,7 @@ created Date    : 1st June 2019
 #include <service_provider/OtaServiceProvider.h>
 #include <service_provider/WiFiServiceProvider.h>
 #include <service_provider/EventServiceProvider.h>
+#include <service_provider/FactoryResetServiceProvider.h>
 
 #ifdef ENABLE_ESP_NOW
 #include <service_provider/ESPNOWServiceProvider.h>
@@ -58,7 +57,7 @@ created Date    : 1st June 2019
 #elif defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
 #include <lwip/napt.h>
 #include <lwip/dns.h>
-#include <LwipDhcpServer.h>
+#include <LwipDhcpServer-NonOS.h>
 #endif
 
 /**

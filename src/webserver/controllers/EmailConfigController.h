@@ -50,7 +50,7 @@ class EmailConfigController : public Controller {
 		void boot( void ){
 
 			if( nullptr != this->m_web_resource && nullptr != this->m_web_resource->m_db_conn ){
-				this->email_configs = this->m_web_resource->m_db_conn->get_email_config_table();
+				this->m_web_resource->m_db_conn->get_email_config_table(&this->email_configs);
 			}
 			if( nullptr != this->m_route_handler ){
 				this->m_route_handler->register_route( EW_SERVER_EMAIL_CONFIG_ROUTE, [&]() { this->handleEmailConfigRoute(); }, AUTH_MIDDLEWARE );
@@ -112,7 +112,7 @@ class EmailConfigController : public Controller {
 				return;
 			}
 
-			this->email_configs = this->m_web_resource->m_db_conn->get_email_config_table();
+			this->m_web_resource->m_db_conn->get_email_config_table(&this->email_configs);
       #ifdef EW_SERIAL_LOG
       Logln(F("Handling Email Config route"));
       #endif
