@@ -53,7 +53,7 @@ class EmailTable : public DatabaseTable<email_config_table>
      */
     bool get(email_config_table *_table)
     {
-        return this->get_table(_table, EMAIL_CONFIG_TABLE_ADDRESS);
+        return this->get_table(EMAIL_CONFIG_TABLE_ADDRESS, _table);
     }
 
     /**
@@ -61,7 +61,7 @@ class EmailTable : public DatabaseTable<email_config_table>
      */
     bool set(email_config_table *_table)
     {
-        return this->set_table(_table, EMAIL_CONFIG_TABLE_ADDRESS);
+        return this->set_table(EMAIL_CONFIG_TABLE_ADDRESS, _table);
     }
 
     /**

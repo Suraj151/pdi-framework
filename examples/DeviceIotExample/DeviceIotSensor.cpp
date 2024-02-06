@@ -58,22 +58,19 @@ void DeviceIotSensor::sampleHook(){
  */
 void DeviceIotSensor::dataHook( String &_payload ){
 
-  #ifdef EW_SERIAL_LOG
   Log(F("Gathering sensor data samples : "));
-  #endif
+
   float _total = 0;
   for (int i = 0; i < this->m_sensor_sample_index; i++) {
     _total += this->m_sensor_samples[i];
-    #ifdef EW_SERIAL_LOG
+
     Log(this->m_sensor_samples[i]);
     Log(F(" "));
-    #endif
   }
   this->m_sensor_sample_value = _total/this->m_sensor_sample_index;
-  #ifdef EW_SERIAL_LOG
+
   Log(F("\nAverage : "));
   Logln(this->m_sensor_sample_value);
-  #endif
 
   this->m_sensor_sample_index = 0;
 

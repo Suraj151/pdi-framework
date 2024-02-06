@@ -11,7 +11,6 @@ created Date    : 1st June 2019
 #ifndef __TASK_SCHEDULER_H__
 #define __TASK_SCHEDULER_H__
 
-#include "Log.h"
 #include "iUtilityInterface.h"
 
 #define DEFAULT_TASK_PRIORITY 0
@@ -68,9 +67,7 @@ public:
 	void setMaxTasksLimit(uint8_t maxtasks);
 	// This needs to be set prior to start the scheduler handle
 	void setUtilityInterface(iUtilityInterface * util);
-#ifdef EW_SERIAL_LOG
 	void printTaskSchedulerLogs(void);
-#endif
 
 protected:
 	/**

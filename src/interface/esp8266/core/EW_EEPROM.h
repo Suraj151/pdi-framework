@@ -18,9 +18,9 @@ created Date    : 1st June 2019
 
 #define EEPROM_VALIDITY_BYTES "EWEE"
 
-class EW_EEPROMClass {
+class EW_EEPROMClass
+{
 public:
-
   EW_EEPROMClass(uint32_t sector);
   EW_EEPROMClass(void);
 
@@ -30,21 +30,20 @@ public:
   bool commit();
   void end();
 
-  uint8_t * getDataPtr();
-  uint8_t const * getConstDataPtr() const;
+  uint8_t *getDataPtr();
+  uint8_t const *getConstDataPtr() const;
 
-  size_t length() {return m_size;}
+  size_t length() { return m_size; }
 
-  uint8_t& operator[](int const address) {return getDataPtr()[address];}
-  uint8_t const & operator[](int const address) const {return getConstDataPtr()[address];}
+  uint8_t &operator[](int const address) { return getDataPtr()[address]; }
+  uint8_t const &operator[](int const address) const { return getConstDataPtr()[address]; }
 
 private:
-
-  uint32_t  m_sector;
-  uint32_t  m_copy_sector;
-  uint8_t   *m_data;
-  size_t    m_size;
-  bool      m_dirty;
+  uint32_t m_sector;
+  uint32_t m_copy_sector;
+  uint8_t *m_data;
+  size_t m_size;
+  bool m_dirty;
 };
 
 #if !defined(NO_GLOBAL_INSTANCES) && !defined(NO_GLOBAL_EEPROM)

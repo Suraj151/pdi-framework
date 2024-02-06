@@ -53,7 +53,7 @@ class GlobalTable : public DatabaseTable<global_config_table>
      */
     bool get(global_config_table *_table)
     {
-        return this->get_table(_table, GLOBAL_CONFIG_TABLE_ADDRESS);
+        return this->get_table(GLOBAL_CONFIG_TABLE_ADDRESS, _table);
     }
 
     /**
@@ -61,7 +61,7 @@ class GlobalTable : public DatabaseTable<global_config_table>
      */
     bool set(global_config_table *_table)
     {
-        return this->set_table(_table, GLOBAL_CONFIG_TABLE_ADDRESS);
+        return this->set_table(GLOBAL_CONFIG_TABLE_ADDRESS, _table);
     }
 
     /**

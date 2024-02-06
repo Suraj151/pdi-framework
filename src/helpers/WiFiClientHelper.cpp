@@ -17,16 +17,14 @@ bool connectToServer( iWiFiClientInterface *client, char* host, uint16_t port, u
   int result = 0;
 
   if ( nullptr != client && nullptr != host ) {
-    #ifdef EW_SERIAL_LOG
-    Log(F("Client: Connecting to "));Log(host);Log(F(" : "));Logln(port);
-    #endif
+    LogFmtI("Client: Connecting to %s : %d\n", host, port);
     client->setTimeout(timeout);
     // client->keepAlive();
     result = client->connect( host, port);
   }
-  #ifdef EW_SERIAL_LOG
-  Log(F("Client: Connect result -: ")); Logln(result);
-  #endif
+
+  LogFmtI("Client Connect result : %d\n", result);
+
   return result != 0;
 }
 
@@ -53,9 +51,8 @@ bool sendPacket( iWiFiClientInterface *client, uint8_t *buffer, uint16_t len ) {
 
     while (len > 0) {
 
-      #ifdef EW_SERIAL_LOG
-      Log(F("Client: Sending to "));Log(client->remoteIP());Log(F(" : "));Logln(client->remotePort());
-      #endif
+      LogFmtI("Client: Sending to remote port %d\n", client->remotePort());
+
       if ( isConnected(client) ) {
         // send 250 bytes at most at a time, can adjust this later based on Client
 
@@ -65,30 +62,23 @@ bool sendPacket( iWiFiClientInterface *client, uint8_t *buffer, uint16_t len ) {
         sentBytes += _sent;
         len -= _sent;
 
-        #ifdef EW_SERIAL_LOG
-        Log(F("Client: sending packets : "));
+        LogI("Client: sending packets : ");
         for (int i = 0; i < sendlen; i++) {
-          Log((char)_buff_pointer[i]);
+          LogFmtI("%c",(char)_buff_pointer[i]);
         }
-        Logln();
-        Log(F("Client: sent ")); Log(sentBytes); Log(F("/")); Logln(_buf_len);
-        #endif
+        LogFmtI("\nClient: sent %d/%d\n", sentBytes, _buf_len);
 
         if (len == 0) {
   	      status = true;
           break;
         }
         if (_sent != sendlen) {
-          #ifdef EW_SERIAL_LOG
-          Logln(F("Client: send packet - failed to send"));
-          #endif
+          LogE("Client: send packet - failed to send\n");
   	      status = false;
           break;
         }
       } else {
-        #ifdef EW_SERIAL_LOG
-        Logln(F("Client: send packet - connection failed"));
-        #endif
+        LogE("Client: send packet - connection failed\n");
         status = false;
         break;
       }
@@ -104,10 +94,6 @@ uint16_t readPacket( iWiFiClientInterface *client, uint8_t *buffer, uint16_t max
   uint16_t len = 0;
   int16_t t = timeout;
 
-  // #ifdef EW_SERIAL_LOG
-  // Log(F("Client: Reading from "));Log(client->remoteIP());Log(F(" : "));Logln(client->remotePort());
-  // Log(F("Client: Reading packets : "));
-  // #endif
   if( nullptr != client && nullptr != buffer ){
 
     while ( isConnected(client) && ( timeout >= 0 ) ) {
@@ -118,21 +104,12 @@ uint16_t readPacket( iWiFiClientInterface *client, uint8_t *buffer, uint16_t max
         timeout = t;  // reset the timeout
         buffer[len] = c;
         len++;
-        // #ifdef EW_SERIAL_LOG
-        // Log(c);
-        // #endif
 
         if( maxlen == 0 ){
-          // #ifdef EW_SERIAL_LOG
-          // Logln();
-          // #endif
           return 0;
         }
 
         if( len == maxlen ){
-          // #ifdef EW_SERIAL_LOG
-          // Logln();
-          // #endif
           return len;
         }
       }
@@ -140,8 +117,6 @@ uint16_t readPacket( iWiFiClientInterface *client, uint8_t *buffer, uint16_t max
       __i_dvc_ctrl.wait(1);
     }
   }
-  // #ifdef EW_SERIAL_LOG
-  // Logln();
-  // #endif
+
   return len;
 }

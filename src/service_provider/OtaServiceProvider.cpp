@@ -33,7 +33,6 @@ OtaServiceProvider::~OtaServiceProvider(){
  *
  * @param iWiFiClientInterface* _wifi_client
  * @param iHttpClientInterface*	_http_client
- * @param DefaultDatabase*      _database
  */
 void OtaServiceProvider::begin_ota( iWiFiClientInterface *_wifi_client, iHttpClientInterface *_http_client ){
 
@@ -49,17 +48,15 @@ void OtaServiceProvider::begin_ota( iWiFiClientInterface *_wifi_client, iHttpCli
  */
 void OtaServiceProvider::handleOta(){
 
-  #ifdef EW_SERIAL_LOG
-  Logln( F("\nHandeling OTA") );
-  #endif
+  LogI("\nHandeling OTA\n");
+
   http_ota_status _stat = this->handle();
-  #ifdef EW_SERIAL_LOG
-  Log( F("OTA status : ") );Logln( _stat );
-  #endif
+
+  LogFmtI("OTA status : %d\n", (int)_stat);
+
   if( _stat == UPDATE_OK ){
-    #ifdef EW_SERIAL_LOG
-    Logln( F("\nOTA Done ....Rebooting ") );
-    #endif
+
+    LogI("\nOTA Done ....Rebooting\n");
     __i_dvc_ctrl.restartDevice();
   }
 }
@@ -99,10 +96,8 @@ http_ota_status OtaServiceProvider::handle(){
 
      int _httpCode = this->m_http_client->GET();
 
-     #ifdef EW_SERIAL_LOG
-     Log( F("Http OTA version url Response code : ") );
-     Logln( _httpCode );
-     #endif
+     LogFmtI("Http OTA version url Response code : %d\n", _httpCode);
+
      if ( HTTP_CODE_OK == _httpCode || HTTP_CODE_MOVED_PERMANENTLY == _httpCode ) {
 
        String _response = this->m_http_client->getString();
@@ -126,12 +121,8 @@ http_ota_status OtaServiceProvider::handle(){
          uint32_t _firm_version = StringToUint32(_version_buf);
          delete[] _buf; delete[] _version_buf;
 
-         #ifdef EW_SERIAL_LOG
-         Log( F("Http OTA current version : ") );
-         Logln( _global_configs.firmware_version );
-         Log( F("Http OTA got version : ") );
-         Logln( _firm_version );
-         #endif
+         LogFmtI("Http OTA current version : %d\n", _global_configs.firmware_version);
+         LogFmtI("Http OTA got version : %d\n", _firm_version);
 
          if( _firm_version > _global_configs.firmware_version ){
 
@@ -149,29 +140,21 @@ http_ota_status OtaServiceProvider::handle(){
 
            if( ret == HTTP_UPDATE_FAILED ){
 
-             #ifdef EW_SERIAL_LOG
-             Logln( F("HTTP_UPDATE_FAILD") );
-             #endif
+             LogE("HTTP_UPDATE_FAILD\n");
              return UPDATE_FAILD;
            }else if( ret == HTTP_UPDATE_NO_UPDATES ){
 
-             #ifdef EW_SERIAL_LOG
-             Logln( F("HTTP_UPDATE_NO_UPDATES") );
-             #endif
+             LogI("HTTP_UPDATE_NO_UPDATES\n");
              return NO_UPDATES;
            }else if( ret == HTTP_UPDATE_OK ){
 
-             #ifdef EW_SERIAL_LOG
-             Logln( F("HTTP_UPDATE_OK") );
-             #endif
+             LogS("HTTP_UPDATE_OK\n");
              _global_configs.firmware_version = _firm_version;
              __database_service.set_global_config_table( &_global_configs );
              return UPDATE_OK;
            }else{
 
-             #ifdef EW_SERIAL_LOG
-             Logln( F("HTTP_UPDATE_UNKNOWN_RETURN") );
-             #endif
+             LogW("HTTP_UPDATE_UNKNOWN_RETURN\n");
              return UNKNOWN;
            }
 
@@ -187,14 +170,11 @@ http_ota_status OtaServiceProvider::handle(){
        return VERSION_CHECK_FAILED;
      }
    }else{
-     #ifdef EW_SERIAL_LOG
-     Logln( F("Http OTA Update not initializing or failed or Not Configured Correctly") );
-     #endif
+     LogE("Http OTA Update not initializing or failed or Not Configured Correctly\n");
      return CONFIG_ERROR;
    }
 }
 
-#ifdef EW_SERIAL_LOG
 /**
  * print ota configs
  */
@@ -203,10 +183,7 @@ void OtaServiceProvider::printOtaConfigLogs(){
   ota_config_table _ota_configs;
   __database_service.get_ota_config_table(&_ota_configs);
 
-  Logln(F("\nOTA Configs :"));
-  Log(_ota_configs.ota_host); Log("\t");
-  Log(_ota_configs.ota_port); Logln("\n");
+  LogFmtI("\nOTA Configs :\n%s\t%d\n", _ota_configs.ota_host, _ota_configs.ota_port);
 }
-#endif
 
 OtaServiceProvider __ota_service;

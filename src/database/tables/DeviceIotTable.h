@@ -53,7 +53,7 @@ class DeviceIotTable : public DatabaseTable<device_iot_config_table>
      */
     bool get(device_iot_config_table *_table)
     {
-        return this->get_table(_table, DEVICE_IOT_CONFIG_TABLE_ADDRESS);
+        return this->get_table(DEVICE_IOT_CONFIG_TABLE_ADDRESS, _table);
     }
 
     /**
@@ -61,7 +61,7 @@ class DeviceIotTable : public DatabaseTable<device_iot_config_table>
      */
     bool set(device_iot_config_table *_table)
     {
-        return this->set_table(_table, DEVICE_IOT_CONFIG_TABLE_ADDRESS);
+        return this->set_table(DEVICE_IOT_CONFIG_TABLE_ADDRESS, _table);
     }
 
     /**

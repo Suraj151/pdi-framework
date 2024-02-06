@@ -54,6 +54,8 @@ public:
   // below are the utility interface dependencies which needs to be satisfy
   // virtual void wait(uint64_t timeoutms) = 0;
   // virtual uint32_t millis_now() = 0;
+  // virtual void log(const char *format, logger_type_t log_type, ...) = 0;
+  // virtual void yield() = 0;
 };
 
 // derived class must define this

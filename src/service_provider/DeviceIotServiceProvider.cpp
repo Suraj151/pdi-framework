@@ -89,10 +89,7 @@ void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_t
   sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
   __find_and_replace( __http_service.m_host, "[mac]", macStr, 2 );
 
-  #ifdef EW_SERIAL_LOG
-  Log( F("Handling device otp Http Request : ") );
-  Logln( __http_service.m_host );
-  #endif
+  LogFmtI("Handling device otp Http Request : %s\n", __http_service.m_host );
 
   if( strlen( __http_service.m_host ) > 5 &&
     __http_service.m_http_client->begin( *this->m_wifi_client, __http_service.m_host )
@@ -104,10 +101,7 @@ void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_t
 
     int _httpCode = __http_service.m_http_client->GET();
 
-    #ifdef EW_SERIAL_LOG
-    Log( F("Http device otp Response code : ") );
-    Logln( _httpCode );
-    #endif
+    LogFmtI("Http device otp Response code : %d\n", _httpCode );
     if ( (_httpCode == HTTP_CODE_OK || _httpCode == HTTP_CODE_MOVED_PERMANENTLY) && __http_service.m_http_client->getSize() <= DEVICE_IOT_OTP_API_RESP_LENGTH ) {
 
       _response = __http_service.m_http_client->getString();
@@ -121,9 +115,7 @@ void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_t
     __http_service.m_http_client->end();
 
   }else{
-    #ifdef EW_SERIAL_LOG
-    Logln( F("Device otp Request not initializing or failed or Not Configured Correctly") );
-    #endif
+    LogE("Device otp Request not initializing or failed or Not Configured Correctly\n");
   }
 }
 
@@ -147,10 +139,7 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
   wifi_get_macaddr(STATION_IF, mac);
   sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
   __find_and_replace( __http_service.m_host, "[mac]", macStr, 2 );
-  #ifdef EW_SERIAL_LOG
-  Logln( F("Handling device iot config Request") );
-  // Log( F("Mac : ") );Logln( macStr );
-  #endif
+  LogI("Handling device iot config Request\n");
 
   if( strlen( __http_service.m_host ) > 5 &&
     __http_service.m_http_client->begin( *this->m_wifi_client, __http_service.m_host )
@@ -160,20 +149,13 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
     __http_service.m_http_client->setTimeout(3*MILLISECOND_DURATION_1000);
     int _httpCode = __http_service.m_http_client->GET();
 
-    #ifdef EW_SERIAL_LOG
-    Log( F("Device iot config request Status Code : ") ); Logln( _httpCode );
-    #endif
+    LogFmtI("Device iot config request Status Code : %d\n", _httpCode);
     if ( _httpCode == HTTP_CODE_OK || _httpCode == HTTP_CODE_MOVED_PERMANENTLY ) {
 
-      #ifdef EW_SERIAL_LOG
-      Log( F("Http Response : ") );
-      #endif
       if( __http_service.m_http_client->getSize() < DEVICE_IOT_CONFIG_RESP_MAX_SIZE ){
 
         String _response = __http_service.m_http_client->getString();
-        #ifdef EW_SERIAL_LOG
-        Logln( _response );
-        #endif
+        LogFmtI("Http Response : %d\n",_response);
 
         char *_buf = new char[DEVICE_IOT_CONFIG_RESP_MAX_SIZE];
         memset( _buf, 0, DEVICE_IOT_CONFIG_RESP_MAX_SIZE );
@@ -185,12 +167,8 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
           _json_result = __get_from_json( _buf, (char*)DEVICE_IOT_CONFIG_TOPIC_KEY, this->m_device_iot_configs.device_iot_topic, DEVICE_IOT_CONFIG_TOPIC_MAX_SIZE );
           if(  _json_result && strlen( this->m_device_iot_configs.device_iot_token ) && strlen( this->m_device_iot_configs.device_iot_topic ) ){
 
-            #ifdef EW_SERIAL_LOG
-            Log( F("Got Token : ") );
-            Logln( this->m_device_iot_configs.device_iot_token );
-            Log( F("Got Topic : ") );
-            Logln( this->m_device_iot_configs.device_iot_topic );
-            #endif
+            LogFmtI("Got Token : %s\n", this->m_device_iot_configs.device_iot_token );
+            LogFmtI("Got Topic : %s\n", this->m_device_iot_configs.device_iot_topic );
             __database_service.set_device_iot_config_table( &this->m_device_iot_configs );
 
             this->handleServerConfigurableParameters( _buf );
@@ -216,17 +194,13 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
         }
         delete[] _buf;
       }else{
-        #ifdef EW_SERIAL_LOG
-        Logln( F(" response size over !") );
-        #endif
+        LogW("Http Response : response size over !\n");
       }
     }
     __http_service.m_http_client->end();
   }else{
 
-    #ifdef EW_SERIAL_LOG
-    Logln( F("Device iot config request not initializing or failed or Not Configured Correctly") );
-    #endif
+    LogE("Device iot config request not initializing or failed or Not Configured Correctly\n");
   }
 
 }
@@ -237,10 +211,7 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
 void DeviceIotServiceProvider::handleConnectivityCheck(){
 
   bool _is_mqtt_connected = __mqtt_service.m_mqtt_client.is_mqtt_connected();
-  #ifdef EW_SERIAL_LOG
-  Log( F("Device iot mqtt connection check cycle : ") );
-  Logln( _is_mqtt_connected );
-  #endif
+  LogFmtI("Device iot mqtt connection check cycle : %d\n", (int)_is_mqtt_connected );
   if( !_is_mqtt_connected ) {
     this->m_token_validity = false;
     __mqtt_service.stop();
@@ -301,19 +272,14 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
   if( _json_result && SENSOR_DATA_PUBLISH_FREQ_MIN_LIMIT <= data_rate && data_rate <= SENSOR_DATA_PUBLISH_FREQ_MAX_LIMIT ){
 
     this->m_sensor_data_publish_freq = data_rate;
-    #ifdef EW_SERIAL_LOG
-    Log( F("Got Data rate : ") );
-    Logln( data_rate );
-    #endif
+    LogFmtI("Got Data rate : %d\n", data_rate);
   }
 
   uint16_t sample_rate = round ( this->m_sensor_data_publish_freq / ( ( SENSOR_DATA_SAMPLES_PER_PUBLISH_MAX_LIMIT * 0.125 ) * ( log(this->m_sensor_data_publish_freq) ) ) );
   if( 0 < sample_rate && sample_rate <= SENSOR_DATA_SAMPLES_PER_PUBLISH_MAX_LIMIT ){
+
     this->m_smaple_per_publish = sample_rate;
-    #ifdef EW_SERIAL_LOG
-    Log( F("Got Sample rate : ") );
-    Logln( sample_rate );
-    #endif
+    LogFmtI("Got Sample rate : %d\n", sample_rate);
   }
 
   memset( _value_buff, 0, 10 );
@@ -322,10 +288,7 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
   if( _json_result && DEVICE_IOT_MQTT_KEEP_ALIVE_MIN <= keep_alive && keep_alive <= DEVICE_IOT_MQTT_KEEP_ALIVE_MAX ){
 
     this->m_mqtt_keep_alive = keep_alive;
-    #ifdef EW_SERIAL_LOG
-    Log( F("Got keep alive : ") );
-    Logln( keep_alive );
-    #endif
+    LogFmtI("Got keep alive : %d\n", keep_alive);
   }
 
   this->beginSensorData();
@@ -374,9 +337,7 @@ void DeviceIotServiceProvider::initDeviceIotSensor( iDeviceIotInterface *_device
  */
 void DeviceIotServiceProvider::handleSensorData(){
 
-  #ifdef EW_SERIAL_LOG
-  Log(F("Handling sensor data samples: "));Logln(this->m_smaple_index);
-  #endif
+  LogFmtI("Handling sensor data samples: %d\n", this->m_smaple_index);
 
   if( nullptr == this->m_device_iot ){
     return;
@@ -423,16 +384,12 @@ void DeviceIotServiceProvider::handleWifiStatusLed(){
     return;
   }
 
-  #ifdef EW_SERIAL_LOG
-  Logln(F("Handling LED Status Indications"));
-  Log(F("RSSI : "));Logln( this->m_wifi->RSSI() );
-  #endif
+  LogI("Handling LED Status Indications\n");
+  LogFmtI("RSSI : %d\n", this->m_wifi->RSSI());
 
   if( !this->m_wifi->localIP().isSet() || !this->m_wifi->isConnected() || ( this->m_wifi->RSSI() < (int)WIFI_RSSI_THRESHOLD ) ){
 
-    #ifdef EW_SERIAL_LOG
-    Logln( F("WiFi not connected.") );
-    #endif
+    LogW("WiFi not connected.\n");
     __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, this->m_wifi_led, LOW );
   }else{
 
@@ -449,7 +406,6 @@ void DeviceIotServiceProvider::handleWifiStatusLed(){
 }
 #endif
 
-#ifdef EW_SERIAL_LOG
 /**
  * print device register configs
  */
@@ -458,10 +414,8 @@ void DeviceIotServiceProvider::printDeviceIotConfigLogs(){
   device_iot_config_table _device_iot_configs;
   __database_service.get_device_iot_config_table(&_device_iot_configs);
 
-  Logln(F("\nDevice IOT Configs :"));
-  Log(_device_iot_configs.device_iot_host); Logln("\n");
+  LogFmtI("\nDevice IOT Configs : %s\n\n", _device_iot_configs.device_iot_host);
 }
-#endif
 
 DeviceIotServiceProvider __device_iot_service;
 

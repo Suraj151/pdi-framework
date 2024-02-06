@@ -152,14 +152,8 @@ void SMTPdriver::waitForResponse( uint16_t _timeOut ) {
  		this->readResponse();
 	} while( SMTP_RESPONSE_WAITING == this->m_responseReaderStatus );
 
-  #ifdef EW_SERIAL_LOG
-  Log(F("SMTP status: "));
-	Logln(this->m_responseReaderStatus);
-	Log(F("SMTP response: "));
-  if( nullptr != this->m_responseBuffer ){
-    Logln(this->m_responseBuffer);
-  }
-	#endif
+	LogFmtI("SMTP status: %d\n", this->m_responseReaderStatus);
+	LogFmtI("SMTP response: %s\n", nullptr != this->m_responseBuffer ? this->m_responseBuffer : " ");
 }
 
 bool SMTPdriver::waitForExpectedResponse(	char *expectedResponse, uint16_t _timeOut ){
@@ -168,10 +162,7 @@ bool SMTPdriver::waitForExpectedResponse(	char *expectedResponse, uint16_t _time
 
 	this->waitForResponse( _timeOut );
 
-  #ifdef EW_SERIAL_LOG
-  Log(F("SMTP espected response: "));
-	Logln(expectedResponse);
-	#endif
+	LogFmtI("SMTP espected response: %s\n", expectedResponse);
 
   if( nullptr != this->m_responseBuffer ){
     status = ( __strstr( (char*)this->m_responseBuffer, expectedResponse ) > 0 );
@@ -184,10 +175,7 @@ bool SMTPdriver::sendCommandAndExpect( char *command, char *expectedResponse, ui
 
   bool status = false;
 
-  #ifdef EW_SERIAL_LOG
-  Log(F("SMTP sending command: "));
-	Logln(command);
-	#endif
+	LogFmtI("SMTP sending command: %s\n", command);
 
   if( nullptr != this->m_client ){
 
@@ -207,10 +195,8 @@ bool SMTPdriver::sendCommandAndExpect( char *command, char *expectedResponse, ui
 int SMTPdriver::sendCommandAndGetCode( PGM_P command, uint16_t _timeOut ){
 
   int respcode = SMTP_STATUS_MAX;
-  #ifdef EW_SERIAL_LOG
-  Log(F("SMTP sending command: "));
-	Logln(command);
-	#endif
+
+	LogFmtI("SMTP sending command: %s\n", command);
 
   if( nullptr != this->m_client ){
 
@@ -236,10 +222,9 @@ int SMTPdriver::sendCommandAndGetCode( PGM_P command, uint16_t _timeOut ){
 int SMTPdriver::sendCommandAndGetCode( char *command, uint16_t _timeOut ){
 
   int respcode = SMTP_STATUS_MAX;
-  #ifdef EW_SERIAL_LOG
-  Log(F("SMTP sending command: "));
-	Logln(command);
-	#endif
+
+	LogFmtI("SMTP sending command: %s\n", command);
+
   if( nullptr != this->m_client ){
 
     if( isConnected( this->m_client ) ){
@@ -366,10 +351,9 @@ void SMTPdriver::sendDataHeader( char *sender, char *recipient, char *subject ){
 bool SMTPdriver::sendDataBody( String &body ){
 
   int respcode = SMTP_STATUS_MAX;
-  #ifdef EW_SERIAL_LOG
-  Log(F("SMTP sending data: "));
-	Logln(body);
-	#endif
+
+	LogFmtI("SMTP sending data: %s\n", body.c_str());
+
   if( nullptr != this->m_client ){
     // this->m_client->writeln( body );
     sendPacket( this->m_client, (uint8_t*)body.c_str(), body.length()+1 );
@@ -382,10 +366,9 @@ bool SMTPdriver::sendDataBody( String &body ){
 bool SMTPdriver::sendDataBody( char *body ){
 
   int respcode = SMTP_STATUS_MAX;
-  #ifdef EW_SERIAL_LOG
-  Log(F("SMTP sending data: "));
-	Logln(body);
-	#endif
+
+	LogFmtI("SMTP sending data: %s\n", body);
+
   if( nullptr != this->m_client ){
     // this->m_client->writeln( body );
     sendPacket( this->m_client, (uint8_t*)body, strlen(body) );
@@ -398,10 +381,9 @@ bool SMTPdriver::sendDataBody( char *body ){
 bool SMTPdriver::sendDataBody( PGM_P body ){
 
   int respcode = SMTP_STATUS_MAX;
-  #ifdef EW_SERIAL_LOG
-  Log(F("SMTP sending data: "));
-	Logln(body);
-	#endif
+
+	LogFmtI("SMTP sending data: %s\n", body);
+
   if( nullptr != this->m_client ){
     this->m_client->writeln( body );
     respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA_TERMINATOR );

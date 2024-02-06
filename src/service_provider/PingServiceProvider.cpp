@@ -21,21 +21,10 @@ static void ICACHE_FLASH_ATTR ping_recv_cb (void* arg, void *pdata){
   struct ping_resp *pingrsp = (struct ping_resp *)pdata;
 
   if (pingrsp->bytes > 0) {
-    #ifdef EW_SERIAL_LOG
-    Plain_Log(F("\nPing: Reply "));
-    // Plain_Log(PING_TARGET);
-    Plain_Log(F(": "));
-    Plain_Log(F("bytes="));
-    Plain_Log(pingrsp->bytes);
-    Plain_Log(F(" time="));
-    Plain_Log(pingrsp->resp_time);
-    Plain_Logln(F("ms"));
-    #endif
+    LogFmtI("\nPing: Reply bytes=%d time=%dms\n", pingrsp->bytes, pingrsp->resp_time);
     _host_resp = true;
   } else {
-    #ifdef EW_SERIAL_LOG
-    Plain_Logln(F("\nPing: Request timed out"));
-    #endif
+    LogI("\nPing: Request timed out\n");
     _host_resp = false;
   }
 }
@@ -78,10 +67,7 @@ bool PingServiceProvider::ping(){
     this->m_wifi->hostByName(_pinghostname, _ip, 1500);
     this->m_opt.ip = (uint32_t)_ip;
   }
-  #ifdef EW_SERIAL_LOG
-  Log(F("\nPing ip: "));
-  Logln(_ip);
-  #endif
+  LogFmtI("\nPing ip: %s\n", _ip.toString().c_str());
   return _ip.isSet() ? ping_start(&this->m_opt) : false;
 }
 

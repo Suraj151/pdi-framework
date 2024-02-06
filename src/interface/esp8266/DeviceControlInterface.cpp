@@ -81,14 +81,6 @@ void DeviceControlInterface::restartDevice()
 }
 
 /**
- * keep hold on current execution
- */
-void DeviceControlInterface::wait(uint64_t timeoutms)
-{
-    delay(timeoutms);
-}
-
-/**
  * erase device config if any
  */
 void DeviceControlInterface::eraseConfig()
@@ -122,10 +114,7 @@ bool DeviceControlInterface::isDeviceFactoryRequested()
     if (__i_dvc_ctrl.gpioRead(DIGITAL_READ, FLASH_KEY_PIN) == LOW)
     {
         m_flash_key_pressed++;
-#ifdef EW_SERIAL_LOG
-        Log(F("Flash Key pressed : "));
-        Logln(m_flash_key_pressed);
-#endif
+        LogFmtI("Flash Key pressed : %d\n", m_flash_key_pressed);
     }
     else
     {
@@ -136,11 +125,35 @@ bool DeviceControlInterface::isDeviceFactoryRequested()
 }
 
 /**
+ * keep hold on current execution
+ */
+void DeviceControlInterface::wait(uint64_t timeoutms)
+{
+    delay(timeoutms);
+}
+
+/**
  * return current time in milli second
  */
 uint32_t DeviceControlInterface::millis_now()
 {
     return millis();
+}
+
+/**
+ * log helper for utility
+ */
+void DeviceControlInterface::log(logger_type_t log_type, const char *content)
+{
+    __i_logger.log(log_type, content);
+}
+
+/**
+ * yield
+ */
+void DeviceControlInterface::yield()
+{
+    delay(0);
 }
 
 DeviceControlInterface __i_dvc_ctrl;

@@ -23,7 +23,6 @@ created Date    : 1st June 2019
 #include "DataTypeConversions.h"
 #include "StringOperations.h"
 #include "queue/queue.h"
-#include "Log.h"
 
 /**
  * This template clone program memory object to data memory.
@@ -31,10 +30,10 @@ created Date    : 1st June 2019
  * @param	cost T* sce
  * @param	T&	dest
  */
-template <typename T> void PROGMEM_readAnything (const T * sce, T& dest)
-{
-	memcpy_P (&dest, sce, sizeof (T));
-}
+// template <typename T> void PROGMEM_readAnything (const T * sce, T& dest)
+// {
+// 	memcpy_P (&dest, sce, sizeof (T));
+// }
 
 /**
  * This template returns static copy of program memory object.
@@ -42,12 +41,12 @@ template <typename T> void PROGMEM_readAnything (const T * sce, T& dest)
  * @param		cost T* sce
  * @return	T
  */
-template <typename T> T PROGMEM_getAnything (const T * sce)
-{
-	static T temp;
-	memcpy_P (&temp, sce, sizeof (T));
-	return temp;
-}
+// template <typename T> T PROGMEM_getAnything (const T * sce)
+// {
+// 	static T temp;
+// 	memcpy_P (&temp, sce, sizeof (T));
+// 	return temp;
+// }
 
 /**
  * Template to clear type of object/struct.

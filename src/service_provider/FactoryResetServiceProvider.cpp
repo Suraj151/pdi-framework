@@ -78,9 +78,7 @@ void DeviceFactoryReset::check_device_factory_request()
 {
   if( __i_dvc_ctrl.isDeviceFactoryRequested() )
   {
-#ifdef EW_SERIAL_LOG
-      Logln(F("requested factory reset !"));
-#endif
+      LogI("requested factory reset !\n");
       this->factory_reset();
   }
 }

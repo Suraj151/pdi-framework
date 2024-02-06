@@ -51,10 +51,7 @@ class DashboardController : public Controller {
 		 */
 		void handleDashboardMonitor(void)
 		{
-
-#ifdef EW_SERIAL_LOG
-			Logln(F("Handling dashboard monitor route"));
-#endif
+			LogI("Handling dashboard monitor route\n");
 
 			if (nullptr == this->m_web_resource || nullptr == this->m_web_resource->m_wifi || nullptr == this->m_route_handler)
 			{
@@ -114,9 +111,8 @@ class DashboardController : public Controller {
 		 */
 		void handleDashboardRoute(void)
 		{
-#ifdef EW_SERIAL_LOG
-			Logln(F("Handling dashboard route"));
-#endif
+			LogI("Handling dashboard route\n");
+
 			bool _is_posted = false;
 
 			char *_page = new char[EW_HTML_MAX_SIZE];

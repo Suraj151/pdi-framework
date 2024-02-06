@@ -67,17 +67,10 @@ void EventServiceProvider::execute_event( event_name_t _event, void* _arg ){
 
     if( this->m_event_listeners[i]._event == _event && this->m_event_listeners[i]._event_handler ){
 
-      #ifdef EW_SERIAL_LOG
-        Plain_Log(F("\nExecuting event : "));
-        Plain_Logln((int)_event);
-      #endif
+      LogFmtI("\nExecuting event : %d\n", (int)_event);
       this->m_event_listeners[i]._event_handler(_arg);
     }
   }
-  // #ifdef EW_SERIAL_LOG
-  //   Plain_Log(F("\nExecuting event : "));
-  //   Plain_Logln((int)_event);
-  // #endif
 }
 
 /**

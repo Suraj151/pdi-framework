@@ -52,10 +52,8 @@ void subscribe_callback( uint32_t *args, const char* topic, uint32_t topic_len, 
   memcpy(dataBuf, data, data_len);
   dataBuf[data_len] = 0;
 
-  #ifdef EW_SERIAL_LOG
   Logln(F("\n\nMQTT: user data callback"));
   Serial.printf("MQTT: user Receive topic: %s, data: %s \n\n", topicBuf, dataBuf);
-  #endif
 
   delete[] topicBuf; delete[] dataBuf;
 }

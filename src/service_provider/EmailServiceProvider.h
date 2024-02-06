@@ -41,10 +41,7 @@ class EmailServiceProvider : public ServiceProvider {
     bool sendMail( PGM_P mail_body );
     // template <typename T> bool sendMail( T mail_body );
     void handleEmail( void );
-
-    #ifdef EW_SERIAL_LOG
     void printEmailConfigLogs( void );
-    #endif
 
     /**
 		 * @var	int|0 m_mail_handler_cb_id

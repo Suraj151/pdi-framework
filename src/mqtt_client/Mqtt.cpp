@@ -24,9 +24,7 @@ created Date    : 1st June 2019
 
 void mqttConnectedCb( uint32_t *args ){
 
-    #ifdef EW_SERIAL_LOG
-    Logln(F("MQTT: connected cb"));
-    #endif
+    LogI("MQTT: connected cb\n");
     MQTTClient* _client = reinterpret_cast<MQTTClient*>(args);
     if( nullptr != _client ){
       _client->m_mqttClient.mqtt_connected = true;
@@ -35,9 +33,7 @@ void mqttConnectedCb( uint32_t *args ){
 
 void mqttDisconnectedCb( uint32_t *args ){
 
-    #ifdef EW_SERIAL_LOG
-    Logln(F("MQTT: disconnect cb"));
-    #endif
+    LogI("MQTT: disconnect cb\n");
     MQTTClient* _client = reinterpret_cast<MQTTClient*>(args);
 
     if( nullptr != _client ){
@@ -48,23 +44,17 @@ void mqttDisconnectedCb( uint32_t *args ){
 
 void mqttPublishedCb( uint32_t *args ){
 
-    #ifdef EW_SERIAL_LOG
-    Logln(F("MQTT: published cb"));
-    #endif
+    LogI("MQTT: published cb\n");
 }
 
 void mqttSubscribedCb( uint32_t *args ){
 
-    #ifdef EW_SERIAL_LOG
-    Logln(F("MQTT: subscribed cb"));
-    #endif
+    LogI("MQTT: subscribed cb\n");
 }
 
 void mqttUnsubscribedCb( uint32_t *args ){
 
-    #ifdef EW_SERIAL_LOG
-    Logln(F("MQTT: unsubscribed cb"));
-    #endif
+    LogI("MQTT: unsubscribed cb\n");
 }
 
 void mqttDataCb( uint32_t *args, const char *topic, uint32_t topic_len, const char *data, uint32_t data_len){
@@ -84,10 +74,7 @@ void mqttDataCb( uint32_t *args, const char *topic, uint32_t topic_len, const ch
 
     if( nullptr != topicBuf && nullptr != dataBuf ){
 
-      #ifdef EW_SERIAL_LOG
-      Logln(F("MQTT: data cb"));
-      Serial.printf("MQTT: Receive topic: %s, data: %s \r\n", topicBuf, dataBuf);
-      #endif
+      LogFmtI("MQTT: data cb\nMQTT: Receive topic: %s, data: %s \r\n", topicBuf, dataBuf);
     }
 
     if( nullptr != topicBuf ){
@@ -194,9 +181,6 @@ void MQTTClient::deliver_publish(  uint8_t *message, int length ){
 // void mqtt_wificlient_delete( MQTT_Client *m_mqttClient ){
 //
 //     if ( m_mqttClient->m_wifi_client != nullptr) {
-//         #ifdef EW_SERIAL_LOG
-//         Logln(F("MQTT: deleting wifi Client"));
-//         #endif
 //         m_mqttClient->m_wifi_client->stopAll();
 //         delete m_mqttClient->m_wifi_client;
 //         m_mqttClient->m_wifi_client = nullptr;
@@ -210,15 +194,15 @@ void MQTTClient::mqtt_client_recv(){
     }
 
     int len = this->readFullPacket( this->m_mqttClient.mqtt_state.in_buffer, this->m_mqttClient.mqtt_state.in_buffer_length, MQTT_READ_TIMEOUT*10 );
-    #ifdef EW_SERIAL_LOG
-    Log(F("MQTT: recieved packet size :"));Logln(len);
-    Log(F("MQTT: recieved packets :"));
+
+    LogFmtI("MQTT: recieved packet size : %d\n",len);
+    LogI("MQTT: recieved packets : ");
     for (int i = 0; i < len; i++) {
-      Log_format( this->m_mqttClient.mqtt_state.in_buffer[i], HEX ); Log(" ");
+      LogFmtI("%x ", this->m_mqttClient.mqtt_state.in_buffer[i]);
       __i_dvc_ctrl.wait(0);
     }
-    Logln();
-    #endif
+    LogI("\n");
+
     __i_dvc_ctrl.wait(0);
 
     if ( len < MQTT_BUF_SIZE && len > 0 ) {
@@ -234,10 +218,7 @@ void MQTTClient::mqtt_client_recv(){
           this->m_mqttClient.sendTimeout = MQTT_SEND_TIMEOUT;
         }
 
-        #ifdef EW_SERIAL_LOG
-        Log(F("MQTT: recieved msg type :"));Logln(msg_type);
-        Log(F("MQTT: recieved msg qos :"));Logln(msg_qos);
-        #endif
+        LogFmtI("MQTT: recieved msg type(%d), qos(%d)\n",msg_type, msg_qos);
 
         switch ( this->m_mqttClient.connState ) {
 
@@ -247,15 +228,11 @@ void MQTTClient::mqtt_client_recv(){
 
                     if ( MQTT_MSG_TYPE_CONNECT != this->m_mqttClient.mqtt_state.pending_msg_type ) {
 
-                        #ifdef EW_SERIAL_LOG
-                        Logln(F("MQTT: Invalid packet recieved"));
-                        #endif
+                        LogE("MQTT: Invalid packet recieved\n");
                         this->m_mqttClient.connState = MQTT_HOST_RECONNECT_REQ;
                     } else {
 
-                        #ifdef EW_SERIAL_LOG
-                        Logln(F("MQTT: CONNACK recieved"));
-                        #endif
+                        LogI("MQTT: CONNACK recieved\n");
                         this->m_mqttClient.connState = MQTT_DATA;
                         if ( nullptr != this->m_connectedCb ){
                           this->m_connectedCb( (uint32_t*)this );
@@ -286,9 +263,7 @@ void MQTTClient::mqtt_client_recv(){
 
                         if ( MQTT_MSG_TYPE_SUBSCRIBE == this->m_mqttClient.mqtt_state.pending_msg_type && this->m_mqttClient.mqtt_state.pending_msg_id == msg_id ){
 
-                          #ifdef EW_SERIAL_LOG
-                          Logln(F("MQTT: Subscribe successful"));
-                          #endif
+                          LogS("MQTT: Subscribe successful\n");
                         }
                         if ( nullptr != this->m_subscribedCb ){
                           this->m_subscribedCb( (uint32_t*)this );
@@ -298,9 +273,7 @@ void MQTTClient::mqtt_client_recv(){
                     case MQTT_MSG_TYPE_UNSUBACK:
 
                         if ( MQTT_MSG_TYPE_UNSUBSCRIBE == this->m_mqttClient.mqtt_state.pending_msg_type && this->m_mqttClient.mqtt_state.pending_msg_id == msg_id ){
-                          #ifdef EW_SERIAL_LOG
-                          Logln(F("MQTT: UnSubscribe successful"));
-                          #endif
+                          LogS("MQTT: UnSubscribe successful\n");
                         }
                         if ( nullptr != this->m_unsubscribedCb ){
                           this->m_unsubscribedCb( (uint32_t*)this );
@@ -318,13 +291,9 @@ void MQTTClient::mqtt_client_recv(){
                         }
                         if ( 1 == msg_qos || 2 == msg_qos ) {
 
-                            #ifdef EW_SERIAL_LOG
-                            Serial.printf("MQTT: Queue response QoS: %d\r\n", msg_qos);
-                            #endif
+                            LogFmtI("MQTT: Queue response QoS: %d\r\n", msg_qos);
                             if ( QUEUE_Puts(&this->m_mqttClient.msgQueue, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length) == -1) {
-                              #ifdef EW_SERIAL_LOG
-                              Logln(F("MQTT: Queue full"));
-                              #endif
+                              LogW("MQTT: Queue full\n");
                             }
                         }
 
@@ -335,9 +304,7 @@ void MQTTClient::mqtt_client_recv(){
 
                         if ( MQTT_MSG_TYPE_PUBLISH == this->m_mqttClient.mqtt_state.pending_msg_type && this->m_mqttClient.mqtt_state.pending_msg_id == msg_id) {
 
-                            #ifdef EW_SERIAL_LOG
-                            Logln(F("MQTT: received MQTT_MSG_TYPE_PUBACK, finish QoS1 publish"));
-                            #endif
+                            LogI("MQTT: received MQTT_MSG_TYPE_PUBACK, finish QoS1 publish\n");
                             if ( nullptr != this->m_publishedCb ){
                               this->m_publishedCb( (uint32_t*)this );
                             }
@@ -350,9 +317,7 @@ void MQTTClient::mqtt_client_recv(){
                         this->m_mqttClient.mqtt_state.outbound_message = mqtt_msg_pubrel(&this->m_mqttClient.mqtt_state.mqtt_connection, msg_id);
 
                         if (QUEUE_Puts(&this->m_mqttClient.msgQueue, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length) == -1) {
-                            #ifdef EW_SERIAL_LOG
-                            Logln(F("MQTT: Queue full"));
-                            #endif
+                          LogW("MQTT: Queue full\n");
                         }
                         break;
 
@@ -361,9 +326,7 @@ void MQTTClient::mqtt_client_recv(){
                         this->m_mqttClient.mqtt_state.outbound_message = mqtt_msg_pubcomp(&this->m_mqttClient.mqtt_state.mqtt_connection, msg_id);
 
                         if (QUEUE_Puts(&this->m_mqttClient.msgQueue, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length) == -1) {
-                            #ifdef EW_SERIAL_LOG
-                            Logln(F("MQTT: Queue full"));
-                            #endif
+                          LogW("MQTT: Queue full\n");
                         }
                         break;
 
@@ -371,9 +334,7 @@ void MQTTClient::mqtt_client_recv(){
 
                         if ( MQTT_MSG_TYPE_PUBLISH == this->m_mqttClient.mqtt_state.pending_msg_type && this->m_mqttClient.mqtt_state.pending_msg_id == msg_id) {
 
-                            #ifdef EW_SERIAL_LOG
-                            Logln(F("MQTT: received MQTT_MSG_TYPE_PUBCOMP, finish QoS2 publish"));
-                            #endif
+                            LogI("MQTT: received MQTT_MSG_TYPE_PUBCOMP, finish QoS2 publish\n");
                             if ( nullptr != this->m_publishedCb ){
                               this->m_publishedCb( (uint32_t*)this );
                             }
@@ -386,38 +347,26 @@ void MQTTClient::mqtt_client_recv(){
 
                         if (QUEUE_Puts(&this->m_mqttClient.msgQueue, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length) == -1) {
 
-                            #ifdef EW_SERIAL_LOG
-                            Logln(F("MQTT: Queue full"));
-                            #endif
+                            LogW("MQTT: Queue full\n");
                         }
                         break;
 
                     case MQTT_MSG_TYPE_PINGRESP:
-                        #ifdef EW_SERIAL_LOG
-                        Logln(F("MQTT: MQTT_MSG_TYPE_PINGRESP recieved"));
-                        #endif
+                        LogI("MQTT: MQTT_MSG_TYPE_PINGRESP recieved\n");
                         break;
                     default :
-                        #ifdef EW_SERIAL_LOG
-                        Logln(F("MQTT: Uknown msg type received."));
-                        #endif
+                        LogI("MQTT: Uknown msg type received.\n");
                         break;
                 }
                 break;
             default :
-                #ifdef EW_SERIAL_LOG
-                Logln(F("MQTT: Uknown msg type received."));
-                #endif
+                LogW("MQTT: Uknown msg type received.\n");
                 break;
         }
     } else if( 0 == len ){
-      #ifdef EW_SERIAL_LOG
-      Logln(F("MQTT: No response received yet"));
-      #endif
+      LogW("MQTT: No response received yet\n");
     }else {
-      #ifdef EW_SERIAL_LOG
-      Logln(F("MQTT: response too long"));
-      #endif
+      LogW("MQTT: response too long\n");
     }
     // if( this->m_mqttClient.connState == MQTT_DATA ) this->MQTT_Task();
 }
@@ -430,23 +379,17 @@ void MQTTClient::mqtt_client_connect(){
     this->m_mqttClient.mqtt_state.pending_msg_id = mqtt_get_id(this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length);
 
     this->m_mqttClient.sendTimeout = MQTT_SEND_TIMEOUT;
-    #ifdef EW_SERIAL_LOG
-    Serial.printf("MQTT: Sending, type: %d, id: %04X\r\n", this->m_mqttClient.mqtt_state.pending_msg_type, this->m_mqttClient.mqtt_state.pending_msg_id);
-    #endif
+    LogFmtI("MQTT: Sending, type: %d, id: %x\r\n", this->m_mqttClient.mqtt_state.pending_msg_type, this->m_mqttClient.mqtt_state.pending_msg_id);
     bool result = sendPacket( this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length );
 
     if( result ){
 
-      #ifdef EW_SERIAL_LOG
-      Logln(F("MQTT: connect packet sent"));
-      #endif
+      LogI("MQTT: connect packet sent\n");
       this->m_mqttClient.connState = MQTT_CONNECT_SENT;
       this->m_mqttClient.readTimeout = 0;
     }else{
 
-      #ifdef EW_SERIAL_LOG
-      Logln(F("MQTT: connect packet send failed"));
-      #endif
+      LogE("MQTT: connect packet send failed\n");
       this->m_mqttClient.connState = MQTT_CONNECT_FAILED;
       this->m_mqttClient.host_connect_tick = 0;
       this->disconnectServer();
@@ -462,23 +405,17 @@ void MQTTClient::mqtt_client_disconnect(){
     this->m_mqttClient.mqtt_state.pending_msg_id = mqtt_get_id(this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length);
 
     this->m_mqttClient.sendTimeout = MQTT_SEND_TIMEOUT;
-    #ifdef EW_SERIAL_LOG
-    Serial.printf("MQTT: Sending, type: %d, id: %04X\r\n", this->m_mqttClient.mqtt_state.pending_msg_type, this->m_mqttClient.mqtt_state.pending_msg_id);
-    #endif
+    LogFmtI("MQTT: Sending, type: %d, id: %x\r\n", this->m_mqttClient.mqtt_state.pending_msg_type, this->m_mqttClient.mqtt_state.pending_msg_id);
     bool result = sendPacket( this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length );
 
     if( result ){
 
-      #ifdef EW_SERIAL_LOG
-      Logln(F("MQTT: disconnect packet sent"));
-      #endif
+      LogI("MQTT: disconnect packet sent\n");
       this->m_mqttClient.connState = MQTT_DISCONNECT_SENT;
       this->m_mqttClient.readTimeout = 0;
     }else{
 
-      #ifdef EW_SERIAL_LOG
-      Logln(F("MQTT: disconnect packet send failed"));
-      #endif
+      LogE("MQTT: disconnect packet send failed\n");
       this->m_mqttClient.connState = MQTT_DISCONNECT_FAILED;
       this->m_mqttClient.host_connect_tick = 0;
     }
@@ -488,9 +425,7 @@ void MQTTClient::mqtt_client_disconnect(){
 
 void MQTTClient::mqtt_send_keepalive(){
 
-    #ifdef EW_SERIAL_LOG
-    Serial.printf("\r\nMQTT: Send keepalive packet to %s:%d!\r\n", this->m_host, this->m_port);
-    #endif
+    LogFmtI("\r\nMQTT: Send keepalive packet to %s:%d!\r\n", this->m_host, this->m_port);
     this->m_mqttClient.mqtt_state.outbound_message = mqtt_msg_pingreq(&this->m_mqttClient.mqtt_state.mqtt_connection);
     // this->m_mqttClient.mqtt_state.pending_msg_type = MQTT_MSG_TYPE_PINGREQ;
     this->m_mqttClient.mqtt_state.pending_msg_type = mqtt_get_type(this->m_mqttClient.mqtt_state.outbound_message->data);
@@ -498,9 +433,7 @@ void MQTTClient::mqtt_send_keepalive(){
 
 
     this->m_mqttClient.sendTimeout = MQTT_SEND_TIMEOUT;
-    #ifdef EW_SERIAL_LOG
-    Serial.printf("MQTT: Sending, type: %d, id: %04X\r\n", this->m_mqttClient.mqtt_state.pending_msg_type, this->m_mqttClient.mqtt_state.pending_msg_id);
-    #endif
+    LogFmtI("MQTT: Sending, type: %d, id: %x\r\n", this->m_mqttClient.mqtt_state.pending_msg_type, this->m_mqttClient.mqtt_state.pending_msg_id);
     bool result = sendPacket( this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length );
 
     if(result) {
@@ -518,9 +451,7 @@ void MQTTClient::mqtt_send_keepalive(){
 
 void MQTTClient::MQTT_Task(){
 
-    #ifdef EW_SERIAL_LOG
-    Log(F("MQTT: Task ")); Logln(this->m_mqttClient.connState);
-    #endif
+    LogFmtI("MQTT: Task %d\n", (int)this->m_mqttClient.connState);
 
     uint8_t dataBuffer[MQTT_BUF_SIZE];  uint16_t dataLen;
     memset( dataBuffer, 0, MQTT_BUF_SIZE );
@@ -547,17 +478,13 @@ void MQTTClient::MQTT_Task(){
           break;
       case MQTT_HOST_CONNECTING:
           if( nullptr != this->m_wifi && !this->m_wifi->isConnected() ){
-            #ifdef EW_SERIAL_LOG
-            Logln( F("MQTT: WiFi not connected. waiting..") );
-            #endif
+            LogI("MQTT: WiFi not connected. waiting..\n");
             this->m_mqttClient.host_connect_tick = 0;
             this->m_mqttClient.connState = WIFI_CONNECTING_ERROR;
           }else{
 
             if( this->connected() ){
-              #ifdef EW_SERIAL_LOG
-              Serial.printf("MQTT: Connected to broker %s:%d\r\n", this->m_host, this->m_port);
-              #endif
+              LogFmtI("MQTT: Connected to broker %s:%d\r\n", this->m_host, this->m_port);
               this->mqtt_client_connect();
             }
           }
@@ -576,15 +503,12 @@ void MQTTClient::MQTT_Task(){
           }
           if ( QUEUE_Gets(&this->m_mqttClient.msgQueue, dataBuffer, &dataLen, MQTT_BUF_SIZE) == 0 ) {
 
-              #ifdef EW_SERIAL_LOG
-              Log(F("MQTT: getting qued packets :"));
+              LogI("MQTT: getting qued packets :");
               for (int i = 0; i < dataLen; i++) {
-                // Log_format( dataBuffer[i], HEX ); Log(" ");
-                Log( (char)dataBuffer[i] ); Log(" ");
+                LogFmtI("%c ", (char)dataBuffer[i] );
                 __i_dvc_ctrl.wait(0);
               }
-              Logln();
-              #endif
+              LogI("\n");
 
               uint8_t msg_qos = mqtt_get_qos(dataBuffer);
               uint8_t msg_type = mqtt_get_type(dataBuffer);
@@ -597,16 +521,12 @@ void MQTTClient::MQTT_Task(){
 
               if( result ){
 
-                #ifdef EW_SERIAL_LOG
-                Log(F("MQTT: data packet sent of id: "));Logln(this->m_mqttClient.mqtt_state.pending_msg_id);
-                #endif
+                LogFmtI("MQTT: data packet sent of id: %d\n", this->m_mqttClient.mqtt_state.pending_msg_id);
                 this->m_mqttClient.connState = (MQTT_MSG_TYPE_PUBLISH==msg_type&&0==msg_qos)?MQTT_DATA:MQTT_DATA_SENT;
                 this->m_mqttClient.readTimeout = 0;
               }else{
 
-                #ifdef EW_SERIAL_LOG
-                Logln(F("MQTT: data packet send failed"));
-                #endif
+                LogE("MQTT: data packet send failed\n");
                 this->m_mqttClient.connState = MQTT_DATA_FAILED;
                 this->m_mqttClient.host_connect_tick = 0;
                 this->disconnectServer();
@@ -693,19 +613,13 @@ bool MQTTClient::Subscribe( char *topic, uint8_t qos){
                                           topic, qos,
                                           &this->m_mqttClient.mqtt_state.pending_msg_id);
 
-    #ifdef EW_SERIAL_LOG
-    Serial.printf("MQTT: queue subscribe, topic \"%s\", id: %d\r\n", topic, this->m_mqttClient.mqtt_state.pending_msg_id );
-    #endif
+    LogFmtI("MQTT: queue subscribe, topic \"%s\", id: %d\r\n", topic, this->m_mqttClient.mqtt_state.pending_msg_id );
     // bool result = sendPacket( this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length );
 
     while (QUEUE_Puts(&this->m_mqttClient.msgQueue, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length) == -1) {
-      #ifdef EW_SERIAL_LOG
-      Logln(F("MQTT: Queue full"));
-      #endif
+        LogW("MQTT: Queue full\n");
         if (QUEUE_Gets(&this->m_mqttClient.msgQueue, dataBuffer, &dataLen, MQTT_BUF_SIZE) == -1) {
-          #ifdef EW_SERIAL_LOG
-          Logln(F("MQTT: Serious buffer error"));
-          #endif
+          LogE("MQTT: Serious buffer error\n");
           return false;
         }
     }
@@ -726,18 +640,12 @@ bool MQTTClient::UnSubscribe( char *topic ) {
                                           topic,
                                           &this->m_mqttClient.mqtt_state.pending_msg_id);
 
-    #ifdef EW_SERIAL_LOG
-    Serial.printf("MQTT: queue un-subscribe, topic \"%s\", id: %d\r\n", topic, this->m_mqttClient.mqtt_state.pending_msg_id);
-    #endif
+    LogFmtI("MQTT: queue un-subscribe, topic \"%s\", id: %d\r\n", topic, this->m_mqttClient.mqtt_state.pending_msg_id);
 
     while (QUEUE_Puts(&this->m_mqttClient.msgQueue, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length) == -1) {
-        #ifdef EW_SERIAL_LOG
-        Logln(F("MQTT: Queue full"));
-        #endif
+        LogW("MQTT: Queue full\n");
         if (QUEUE_Gets(&this->m_mqttClient.msgQueue, dataBuffer, &dataLen, MQTT_BUF_SIZE) == -1) {
-            #ifdef EW_SERIAL_LOG
-            Logln(F("MQTT: Serious buffer error"));
-            #endif
+            LogE("MQTT: Serious buffer error\n");
             return false;
         }
     }
@@ -761,22 +669,14 @@ bool MQTTClient::Publish( const char *topic, const char *data, int data_length, 
                                           qos, retain,
                                           &this->m_mqttClient.mqtt_state.pending_msg_id);
     if ( 0 == this->m_mqttClient.mqtt_state.outbound_message->length ) {
-        #ifdef EW_SERIAL_LOG
-        Logln(F("MQTT: Queuing publish failed"));
-        #endif
+        LogE("MQTT: Queuing publish failed\n");
         return false;
     }
-    #ifdef EW_SERIAL_LOG
-    Serial.printf("MQTT: queuing publish, length: %d, queue size(%d/%d)\r\n", this->m_mqttClient.mqtt_state.outbound_message->length, this->m_mqttClient.msgQueue.rb.fill_cnt, this->m_mqttClient.msgQueue.rb.size);
-    #endif
+    LogFmtI("MQTT: queuing publish, length: %d, queue size(%d/%d)\r\n", this->m_mqttClient.mqtt_state.outbound_message->length, this->m_mqttClient.msgQueue.rb.fill_cnt, this->m_mqttClient.msgQueue.rb.size);
     while (QUEUE_Puts(&this->m_mqttClient.msgQueue, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length) == -1) {
-        #ifdef EW_SERIAL_LOG
-        Logln(F("MQTT: Queue full"));
-        #endif
+        LogW("MQTT: Queue full\n");
         if (QUEUE_Gets(&this->m_mqttClient.msgQueue, dataBuffer, &dataLen, MQTT_BUF_SIZE) == -1) {
-            #ifdef EW_SERIAL_LOG
-            Logln(F("MQTT: Serious buffer error"));
-            #endif
+            LogE("MQTT: Serious buffer error\n");
             return false;
         }
     }
@@ -845,12 +745,9 @@ bool MQTTClient::begin( iWiFiInterface *_wifi, mqtt_general_config_table *_mqtt_
       _mqtt_lwt_configs->will_retain
     );
   }
-  #ifdef EW_SERIAL_LOG
-  Logln( F("MQTT: Connecting") );
-  // Log( F("client_id: ") );	Logln( _mqtt_general_configs->client_id );
-  // Log( F("password: ") );	Logln( _mqtt_general_configs->password );
-  // Log( F("username: ") );	Logln( _mqtt_general_configs->username );
-  #endif
+
+  LogI("MQTT: Connecting\n");
+
   this->OnConnected( mqttConnectedCb );
   this->OnDisconnected( mqttDisconnectedCb );
   this->OnPublished( mqttPublishedCb );
@@ -864,9 +761,7 @@ bool MQTTClient::begin( iWiFiInterface *_wifi, mqtt_general_config_table *_mqtt_
 
 void MQTTClient::InitConnection( char *host, int port, uint8_t security ){
 
-    #ifdef EW_SERIAL_LOG
-    Logln(F("MQTT: InitConnection"));
-    #endif
+    LogI("MQTT: InitConnection\n");
 
     int _host_len = strlen(host);
     memset( &this->m_mqttClient, 0, sizeof(MQTT_Client) );
@@ -888,9 +783,7 @@ void MQTTClient::InitClient( char *client_id, char *client_user, char *client_pa
     uint32_t temp;
     int _len = 0;
 
-    #ifdef EW_SERIAL_LOG
-    Logln(F("MQTT: InitClient"));
-    #endif
+    LogI("MQTT: InitClient\n");
 
     memset(&this->m_mqttClient.connect_info, 0, sizeof(mqtt_connect_info_t));
 
@@ -958,9 +851,8 @@ void MQTTClient::InitClient( char *client_id, char *client_user, char *client_pa
 void MQTTClient::InitLWT( char *will_topic, char *will_msg, uint8_t will_qos, uint8_t will_retain ){
 
     int _len = 0;
-    #ifdef EW_SERIAL_LOG
-    Logln(F("MQTT: InitLWT"));
-    #endif
+
+    LogI("MQTT: InitLWT\n");
 
     if ( nullptr != will_topic ){
 
@@ -993,20 +885,12 @@ void MQTTClient::InitLWT( char *will_topic, char *will_msg, uint8_t will_qos, ui
 
 void MQTTClient::mqtt_timer(){
 
-    #ifdef EW_SERIAL_LOG
-    Log( F("MQTT: mqtt timer : ") ); Log( this->connected() );
-    Log( F("\t mqtt state : ") ); Logln( this->m_mqttClient.connState );
-
-    Log( F("MQTT: subscribed topics(QoS) : ") );
+    LogFmtI("MQTT: mqtt timer : %d\t mqtt state : %d\n", (int)this->connected(), (int)this->m_mqttClient.connState);
+    LogI("MQTT: subscribed topics(QoS) : ");
     for ( uint16_t i = 0; i < this->m_mqttClient.subscribed_topics.size(); i++) {
-
-      Log( this->m_mqttClient.subscribed_topics[i].topic );
-      Log( F("(") );
-      Log( this->m_mqttClient.subscribed_topics[i].qos );
-      Log( F("), ") );
+      LogFmtI("%s(%d), ", this->m_mqttClient.subscribed_topics[i].topic, this->m_mqttClient.subscribed_topics[i].qos);
     }
-    Logln();
-    #endif
+    LogI("\n");
     // if( this->m_mqttClient.connState == MQTT_DELETING ) return;
 
     if ( MQTT_DATA == this->m_mqttClient.connState ) {
@@ -1050,9 +934,7 @@ void MQTTClient::mqtt_timer(){
       this->m_mqttClient.host_connect_tick ++;
       if (this->m_mqttClient.host_connect_tick > MQTT_HOST_CONNECT_TIMEOUT) {
           this->m_mqttClient.host_connect_tick = 0;
-          #ifdef EW_SERIAL_LOG
-          Logln( F("MQTT: host connect error. trying reconnect") );
-          #endif
+          LogE("MQTT: host connect error. trying reconnect\n");
           this->m_mqttClient.connState = MQTT_HOST_RECONNECT;
           this->MQTT_Task();
       }
@@ -1141,14 +1023,14 @@ bool MQTTClient::connectServer( ) {
   if( nullptr == this->m_wifi_client ){
     return false;
   }
-  #ifdef EW_SERIAL_LOG
-  Serial.printf("MQTT: Connecting to %s:%d\r\n", this->m_host, this->m_port);
-  #endif
+
+  LogFmtI("MQTT: Connecting to %s:%d\r\n", this->m_host, this->m_port);
+
   this->m_wifi_client->setTimeout(3000);
   int result = this->m_wifi_client->connect(this->m_host, this->m_port);
-  #ifdef EW_SERIAL_LOG
-  Log(F("MQTT: Connect result -: ")); Logln(result);
-  #endif
+  
+  LogFmtI("MQTT: Connect result -: %d\n", result);
+
   return ( 0 != result );
 }
 
@@ -1180,10 +1062,6 @@ uint16_t MQTTClient::readFullPacket( uint8_t *buffer, uint16_t maxsize, uint16_t
   rlen = this->readPacket( pbuff, 1, timeout );
   if (rlen != 1) return 0;
 
-  // #ifdef EW_SERIAL_LOG
-  // Log(F("MQTT: Packet Type:\t")); Logln((char*)pbuff);
-  // #endif
-
   pbuff++;
 
   uint32_t value = 0;
@@ -1200,21 +1078,13 @@ uint16_t MQTTClient::readFullPacket( uint8_t *buffer, uint16_t maxsize, uint16_t
     value += intermediate;
     multiplier *= 128;
     if (multiplier > (128UL*128UL*128UL)) {
-      #ifdef EW_SERIAL_LOG
-      Log(F("Malformed packet len"));
-      #endif
+      LogW("Malformed packet len\n");
       return 0;
     }
   } while (encodedByte & 0x80);
 
-  // #ifdef EW_SERIAL_LOG
-  // Log(F("MQTT: Packet Length:\t"));Logln(value);
-  // #endif
-
   if (value > (maxsize - (pbuff-buffer) - 1)) {
-    #ifdef EW_SERIAL_LOG
-    Logln(F("MQTT: Packet too big for buffer"));
-    #endif
+    LogW("MQTT: Packet too big for buffer\n");
     rlen = this->readPacket( pbuff, (maxsize - (pbuff-buffer) - 1), timeout );
   } else {
     rlen = this->readPacket( pbuff, value, timeout );
@@ -1241,9 +1111,6 @@ uint16_t MQTTClient::readPacket( uint8_t *buffer, uint16_t maxlen, int16_t timeo
       }
 
       if( len == maxlen ){
-        // #ifdef EW_SERIAL_LOG
-        // Log(F("MQTT: Read Data ")); Logln((char*)buffer);
-        // #endif
         return len;
       }
     }
@@ -1262,29 +1129,16 @@ bool MQTTClient::sendPacket( uint8_t *buffer, uint16_t len ) {
 
       // uint16_t sendlen = len > 250 ? 250 : len;
       uint16_t sendlen = len;
-      //Serial.print("Sending: "); Serial.println(sendlen);
       ret = this->m_wifi_client->write( buffer, sendlen);
-      #ifdef EW_SERIAL_LOG
-      // Log(F("MQTT: sending packets : "));
-      // for (int i = 0; i < len; i++) {
-      //   Log((char)buffer[i]);
-      //   Log(F(" "));
-      // }
-      // Logln();
-      Log(F("MQTT: send packet return ")); Logln(ret);
-      #endif
+      LogFmtI("MQTT: send packet return %d\n", ret);
       len -= ret;
 
       if (ret != sendlen) {
-        #ifdef EW_SERIAL_LOG
-        Logln(F("MQTT: send packet - failed to send"));
-        #endif
+        LogE("MQTT: send packet - failed to send\n");
 	      return false;
       }
     } else {
-      #ifdef EW_SERIAL_LOG
-      Logln(F("MQTT: send packet - connection failed"));
-      #endif
+      LogE("MQTT: send packet - connection failed\n");
       return false;
     }
   }

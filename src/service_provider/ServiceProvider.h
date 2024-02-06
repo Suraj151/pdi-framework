@@ -15,7 +15,7 @@ created Date    : 1st June 2019
 #include <interface/pdi.h>
 #include <config/Config.h>
 #include <utility/Utility.h>
-#include <database/DefaultDatabase.h>
+
 extern "C" {
 #include "user_interface.h"
 }

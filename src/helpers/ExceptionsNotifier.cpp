@@ -24,7 +24,6 @@ void beginCrashHandler()
 								 CRASH_HANDLER_DURATION, __i_dvc_ctrl.millis_now());
 }
 
-// #ifdef EW_SERIAL_LOG
 // void dummyCrash() {
 //
 // 	if (Serial.available() > 0){
@@ -61,7 +60,6 @@ void beginCrashHandler()
 //     }
 //   }
 // }
-// #endif
 
 /**
  * This function returns saved crashdump file as a string
@@ -191,10 +189,7 @@ extern "C" void custom_crash_callback(struct rst_info *rst_info, uint32_t stack,
 		_file.close();
 	}
 
-#ifdef EW_SERIAL_LOG
-	Plain_Log(F("\nStack Trace saved to file : "));
-	Plain_Logln(CRASHFILEPATH);
-#endif
+	LogFmtI("\nStack Trace saved to file : %s\n", CRASHFILEPATH);
 }
 
 /**

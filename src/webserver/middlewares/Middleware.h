@@ -53,9 +53,7 @@ class Middleware  : public EwSessionHandler{
 		 */
     bool handle_middleware( middlwares _middleware_level, const char* _redirect_uri ){
 
-      #ifdef EW_SERIAL_LOG
-      Logln(F("checking through middleware"));
-      #endif
+      LogI("checking through middleware\n");
 
       if ( _middleware_level == AUTH_MIDDLEWARE ) {
 

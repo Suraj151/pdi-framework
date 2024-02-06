@@ -40,9 +40,7 @@ class TestController : public Controller {
 		 */
     void handleTestRoute( void ) {
 
-      #ifdef EW_SERIAL_LOG
       Logln(F("Handling Test route"));
-      #endif
 
       /**
        * take new dynamic array to build html response page

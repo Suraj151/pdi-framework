@@ -53,7 +53,7 @@ class WiFiTable : public DatabaseTable<wifi_config_table>
      */
     bool get(wifi_config_table *_table)
     {
-        return this->get_table(_table, WIFI_CONFIG_TABLE_ADDRESS);
+        return this->get_table(WIFI_CONFIG_TABLE_ADDRESS, _table);
     }
 
     /**
@@ -61,7 +61,7 @@ class WiFiTable : public DatabaseTable<wifi_config_table>
      */
     bool set(wifi_config_table *_table)
     {
-        return this->set_table(_table, WIFI_CONFIG_TABLE_ADDRESS);
+        return this->set_table(WIFI_CONFIG_TABLE_ADDRESS, _table);
     }
 
     /**

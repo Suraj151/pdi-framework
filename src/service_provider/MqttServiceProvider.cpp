@@ -63,9 +63,7 @@ void MqttServiceProvider::begin( iWiFiInterface* _wifi ){
  */
 void MqttServiceProvider::handleMqttPublish(){
 
-  #ifdef EW_SERIAL_LOG
-  Logln( F("MQTT: handling mqtt publish interval") );
-  #endif
+  LogI("MQTT: handling mqtt publish interval\n");
   if( !this->m_mqtt_client.is_mqtt_connected() ) return;
 
   mqtt_pubsub_config_table _mqtt_pubsub_configs;
@@ -78,9 +76,7 @@ void MqttServiceProvider::handleMqttPublish(){
   for (uint8_t i = 0; i < MQTT_MAX_PUBLISH_TOPIC; i++) {
 
     __find_and_replace( _mqtt_pubsub_configs.publish_topics[i].topic, "[mac]", macStr, 2 );
-    #ifdef EW_SERIAL_LOG
-    Log( F("MQTT: publishing on topic : ") );Logln( _mqtt_pubsub_configs.publish_topics[i].topic );
-    #endif
+    LogFmtI("MQTT: publishing on topic : %s\n", _mqtt_pubsub_configs.publish_topics[i].topic);
     if( nullptr != this->m_mqtt_payload && strlen(_mqtt_pubsub_configs.publish_topics[i].topic) > 0 ){
 
       #ifdef ENABLE_MQTT_DEFAULT_PAYLOAD
@@ -130,9 +126,7 @@ void MqttServiceProvider::handleMqttPublish(){
  */
 void MqttServiceProvider::handleMqttSubScribe(){
 
-  #ifdef EW_SERIAL_LOG
-  Logln( F("MQTT: handling mqtt subscribe interval") );
-  #endif
+  LogI("MQTT: handling mqtt subscribe interval\n");
   if( !this->m_mqtt_client.is_mqtt_connected() ) return;
 
   mqtt_pubsub_config_table _mqtt_pubsub_configs;
@@ -300,13 +294,8 @@ void MqttServiceProvider::handleMqttDataCb( uint32_t *args, const char* topic, u
 
       delete[] dataBuf;
     }
-    // #ifdef EW_SERIAL_LOG
-    // Logln(F("\n\nMQTT: service data callback"));
-    // Serial.printf("MQTT: service Receive topic: %s, data: %s \n\n", topicBuf, dataBuf);
-    // #endif
 }
 
-#ifdef EW_SERIAL_LOG
 /**
  * print mqtt configs
  */
@@ -319,44 +308,47 @@ void MqttServiceProvider::printMqttConfigLogs(){
   __database_service.get_mqtt_lwt_config_table(&_mqtt_lwt_configs);
   __database_service.get_mqtt_pubsub_config_table(&_mqtt_pubsub_configs);
 
-  Logln(F("\nMqtt General Configs :"));
-  Log( _mqtt_general_configs.host ); Log("\t");
-  Log( _mqtt_general_configs.port ); Log("\t");
-  Log( _mqtt_general_configs.security ); Log("\t");
-  Log( _mqtt_general_configs.client_id ); Log("\t");
-  Log( _mqtt_general_configs.username ); Log("\t");
-  Log( _mqtt_general_configs.password ); Log("\t");
-  Log( _mqtt_general_configs.keepalive ); Log("\t");
-  Log( _mqtt_general_configs.clean_session ); Logln();
+  LogI("\nMqtt General Configs :\n");
+  LogFmtI("%s\t%d\t%d\t%s\t%s\t%s\t%d\t%d\n", 
+  _mqtt_general_configs.host,
+  _mqtt_general_configs.port,
+  _mqtt_general_configs.security, 
+  _mqtt_general_configs.client_id,
+  _mqtt_general_configs.username,
+  _mqtt_general_configs.password,
+  _mqtt_general_configs.keepalive,
+  _mqtt_general_configs.clean_session);
 
-  Logln(F("\nMqtt Lwt Configs :"));
-  Log( _mqtt_lwt_configs.will_topic ); Log("\t");
-  Log( _mqtt_lwt_configs.will_message ); Log("\t");
-  Log( _mqtt_lwt_configs.will_qos ); Log("\t");
-  Log( _mqtt_lwt_configs.will_retain ); Logln();
+  LogI("\nMqtt Lwt Configs :\n");
+  LogFmtI("%s\t%s\t%d\t%d\n", 
+  _mqtt_lwt_configs.will_topic,
+  _mqtt_lwt_configs.will_message,
+  _mqtt_lwt_configs.will_qos, 
+  _mqtt_lwt_configs.will_retain);
 
-  Logln(F("\nMqtt Pub Configs :"));
+  LogI("\nMqtt Pub Configs :\n");
   for (uint8_t i = 0; i < MQTT_MAX_PUBLISH_TOPIC; i++) {
 
     if( strlen(_mqtt_pubsub_configs.publish_topics[i].topic) > 0 ){
 
-      Log( _mqtt_pubsub_configs.publish_topics[i].topic ); Log("\t");
-      Log( _mqtt_pubsub_configs.publish_topics[i].qos ); Log("\t");
-      Log( _mqtt_pubsub_configs.publish_topics[i].retain ); Logln();
+      LogFmtI("%s\t%d\t%d\n", 
+      _mqtt_pubsub_configs.publish_topics[i].topic,
+      _mqtt_pubsub_configs.publish_topics[i].qos,
+      _mqtt_pubsub_configs.publish_topics[i].retain);
     }
   }
 
-  Logln(F("\nMqtt Sub Configs :"));
+  LogI("\nMqtt Sub Configs :\n");
   for (uint8_t i = 0; i < MQTT_MAX_SUBSCRIBE_TOPIC; i++) {
 
     if( strlen(_mqtt_pubsub_configs.subscribe_topics[i].topic) > 0 ){
 
-      Log( _mqtt_pubsub_configs.subscribe_topics[i].topic ); Log("\t");
-      Log( _mqtt_pubsub_configs.subscribe_topics[i].qos ); Logln();
+      LogFmtI("%s\t%d\n", 
+      _mqtt_pubsub_configs.publish_topics[i].topic,
+      _mqtt_pubsub_configs.publish_topics[i].qos);
     }
   }
 }
-#endif
 
 
 MqttServiceProvider __mqtt_service;

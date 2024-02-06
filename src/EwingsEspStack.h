@@ -19,7 +19,7 @@ created Date    : 1st June 2019
 #include <webserver/EwingsWebServer.h>
 #endif
 
-#include <database/DefaultDatabase.h>
+#include <service_provider/DatabaseServiceProvider.h>
 #include <service_provider/NtpServiceProvider.h>
 #include <service_provider/HttpServiceProvider.h>
 #include <service_provider/OtaServiceProvider.h>
@@ -80,9 +80,7 @@ class EwingsEspStack {
     void serve( void );
 
   protected:
-    #ifdef EW_SERIAL_LOG
     static void handleLogPrints( void );
-    #endif
     #if defined( ENABLE_NAPT_FEATURE ) || defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
     void enable_napt_service( void );
     #endif

@@ -11,8 +11,10 @@ created Date    : 1st June 2019
 #define _ESPNOW_SERVICE_PROVIDER_H_
 
 #include <service_provider/ServiceProvider.h>
+#include <service_provider/DatabaseServiceProvider.h>
 
-typedef struct {
+typedef struct
+{
   uint8_t mesh_level;
   struct global_config global_config;
   uint8_t ssid[WIFI_CONFIGS_BUF_SIZE];
@@ -35,52 +37,50 @@ void esp_now_send_cb(uint8_t *macaddr, uint8_t status);
 /**
  * ESPNOWServiceProvider class
  */
-class ESPNOWServiceProvider : public ServiceProvider{
+class ESPNOWServiceProvider : public ServiceProvider
+{
 
-  public:
+public:
+  /**
+   * ESPNOWServiceProvider constructor.
+   */
+  ESPNOWServiceProvider();
+  /**
+   * ESPNOWServiceProvider destructor.
+   */
+  ~ESPNOWServiceProvider();
 
-    /**
-     * ESPNOWServiceProvider constructor.
-     */
-    ESPNOWServiceProvider();
-    /**
-     * ESPNOWServiceProvider destructor.
-     */
-    ~ESPNOWServiceProvider();
+  void beginEspNow(iWiFiInterface *_wifi);
+  void handlePeers(void);
+  void scanPeers(void);
+  void printPeers(void);
 
-    void beginEspNow( iWiFiInterface* _wifi );
-    void handlePeers(void);
-    void scanPeers(void);
-    void printPeers(void);
+  void registerCallbacks(void);
+  void unregisterCallbacks(void);
 
-    void registerCallbacks(void);
-    void unregisterCallbacks(void);
+  bool isPeerExist(uint8_t *mac_addr);
+  bool isApPeer(uint8_t *mac_addr);
+  bool setPeerRole(uint8_t *mac_addr, uint8_t role = ESP_NOW_ROLE_COMBO);
+  bool addPeer(uint8_t *mac_addr, uint8_t role = ESP_NOW_ROLE_COMBO, uint8_t channel = ESP_NOW_CHANNEL, uint8_t *key = (uint8_t *)ESP_NOW_KEY, uint8_t key_len = ESP_NOW_KEY_LENGTH);
+  bool addInPeers(uint8_t *mac_addr, uint8_t role = ESP_NOW_ROLE_COMBO, uint8_t channel = ESP_NOW_CHANNEL);
+  void freePeers(void);
 
-    bool isPeerExist(uint8_t *mac_addr);
-    bool isApPeer(uint8_t *mac_addr);
-    bool setPeerRole(uint8_t *mac_addr, uint8_t role=ESP_NOW_ROLE_COMBO);
-    bool addPeer(uint8_t *mac_addr, uint8_t role=ESP_NOW_ROLE_COMBO, uint8_t channel=ESP_NOW_CHANNEL, uint8_t *key=(uint8_t *)ESP_NOW_KEY, uint8_t key_len=ESP_NOW_KEY_LENGTH);
-    bool addInPeers(uint8_t *mac_addr, uint8_t role=ESP_NOW_ROLE_COMBO, uint8_t channel=ESP_NOW_CHANNEL);
-    void freePeers(void);
+  bool sendToPeer(uint8_t *mac_addr, uint8_t *packet, uint8_t len);
+  void receiveFromPeers(void);
+  bool broadcastToPeers(uint8_t *packet, uint8_t len);
+  bool broadcastToAll(uint8_t *packet, uint8_t len);
+  void broadcastConfigData(void);
 
-    bool sendToPeer(uint8_t *mac_addr, uint8_t *packet, uint8_t len);
-    void receiveFromPeers(void);
-    bool broadcastToPeers(uint8_t *packet, uint8_t len);
-    bool broadcastToAll(uint8_t *packet, uint8_t len);
-    void broadcastConfigData(void);
+  void closeAll(void);
+  bool deletePeer(uint8_t _peer_index);
+  void flushPeersToDefaults(void);
+  void setPeerToDefaults(uint8_t _peer_index);
 
-    void closeAll(void);
-    bool deletePeer(uint8_t _peer_index);
-    void flushPeersToDefaults(void);
-    void setPeerToDefaults(uint8_t _peer_index);
-
-  protected:
-
-    /**
-		 * @var	iWiFiInterface*  m_wifi
-		 */
-    iWiFiInterface  *m_wifi;
-
+protected:
+  /**
+   * @var	iWiFiInterface*  m_wifi
+   */
+  iWiFiInterface *m_wifi;
 };
 
 extern ESPNOWServiceProvider __espnow_service;

@@ -156,7 +156,7 @@ int TaskScheduler::register_task(CallBackVoidArgFn _task_fn, uint32_t _duration,
 void TaskScheduler::handle_tasks()
 {
 
-	if( nullptr == m_util )
+	if (nullptr == m_util)
 	{
 		return;
 	}
@@ -306,38 +306,52 @@ void TaskScheduler::setUtilityInterface(iUtilityInterface *util)
 	m_util = util;
 }
 
-#ifdef EW_SERIAL_LOG
 /**
  * this function prints task logs.
  *
  */
 void TaskScheduler::printTaskSchedulerLogs()
 {
-
-	Logln(F("\nTasks : "));
-	Log(F("id\t"));
-	Log(F("priority\t"));
-	Log(F("duration\t"));
-	Log(F("last_ms\t\t"));
-	Log(F("execute_ms\t"));
-	Log(F("max_attempts\n"));
-	for (int i = 0; i < this->m_tasks.size(); i++)
+	if (nullptr != m_util)
 	{
-		Log(this->m_tasks[i]._task_id);
-		Log("\t");
-		Log(this->m_tasks[i]._task_priority);
-		Log("\t\t");
-		Log(this->m_tasks[i]._duration);
-		Log("\t\t");
-		Log(this->m_tasks[i]._last_millis);
-		Log("\t\t");
-		Log(this->m_tasks[i]._task_exec_millis);
-		Log("\t\t");
-		Log(this->m_tasks[i]._max_attempts);
-		Logln();
+		m_util->log(INFO_LOG, "\nTasks : \n");
+		m_util->log(INFO_LOG, "id\t");
+		m_util->log(INFO_LOG, "priority\t");
+		m_util->log(INFO_LOG, "interval\t");
+		m_util->log(INFO_LOG, "last_ms\t");
+		m_util->log(INFO_LOG, "exc_ms\t");
+		m_util->log(INFO_LOG, "max_attempts\n");
+
+		char content[20];
+
+		for (int i = 0; i < this->m_tasks.size(); i++)
+		{
+			memset(content, 0, 20);
+			sprintf(content, "%d\t", this->m_tasks[i]._task_id);
+			m_util->log(INFO_LOG, content);
+
+			memset(content, 0, 20);
+			sprintf(content, "%d\t", this->m_tasks[i]._task_priority);
+			m_util->log(INFO_LOG, content);
+
+			memset(content, 0, 20);
+			sprintf(content, "%d\t", this->m_tasks[i]._duration);
+			m_util->log(INFO_LOG, content);
+
+			memset(content, 0, 20);
+			sprintf(content, "%d\t\t", this->m_tasks[i]._last_millis);
+			m_util->log(INFO_LOG, content);
+
+			memset(content, 0, 20);
+			sprintf(content, "%d\t\t", this->m_tasks[i]._task_exec_millis);
+			m_util->log(INFO_LOG, content);
+
+			memset(content, 0, 20);
+			sprintf(content, "%d\t\t\n", this->m_tasks[i]._max_attempts);
+			m_util->log(INFO_LOG, content);
+		}
 	}
 }
-#endif
 
 TaskScheduler __task_scheduler;
 

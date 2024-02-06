@@ -11,7 +11,7 @@ created Date    : 1st June 2019
 #ifndef _DATABASE_HANDLER_
 #define _DATABASE_HANDLER_
 
-#include <database/eeprom/EepromDatabase.h>
+#include <utility/Utility.h>
 
 /**
  * define database tables max limit
@@ -82,17 +82,18 @@ class Database
 public:
 	std::vector<struct_tables> m_database_tables;
 
-	Database()
-	{
-	}
-	~Database()
-	{
-	}
+	Database();
+	~Database();
 
-	void init_database(uint16_t _size = DATABASE_MAX_SIZE);
+	void init_database(uint32_t _size);
 	bool register_table(struct_tables &_table);
 	struct_tables get_last_table(void);
 	void clear_all(void);
+
+	/**
+	 * @var	uint db max size
+	 */
+	uint32_t m_max_db_size;
 };
 
 extern Database __database;

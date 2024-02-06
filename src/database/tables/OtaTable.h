@@ -53,7 +53,7 @@ class OtaTable : public DatabaseTable<ota_config_table>
      */
     bool get(ota_config_table *_table)
     {
-        return this->get_table(_table, OTA_CONFIG_TABLE_ADDRESS);
+        return this->get_table(OTA_CONFIG_TABLE_ADDRESS, _table);
     }
 
     /**
@@ -61,7 +61,7 @@ class OtaTable : public DatabaseTable<ota_config_table>
      */
     bool set(ota_config_table *_table)
     {
-        return this->set_table(_table, OTA_CONFIG_TABLE_ADDRESS);
+        return this->set_table(OTA_CONFIG_TABLE_ADDRESS, _table);
     }
 
     /**

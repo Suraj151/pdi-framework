@@ -13,6 +13,7 @@ created Date    : 1st Jan 2024
 
 #include "esp8266.h"
 #include <interface/pdi/iDeviceControlInterface.h>
+#include "LoggerInterface.h"
 
 /**
  * DeviceControlInterface class
@@ -40,12 +41,16 @@ public:
   void restartDevice() override;
 
   // misc methods
-  void wait(uint64_t timeoutms) override;
   void eraseConfig() override;
   uint32_t getDeviceId() override;
   void deviceWdtFeed() override;
   bool isDeviceFactoryRequested() override;
+
+  // util methods
+  void wait(uint64_t timeoutms) override;
   uint32_t millis_now() override;
+  void log(logger_type_t log_type, const char *content) override;
+  void yield() override;
 };
 
 #endif

@@ -57,9 +57,7 @@ void EmailServiceProvider::handleEmail(){
     this->m_mail_handler_cb_id,
     [&]() {
 
-      #ifdef EW_SERIAL_LOG
-      Logln(F("Handling email"));
-      #endif
+      LogI("Handling email\n");
 
       String *_payload = new String("");
 
@@ -286,7 +284,6 @@ bool EmailServiceProvider::sendMail( PGM_P mail_body ){
   return ret;
 }
 
-#ifdef EW_SERIAL_LOG
 /**
  * print email configs
  */
@@ -295,21 +292,14 @@ void EmailServiceProvider::printEmailConfigLogs(){
   email_config_table _email_config;
   __database_service.get_email_config_table(&_email_config);
 
-  Logln(F("\nEmail Configs :"));
-  // Logln(F("ssid\tpassword\tlocal\tgateway\tsubnet"));
+  LogI("\nEmail Configs :\n");
 
-  Log(_email_config.sending_domain); Log("\t");
-  Log(_email_config.mail_host); Log("\t");
-  Log(_email_config.mail_port); Log("\t");
-  Log(_email_config.mail_username); Log("\t");
-  Log(_email_config.mail_password); Log("\t\n");
-  Log(_email_config.mail_from); Log("\t");
-  Log(_email_config.mail_from_name); Log("\t");
-  Log(_email_config.mail_to); Log("\t");
-  Log(_email_config.mail_subject); Log("\t");
-  Logln(_email_config.mail_frequency);
+  LogFmtI("%s\t%s\t%d\t%s\t%s\n", _email_config.sending_domain, _email_config.mail_host, 
+  _email_config.mail_port, _email_config.mail_username, _email_config.mail_password);
+
+  LogFmtI("%s\t%s\t%s\t%s\t%d\n", _email_config.mail_from, _email_config.mail_from_name, 
+  _email_config.mail_to, _email_config.mail_subject, _email_config.mail_frequency);
 }
-#endif
 
 EmailServiceProvider __email_service;
 

@@ -11,6 +11,8 @@ created Date    : 1st Jan 2024
 #ifndef _ESP8266_PORTABLE_DEVICE_INTERFACE_H_
 #define _ESP8266_PORTABLE_DEVICE_INTERFACE_H_
 
+#include "LoggerInterface.h"
+#include "DatabaseInterface.h"
 #include "DeviceControlInterface.h"
 #include "WiFiInterface.h"
 #include "WiFiClientInterface.h"

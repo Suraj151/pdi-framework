@@ -85,10 +85,6 @@ void WiFiServiceProvider::handleInternetConnectivity(){
     return;
   }
 
-  #ifdef EW_SERIAL_LOG
-  Log( F("\nhandeling internet connectivity :") );
-  #endif
-
   if( !this->m_wifi->localIP().isSet() || !this->m_wifi->isConnected() ){
 
     memset( &__status_wifi, 0, sizeof(__status_wifi_t) );
@@ -118,9 +114,7 @@ void WiFiServiceProvider::handleInternetConnectivity(){
       }, 500, __i_dvc_ctrl.millis_now() );
 
       __task_scheduler.setTimeout( [&]() {
-        #ifdef EW_SERIAL_LOG
-        Logln( F("\nhandle station reconnecting...") );
-        #endif
+        LogI("\nhandle station reconnecting...\n");
         memset( __status_wifi.ignore_bssid, 0, 6 );
         if( !this->m_wifi->localIP().isSet() || !this->m_wifi->isConnected() ){
           wifi_config_table _wifi_credentials;
@@ -133,10 +127,8 @@ void WiFiServiceProvider::handleInternetConnectivity(){
     #endif
   }
 
-  #ifdef EW_SERIAL_LOG
-  Log( __status_wifi.internet_available ); Log( F(" : ") );
-  Logln( (__i_dvc_ctrl.millis_now()-__status_wifi.last_internet_millis) );
-  #endif
+  LogFmtI("\nHandeling internet connectivity : %d : %d\n", (int)__status_wifi.internet_available, 
+  (__i_dvc_ctrl.millis_now()-__status_wifi.last_internet_millis) );
 }
 
 /**
@@ -182,16 +174,14 @@ bool WiFiServiceProvider::configure_wifi_station( wifi_config_table* _wifi_crede
     return false;
   }
 
-  #ifdef EW_SERIAL_LOG
-    Log(F("\nConnecing To "));
-    Log(_wifi_credentials->sta_ssid);
-    if( nullptr != mac ){
-      Log(F(" : "));
-      for (uint8_t i = 0; i < 6; i++) {
-        Log_format(mac[i], HEX);
-      }
-    }
-  #endif
+  LogFmtI("\nConnecing To %s", _wifi_credentials->sta_ssid);
+
+  if (nullptr != mac)
+  {
+    LogFmtI(" : %x%x%x%x%x%x",
+            mac[0], mac[1], mac[2],
+            mac[3], mac[4], mac[5]);
+  }
 
   IPAddress local_IP(
     _wifi_credentials->sta_local_ip[0],_wifi_credentials->sta_local_ip[1],_wifi_credentials->sta_local_ip[2],_wifi_credentials->sta_local_ip[3]
@@ -212,45 +202,29 @@ bool WiFiServiceProvider::configure_wifi_station( wifi_config_table* _wifi_crede
 
     __i_dvc_ctrl.wait(999);
     if( _wait%7 == 0 ){
-      #ifdef EW_SERIAL_LOG
-        Log(F("\ntrying reconnect"));
-      #endif
+      LogI("\ntrying reconnect");
       this->m_wifi->reconnect();
     }
     if( _wait++ > this->m_wifi_connection_timeout ){
       break;
     }
-    #ifdef EW_SERIAL_LOG
-      Log(".");
-    #endif
+    LogI(".");
   }
-  #ifdef EW_SERIAL_LOG
-  Logln();
-  #endif
+
+  LogI("\n");
+
   if( this->m_wifi->status() == WL_CONNECTED ){
-    #ifdef EW_SERIAL_LOG
-    Log(F("Connected to "));
-    Logln(_wifi_credentials->sta_ssid);
-    Log(F("IP address: "));
-    Logln(this->m_wifi->localIP());
-    #endif
+    LogFmtI("Connected to %s\n", _wifi_credentials->sta_ssid);
+    LogFmtI("IP address: %s\n", this->m_wifi->localIP().toString().c_str());
     // this->m_wifi->setAutoConnect(true);
     // this->m_wifi->setAutoReconnect(true);
     return true;
   }else if( this->m_wifi->status() == WL_NO_SSID_AVAIL ){
-    #ifdef EW_SERIAL_LOG
-    Log(_wifi_credentials->sta_ssid);
-    Logln(F(" Not Found/reachable. Make sure it's availability."));
-    #endif
+    LogFmtW("%s Not Found/reachable. Make sure it's availability.\n", _wifi_credentials->sta_ssid);
   }else if( this->m_wifi->status() == WL_CONNECT_FAILED ){
-    #ifdef EW_SERIAL_LOG
-    Log(_wifi_credentials->sta_ssid);
-    Logln(F(" is available but not connecting. Please check password."));
-    #endif
+    LogFmtW("%s is available but not connecting. Please check password.\n", _wifi_credentials->sta_ssid);
   }else{
-    #ifdef EW_SERIAL_LOG
-      Logln(F("WiFi Not Connecting. Will try later soon.."));
-    #endif
+    LogW("WiFi Not Connecting. Will try later soon..\n");
   }
   return false;
 }
@@ -266,9 +240,8 @@ void WiFiServiceProvider::reconfigure_wifi_access_point( void ){
     return;
   }
 
-  #ifdef EW_SERIAL_LOG
-  Logln( F("Handeling reconfigure AP.") );
-  #endif
+  LogI("Handeling reconfigure AP.\n");
+
   wifi_config_table _wifi_credentials;
   __database_service.get_wifi_config_table( &_wifi_credentials );
   bool _ap_change = false;
@@ -315,9 +288,8 @@ void WiFiServiceProvider::reconfigure_wifi_access_point( void ){
   }
 
   if( _ap_change ){
-    #ifdef EW_SERIAL_LOG
-    Logln( F("reconfiguring....") );
-    #endif
+    LogI("reconfiguring....\n");
+
     this->m_wifi->softAPdisconnect(false);
     // this->m_wifi->enableAP(false);
 
@@ -344,11 +316,7 @@ bool WiFiServiceProvider::configure_wifi_access_point( wifi_config_table* _wifi_
     return false;
   }
 
-  #ifdef EW_SERIAL_LOG
-  Log(F("Configuring access point "));
-  Log( _wifi_credentials->ap_ssid );
-  Logln(F(" .."));
-  #endif
+  LogFmtI("Configuring access point %s..\n", _wifi_credentials->ap_ssid);
 
   IPAddress local_IP(
     _wifi_credentials->ap_local_ip[0],_wifi_credentials->ap_local_ip[1],_wifi_credentials->ap_local_ip[2],_wifi_credentials->ap_local_ip[3]
@@ -361,18 +329,14 @@ bool WiFiServiceProvider::configure_wifi_access_point( wifi_config_table* _wifi_
   );
 
   this->m_wifi->enableAP(true);
+
   if( this->m_wifi->softAPConfig( local_IP, gateway, subnet ) &&
     this->m_wifi->softAP( _wifi_credentials->ap_ssid, _wifi_credentials->ap_password, 1, 0, 8 )
   ){
-    #ifdef EW_SERIAL_LOG
-    Log(F("AP IP address: "));
-    Logln(this->m_wifi->softAPIP());
-    #endif
+    LogFmtI("AP IP address: %s\n", this->m_wifi->softAPIP().toString().c_str());
     return true;
   }else{
-    #ifdef EW_SERIAL_LOG
-    Logln(F("Configuring access point failed!"));
-    #endif
+    LogE("Configuring access point failed!\n");
     return false;
   }
 }
@@ -390,9 +354,7 @@ bool WiFiServiceProvider::scan_within_station_async( char* ssid, uint8_t* bssid,
     return false;
   }
 
-  #ifdef EW_SERIAL_LOG
-    Plain_Logln(F("Scanning stations"));
-  #endif
+  LogI("Scanning stations\n");
 
   int n = _scanCount;
   // int indices[n];
@@ -419,12 +381,6 @@ bool WiFiServiceProvider::scan_within_station_async( char* ssid, uint8_t* bssid,
 
     String _ssid = this->m_wifi->SSID(i);
     _ssid.toCharArray( _ssid_buff, _ssid.length()+1 );
-
-    // #ifdef EW_SERIAL_LOG
-    //   Plain_Log(_ssid_buff);
-    //   Plain_Log(F(" : "));
-    //   Plain_Logln(this->m_wifi->BSSIDstr(i));
-    // #endif
 
     if( __are_arrays_equal( ssid, _ssid_buff, _ssid.length()+1 ) ){
 
@@ -501,9 +457,6 @@ void WiFiServiceProvider::scan_aps_and_configure_wifi_station_async( int _scanCo
  */
 void WiFiServiceProvider::scan_aps_and_configure_wifi_station( ){
 
-  // #ifdef EW_SERIAL_LOG
-  //   Logln(F("scanning connected stations for wifi config.."));
-  // #endif
   wifi_config_table _wifi_credentials;
   __database_service.get_wifi_config_table(&_wifi_credentials);
   if( this->scan_within_station( _wifi_credentials.sta_ssid, this->m_temp_mac) ){
@@ -526,18 +479,11 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
     return;
   }
 
-  #ifdef EW_SERIAL_LOG
-  Logln( F("\nHandeling WiFi Connectivity") );
-  #endif
+  LogI("\nHandeling WiFi Connectivity\n");
 
   if( !this->m_wifi->localIP().isSet() || !this->m_wifi->isConnected() ){
 
-    #ifdef EW_SERIAL_LOG
-    Log( F("Handeling WiFi Reconnect Manually : ") );
-    Logln(this->m_wifi->softAPIP());
-    // Log(F(" : "));
-    // Logln(number_client);
-    #endif
+    LogFmtI("Handeling WiFi Reconnect Manually : %s\n", this->m_wifi->softAPIP().toString().c_str());
 
     #ifdef IGNORE_FREE_RELAY_CONNECTIONS
     this->m_wifi->reconnect();
@@ -555,18 +501,13 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
     __status_wifi.wifi_connected = false;
   }else{
     __status_wifi.wifi_connected = true;
-    #ifdef EW_SERIAL_LOG
-    Log(F("IP address: "));
-    Log(this->m_wifi->gatewayIP());
-    Log(F(" : "));
-    Log(this->m_wifi->localIP());
-    Log(F(" : "));
-    Logln(this->m_wifi->softAPIP());
-    #endif
+    LogFmtI("IP address: %d : %d : %d\n", 
+    this->m_wifi->gatewayIP().toString().c_str(), 
+    this->m_wifi->localIP().toString().c_str(), 
+    this->m_wifi->softAPIP().toString().c_str());
   }
 }
 
-#ifdef EW_SERIAL_LOG
 /**
  * print wifi configs
  */
@@ -576,23 +517,17 @@ void WiFiServiceProvider::printWiFiConfigLogs(){
   __database_service.get_wifi_config_table(&_table);
   char _ip_address[20];
 
-  Logln(F("\nWiFi Configs :"));
-  // Logln(F("ssid\tpassword\tlocal\tgateway\tsubnet"));
+  LogI("\nWiFi Configs :\n");
+  LogFmtI("%s\t%s\t", _table.sta_ssid, _table.sta_password);
+  __int_ip_to_str( _ip_address, _table.sta_local_ip, 20 ); LogFmtI("%s\t", _ip_address);
+  __int_ip_to_str( _ip_address, _table.sta_gateway, 20 ); LogFmtI("%s\t", _ip_address);
+  __int_ip_to_str( _ip_address, _table.sta_subnet, 20 ); LogFmtI("%s\t\n", _ip_address);
 
-  Log(_table.sta_ssid); Log("\t");
-  Log(_table.sta_password); Log("\t");
-  __int_ip_to_str( _ip_address, _table.sta_local_ip, 20 ); Log(_ip_address); Log("\t");
-  __int_ip_to_str( _ip_address, _table.sta_gateway, 20 ); Log(_ip_address); Log("\t");
-  __int_ip_to_str( _ip_address, _table.sta_subnet, 20 ); Log(_ip_address); Log("\t\n");
-
-  Logln(F("\nAccess Configs :"));
-  // Logln(F("ssid\tpassword\tlocal\tgateway\tsubnet"));
-  Log(_table.ap_ssid); Log("\t");
-  Log(_table.ap_password); Log("\t");
-  __int_ip_to_str( _ip_address, _table.ap_local_ip, 20 ); Log(_ip_address); Log("\t");
-  __int_ip_to_str( _ip_address, _table.ap_gateway, 20 ); Log(_ip_address); Log("\t");
-  __int_ip_to_str( _ip_address, _table.ap_subnet, 20 ); Log(_ip_address); Log("\t\n\n");
+  LogI("\nAccess Configs :\n");
+  LogFmtI("%s\t%s\t", _table.ap_ssid, _table.ap_password);
+  __int_ip_to_str( _ip_address, _table.ap_local_ip, 20 ); LogFmtI("%s\t", _ip_address);
+  __int_ip_to_str( _ip_address, _table.ap_gateway, 20 ); LogFmtI("%s\t", _ip_address);
+  __int_ip_to_str( _ip_address, _table.ap_subnet, 20 ); LogFmtI("%s\t\n\n", _ip_address);
 }
-#endif
 
 WiFiServiceProvider __wifi_service;

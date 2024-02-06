@@ -29,6 +29,8 @@ public:
 
   virtual void wait(uint64_t timeoutms) = 0;
   virtual uint32_t millis_now() = 0;
+  virtual void log(logger_type_t log_type, const char *content) = 0;
+  virtual void yield() = 0;
 };
 
 #endif

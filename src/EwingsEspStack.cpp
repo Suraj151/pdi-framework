@@ -35,18 +35,14 @@ EwingsEspStack::~EwingsEspStack(){
  */
 void EwingsEspStack::initialize(){
 
-  #ifdef EW_SERIAL_LOG
-  LogBegin(115200);
-  Logln(F("Initializing..."));
-  #endif
+  LOGBEGIN;
+  LogI("Initializing...\n");
 
   __database_service.init_default_database();
   #ifdef AUTO_FACTORY_RESET_ON_INVALID_CONFIGS
   __task_scheduler.setInterval( [&]() {
-    if ( !isValidConfigs() ){
-      #ifdef EW_SERIAL_LOG
-      Log( F("\n\nFound invalid configs.. starting factory reset..!\n\n") );
-      #endif
+    if ( !__i_db.isValidConfigs() ){
+      LogE("\n\nFound invalid configs.. starting factory reset..!\n\n");
       __factory_reset.factory_reset();
     }
   }, MILLISECOND_DURATION_5000, __i_dvc_ctrl.millis_now() );
@@ -77,9 +73,7 @@ void EwingsEspStack::initialize(){
   __email_service.begin( this->m_wifi, this->m_wifi_client );
   #endif
 
-  #ifdef EW_SERIAL_LOG
-  __task_scheduler.setInterval( this->handleLogPrints, EW_DEFAULT_LOG_DURATION, __i_dvc_ctrl.millis_now() );
-  #endif
+  __task_scheduler.setInterval( this->handleLogPrints, MILLISECOND_DURATION_5000, __i_dvc_ctrl.millis_now() );
 
   __factory_reset.initService();
   __factory_reset.run_while_factory_reset( [&]() { __database_service.clear_default_tables(); this->m_wifi->disconnect(true); } );
@@ -110,10 +104,7 @@ void EwingsEspStack::enable_napt_service(){
   ip_napt_enable_no(1, 1);
   // Set the DNS server for clients of the AP to the one we also use for the STA interface
   dhcps_set_DNS(this->m_wifi->dnsIP());
-  #ifdef EW_SERIAL_LOG
-    Log(F("NAPT(lwip "));Log(LWIP_VERSION_MAJOR);
-    Logln(F(") initialization done"));
-  #endif
+  LogFmtS("NAPT(lwip %d) initialization done\n", (int)LWIP_VERSION_MAJOR);
 }
 #elif defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
 /**
@@ -127,19 +118,14 @@ void EwingsEspStack::enable_napt_service(){
     // Enable NAT on the AP interface
     ret = ip_napt_enable_no(SOFTAP_IF, 1);
     if (ret == ERR_OK) {
-      #ifdef EW_SERIAL_LOG
-        Log(F("NAPT(lwip "));Log(LWIP_VERSION_MAJOR);
-        Logln(F(") initialization done"));
-      #endif
+      LogFmtS("NAPT(lwip %d) initialization done\n", (int)LWIP_VERSION_MAJOR);
       // Set the DNS server for clients of the AP to the one we also use for the STA interface
       getNonOSDhcpServer().setDns(this->m_wifi->dnsIP(0));
       //dhcpSoftAP.dhcps_set_dns(1, this->m_wifi->dnsIP(1));
     }
   }
   if (ret != ERR_OK) {
-    #ifdef EW_SERIAL_LOG
-      Logln(F("NAPT initialization failed"));
-    #endif
+    LogE("NAPT initialization failed\n");
   }
 }
 #endif
@@ -153,9 +139,9 @@ void EwingsEspStack::serve(){
   __web_server.handle_clients();
   #endif
   __task_scheduler.handle_tasks();
+  __i_dvc_ctrl.yield();
 }
 
-#ifdef EW_SERIAL_LOG
 /**
  * prints log as per defined duration
  */
@@ -176,11 +162,8 @@ void EwingsEspStack::handleLogPrints(){
   __device_iot_service.printDeviceIotConfigLogs();
   #endif
   __task_scheduler.printTaskSchedulerLogs();
-  Log( F("\nNTP Validity : ") );
-  Logln( __nw_time_service.is_valid_ntptime() );
-  Log( F("NTP Time : ") );
-  Logln( __nw_time_service.get_ntp_time() );
+  LogFmtI("\nNTP Validity : %d\n", __nw_time_service.is_valid_ntptime());
+  LogFmtI("NTP Time : %d\n", (int)__nw_time_service.get_ntp_time());
 }
-#endif
 
 EwingsEspStack EwStack;

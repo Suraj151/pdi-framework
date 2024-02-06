@@ -13,7 +13,7 @@ created Date    : 1st June 2019
 
 #include <interface/pdi.h>
 #include <utility/Utility.h>
-#include <database/DefaultDatabase.h>
+#include <service_provider/DatabaseServiceProvider.h>
 #include <webserver/routes/Routes.h>
 #include <webserver/pages/Header.h>
 #include <webserver/pages/Footer.h>
@@ -68,9 +68,9 @@ public:
    */
   iWiFiServerInterface *m_server;
   /**
-   * @var	DefaultDatabase*  m_db_conn
+   * @var	DatabaseServiceProvider*  m_db_conn
    */
-  DefaultDatabase *m_db_conn;
+  DatabaseServiceProvider *m_db_conn;
 };
 
 extern WebResourceProvider __web_resource;

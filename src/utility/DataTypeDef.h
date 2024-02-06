@@ -13,10 +13,11 @@ created Date    : 1st June 2019
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdarg.h>
+#include <string>
 #include <cstdio>
 #include <cstring>
 #include <functional>
-// #include <Arduino.h>
 
 typedef uint8_t   gpio_id_t;
 typedef int64_t   gpio_val_t;
@@ -35,5 +36,11 @@ typedef std::function<void(int)> CallBackIntArgFn;
 typedef std::function<void(void)> CallBackVoidArgFn;
 typedef std::function<void(void*)> CallBackVoidPointerArgFn;
 
+typedef enum {
+  INFO_LOG,
+  ERROR_LOG,
+  WARNING_LOG,
+  SUCCESS_LOG
+} logger_type_t;
 
 #endif

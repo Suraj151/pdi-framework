@@ -36,21 +36,16 @@ HttpServiceProvider::~HttpServiceProvider(){
  */
 bool HttpServiceProvider::followHttpRequest( int _httpCode ){
 
-  #ifdef EW_SERIAL_LOG
-  Logln( F("Following Http Request") );
-  Log( F("Http Request Status Code : ") ); Logln( _httpCode );
+  LogI("Following Http Request\n");
+  LogFmtI("Http Request Status Code : %d\n", _httpCode);
   if ( _httpCode == HTTP_CODE_OK || _httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
-    Log( F("Http Response : ") );
-    Logln( this->m_http_client->getString() );
+    LogFmtI("Http Response : %s\n", this->m_http_client->getString().c_str() );
   }
-  #endif
   this->m_http_client->end();
 
   if( _httpCode < 0 && this->m_retry > 0 ){
     this->m_retry--;
-    #ifdef EW_SERIAL_LOG
-    Logln( F("Http Request retrying...") );
-    #endif
+    LogI("Http Request retrying...\n");
     return true;
   }
   this->m_retry = HTTP_REQUEST_RETRY;

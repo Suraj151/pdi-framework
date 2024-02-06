@@ -53,7 +53,7 @@ class MqttPubSubTable : public DatabaseTable<mqtt_pubsub_config_table>
      */
     bool get(mqtt_pubsub_config_table *_table)
     {
-        return this->get_table(_table, MQTT_PUBSUB_CONFIG_TABLE_ADDRESS);
+        return this->get_table(MQTT_PUBSUB_CONFIG_TABLE_ADDRESS, _table);
     }
 
     /**
@@ -61,7 +61,7 @@ class MqttPubSubTable : public DatabaseTable<mqtt_pubsub_config_table>
      */
     bool set(mqtt_pubsub_config_table *_table)
     {
-        return this->set_table(_table, MQTT_PUBSUB_CONFIG_TABLE_ADDRESS);
+        return this->set_table(MQTT_PUBSUB_CONFIG_TABLE_ADDRESS, _table);
     }
 
     /**

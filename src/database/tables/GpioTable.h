@@ -53,7 +53,7 @@ class GpioTable : public DatabaseTable<gpio_config_table>
      */
     bool get(gpio_config_table *_table)
     {
-        return this->get_table(_table, GPIO_CONFIG_TABLE_ADDRESS);
+        return this->get_table(GPIO_CONFIG_TABLE_ADDRESS, _table);
     }
 
     /**
@@ -61,7 +61,7 @@ class GpioTable : public DatabaseTable<gpio_config_table>
      */
     bool set(gpio_config_table *_table)
     {
-        return this->set_table(_table, GPIO_CONFIG_TABLE_ADDRESS);
+        return this->set_table(GPIO_CONFIG_TABLE_ADDRESS, _table);
     }
 
     /**

@@ -86,9 +86,7 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isAlertPost ){
 
   __http_service.m_port = this->m_gpio_config_copy.gpio_port;
 
-  #ifdef EW_SERIAL_LOG
-  Logln( F("Handling GPIO Http Request") );
-  #endif
+  LogI("Handling GPIO Http Request\n");
 
   if( strlen( __http_service.m_host ) > 5 &&
     __http_service.m_port > 0 &&
@@ -121,10 +119,7 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isAlertPost ){
 
       __http_service.m_http_client->addHeader("Content-Type", "application/json");
 
-      #ifdef EW_SERIAL_LOG
-      Log( F("posting data : ") );
-      Logln( *_payload );
-      #endif
+      LogFmtI("posting data : %s\n", _payload->c_str());
 
       int _httpCode = __http_service.m_http_client->POST( *_payload );
       status = __http_service.followHttpRequest( _httpCode );
@@ -137,9 +132,7 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isAlertPost ){
       }
     }
   }else{
-    #ifdef EW_SERIAL_LOG
-    Logln( F("GPIO Http Request not initializing or failed or Not Configured Correctly") );
-    #endif
+    LogI("GPIO Http Request not initializing or failed or Not Configured Correctly\n");
   }
 
   return status;
@@ -231,10 +224,7 @@ void GpioServiceProvider::appendGpioJsonPayload( String& _payload, bool isAlertP
  */
 void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payload_length ){
 
-  #ifdef EW_SERIAL_LOG
-  Log( F("Applying GPIO from Json Payload : ") );
-  Logln( _payload );
-  #endif
+  LogFmtI("Applying GPIO from Json Payload : %s\n", _payload);
 
   if(
     0 <= __strstr( _payload, (char*)GPIO_PAYLOAD_DATA_KEY, _payload_length - strlen(GPIO_PAYLOAD_DATA_KEY) ) &&
@@ -280,9 +270,7 @@ bool GpioServiceProvider::handleGpioEmailAlert(){
 
   bool status = false;
 
-  #ifdef EW_SERIAL_LOG
-  Logln( F("Handling GPIO email alert") );
-  #endif
+  LogI("Handling GPIO email alert\n");
 
   String *_payload = new String("");
 
@@ -329,7 +317,6 @@ void GpioServiceProvider::handleGpioOperations(){
         break;
       }
       case DIGITAL_WRITE:{
-        // Log( F("writing "));Log( this->getGpioFromPinMap( _pin ) );Log( F(" pin to "));Logln( this->m_gpio_config_copy.gpio_readings[_pin]);
         __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, this->getGpioFromPinMap( _pin ), this->m_gpio_config_copy.gpio_readings[_pin] );
         break;
       }
@@ -468,40 +455,41 @@ void GpioServiceProvider::handleGpioModes( int _gpio_config_type ){
 
 }
 
-#ifdef EW_SERIAL_LOG
 /**
  * print gpio configs
  */
 void GpioServiceProvider::printGpioConfigLogs(){
 
 
-  Logln(F("\nGPIO Configs (mode) :"));
-  // Logln(F("ssid\tpassword\tlocal\tgateway\tsubnet"));
+  LogI("\nGPIO Configs (mode) :\n");
   for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
-    Log(this->m_gpio_config_copy.gpio_mode[_pin]); Log("\t");
+    LogFmtI("%d\t", this->m_gpio_config_copy.gpio_mode[_pin]);
   }
-  Logln(F("\nGPIO Configs (readings) :"));
+
+  LogI("\nGPIO Configs (readings) :\n");
   for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
-    Log(this->m_gpio_config_copy.gpio_readings[_pin]); Log("\t");
+    LogFmtI("%d\t", this->m_gpio_config_copy.gpio_readings[_pin]);
   }
-  Logln(F("\nGPIO Configs (alert comparator) :"));
+
+  LogI("\nGPIO Configs (alert comparator) :\n");
   for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
-    Log(this->m_gpio_config_copy.gpio_alert_comparator[_pin]); Log("\t");
+    LogFmtI("%d\t", this->m_gpio_config_copy.gpio_alert_comparator[_pin]);
   }
-  Logln(F("\nGPIO Configs (alert channels) :"));
+
+  LogI("\nGPIO Configs (alert channels) :\n");
   for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
-    Log(this->m_gpio_config_copy.gpio_alert_channel[_pin]); Log("\t");
+    LogFmtI("%d\t", this->m_gpio_config_copy.gpio_alert_channel[_pin]);
   }
-  Logln(F("\nGPIO Configs (alert values) :"));
+
+  LogI("\nGPIO Configs (alert values) :\n");
   for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
-    Log(this->m_gpio_config_copy.gpio_alert_values[_pin]); Log("\t");
+    LogFmtI("%d\t", this->m_gpio_config_copy.gpio_alert_values[_pin]);
   }
-  Logln(F("\nGPIO Configs (server) :"));
-  Log(this->m_gpio_config_copy.gpio_host); Log("\t");
-  Log(this->m_gpio_config_copy.gpio_port); Log("\t");
-  Log(this->m_gpio_config_copy.gpio_post_frequency); Log("\n\n");
+
+  LogI("\nGPIO Configs (server) :\n");
+  LogFmtI("%s\t%d\t%d\n\n", this->m_gpio_config_copy.gpio_host, this->m_gpio_config_copy.gpio_port, 
+  this->m_gpio_config_copy.gpio_post_frequency);
 }
-#endif
 
 /**
  * get gpio mapped pin from its no.

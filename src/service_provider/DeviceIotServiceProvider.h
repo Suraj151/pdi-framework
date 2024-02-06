@@ -15,6 +15,7 @@ created Date    : 1st June 2019
 #include <service_provider/ServiceProvider.h>
 #include <service_provider/HttpServiceProvider.h>
 #include <service_provider/MqttServiceProvider.h>
+#include <service_provider/DatabaseServiceProvider.h>
 
 /**
  * DeviceIotServiceProvider class
@@ -45,9 +46,7 @@ class DeviceIotServiceProvider : public ServiceProvider {
     void beginWifiStatusLed( void );
     void handleWifiStatusLed( void );
     #endif
-    #ifdef EW_SERIAL_LOG
     void printDeviceIotConfigLogs( void );
-    #endif
 
   protected:
 

@@ -1,4 +1,4 @@
-/*************************** Default Database *********************************
+/***************************** database service *******************************
 This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
@@ -8,79 +8,92 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
-#include "DefaultDatabase.h"
-
-
+#include "DatabaseServiceProvider.h"
 
 /**
  * @var	GlobalTable	__global_table
  */
-GlobalTable	__global_table;
+GlobalTable __global_table;
 
 /**
  * @var	LoginTable	__login_table
  */
-LoginTable	__login_table;
+LoginTable __login_table;
 
 /**
  * @var	WiFiTable	__wifi_table
  */
-WiFiTable	__wifi_table;
+WiFiTable __wifi_table;
 
 /**
  * @var	OtaTable	__ota_table
  */
-OtaTable	__ota_table;
-
+OtaTable __ota_table;
 
 #ifdef ENABLE_GPIO_SERVICE
 /**
  * @var	GpioTable	__gpio_table
  */
-GpioTable	__gpio_table;
+GpioTable __gpio_table;
 #endif
 
 #ifdef ENABLE_MQTT_SERVICE
 /**
  * @var	MqttGeneralTable	__mqtt_general_table
  */
-MqttGeneralTable	__mqtt_general_table;
+MqttGeneralTable __mqtt_general_table;
 /**
  * @var	MqttLwtTable	__mqtt_lwt_table
  */
-MqttLwtTable	__mqtt_lwt_table;
+MqttLwtTable __mqtt_lwt_table;
 /**
  * @var	MqttPubSubTable	__mqtt_pubsub_table
  */
-MqttPubSubTable	__mqtt_pubsub_table;
+MqttPubSubTable __mqtt_pubsub_table;
 #endif
 
 #ifdef ENABLE_EMAIL_SERVICE
 /**
  * @var	EmailTable	__email_table
  */
-EmailTable	__email_table;
+EmailTable __email_table;
 #endif
 
 #ifdef ENABLE_DEVICE_IOT
 /**
  * @var	DeviceIotTable	__device_iot_table
  */
-DeviceIotTable	__device_iot_table;
+DeviceIotTable __device_iot_table;
 #endif
 
+/**
+ * Constructor
+ */
+DatabaseServiceProvider::DatabaseServiceProvider()
+{
+}
+
+/**
+ * Destructor
+ */
+DatabaseServiceProvider::~DatabaseServiceProvider()
+{
+}
 
 /**
  * init all tables.
  */
-void DefaultDatabase::init_default_database(){
-  __database.init_database();
+void DatabaseServiceProvider::init_default_database()
+{
+  __i_db.beginConfigs(__i_db.getMaxDBSize());
+  __database.init_database(__i_db.getMaxDBSize());
 }
 
 /**
  * clear all tables to their defaults value.
  */
-void DefaultDatabase::clear_default_tables(){
+void DatabaseServiceProvider::clear_default_tables()
+{
   __database.clear_all();
 }
 
@@ -89,7 +102,8 @@ void DefaultDatabase::clear_default_tables(){
  *
  * @return status
  */
-bool DefaultDatabase::get_global_config_table( global_config_table* _table ){
+bool DatabaseServiceProvider::get_global_config_table(global_config_table *_table)
+{
   return __global_table.get(_table);
 }
 
@@ -98,7 +112,8 @@ bool DefaultDatabase::get_global_config_table( global_config_table* _table ){
  *
  * @return status
  */
-bool DefaultDatabase::get_login_credential_table( login_credential_table* _table ){
+bool DatabaseServiceProvider::get_login_credential_table(login_credential_table *_table)
+{
   return __login_table.get(_table);
 }
 
@@ -107,7 +122,8 @@ bool DefaultDatabase::get_login_credential_table( login_credential_table* _table
  *
  * @return status
  */
-bool DefaultDatabase::get_wifi_config_table( wifi_config_table* _table ){
+bool DatabaseServiceProvider::get_wifi_config_table(wifi_config_table *_table)
+{
   return __wifi_table.get(_table);
 }
 
@@ -116,7 +132,8 @@ bool DefaultDatabase::get_wifi_config_table( wifi_config_table* _table ){
  *
  * @return status
  */
-bool DefaultDatabase::get_ota_config_table( ota_config_table* _table ){
+bool DatabaseServiceProvider::get_ota_config_table(ota_config_table *_table)
+{
   return __ota_table.get(_table);
 }
 
@@ -126,7 +143,8 @@ bool DefaultDatabase::get_ota_config_table( ota_config_table* _table ){
  *
  * @return status
  */
-bool DefaultDatabase::get_gpio_config_table( gpio_config_table* _table ){
+bool DatabaseServiceProvider::get_gpio_config_table(gpio_config_table *_table)
+{
   return __gpio_table.get(_table);
 }
 #endif
@@ -137,7 +155,8 @@ bool DefaultDatabase::get_gpio_config_table( gpio_config_table* _table ){
  *
  * @return status
  */
-bool DefaultDatabase::get_mqtt_general_config_table( mqtt_general_config_table* _table ){
+bool DatabaseServiceProvider::get_mqtt_general_config_table(mqtt_general_config_table *_table)
+{
   return __mqtt_general_table.get(_table);
 }
 
@@ -146,7 +165,8 @@ bool DefaultDatabase::get_mqtt_general_config_table( mqtt_general_config_table* 
  *
  * @return status
  */
-bool DefaultDatabase::get_mqtt_lwt_config_table( mqtt_lwt_config_table* _table ){
+bool DatabaseServiceProvider::get_mqtt_lwt_config_table(mqtt_lwt_config_table *_table)
+{
   return __mqtt_lwt_table.get(_table);
 }
 
@@ -155,7 +175,8 @@ bool DefaultDatabase::get_mqtt_lwt_config_table( mqtt_lwt_config_table* _table )
  *
  * @return status
  */
-bool DefaultDatabase::get_mqtt_pubsub_config_table( mqtt_pubsub_config_table* _table ){
+bool DatabaseServiceProvider::get_mqtt_pubsub_config_table(mqtt_pubsub_config_table *_table)
+{
   return __mqtt_pubsub_table.get(_table);
 }
 #endif
@@ -166,7 +187,8 @@ bool DefaultDatabase::get_mqtt_pubsub_config_table( mqtt_pubsub_config_table* _t
  *
  * @return status
  */
-bool DefaultDatabase::get_email_config_table( email_config_table* _table ){
+bool DatabaseServiceProvider::get_email_config_table(email_config_table *_table)
+{
   return __email_table.get(_table);
 }
 #endif
@@ -177,7 +199,8 @@ bool DefaultDatabase::get_email_config_table( email_config_table* _table ){
  *
  * @return status
  */
-bool DefaultDatabase::get_device_iot_config_table( device_iot_config_table* _table ){
+bool DatabaseServiceProvider::get_device_iot_config_table(device_iot_config_table *_table)
+{
   return __device_iot_table.get(_table);
 }
 #endif
@@ -187,8 +210,9 @@ bool DefaultDatabase::get_device_iot_config_table( device_iot_config_table* _tab
  *
  * @param global_config_table* _table
  */
-void DefaultDatabase::set_global_config_table( global_config_table* _table ){
-  __global_table.set( _table );
+void DatabaseServiceProvider::set_global_config_table(global_config_table *_table)
+{
+  __global_table.set(_table);
 }
 
 /**
@@ -196,8 +220,9 @@ void DefaultDatabase::set_global_config_table( global_config_table* _table ){
  *
  * @param login_credential_table* _table
  */
-void DefaultDatabase::set_login_credential_table( login_credential_table* _table ){
-  __login_table.set( _table );
+void DatabaseServiceProvider::set_login_credential_table(login_credential_table *_table)
+{
+  __login_table.set(_table);
 }
 
 /**
@@ -205,8 +230,9 @@ void DefaultDatabase::set_login_credential_table( login_credential_table* _table
  *
  * @param wifi_config_table* _table
  */
-void DefaultDatabase::set_wifi_config_table( wifi_config_table* _table ){
-  __wifi_table.set( _table );
+void DatabaseServiceProvider::set_wifi_config_table(wifi_config_table *_table)
+{
+  __wifi_table.set(_table);
 }
 
 /**
@@ -214,8 +240,9 @@ void DefaultDatabase::set_wifi_config_table( wifi_config_table* _table ){
  *
  * @param ota_config_table* _table
  */
-void DefaultDatabase::set_ota_config_table( ota_config_table* _table ){
-  __ota_table.set( _table );
+void DatabaseServiceProvider::set_ota_config_table(ota_config_table *_table)
+{
+  __ota_table.set(_table);
 }
 
 #ifdef ENABLE_GPIO_SERVICE
@@ -224,8 +251,9 @@ void DefaultDatabase::set_ota_config_table( ota_config_table* _table ){
  *
  * @param gpio_config_table* _table
  */
-void DefaultDatabase::set_gpio_config_table( gpio_config_table* _table ){
-  __gpio_table.set( _table );
+void DatabaseServiceProvider::set_gpio_config_table(gpio_config_table *_table)
+{
+  __gpio_table.set(_table);
 }
 #endif
 
@@ -235,8 +263,9 @@ void DefaultDatabase::set_gpio_config_table( gpio_config_table* _table ){
  *
  * @param mqtt_general_config_table* _table
  */
-void DefaultDatabase::set_mqtt_general_config_table( mqtt_general_config_table* _table ){
-  __mqtt_general_table.set( _table );
+void DatabaseServiceProvider::set_mqtt_general_config_table(mqtt_general_config_table *_table)
+{
+  __mqtt_general_table.set(_table);
 }
 
 /**
@@ -244,8 +273,9 @@ void DefaultDatabase::set_mqtt_general_config_table( mqtt_general_config_table* 
  *
  * @param mqtt_lwt_config_table* _table
  */
-void DefaultDatabase::set_mqtt_lwt_config_table( mqtt_lwt_config_table* _table ){
-  __mqtt_lwt_table.set( _table );
+void DatabaseServiceProvider::set_mqtt_lwt_config_table(mqtt_lwt_config_table *_table)
+{
+  __mqtt_lwt_table.set(_table);
 }
 
 /**
@@ -253,8 +283,9 @@ void DefaultDatabase::set_mqtt_lwt_config_table( mqtt_lwt_config_table* _table )
  *
  * @param mqtt_pubsub_config_table* _table
  */
-void DefaultDatabase::set_mqtt_pubsub_config_table( mqtt_pubsub_config_table* _table ){
-  __mqtt_pubsub_table.set( _table );
+void DatabaseServiceProvider::set_mqtt_pubsub_config_table(mqtt_pubsub_config_table *_table)
+{
+  __mqtt_pubsub_table.set(_table);
 }
 #endif
 
@@ -264,8 +295,9 @@ void DefaultDatabase::set_mqtt_pubsub_config_table( mqtt_pubsub_config_table* _t
  *
  * @param email_config_table* _table
  */
-void DefaultDatabase::set_email_config_table( email_config_table* _table ){
-  __email_table.set( _table );
+void DatabaseServiceProvider::set_email_config_table(email_config_table *_table)
+{
+  __email_table.set(_table);
 }
 #endif
 
@@ -275,9 +307,10 @@ void DefaultDatabase::set_email_config_table( email_config_table* _table ){
  *
  * @param device_iot_config_table* _table
  */
-void DefaultDatabase::set_device_iot_config_table( device_iot_config_table* _table ){
-  __device_iot_table.set( _table );
+void DatabaseServiceProvider::set_device_iot_config_table(device_iot_config_table *_table)
+{
+  __device_iot_table.set(_table);
 }
 #endif
 
-DefaultDatabase __database_service;
+DatabaseServiceProvider __database_service;

@@ -42,9 +42,12 @@ created Date    : 1st June 2019
 #define ENABLE_DEVICE_IOT
 
 /**
- * enable/disable serial log
+ * enable/disable logging
  */
-#define EW_SERIAL_LOG
+#define ENABLE_INFO_LOG
+#define ENABLE_ERROR_LOG
+#define ENABLE_WARNING_LOG
+#define ENABLE_SUCCESS_LOG
 
 /**
  * enable/disable auto factory reset on invalid database config found
@@ -69,17 +72,17 @@ created Date    : 1st June 2019
 /**
  * enable/disable network subnetting ( dynamically set ap subnet,gateway etc. )
  */
-// #define ENABLE_DYNAMIC_SUBNETTING
+#define ENABLE_DYNAMIC_SUBNETTING
 
 /**
  * enable/disable internet availability based station connections
  */
-// #define ENABLE_INTERNET_BASED_CONNECTIONS
+#define ENABLE_INTERNET_BASED_CONNECTIONS
 
 /**
  * enable/disable esp now feature here
  */
-// #define ENABLE_ESP_NOW
+#define ENABLE_ESP_NOW
 
 /**
  * @define wifi & internet connectivity check cycle durations

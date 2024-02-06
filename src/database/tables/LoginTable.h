@@ -53,7 +53,7 @@ class LoginTable : public DatabaseTable<login_credential_table>
      */
     bool get(login_credential_table *_table)
     {
-        return this->get_table(_table, LOGIN_CREDENTIAL_TABLE_ADDRESS);
+        return this->get_table(LOGIN_CREDENTIAL_TABLE_ADDRESS, _table);
     }
 
     /**
@@ -61,7 +61,7 @@ class LoginTable : public DatabaseTable<login_credential_table>
      */
     bool set(login_credential_table *_table)
     {
-        return this->set_table(_table, LOGIN_CREDENTIAL_TABLE_ADDRESS);
+        return this->set_table(LOGIN_CREDENTIAL_TABLE_ADDRESS, _table);
     }
 
     /**

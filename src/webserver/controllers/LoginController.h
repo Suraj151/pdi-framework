@@ -117,9 +117,7 @@ class LoginController : public Controller {
 		 */
     void handleLoginConfigRoute( void ) {
 
-      #ifdef EW_SERIAL_LOG
-      Logln(F("Handling Login Config route"));
-      #endif
+      LogI("Handling Login Config route\n");
 
 			if( nullptr == this->m_web_resource ||
 					nullptr == this->m_web_resource->m_db_conn ||
@@ -138,12 +136,9 @@ class LoginController : public Controller {
         String _username = this->m_web_resource->m_server->arg("usrnm");
         String _password = this->m_web_resource->m_server->arg("pswd");
 
-        #ifdef EW_SERIAL_LOG
-          Logln(F("\nSubmitted info :\n"));
-          Log(F("Username : ")); Logln( _username );
-          Log(F("Password : ")); Logln( _password );
-          Logln();
-        #endif
+        LogI("\nSubmitted info :\n");
+        LogFmtI("Username : %s\n", _username.c_str());
+        LogFmtI("Password : %s\n\n", _password.c_str());
 
         if( _username.length() <= LOGIN_CONFIGS_BUF_SIZE && _password.length() <= LOGIN_CONFIGS_BUF_SIZE &&
           _username.length() > MIN_ACCEPTED_ARG_SIZE && _password.length() > MIN_ACCEPTED_ARG_SIZE
@@ -176,9 +171,7 @@ class LoginController : public Controller {
 		 */
     void handleLogoutRoute( void ) {
 
-      #ifdef EW_SERIAL_LOG
-      Logln(F("Handling logout route"));
-      #endif
+      LogI("Handling logout route\n");
 
 			if( nullptr == this->m_web_resource ||
 					nullptr == this->m_web_resource->m_server ||
@@ -223,9 +216,8 @@ class LoginController : public Controller {
         this->m_web_resource->m_server->sendHeader("Cache-Control", "no-cache");
         this->m_web_resource->m_server->sendHeader("Set-Cookie", _session_cookie);
         this->m_web_resource->m_server->send(HTTP_REDIRECT);
-        #ifdef EW_SERIAL_LOG
-        Logln(F("Log in Successful"));
-        #endif
+
+        LogS("Log in Successful\n");
         return;
       }
 

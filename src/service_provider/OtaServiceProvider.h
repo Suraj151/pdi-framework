@@ -12,6 +12,7 @@ created Date    : 1st June 2019
 #define _HTTP_OTA_SERVICE_PROVIDER_H_
 
 #include <service_provider/ServiceProvider.h>
+#include <service_provider/DatabaseServiceProvider.h>
 #include <ESP8266httpUpdate.h>
 
 /**
@@ -49,9 +50,7 @@ class OtaServiceProvider : public ServiceProvider{
     void begin_ota( iWiFiClientInterface* _wifi_client, iHttpClientInterface* _http_client );
     void handleOta( void );
     http_ota_status handle( void );
-    #ifdef EW_SERIAL_LOG
     void printOtaConfigLogs( void );
-    #endif
 
     /**
      * @var	iWiFiClientInterface*|nullptr	m_wifi_client

@@ -53,7 +53,7 @@ class MqttLwtTable : public DatabaseTable<mqtt_lwt_config_table>
      */
     bool get(mqtt_lwt_config_table *_table)
     {
-        return this->get_table(_table, MQTT_LWT_CONFIG_TABLE_ADDRESS);
+        return this->get_table(MQTT_LWT_CONFIG_TABLE_ADDRESS, _table);
     }
 
     /**
@@ -61,7 +61,7 @@ class MqttLwtTable : public DatabaseTable<mqtt_lwt_config_table>
      */
     bool set(mqtt_lwt_config_table *_table)
     {
-        return this->set_table(_table, MQTT_LWT_CONFIG_TABLE_ADDRESS);
+        return this->set_table(MQTT_LWT_CONFIG_TABLE_ADDRESS, _table);
     }
 
     /**

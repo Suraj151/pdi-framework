@@ -36,10 +36,6 @@ ESPNOWServiceProvider::~ESPNOWServiceProvider(){
 
 void add_device_to_table(esp_now_device_t *_device){
 
-  // #ifdef EW_SERIAL_LOG
-  // Plain_Logln(F("espnow: adding device in table"));
-  // #endif
-
   int _index = is_device_exist_in_table( _device );
 
   if( _index < 0 ){
@@ -55,10 +51,6 @@ void add_device_to_table(esp_now_device_t *_device){
 
 int is_device_exist_in_table(esp_now_device_t *_device){
 
-  // #ifdef EW_SERIAL_LOG
-  // Plain_Logln(F("espnow: device exist"));
-  // #endif
-
   for ( int i = 0; i < esp_now_device_table.size(); i++) {
 
     if( __are_arrays_equal( (char*)esp_now_device_table[i].mac, (char*)_device->mac, 6 ) ){
@@ -71,9 +63,7 @@ int is_device_exist_in_table(esp_now_device_t *_device){
 
 void remove_device_from_table(esp_now_device_t *_device){
 
-  #ifdef EW_SERIAL_LOG
-  Plain_Logln(F("espnow: remove device in table"));
-  #endif
+  LogI("espnow: remove device in table\n");
 
   for ( uint16_t i = 0; i < esp_now_device_table.size(); i++) {
 
@@ -88,9 +78,7 @@ void remove_device_from_table(esp_now_device_t *_device){
 
 void esp_now_encrypt_payload(uint8_t *payload, uint8_t len){
 
-  #ifdef EW_SERIAL_LOG
-  Plain_Logln(F("espnow: encrypting payload"));
-  #endif
+  LogI("espnow: encrypting payload\n");
 
   for (uint8_t i = 0; i < len; i++) {
 
@@ -101,9 +89,7 @@ void esp_now_encrypt_payload(uint8_t *payload, uint8_t len){
 
 void esp_now_decrypt_payload(uint8_t *payload, uint8_t len){
 
-  #ifdef EW_SERIAL_LOG
-  Plain_Logln(F("espnow: decrypting payload"));
-  #endif
+  LogI("espnow: decrypting payload\n");
 
   for (uint8_t i = 0; i < len; i++) {
 
@@ -114,13 +100,8 @@ void esp_now_decrypt_payload(uint8_t *payload, uint8_t len){
 
 void esp_now_send_cb(uint8_t *macaddr, uint8_t status){
 
-  #ifdef EW_SERIAL_LOG
-  Plain_Log(F("\nespnow: in send cb : "));
-  Plain_Log_format(macaddr[0],HEX);    Plain_Log_format(macaddr[1],HEX);
-  Plain_Log_format(macaddr[2],HEX);    Plain_Log_format(macaddr[3],HEX);
-  Plain_Log_format(macaddr[4],HEX);    Plain_Log_format(macaddr[5],HEX);
-  Plain_Log(F(" : ")); Plain_Logln(status);
-  #endif
+  LogFmtI("\nespnow: in send cb : %x%x%x%x%x%x : %d\n", 
+  macaddr[0],macaddr[1],macaddr[2],macaddr[3],macaddr[4],macaddr[5],status);
 
   for (uint8_t i = 0; i < ESP_NOW_MAX_PEER; i++) {
 
@@ -143,30 +124,23 @@ void esp_now_recv_cb(uint8_t *macaddr, uint8_t *data, uint8_t len){
 
   esp_now_decrypt_payload(data,len);
 
-  #ifdef EW_SERIAL_LOG
-  Plain_Log(F("\nespnow: in recv cb : "));
-  Plain_Log_format(macaddr[0],HEX);    Plain_Log_format(macaddr[1],HEX);
-  Plain_Log_format(macaddr[2],HEX);    Plain_Log_format(macaddr[3],HEX);
-  Plain_Log_format(macaddr[4],HEX);    Plain_Log_format(macaddr[5],HEX);
-  Plain_Log(F(" : "));
-  Plain_Log(len);
+  LogFmtI("\nespnow: in recv cb : %x%x%x%x%x%x : %d : ", 
+  macaddr[0],macaddr[1],macaddr[2],macaddr[3],macaddr[4],macaddr[5],len);
 
   // esp_now_payload_t* _payload = (esp_now_payload_t*)data;
-  // Plain_Log(F("\nmesh : ")); Plain_Logln(_payload->mesh_level);
-  // Plain_Log(F("config version : ")); Plain_Logln(_payload->global_config.config_version);
-  // Plain_Log(F("current year : ")); Plain_Logln(_payload->global_config.current_year);
+  // (F("\nmesh : ")); ln(_payload->mesh_level);
+  // (F("config version : ")); ln(_payload->global_config.config_version);
+  // (F("current year : ")); ln(_payload->global_config.current_year);
   // uint32_t fimr_version = 0;
   // memcpy(&fimr_version, &_payload->global_config.firmware_version, 4);
-  // Plain_Log(F("firmware version : ")); Plain_Logln(fimr_version);
-  // Plain_Log(F("ssid : ")); Plain_Logln((char*)_payload->ssid);
-  // Plain_Log(F("pswd : ")); Plain_Logln((char*)_payload->pswd);
+  // (F("firmware version : ")); ln(fimr_version);
+  // (F("ssid : ")); ln((char*)_payload->ssid);
+  // (F("pswd : ")); ln((char*)_payload->pswd);
 
-  Plain_Log(F(" : "));
   for (uint8_t i = 0; i < len; i++) {
-    Plain_Log((char)data[i]);
+    LogFmtI("%c",(char)data[i]);
   }
-  Plain_Logln();
-  #endif
+  LogI("\n");
 
   esp_now_device_t new_device;
   esp_now_payload_t* _payload = (esp_now_payload_t*)data;
@@ -216,45 +190,35 @@ void esp_now_recv_cb(uint8_t *macaddr, uint8_t *data, uint8_t len){
 
 void ESPNOWServiceProvider::registerCallbacks(void) {
 
-  #ifdef EW_SERIAL_LOG
-  Logln(F("espnow: registering callbacks"));
-  #endif
+  LogI("espnow: registering callbacks\n");
   esp_now_register_send_cb(esp_now_send_cb);
   esp_now_register_recv_cb(esp_now_recv_cb);
 }
 
 void ESPNOWServiceProvider::unregisterCallbacks(void) {
 
-  #ifdef EW_SERIAL_LOG
-  Logln(F("espnow: unregistering callbacks"));
-  #endif
+  LogI("espnow: unregistering callbacks\n");
   esp_now_unregister_send_cb();
   esp_now_unregister_recv_cb();
 }
 
 void ESPNOWServiceProvider::beginEspNow( iWiFiInterface* _wifi ){
 
-  #ifdef EW_SERIAL_LOG
-  Logln(F("espnow: begin"));
-  #endif
+  LogI("espnow: begin\n");
   this->m_wifi= _wifi;
 
   this->flushPeersToDefaults();
 
   if( esp_now_init()==0 ){
 
-    #ifdef EW_SERIAL_LOG
-    Logln(F("espnow: init done"));
-    #endif
+    LogI("espnow: init done\n");
     this->registerCallbacks();
     esp_now_set_kok((uint8_t*)ESP_NOW_KEY, ESP_NOW_KEY_LENGTH);
     esp_now_set_self_role(ESP_NOW_ROLE_COMBO);
   }else{
 
     this->closeAll();
-    #ifdef EW_SERIAL_LOG
-    Logln(F("espnow: init failed !"));
-    #endif
+    LogE("espnow: init failed !\n");
   }
 }
 
@@ -272,10 +236,7 @@ void ESPNOWServiceProvider::scanPeers(void) {
   #endif
   IPAddress address;
 
-  #ifdef EW_SERIAL_LOG
-  Log(F("espnow: scanning.. client found = "));
-  Logln(number_client);
-  #endif
+  LogFmtI("espnow: scanning.. client found = %d\n", number_client);
 
   int i=1;
   while (stat_info != NULL) {
@@ -283,13 +244,9 @@ void ESPNOWServiceProvider::scanPeers(void) {
     IPaddress = &stat_info->ip;
     address = IPaddress->addr;
 
-    #ifdef EW_SERIAL_LOG
-    Log(F("espnow: station : ")); Log(i); Log(F(" : "));
-    Log((address)); Log(F(" : "));
-    Log_format(stat_info->bssid[0],HEX);    Log_format(stat_info->bssid[1],HEX);
-    Log_format(stat_info->bssid[2],HEX);    Log_format(stat_info->bssid[3],HEX);
-    Log_format(stat_info->bssid[4],HEX);    Logln_format(stat_info->bssid[5],HEX);
-    #endif
+    LogFmtI("espnow: station : %d : %s : %x%x%x%x%x%x\n", i, address.toString().c_str(),
+    (int)stat_info->bssid[0],(int)stat_info->bssid[1],(int)stat_info->bssid[2],
+    (int)stat_info->bssid[3],(int)stat_info->bssid[4],(int)stat_info->bssid[5]);
 
     uint8_t mac[6];
     memcpy(mac, stat_info->bssid, 6);
@@ -310,12 +267,7 @@ void ESPNOWServiceProvider::scanPeers(void) {
     uint8_t mac[6];
     memcpy(mac, this->m_wifi->BSSID(), 6);
 
-    #ifdef EW_SERIAL_LOG
-    Log(F("espnow: ap : "));
-    Log_format(mac[0],HEX);    Log_format(mac[1],HEX);
-    Log_format(mac[2],HEX);    Log_format(mac[3],HEX);
-    Log_format(mac[4],HEX);    Logln_format(mac[5],HEX);
-    #endif
+    LogFmtI("espnow: ap : %x%x%x%x%x%x\n", mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
 
     if( !this->isPeerExist(mac) ){
 
@@ -330,10 +282,7 @@ void ESPNOWServiceProvider::handlePeers(void) {
 
   if( nullptr == this->m_wifi ) return;
 
-  #ifdef EW_SERIAL_LOG
-  Log(F("\nespnow: handeling peers : "));
-  Logln(this->m_wifi->channel());
-  #endif
+  LogFmtI("\nespnow: handeling peers : %d\n", this->m_wifi->channel());
   this->freePeers();
   this->receiveFromPeers();
   this->scanPeers();
@@ -398,39 +347,26 @@ bool ESPNOWServiceProvider::isApPeer(uint8_t *mac_addr) {
 
 void ESPNOWServiceProvider::printPeers(void) {
 
-  #ifdef EW_SERIAL_LOG
-
-  Logln(F("espnow: peer list"));
+  LogI("espnow: peer list\n");
   for (uint8_t i = 0; i < ESP_NOW_MAX_PEER; i++) {
 
     if( esp_now_peers[i].state != ESP_NOW_STATE_EMPTY ){
-      Log(i); Log(F(" : "));
-      Log_format(esp_now_peers[i].mac[0],HEX);    Log_format(esp_now_peers[i].mac[1],HEX);
-      Log_format(esp_now_peers[i].mac[2],HEX);    Log_format(esp_now_peers[i].mac[3],HEX);
-      Log_format(esp_now_peers[i].mac[4],HEX);    Log_format(esp_now_peers[i].mac[5],HEX);   Log(F(" : "));
-      Log(esp_now_peers[i].role); Log(F(" : "));
-      Log(esp_now_peers[i].channel); Log(F(" : "));
-      Log(esp_now_peers[i].state); Log(F(" : "));
-      Log(esp_now_peers[i].last_receive); Log(F(" : "));
-      for (uint8_t j = 0; j < esp_now_peers[i].data_length; j++) {
-        Log((char)esp_now_peers[i].buffer[j]);
-      }
-      Logln();
+
+      LogFmtI("%d : %x%x%x%x%x%x : %d : %d : %d : %d : %s\n", i, 
+      esp_now_peers[i].mac[0],esp_now_peers[i].mac[1],esp_now_peers[i].mac[2],
+      esp_now_peers[i].mac[3],esp_now_peers[i].mac[4],esp_now_peers[i].mac[5],
+      esp_now_peers[i].role, esp_now_peers[i].channel, esp_now_peers[i].state,
+      esp_now_peers[i].last_receive, esp_now_peers[i].buffer);
     }
   }
 
-  Logln(F("espnow: device list"));
+  LogI("espnow: device list\n");
   for ( uint16_t i = 0; i < esp_now_device_table.size(); i++) {
 
-    Log(i); Log(F(" : "));
-    Log(esp_now_device_table[i].mesh_level); Log(F(" : "));
-    Log_format(esp_now_device_table[i].mac[0],HEX);    Log_format(esp_now_device_table[i].mac[1],HEX);
-    Log_format(esp_now_device_table[i].mac[2],HEX);    Log_format(esp_now_device_table[i].mac[3],HEX);
-    Log_format(esp_now_device_table[i].mac[4],HEX);    Log_format(esp_now_device_table[i].mac[5],HEX);
-    Logln();
+    LogFmtI("%d : %d : %x%x%x%x%x%x\n", i, esp_now_device_table[i].mesh_level,
+    esp_now_device_table[i].mac[0],esp_now_device_table[i].mac[1],esp_now_device_table[i].mac[2],
+    esp_now_device_table[i].mac[3],esp_now_device_table[i].mac[4],esp_now_device_table[i].mac[5]);
   }
-
-  #endif
 }
 
 void ESPNOWServiceProvider::receiveFromPeers(void) {
@@ -441,17 +377,10 @@ void ESPNOWServiceProvider::receiveFromPeers(void) {
 
     if( ESP_NOW_STATE_DATA_AVAILABLE == esp_now_peers[i].state || ESP_NOW_STATE_RECV_AVAILABLE == esp_now_peers[i].state ){
 
-      #ifdef EW_SERIAL_LOG
-      Log(F("espnow: recv from "));
-      Log_format(esp_now_peers[i].mac[0],HEX);    Log_format(esp_now_peers[i].mac[1],HEX);
-      Log_format(esp_now_peers[i].mac[2],HEX);    Log_format(esp_now_peers[i].mac[3],HEX);
-      Log_format(esp_now_peers[i].mac[4],HEX);    Log_format(esp_now_peers[i].mac[5],HEX);
-      Log(F(" : "));
-      for (uint8_t j = 0; j < esp_now_peers[i].data_length; j++) {
-        Log((char)esp_now_peers[i].buffer[j]);
-      }
-      Logln();
-      #endif
+      LogFmtI("espnow: recv from : %x%x%x%x%x%x : %s\n", 
+      esp_now_peers[i].mac[0],esp_now_peers[i].mac[1],esp_now_peers[i].mac[2],
+      esp_now_peers[i].mac[3],esp_now_peers[i].mac[4],esp_now_peers[i].mac[5],
+      esp_now_peers[i].buffer);
 
       esp_now_peers[i].state=ESP_NOW_STATE_INIT;
       // memset(esp_now_peers[i].buffer, 0, ESP_NOW_MAX_BUFF_SIZE);
@@ -471,14 +400,10 @@ bool ESPNOWServiceProvider::sendToPeer(uint8_t *mac_addr, uint8_t *packet, uint8
     return false;
   }
 
-  #ifdef EW_SERIAL_LOG
-  Log(F("espnow: sending to "));
-  Log_format(mac_addr[0],HEX);    Log_format(mac_addr[1],HEX);
-  Log_format(mac_addr[2],HEX);    Log_format(mac_addr[3],HEX);
-  Log_format(mac_addr[4],HEX);    Log_format(mac_addr[5],HEX);
-  Log(F(" : "));
-  Logln((char*)packet);
-  #endif
+  LogFmtI("\nespnow: sending to %x%x%x%x%x%x : %s\n", 
+  mac_addr[0],mac_addr[1],mac_addr[2],
+  mac_addr[3],mac_addr[4],mac_addr[5],
+  packet);
 
   int result =  esp_now_send(mac_addr, packet, len<ESP_NOW_MAX_BUFF_SIZE?len:ESP_NOW_MAX_BUFF_SIZE);
   if( 0 == result ){
@@ -506,10 +431,7 @@ bool ESPNOWServiceProvider::broadcastToPeers(uint8_t *packet, uint8_t len) {
     return false;
   }
 
-  #ifdef EW_SERIAL_LOG
-  Log(F("espnow: broadcasting to peer : "));
-  Logln((char*)packet);
-  #endif
+  LogFmtI("espnow: broadcasting to peer : %s", (char*)packet);
 
   int result = esp_now_send(NULL, packet, len<ESP_NOW_MAX_BUFF_SIZE?len:ESP_NOW_MAX_BUFF_SIZE);
   if( 0 == result ){
@@ -527,10 +449,7 @@ bool ESPNOWServiceProvider::broadcastToPeers(uint8_t *packet, uint8_t len) {
 
 bool ESPNOWServiceProvider::broadcastToAll(uint8_t *packet, uint8_t len) {
 
-  #ifdef EW_SERIAL_LOG
-  Log(F("espnow: broadcasting to all : "));
-  Logln((char*)packet);
-  #endif
+  LogFmtI("espnow: broadcasting to all : %s", (char*)packet);
 
   uint8_t broadcast_address[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
@@ -544,14 +463,10 @@ bool ESPNOWServiceProvider::broadcastToAll(uint8_t *packet, uint8_t len) {
 
 bool ESPNOWServiceProvider::setPeerRole(uint8_t *mac_addr, uint8_t role) {
 
-  #ifdef EW_SERIAL_LOG
-  Log(F("espnow: settting role to "));
-  Log_format(mac_addr[0],HEX);    Log_format(mac_addr[1],HEX);
-  Log_format(mac_addr[2],HEX);    Log_format(mac_addr[3],HEX);
-  Log_format(mac_addr[4],HEX);    Log_format(mac_addr[5],HEX);
-  Log(F(" : "));
-  Logln(role);
-  #endif
+  LogFmtI("espnow: settting role to %x%x%x%x%x%x : %d\n", 
+  mac_addr[0],mac_addr[1],mac_addr[2],
+  mac_addr[3],mac_addr[4],mac_addr[5],
+  role);
 
   int result = esp_now_set_peer_role(mac_addr, role);
   if( 0 == result ){
@@ -574,13 +489,9 @@ bool ESPNOWServiceProvider::setPeerRole(uint8_t *mac_addr, uint8_t role) {
 
 bool ESPNOWServiceProvider::isPeerExist(uint8_t *mac_addr) {
 
-  #ifdef EW_SERIAL_LOG
-  Log(F("espnow: isExist : "));
-  Log_format(mac_addr[0],HEX);    Log_format(mac_addr[1],HEX);
-  Log_format(mac_addr[2],HEX);    Log_format(mac_addr[3],HEX);
-  Log_format(mac_addr[4],HEX);    Log_format(mac_addr[5],HEX);
-  Logln();
-  #endif
+  LogFmtI("espnow: isExist : %x%x%x%x%x%x\n", 
+  mac_addr[0],mac_addr[1],mac_addr[2],
+  mac_addr[3],mac_addr[4],mac_addr[5]);
 
   int exist = esp_now_is_peer_exist(mac_addr);
   if( exist>0 ){
@@ -592,9 +503,7 @@ bool ESPNOWServiceProvider::isPeerExist(uint8_t *mac_addr) {
           return true;
         }
     }
-    #ifdef EW_SERIAL_LOG
-    Logln(F("espnow: not exist adding"));
-    #endif
+    LogI("espnow: not exist adding\n");
     return this->addInPeers(mac_addr, esp_now_get_peer_role(mac_addr), esp_now_get_peer_channel(mac_addr));
   }else{
     return false;
@@ -607,14 +516,9 @@ bool ESPNOWServiceProvider::addPeer(uint8_t *mac_addr, uint8_t role, uint8_t cha
   esp_now_get_cnt_info(&no_of_devices,&no_of_encrypted_devices);
   if( no_of_devices >= ESP_NOW_MAX_PEER ) return false;
 
-  #ifdef EW_SERIAL_LOG
-  Log(F("espnow: adding peer : "));
-  Log_format(mac_addr[0],HEX);    Log_format(mac_addr[1],HEX);
-  Log_format(mac_addr[2],HEX);    Log_format(mac_addr[3],HEX);
-  Log_format(mac_addr[4],HEX);    Log_format(mac_addr[5],HEX);
-  Log(F(" : "));
-  Logln(role);
-  #endif
+  LogFmtI("espnow: adding peer : %x%x%x%x%x%x : %d\n", 
+  mac_addr[0],mac_addr[1],mac_addr[2],
+  mac_addr[3],mac_addr[4],mac_addr[5], role);
 
   int add = esp_now_add_peer(mac_addr, role, channel, key, key_len);
   if( add==0 ){
@@ -654,9 +558,7 @@ bool ESPNOWServiceProvider::addInPeers(uint8_t *mac_addr, uint8_t role, uint8_t 
 
 void ESPNOWServiceProvider::closeAll(void) {
 
-  #ifdef EW_SERIAL_LOG
-  Logln(F("espnow: closing all"));
-  #endif
+  LogI("espnow: closing all\n");
 
     for (uint8_t i = 0; i < ESP_NOW_MAX_PEER; i++) {
 
@@ -669,9 +571,7 @@ void ESPNOWServiceProvider::closeAll(void) {
 
 bool ESPNOWServiceProvider::deletePeer(uint8_t _peer_index) {
 
-  #ifdef EW_SERIAL_LOG
-  Logln(F("espnow: deleting peer"));
-  #endif
+  LogI("espnow: deleting peer\n");
 
   if ( _peer_index < ESP_NOW_MAX_PEER &&
     esp_now_peers[_peer_index].state != ESP_NOW_STATE_EMPTY &&
