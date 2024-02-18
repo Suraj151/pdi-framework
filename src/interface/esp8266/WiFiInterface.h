@@ -33,14 +33,13 @@ public:
   // generic api's
   void setOutputPower(float _dBm) override;
   void persistent(bool _persistent) override;
-  bool getPersistent() override;
+  // bool getPersistent() override;
   bool setMode(wifi_mode_t _mode) override;
   wifi_mode_t getMode() override;
   bool setSleepMode(sleep_mode_t type, uint8_t listenInterval = 0) override;
   sleep_mode_t getSleepMode() override;
   bool enableSTA(bool _enable) override;
   bool enableAP(bool _enable) override;
-  int hostByName(const char *aHostname, IPAddress &aResult) override;
   int hostByName(const char *aHostname, IPAddress &aResult, uint32_t timeout_ms) override;
 
   wifi_status_t begin(char *_ssid, char *_passphrase = nullptr, int32_t _channel = 0, const uint8_t *_bssid = nullptr, bool _connect = true) override;

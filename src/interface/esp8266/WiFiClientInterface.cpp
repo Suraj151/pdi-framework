@@ -25,95 +25,49 @@ WiFiClientInterface::~WiFiClientInterface()
 }
 
 /**
- * status
- */
-uint8_t WiFiClientInterface::status()
-{
-  return this->m_wifi_client.status();
-}
-
-/**
  * connect
  */
-int WiFiClientInterface::connect(const char *host, uint16_t port)
+int16_t WiFiClientInterface::connect(const uint8_t *host, uint16_t port)
 {
-  return this->m_wifi_client.connect(host, port);
+  return this->m_wifi_client.connect((const char*)host, port);
 }
 
 /**
- * connect
+ * disconnect
  */
-int WiFiClientInterface::connect(const String &host, uint16_t port)
+int16_t WiFiClientInterface::disconnect()
 {
-  return this->m_wifi_client.connect(host, port);
-}
-
-/**
- * write
- */
-size_t WiFiClientInterface::write(uint8_t byte)
-{
-  return this->m_wifi_client.write(byte);
+  return this->m_wifi_client.stop(0);
 }
 
 /**
  * write
  */
-void WiFiClientInterface::write(const char *str)
+uint32_t WiFiClientInterface::write(uint8_t c)
 {
-  this->m_wifi_client.write((const uint8_t *)str, strlen(str));
+  return this->m_wifi_client.write(c);
 }
 
 /**
  * write
  */
-size_t WiFiClientInterface::write(const uint8_t *buf, size_t size)
+uint32_t WiFiClientInterface::write(const uint8_t *c_str)
 {
-  return this->m_wifi_client.write(buf, size);
+  return this->m_wifi_client.write(c_str, strlen((const char*)c_str));
 }
 
 /**
- * writeln
+ * write
  */
-size_t WiFiClientInterface::writeln()
+uint32_t WiFiClientInterface::write(const uint8_t *c_str, uint32_t size)
 {
-  return println();
-}
-
-/**
- * writeln
- */
-size_t WiFiClientInterface::writeln(uint8_t byte)
-{
-  // size_t l = write(byte);
-  // print("\r\n");
-  // return l;
-  return println(byte);
-}
-
-/**
- * writeln
- */
-size_t WiFiClientInterface::writeln(const char *str)
-{
-  // size_t l = write(str);
-  // print("\r\n");
-  // return l;
-  return println(str);
-}
-
-/**
- * available
- */
-int WiFiClientInterface::available()
-{
-  return this->m_wifi_client.available();
+  return this->m_wifi_client.write(c_str, size);
 }
 
 /**
  * read
  */
-int WiFiClientInterface::read()
+uint8_t WiFiClientInterface::read()
 {
   return this->m_wifi_client.read();
 }
@@ -121,47 +75,23 @@ int WiFiClientInterface::read()
 /**
  * read
  */
-int WiFiClientInterface::read(uint8_t *buf, size_t size)
+uint32_t WiFiClientInterface::read(uint8_t *buf, uint32_t size)
 {
   return this->m_wifi_client.read(buf, size);
 }
 
 /**
- * peek
+ * available
  */
-int WiFiClientInterface::peek()
+int32_t WiFiClientInterface::available()
 {
-  return this->m_wifi_client.peek();
-}
-
-/**
- * peekBytes
- */
-size_t WiFiClientInterface::peekBytes(uint8_t *buffer, size_t length)
-{
-  return this->m_wifi_client.peekBytes(buffer, length);
-}
-
-/**
- * flush
- */
-bool WiFiClientInterface::flush(uint32_t maxWaitMs)
-{
-  return this->m_wifi_client.flush(maxWaitMs);
-}
-
-/**
- * stop
- */
-bool WiFiClientInterface::stop(uint32_t maxWaitMs)
-{
-  return this->m_wifi_client.stop(maxWaitMs);
+  return this->m_wifi_client.available();
 }
 
 /**
  * connected
  */
-uint8_t WiFiClientInterface::connected()
+int8_t WiFiClientInterface::connected()
 {
   return this->m_wifi_client.connected();
 }
@@ -175,51 +105,11 @@ void WiFiClientInterface::setTimeout(uint32_t timeout)
 }
 
 /**
- * remoteIP
+ * flush
  */
-IPAddress WiFiClientInterface::remoteIP()
+void WiFiClientInterface::flush()
 {
-  return this->m_wifi_client.remoteIP();
-}
-
-/**
- * localIP
- */
-IPAddress WiFiClientInterface::localIP()
-{
-  return this->m_wifi_client.localIP();
-}
-
-/**
- * remotePort
- */
-uint16_t WiFiClientInterface::remotePort()
-{
-  return this->m_wifi_client.remotePort();
-}
-
-/**
- * localPort
- */
-uint16_t WiFiClientInterface::localPort()
-{
-  return this->m_wifi_client.localPort();
-}
-
-/**
- * availableForWrite
- */
-int WiFiClientInterface::availableForWrite()
-{
-  return this->m_wifi_client.availableForWrite();
-}
-
-/**
- * stopAll
- */
-void WiFiClientInterface::stopAll()
-{
-  WiFiClient::stopAll();
+  this->m_wifi_client.flush();
 }
 
 WiFiClientInterface __i_wifi_client;

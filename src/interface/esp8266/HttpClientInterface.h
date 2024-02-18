@@ -12,7 +12,7 @@ created Date    : 1st June 2019
 #define _HTTP_CLIENT_INTERFACE_H_
 
 #include "esp8266.h"
-#include <interface/pdi/iHttpClientInterface.h>
+#include <interface/pdi/middlewares/iHttpClientInterface.h>
 
 /**
  * HttpClientInterface class
@@ -35,14 +35,14 @@ public:
   void end(void) override;
   bool connected(void) override;
 
-  void setReuse(bool reuse) override;
+  // void setReuse(bool reuse) override;
   void setUserAgent(const String &userAgent) override;
   void setAuthorization(const char *user, const char *password) override;
-  void setAuthorization(const char *auth) override;
+  // void setAuthorization(const char *auth) override;
   void setTimeout(uint16_t timeout) override;
   void setFollowRedirects(follow_redirects_t follow) override;
   void setRedirectLimit(uint16_t limit) override;
-  bool setURL(const String &url) override;
+  // bool setURL(const String &url) override;
 
   int GET() override;
   int POST(const uint8_t *payload, size_t size) override;

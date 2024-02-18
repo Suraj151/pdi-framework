@@ -59,10 +59,10 @@ bool HttpClientInterface::connected(void)
 /**
  * setReuse
  */
-void HttpClientInterface::setReuse(bool reuse)
-{
-  this->m_http_client.setReuse(reuse);
-}
+// void HttpClientInterface::setReuse(bool reuse)
+// {
+//   this->m_http_client.setReuse(reuse);
+// }
 
 /**
  * setUserAgent
@@ -83,10 +83,10 @@ void HttpClientInterface::setAuthorization(const char *user, const char *passwor
 /**
  * setAuthorization
  */
-void HttpClientInterface::setAuthorization(const char *auth)
-{
-  this->m_http_client.setAuthorization(auth);
-}
+// void HttpClientInterface::setAuthorization(const char *auth)
+// {
+//   this->m_http_client.setAuthorization(auth);
+// }
 
 /**
  * setTimeout
@@ -116,10 +116,10 @@ void HttpClientInterface::setRedirectLimit(uint16_t limit)
 /**
  * setURL
  */
-bool HttpClientInterface::setURL(const String &url)
-{
-  return this->m_http_client.setURL(url);
-}
+// bool HttpClientInterface::setURL(const String &url)
+// {
+//   return this->m_http_client.setURL(url);
+// }
 
 /**
  * GET

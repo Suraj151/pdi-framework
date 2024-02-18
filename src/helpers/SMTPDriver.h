@@ -14,7 +14,7 @@ created Date    : 1st June 2019
 #include <config/Config.h>
 #include <utility/Utility.h>
 #include <utility/Base64.h>
-#include <helpers/WiFiClientHelper.h>
+#include <helpers/ClientHelper.h>
 
 /*
  *  reference  https://tools.ietf.org/html/rfc821#page-36
@@ -146,7 +146,7 @@ public:
    SMTPdriver();
    ~SMTPdriver();
 
-   bool begin(iWiFiClientInterface *_client, char *_host, uint16_t _port);
+   bool begin(iClientInterface *_client, char *_host, uint16_t _port);
    void readResponse(void);
    void flushClient(void);
    void startReadResponse(uint16_t _timeOut = SMTP_DEFAULT_TIMEOUT);
@@ -169,7 +169,7 @@ public:
    void end(void);
 
 protected:
-   iWiFiClientInterface *m_client;
+   iClientInterface *m_client;
    uint16_t m_port;
    int m_lastResponseCode;
    uint16_t m_responseBufferIndex;

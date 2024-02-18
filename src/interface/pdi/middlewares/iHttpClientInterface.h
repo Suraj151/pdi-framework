@@ -37,14 +37,14 @@ public:
   virtual void end(void) = 0;
   virtual bool connected(void) = 0;
 
-  virtual void setReuse(bool reuse) = 0;
+  // virtual void setReuse(bool reuse) = 0;
   virtual void setUserAgent(const String &userAgent) = 0;
   virtual void setAuthorization(const char *user, const char *password) = 0;
-  virtual void setAuthorization(const char *auth) = 0;
+  // virtual void setAuthorization(const char *auth) = 0;
   virtual void setTimeout(uint16_t timeout) = 0;
   virtual void setFollowRedirects(follow_redirects_t follow) = 0;
   virtual void setRedirectLimit(uint16_t limit) = 0;
-  virtual bool setURL(const String &url) = 0;
+  // virtual bool setURL(const String &url) = 0;
 
   virtual int GET() = 0;
   virtual int POST(const uint8_t *payload, size_t size) = 0;

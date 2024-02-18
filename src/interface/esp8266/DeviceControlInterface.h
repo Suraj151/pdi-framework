@@ -12,7 +12,7 @@ created Date    : 1st Jan 2024
 #define _DEVICE_CONTROL_INTERFACE_H_
 
 #include "esp8266.h"
-#include <interface/pdi/iDeviceControlInterface.h>
+#include <interface/pdi/middlewares/iDeviceControlInterface.h>
 #include "LoggerInterface.h"
 
 /**
@@ -33,6 +33,7 @@ public:
   ~DeviceControlInterface();
 
   // GPIO methods
+  void gpioMode( GPIO_MODE mode, gpio_id_t pin ) override;
   void gpioWrite( GPIO_MODE mode, gpio_id_t pin, gpio_val_t value ) override;
   gpio_val_t gpioRead( GPIO_MODE mode, gpio_id_t pin ) override;
 
@@ -40,10 +41,14 @@ public:
   void resetDevice() override;
   void restartDevice() override;
 
+  // wdt methods
+  virtual void enableWdt(uint8_t mode_if_any=0) override {} // bypassing these methods since not used
+  virtual void disableWdt() override {} // bypassing these methods since not used
+  virtual void feedWdt() override;
+
   // misc methods
   void eraseConfig() override;
   uint32_t getDeviceId() override;
-  void deviceWdtFeed() override;
   bool isDeviceFactoryRequested() override;
 
   // util methods

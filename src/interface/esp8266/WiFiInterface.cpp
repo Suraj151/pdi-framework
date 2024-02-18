@@ -50,15 +50,15 @@ void WiFiInterface::persistent(bool _persistent)
 /**
  * get Persistent
  */
-bool WiFiInterface::getPersistent()
-{
-  bool persistent = false;
-  if (nullptr != this->m_wifi)
-  {
-    persistent = this->m_wifi->getPersistent();
-  }
-  return persistent;
-}
+// bool WiFiInterface::getPersistent()
+// {
+//   bool persistent = false;
+//   if (nullptr != this->m_wifi)
+//   {
+//     persistent = this->m_wifi->getPersistent();
+//   }
+//   return persistent;
+// }
 
 /**
  * setMode
@@ -137,19 +137,6 @@ bool WiFiInterface::enableAP(bool _enable)
   if (nullptr != this->m_wifi)
   {
     status = this->m_wifi->enableAP(_enable);
-  }
-  return status;
-}
-
-/**
- * hostByName
- */
-int WiFiInterface::hostByName(const char *aHostname, IPAddress &aResult)
-{
-  int status = 0;
-  if (nullptr != this->m_wifi)
-  {
-    status = this->m_wifi->hostByName(aHostname, aResult);
   }
   return status;
 }

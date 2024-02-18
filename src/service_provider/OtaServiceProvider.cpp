@@ -98,7 +98,7 @@ http_ota_status OtaServiceProvider::handle(){
 
      LogFmtI("Http OTA version url Response code : %d\n", _httpCode);
 
-     if ( HTTP_CODE_OK == _httpCode || HTTP_CODE_MOVED_PERMANENTLY == _httpCode ) {
+     if ( HTTP_RESP_OK == _httpCode || HTTP_RESP_MOVED_PERMANENTLY == _httpCode ) {
 
        String _response = this->m_http_client->getString();
        this->m_http_client->end();

@@ -38,7 +38,7 @@ bool HttpServiceProvider::followHttpRequest( int _httpCode ){
 
   LogI("Following Http Request\n");
   LogFmtI("Http Request Status Code : %d\n", _httpCode);
-  if ( _httpCode == HTTP_CODE_OK || _httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
+  if ( _httpCode == HTTP_RESP_OK || _httpCode == HTTP_RESP_MOVED_PERMANENTLY) {
     LogFmtI("Http Response : %s\n", this->m_http_client->getString().c_str() );
   }
   this->m_http_client->end();

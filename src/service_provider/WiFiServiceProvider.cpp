@@ -501,7 +501,7 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
     __status_wifi.wifi_connected = false;
   }else{
     __status_wifi.wifi_connected = true;
-    LogFmtI("IP address: %d : %d : %d\n", 
+    LogFmtI("IP address: %s : %s : %s\n", 
     this->m_wifi->gatewayIP().toString().c_str(), 
     this->m_wifi->localIP().toString().c_str(), 
     this->m_wifi->softAPIP().toString().c_str());

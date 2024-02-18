@@ -102,7 +102,7 @@ void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_t
     int _httpCode = __http_service.m_http_client->GET();
 
     LogFmtI("Http device otp Response code : %d\n", _httpCode );
-    if ( (_httpCode == HTTP_CODE_OK || _httpCode == HTTP_CODE_MOVED_PERMANENTLY) && __http_service.m_http_client->getSize() <= DEVICE_IOT_OTP_API_RESP_LENGTH ) {
+    if ( (_httpCode == HTTP_RESP_OK || _httpCode == HTTP_RESP_MOVED_PERMANENTLY) && __http_service.m_http_client->getSize() <= DEVICE_IOT_OTP_API_RESP_LENGTH ) {
 
       _response = __http_service.m_http_client->getString();
     }else{
@@ -150,7 +150,7 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
     int _httpCode = __http_service.m_http_client->GET();
 
     LogFmtI("Device iot config request Status Code : %d\n", _httpCode);
-    if ( _httpCode == HTTP_CODE_OK || _httpCode == HTTP_CODE_MOVED_PERMANENTLY ) {
+    if ( _httpCode == HTTP_RESP_OK || _httpCode == HTTP_RESP_MOVED_PERMANENTLY ) {
 
       if( __http_service.m_http_client->getSize() < DEVICE_IOT_CONFIG_RESP_MAX_SIZE ){
 

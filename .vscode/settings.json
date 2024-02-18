@@ -10,6 +10,9 @@
         "deque": "cpp",
         "unordered_map": "cpp",
         "vector": "cpp",
-        "system_error": "cpp"
+        "system_error": "cpp",
+        "memory": "cpp",
+        "random": "cpp",
+        "algorithm": "cpp"
     }
 }

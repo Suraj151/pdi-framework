@@ -36,14 +36,13 @@ public:
   // generic api's
   virtual void setOutputPower(float _dBm) = 0;
   virtual void persistent(bool _persistent) = 0;
-  virtual bool getPersistent() = 0;
+  // virtual bool getPersistent() = 0;
   virtual bool setMode(wifi_mode_t _mode) = 0;
   virtual bool setSleepMode(sleep_mode_t type, uint8_t listenInterval = 0) = 0;
   virtual sleep_mode_t getSleepMode() = 0;
   virtual wifi_mode_t getMode() = 0;
   virtual bool enableSTA(bool _enable) = 0;
   virtual bool enableAP(bool _enable) = 0;
-  virtual int hostByName(const char *aHostname, IPAddress &aResult) = 0;
   virtual int hostByName(const char *aHostname, IPAddress &aResult, uint32_t timeout_ms) = 0;
 
   virtual wifi_status_t begin(char *_ssid, char *_passphrase = nullptr, int32_t _channel = 0, const uint8_t *_bssid = nullptr, bool _connect = true) = 0;

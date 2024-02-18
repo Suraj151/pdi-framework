@@ -1,4 +1,4 @@
-/***************************** WiFiClient helper ******************************
+/******************************* Client helper ********************************
 This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
@@ -8,11 +8,11 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
-#include "WiFiClientHelper.h"
+#include "ClientHelper.h"
 
 /*   WiFi client support functions */
 
-bool connectToServer( iWiFiClientInterface *client, char* host, uint16_t port, uint16_t timeout ){
+bool connectToServer( iClientInterface *client, char* host, uint16_t port, uint16_t timeout ){
 
   int result = 0;
 
@@ -20,7 +20,7 @@ bool connectToServer( iWiFiClientInterface *client, char* host, uint16_t port, u
     LogFmtI("Client: Connecting to %s : %d\n", host, port);
     client->setTimeout(timeout);
     // client->keepAlive();
-    result = client->connect( host, port);
+    result = client->connect( (const uint8_t*)host, port);
   }
 
   LogFmtI("Client Connect result : %d\n", result);
@@ -28,17 +28,17 @@ bool connectToServer( iWiFiClientInterface *client, char* host, uint16_t port, u
   return result != 0;
 }
 
-bool isConnected( iWiFiClientInterface *client ) {
+bool isConnected( iClientInterface *client ) {
 
   return ( nullptr != client ) ? client->connected() : false;
 }
 
-bool disconnect( iWiFiClientInterface *client ) {
+bool disconnect( iClientInterface *client ) {
 
-  return isConnected(client) ? client->stop(500) : true;
+  return isConnected(client) ? client->disconnect() : true;
 }
 
-bool sendPacket( iWiFiClientInterface *client, uint8_t *buffer, uint16_t len ) {
+bool sendPacket( iClientInterface *client, uint8_t *buffer, uint16_t len ) {
 
   bool status = false;
 
@@ -50,8 +50,6 @@ bool sendPacket( iWiFiClientInterface *client, uint8_t *buffer, uint16_t len ) {
     status = true;
 
     while (len > 0) {
-
-      LogFmtI("Client: Sending to remote port %d\n", client->remotePort());
 
       if ( isConnected(client) ) {
         // send 250 bytes at most at a time, can adjust this later based on Client
@@ -89,7 +87,7 @@ bool sendPacket( iWiFiClientInterface *client, uint8_t *buffer, uint16_t len ) {
   return status;
 }
 
-uint16_t readPacket( iWiFiClientInterface *client, uint8_t *buffer, uint16_t maxlen, int16_t timeout ) {
+uint16_t readPacket( iClientInterface *client, uint8_t *buffer, uint16_t maxlen, int16_t timeout ) {
 
   uint16_t len = 0;
   int16_t t = timeout;

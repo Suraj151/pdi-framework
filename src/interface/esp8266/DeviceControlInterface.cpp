@@ -25,6 +25,24 @@ DeviceControlInterface::~DeviceControlInterface()
 }
 
 /**
+ * set the gpio mode
+ */
+void DeviceControlInterface::gpioMode(GPIO_MODE mode, gpio_id_t pin)
+{
+    switch (mode)
+    {
+    case DIGITAL_WRITE:
+        pinMode(pin, OUTPUT);
+        break;
+    case DIGITAL_READ:
+        pinMode(pin, INPUT);
+        break;
+    default:
+        break;
+    }
+}
+
+/**
  * write digital/analog to gpio
  */
 void DeviceControlInterface::gpioWrite(GPIO_MODE mode, gpio_id_t pin, gpio_val_t value)
@@ -81,6 +99,14 @@ void DeviceControlInterface::restartDevice()
 }
 
 /**
+ * device watchdog feed
+ */
+void DeviceControlInterface::feedWdt()
+{
+    ESP.wdtFeed();
+}
+
+/**
  * erase device config if any
  */
 void DeviceControlInterface::eraseConfig()
@@ -94,14 +120,6 @@ void DeviceControlInterface::eraseConfig()
 uint32_t DeviceControlInterface::getDeviceId()
 {
     return ESP.getChipId();
-}
-
-/**
- * device watchdog feed
- */
-void DeviceControlInterface::deviceWdtFeed()
-{
-    ESP.wdtFeed();
 }
 
 /**

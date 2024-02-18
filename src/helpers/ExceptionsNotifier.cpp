@@ -132,7 +132,7 @@ void readCrashFileToBuffer(String &_filepath, String &_filedata, uint16_t &_size
 void saveCrashToSpiffs(struct rst_info *rst_info, uint32_t stack, uint32_t stack_end, Print &outputDev)
 {
 
-	__i_dvc_ctrl.deviceWdtFeed();
+	__i_dvc_ctrl.feedWdt();
 	outputDev.printf("\nRestart reason : %d\n", rst_info->reason);
 	outputDev.printf("Exception (%d):\n", rst_info->exccause);
 	outputDev.printf("epc1=0x%08x epc2=0x%08x epc3=0x%08x excvaddr=0x%08x depc=0x%08x\n\n", rst_info->epc1, rst_info->epc2, rst_info->epc3, rst_info->excvaddr, rst_info->depc);

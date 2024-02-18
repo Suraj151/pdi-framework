@@ -12,7 +12,7 @@ created Date    : 1st June 2019
 #define _WIFI_CLIENT_INTERFACE_H_
 
 #include "esp8266.h"
-#include <interface/pdi/iWiFiClientInterface.h>
+#include <interface/pdi/middlewares/iWiFiClientInterface.h>
 
 /**
  * WiFiClientInterface class
@@ -30,33 +30,24 @@ public:
    */
   ~WiFiClientInterface();
 
-  uint8_t status() override;
-  int connect(const char *host, uint16_t port) override;
-  int connect(const String &host, uint16_t port) override;
+  // connect/disconnect api
+  int16_t connect(const uint8_t *host, uint16_t port) override;
+  int16_t disconnect() override;
 
-  size_t write(uint8_t byte) override;
-  void write(const char *str) override;
-  size_t write(const uint8_t *buf, size_t size) override;
-  size_t writeln() override;
-  size_t writeln(uint8_t byte) override;
-  size_t writeln(const char *str) override;
+  // data sending api
+  uint32_t write(uint8_t c) override;
+  uint32_t write(const uint8_t *c_str) override;
+  uint32_t write(const uint8_t *c_str, uint32_t size) override;
 
-  int available() override;
-  int read() override;
-  int read(uint8_t *buf, size_t size) override;
-  int peek() override;
-  size_t peekBytes(uint8_t *buffer, size_t length) override;
-  bool flush(uint32_t maxWaitMs = 0) override;
-  bool stop(uint32_t maxWaitMs = 0) override;
-  uint8_t connected() override;
+  // received data read api
+  uint8_t read() override;
+  uint32_t read(uint8_t *buf, uint32_t size) override;
+
+  // useful api
+  int32_t available() override;
+  int8_t connected() override;
   void setTimeout(uint32_t timeout) override;
-
-  IPAddress remoteIP() override;
-  uint16_t remotePort() override;
-  IPAddress localIP() override;
-  uint16_t localPort() override;
-  int availableForWrite() override;
-  void stopAll() override;
+  void flush() override;
 
   WiFiClient *getWiFiClient() override { return &this->m_wifi_client; }
 
