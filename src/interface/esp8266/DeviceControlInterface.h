@@ -49,6 +49,7 @@ public:
   // misc methods
   void eraseConfig() override;
   uint32_t getDeviceId() override;
+  std::string getDeviceMac() override;
   bool isDeviceFactoryRequested() override;
 
   // util methods

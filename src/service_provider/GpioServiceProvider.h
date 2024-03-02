@@ -12,11 +12,11 @@ created Date    : 1st June 2019
 #define _GPIO_SERVICE_PROVIDER_H_
 
 #include <service_provider/ServiceProvider.h>
-#include <service_provider/HttpServiceProvider.h>
 #include <service_provider/EmailServiceProvider.h>
 #include <service_provider/DatabaseServiceProvider.h>
 
 #include <Ticker.h>
+#include <transports/http/HTTPClient.h>
 
 #define GPIO_PAYLOAD_DATA_KEY "data"
 #define GPIO_PAYLOAD_MODE_KEY "mode"
@@ -117,7 +117,7 @@ public:
    */
   ~GpioServiceProvider();
 
-  void begin(iWiFiInterface *_wifi, iWiFiClientInterface *_wifi_client);
+  void begin(iWiFiClientInterface *_wifi_client);
   void enable_update_gpio_table_from_copy(void);
   void appendGpioJsonPayload(String &_payload, bool isAlertPost = false);
   void applyGpioJsonPayload(char *_payload, uint16_t _payload_length);
@@ -145,11 +145,12 @@ public:
   bool m_update_gpio_table_from_copy;
 
 protected:
+
   /**
-   * @var	iWiFiClientInterface  *m_wifi_client
+   * @var	Http_Client  *m_http_client
    */
-  iWiFiClientInterface *m_wifi_client;
-  iWiFiInterface *m_wifi;
+  Http_Client *m_http_client;
+
   DigitalBlinker *m_digital_blinker[MAX_DIGITAL_GPIO_PINS];
 };
 

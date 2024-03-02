@@ -139,6 +139,7 @@ class Http_Client
 {
 
 public:
+	// Constructor & Destructor
 	Http_Client();
 	~Http_Client();
 
@@ -173,6 +174,9 @@ public:
 
 	// response api
 	int16_t GetResponse(char *&resp_body, int16_t &resp_len);
+
+	// static instance
+	static Http_Client *GetStaticInstance();
 
 protected:
 	int16_t SendRequest(const char *type, const char *url, const char *payload = nullptr, uint16_t size = 0);

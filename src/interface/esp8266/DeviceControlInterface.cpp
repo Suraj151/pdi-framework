@@ -123,6 +123,14 @@ uint32_t DeviceControlInterface::getDeviceId()
 }
 
 /**
+ * get device mac id if any
+ */
+std::string DeviceControlInterface::getDeviceMac()
+{
+    return std::string( WiFi.macAddress().c_str() );
+}
+
+/**
  * check whether device factory reset is requested
  */
 bool DeviceControlInterface::isDeviceFactoryRequested()

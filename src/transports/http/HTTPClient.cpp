@@ -509,6 +509,15 @@ int16_t Http_Client::GetResponse(char *&resp_body, int16_t &resp_len)
 }
 
 /**
+ * get the static instance of http client
+ */
+Http_Client *Http_Client::GetStaticInstance()
+{
+    static Http_Client _client;
+    return &_client;
+}
+
+/**
  * send the request to server
  */
 int16_t Http_Client::SendRequest(const char *type, const char *url, const char *payload, uint16_t size)

@@ -63,7 +63,7 @@ void EwingsEspStack::initialize(){
   #endif
   __ota_service.begin_ota( this->m_wifi_client, this->m_http_client );
   #ifdef ENABLE_GPIO_SERVICE
-  __gpio_service.begin( this->m_wifi, this->m_wifi_client );
+  __gpio_service.begin( this->m_wifi_client );
   #endif
   #ifdef ENABLE_MQTT_SERVICE
   __mqtt_service.begin( this->m_wifi );
