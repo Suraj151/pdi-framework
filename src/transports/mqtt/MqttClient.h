@@ -13,12 +13,12 @@ created Date    : 1st June 2019
 #define EW_MQTT_CLIENT_SERVICE_H
 
 #include <interface/pdi.h>
+#include <helpers/ClientHelper.h>
 #include "Mqtt_msg.h"
 
 typedef enum
 {
 	MQTT_PUBLISH_RECV,
-	WIFI_CONNECTING_ERROR,
 	MQTT_HOST_CONNECTING,
 	MQTT_HOST_CONNECTED,
 	MQTT_CONNECT_SENT,
@@ -59,7 +59,6 @@ typedef enum
 
 typedef struct
 {
-
 	uint8_t type;
 	char *topic;
 	char *data;
@@ -70,7 +69,6 @@ typedef struct
 
 typedef struct
 {
-
 	mqtt_connect_info_t *connect_info;
 	uint8_t *in_buffer;
 	uint8_t *out_buffer;
@@ -117,7 +115,7 @@ public:
 	MQTTClient();
 	~MQTTClient();
 
-	bool begin(iWiFiInterface *_wifi, mqtt_general_config_table *_mqtt_general_configs, mqtt_lwt_config_table *_mqtt_lwt_configs);
+	bool begin(mqtt_general_config_table *_mqtt_general_configs, mqtt_lwt_config_table *_mqtt_lwt_configs);
 	void InitConnection(char *host, int port = MQTT_DEFAULT_PORT, uint8_t security = 0);
 	void InitClient(char *client_id, char *client_user, char *client_pass, uint32_t keepAliveTime = MQTT_DEFAULT_KEEPALIVE, uint8_t cleanSession = 1);
 	void InitLWT(char *will_topic, char *will_msg, uint8_t will_qos, uint8_t will_retain);
@@ -155,7 +153,6 @@ protected:
 	uint8_t m_security;
 
 	iClientInterface *m_client;
-	iWiFiInterface *m_wifi;
 
 	MqttCallback m_connectedCb;
 	MqttCallback m_disconnectedCb;
@@ -165,11 +162,7 @@ protected:
 	MqttCallback m_timeoutCb;
 	MqttDataCallback m_dataCb;
 
-	bool connectServer(void);
 	bool disconnectServer(void);
-	bool connected(void);
-	bool sendPacket(uint8_t *buffer, uint16_t len);
-	uint16_t readPacket(uint8_t *buffer, uint16_t maxlen, int16_t timeout);
 	uint16_t readFullPacket(uint8_t *buffer, uint16_t maxsize, uint16_t timeout);
 
 	void mqtt_client_delete(void);

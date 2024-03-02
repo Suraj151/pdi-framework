@@ -21,12 +21,20 @@ created Date    : 1st Jan 2024
 #include <WiFiClient.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
+#include <utility/DataTypeDef.h>
 
 extern "C"
 {
 #include "user_interface.h"
 #include <espnow.h>
 }
+
+// redefines
+#ifdef RODT_ATTR
+#undef RODT_ATTR
+#define RODT_ATTR(v) (const char*)F(v)
+#endif
+
 
 /**
  * @define flash key parameters for reset factory

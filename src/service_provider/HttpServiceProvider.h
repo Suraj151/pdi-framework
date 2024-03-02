@@ -12,6 +12,7 @@ created Date    : 1st June 2019
 #define _HTTP_SERVICE_PROVIDER_H_
 
 #include <service_provider/ServiceProvider.h>
+#include <transports/http/HTTPClient.h>
 
 /**
  * HttpServiceProvider class

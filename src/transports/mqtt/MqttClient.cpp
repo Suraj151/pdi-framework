@@ -13,7 +13,7 @@ created Date    : 1st June 2019
 
 #if defined(ENABLE_MQTT_SERVICE)
 
-#include "Mqtt.h"
+#include "MqttClient.h"
 
 #define MQTT_SEND_TIMEOUT 5
 #define MQTT_READ_TIMEOUT 10
@@ -93,13 +93,12 @@ bool MQTTClient::is_mqtt_connected()
 {
 
   if (
-      this->m_mqttClient.connState == WIFI_CONNECTING_ERROR ||
       this->m_mqttClient.connState == MQTT_DELETING ||
       this->m_mqttClient.connState == MQTT_DISCONNECTED)
   {
     return false;
   }
-  return (this->connected() && this->m_mqttClient.mqtt_connected);
+  return (isConnected(this->m_client) && this->m_mqttClient.mqtt_connected);
 }
 
 bool MQTTClient::is_topic_subscribed(char *_topic)
@@ -405,7 +404,7 @@ void MQTTClient::mqtt_client_connect()
 
   this->m_mqttClient.sendTimeout = MQTT_SEND_TIMEOUT;
   LogFmtI("MQTT: Sending, type: %d, id: %x\r\n", this->m_mqttClient.mqtt_state.pending_msg_type, this->m_mqttClient.mqtt_state.pending_msg_id);
-  bool result = sendPacket(this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length);
+  bool result = sendPacket(this->m_client, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length);
 
   if (result)
   {
@@ -432,7 +431,7 @@ void MQTTClient::mqtt_client_disconnect()
 
   this->m_mqttClient.sendTimeout = MQTT_SEND_TIMEOUT;
   LogFmtI("MQTT: Sending, type: %d, id: %x\r\n", this->m_mqttClient.mqtt_state.pending_msg_type, this->m_mqttClient.mqtt_state.pending_msg_id);
-  bool result = sendPacket(this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length);
+  bool result = sendPacket(this->m_client, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length);
 
   if (result)
   {
@@ -460,7 +459,7 @@ void MQTTClient::mqtt_send_keepalive()
 
   this->m_mqttClient.sendTimeout = MQTT_SEND_TIMEOUT;
   LogFmtI("MQTT: Sending, type: %d, id: %x\r\n", this->m_mqttClient.mqtt_state.pending_msg_type, this->m_mqttClient.mqtt_state.pending_msg_id);
-  bool result = sendPacket(this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length);
+  bool result = sendPacket(this->m_client, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length);
 
   if (result)
   {
@@ -502,26 +501,11 @@ void MQTTClient::MQTT_Task()
   case MQTT_PING_SENT:
     this->mqtt_client_recv();
     break;
-  case WIFI_CONNECTING_ERROR:
-    if (nullptr != this->m_wifi && this->m_wifi->isConnected())
-    {
-      this->m_mqttClient.connState = MQTT_HOST_RECONNECT_REQ;
-    }
-    break;
   case MQTT_HOST_CONNECTING:
-    if (nullptr != this->m_wifi && !this->m_wifi->isConnected())
+    if (isConnected(this->m_client))
     {
-      LogI("MQTT: WiFi not connected. waiting..\n");
-      this->m_mqttClient.host_connect_tick = 0;
-      this->m_mqttClient.connState = WIFI_CONNECTING_ERROR;
-    }
-    else
-    {
-      if (this->connected())
-      {
-        LogFmtI("MQTT: Connected to broker %s:%d\r\n", this->m_host, this->m_port);
-        this->mqtt_client_connect();
-      }
+      LogFmtI("MQTT: Connected to broker %s:%d\r\n", this->m_host, this->m_port);
+      this->mqtt_client_connect();
     }
     break;
   case MQTT_DISCONNECT_REQ:
@@ -554,7 +538,7 @@ void MQTTClient::MQTT_Task()
       this->m_mqttClient.mqtt_state.pending_msg_id = mqtt_get_id(dataBuffer, dataLen);
 
       this->m_mqttClient.sendTimeout = MQTT_SEND_TIMEOUT;
-      bool result = this->sendPacket(dataBuffer, dataLen);
+      bool result = sendPacket(this->m_client, dataBuffer, dataLen);
 
       if (result)
       {
@@ -574,7 +558,7 @@ void MQTTClient::MQTT_Task()
     }
     break;
   }
-  __i_dvc_ctrl.wait(0); // yield purpose
+  __i_dvc_ctrl.yield(); // yield purpose
 }
 
 void MQTTClient::mqtt_client_delete()
@@ -656,7 +640,7 @@ bool MQTTClient::Subscribe(char *topic, uint8_t qos)
   uint16_t dataLen;
   memset(dataBuffer, 0, MQTT_BUF_SIZE);
 
-  if (!this->connected())
+  if (!isConnected(this->m_client))
   {
     return false;
   }
@@ -666,7 +650,7 @@ bool MQTTClient::Subscribe(char *topic, uint8_t qos)
                                                                       &this->m_mqttClient.mqtt_state.pending_msg_id);
 
   LogFmtI("MQTT: queue subscribe, topic \"%s\", id: %d\r\n", topic, this->m_mqttClient.mqtt_state.pending_msg_id);
-  // bool result = sendPacket( this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length );
+  // bool result = sendPacket(this->m_client, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length );
 
   while (QUEUE_Puts(&this->m_mqttClient.msgQueue, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length) == -1)
   {
@@ -721,7 +705,7 @@ bool MQTTClient::Publish(const char *topic, const char *data, int data_length, i
   uint16_t dataLen;
   memset(dataBuffer, 0, MQTT_BUF_SIZE);
 
-  if (!this->connected())
+  if (!isConnected(this->m_client))
   {
     return false;
   }
@@ -754,7 +738,6 @@ MQTTClient::MQTTClient() : m_mqttDataCallbackArgs(reinterpret_cast<uint32_t *>(t
                            m_port(0),
                            m_security(0),
                            m_client(nullptr),
-                           m_wifi(nullptr),
                            m_connectedCb(nullptr),
                            m_disconnectedCb(nullptr),
                            m_publishedCb(nullptr),
@@ -770,15 +753,13 @@ MQTTClient::~MQTTClient()
   this->mqtt_client_delete();
 }
 
-bool MQTTClient::begin(iWiFiInterface *_wifi, mqtt_general_config_table *_mqtt_general_configs, mqtt_lwt_config_table *_mqtt_lwt_configs)
+bool MQTTClient::begin(mqtt_general_config_table *_mqtt_general_configs, mqtt_lwt_config_table *_mqtt_lwt_configs)
 {
 
-  if (nullptr == _wifi || nullptr == _mqtt_general_configs || nullptr == _mqtt_lwt_configs)
+  if (nullptr == _mqtt_general_configs || nullptr == _mqtt_lwt_configs)
   {
     return false;
   }
-
-  this->m_wifi = _wifi;
 
   if (strlen(_mqtt_general_configs->host) > 5 && _mqtt_general_configs->port > 0)
   {
@@ -954,7 +935,7 @@ void MQTTClient::InitLWT(char *will_topic, char *will_msg, uint8_t will_qos, uin
 void MQTTClient::mqtt_timer()
 {
 
-  LogFmtI("MQTT: mqtt timer : %d\t mqtt state : %d\n", (int)this->connected(), (int)this->m_mqttClient.connState);
+  LogFmtI("MQTT: mqtt timer : %d\t mqtt state : %d\n", (int)isConnected(this->m_client), (int)this->m_mqttClient.connState);
   LogI("MQTT: subscribed topics(QoS) : ");
   for (uint16_t i = 0; i < this->m_mqttClient.subscribed_topics.size(); i++)
   {
@@ -992,8 +973,7 @@ void MQTTClient::mqtt_timer()
     this->MQTT_Task();
   }
   else if (
-      MQTT_HOST_RECONNECT_REQ == this->m_mqttClient.connState ||
-      WIFI_CONNECTING_ERROR == this->m_mqttClient.connState)
+      MQTT_HOST_RECONNECT_REQ == this->m_mqttClient.connState)
   {
     this->MQTT_Task();
   }
@@ -1023,7 +1003,7 @@ void MQTTClient::mqtt_timer()
   {
     this->m_mqttClient.sendTimeout--;
   }
-  __i_dvc_ctrl.wait(0); // yield purpose
+  __i_dvc_ctrl.yield(); // yield purpose
 }
 
 void MQTTClient::Connect()
@@ -1038,7 +1018,8 @@ void MQTTClient::Connect()
 
   this->m_mqttClient.connState = MQTT_HOST_CONNECTING;
 
-  this->connectServer();
+  // this->connectServer();
+  connectToServer(this->m_client, this->m_host, this->m_port, 2500);
   this->MQTT_Task();
 }
 
@@ -1091,24 +1072,7 @@ void MQTTClient::OnTimeout(MqttCallback timeoutCb)
   this->m_timeoutCb = timeoutCb;
 }
 
-/*   WiFi client support functions */
-
-bool MQTTClient::connectServer()
-{
-  if (nullptr == this->m_client)
-  {
-    return false;
-  }
-
-  LogFmtI("MQTT: Connecting to %s:%d\r\n", this->m_host, this->m_port);
-
-  this->m_client->setTimeout(3000);
-  int result = this->m_client->connect((const uint8_t *)this->m_host, this->m_port);
-
-  LogFmtI("MQTT: Connect result -: %d\n", result);
-
-  return (0 != result);
-}
+/* client interface support functions */
 
 bool MQTTClient::disconnectServer()
 {
@@ -1116,17 +1080,7 @@ bool MQTTClient::disconnectServer()
   {
     this->m_disconnectedCb((uint32_t *)this);
   }
-  return this->connected() ? this->m_client->disconnect() : true;
-}
-
-bool MQTTClient::connected()
-{
-  // bool _is_live = this->m_client->connected();
-  // if ( !_is_live ) {
-  //   this->m_client->stop();
-  // }
-  // return _is_live;
-  return (nullptr != this->m_client) ? this->m_client->connected() : false;
+  return disconnect(this->m_client);
 }
 
 uint16_t MQTTClient::readFullPacket(uint8_t *buffer, uint16_t maxsize, uint16_t timeout)
@@ -1136,7 +1090,7 @@ uint16_t MQTTClient::readFullPacket(uint8_t *buffer, uint16_t maxsize, uint16_t 
 
   memset(buffer, 0, maxsize);
   // read the packet type:
-  rlen = this->readPacket(pbuff, 1, timeout);
+  rlen = readPacket(this->m_client, pbuff, 1, timeout);
   if (rlen != 1)
     return 0;
 
@@ -1148,7 +1102,7 @@ uint16_t MQTTClient::readFullPacket(uint8_t *buffer, uint16_t maxsize, uint16_t 
 
   do
   {
-    rlen = this->readPacket(pbuff, 1, timeout);
+    rlen = readPacket(this->m_client, pbuff, 1, timeout);
     if (rlen != 1)
       return 0;
     encodedByte = pbuff[0]; // save the last read val
@@ -1167,74 +1121,13 @@ uint16_t MQTTClient::readFullPacket(uint8_t *buffer, uint16_t maxsize, uint16_t 
   if (value > (maxsize - (pbuff - buffer) - 1))
   {
     LogW("MQTT: Packet too big for buffer\n");
-    rlen = this->readPacket(pbuff, (maxsize - (pbuff - buffer) - 1), timeout);
+    rlen = readPacket(this->m_client, pbuff, (maxsize - (pbuff - buffer) - 1), timeout);
   }
   else
   {
-    rlen = this->readPacket(pbuff, value, timeout);
+    rlen = readPacket(this->m_client, pbuff, value, timeout);
   }
   return ((pbuff - buffer) + rlen);
-}
-
-uint16_t MQTTClient::readPacket(uint8_t *buffer, uint16_t maxlen, int16_t timeout)
-{
-  uint16_t len = 0;
-  int16_t t = timeout;
-
-  while (this->connected() && (timeout >= 0))
-  {
-    while (this->m_client->available())
-    {
-      char c = this->m_client->read();
-      timeout = t; // reset the timeout
-      buffer[len] = c;
-      len++;
-
-      if (maxlen == 0)
-      {
-        return 0;
-      }
-
-      if (len == maxlen)
-      {
-        return len;
-      }
-    }
-    timeout -= MQTT_CLIENT_READINTERVAL_MS;
-    __i_dvc_ctrl.wait(MQTT_CLIENT_READINTERVAL_MS);
-  }
-  return len;
-}
-
-bool MQTTClient::sendPacket(uint8_t *buffer, uint16_t len)
-{
-  uint16_t ret = 0;
-
-  while (len > 0)
-  {
-    if (this->connected())
-    {
-      // send 250 bytes at most at a time, can adjust this later based on Client
-
-      // uint16_t sendlen = len > 250 ? 250 : len;
-      uint16_t sendlen = len;
-      ret = this->m_client->write(buffer, sendlen);
-      LogFmtI("MQTT: send packet return %d\n", ret);
-      len -= ret;
-
-      if (ret != sendlen)
-      {
-        LogE("MQTT: send packet - failed to send\n");
-        return false;
-      }
-    }
-    else
-    {
-      LogE("MQTT: send packet - connection failed\n");
-      return false;
-    }
-  }
-  return true;
 }
 
 #endif

@@ -22,7 +22,6 @@ created Date    : 1st June 2019
  */
 int __strstr(char *str, char *substr, int _len)
 {
-
 	if (nullptr == str || nullptr == substr || 0 == strlen(str) || 0 == strlen(substr))
 	{
 		return -1;
@@ -32,7 +31,6 @@ int __strstr(char *str, char *substr, int _len)
 
 	while (*str && n < _len)
 	{
-
 		char *Begin = str;
 		char *pattern = substr;
 
@@ -127,7 +125,7 @@ char *__strtrim(char *str, uint16_t _overflow_limit)
  * @param   uint16_t|300	_overflow_limit
  * @return  bool
  */
-bool __are_str_equals(char *str1, char *str2, uint16_t _overflow_limit)
+bool __are_str_equals(const char *str1, const char *str2, uint16_t _overflow_limit)
 {
 
 	if (nullptr == str1 || nullptr == str2)

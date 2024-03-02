@@ -1,4 +1,4 @@
-/*********** SMTP (Simple Mail Transfer Protocol) Driver **********************
+/*********** SMTP (Simple Mail Transfer Protocol) Client **********************
 This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
@@ -8,12 +8,12 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
-#include "SMTPDriver.h"
+#include "SMTPClient.h"
 
 /**
- * SMTPdriver constructor.
+ * SMTPClient constructor.
  */
-SMTPdriver::SMTPdriver() :
+SMTPClient::SMTPClient() :
   m_client(nullptr),
   m_port(0),
   m_lastResponseCode(-1),
@@ -28,13 +28,13 @@ SMTPdriver::SMTPdriver() :
 }
 
 /**
- * SMTPdriver destructor
+ * SMTPClient destructor
  */
-SMTPdriver::~SMTPdriver(){
+SMTPClient::~SMTPClient(){
   this->end();
 }
 
-bool SMTPdriver::begin( iClientInterface *_client, char *_host, uint16_t _port ){
+bool SMTPClient::begin( iClientInterface *_client, char *_host, uint16_t _port ){
 
   this->m_client = _client;
 
@@ -64,7 +64,7 @@ bool SMTPdriver::begin( iClientInterface *_client, char *_host, uint16_t _port )
   return ( SMTP_STATUS_SERVER_READY == respcode );
 }
 
-void SMTPdriver::readResponse(){
+void SMTPClient::readResponse(){
 
 	char _crlfBuf[2];
 	char _crlfFound, crlfCount=1;
@@ -81,11 +81,6 @@ void SMTPdriver::readResponse(){
 		return;
 	}
 
-  if( _bufferFull ) {
-		this->m_responseReaderStatus = SMTP_RESPONSE_BUFFER_FULL;
-		return;
-	}
-
   if( nullptr != this->m_client && nullptr != this->m_responseBuffer ){
 
     int availableBytes = this->m_client->available();
@@ -97,6 +92,11 @@ void SMTPdriver::readResponse(){
   			this->m_responseBuffer[this->m_responseBufferIndex++] = nextChar;
   		}else{
         _bufferFull = true;
+      }
+
+      if( _bufferFull ) {
+        this->m_responseReaderStatus = SMTP_RESPONSE_BUFFER_FULL;
+        return;
       }
 
   		memmove(_crlfBuf, _crlfBuf + 1, 1);
@@ -126,7 +126,7 @@ void SMTPdriver::readResponse(){
   __i_dvc_ctrl.wait(0);
 }
 
-void SMTPdriver::flushClient(){
+void SMTPClient::flushClient(){
   if( nullptr != this->m_client ){
     this->m_client->flush();
     uint32_t _now = __i_dvc_ctrl.millis_now();
@@ -136,7 +136,7 @@ void SMTPdriver::flushClient(){
   }
 }
 
-void SMTPdriver::startReadResponse( uint16_t _timeOut ) {
+void SMTPClient::startReadResponse( uint16_t _timeOut ) {
 
   this->m_responseBufferIndex = 0;
 	this->m_lastReceive = __i_dvc_ctrl.millis_now();
@@ -147,7 +147,7 @@ void SMTPdriver::startReadResponse( uint16_t _timeOut ) {
   }
 }
 
-void SMTPdriver::waitForResponse( uint16_t _timeOut ) {
+void SMTPClient::waitForResponse( uint16_t _timeOut ) {
 
 	this->startReadResponse( _timeOut );
 	do {
@@ -158,7 +158,7 @@ void SMTPdriver::waitForResponse( uint16_t _timeOut ) {
 	LogFmtI("SMTP response: %s\n", nullptr != this->m_responseBuffer ? this->m_responseBuffer : " ");
 }
 
-bool SMTPdriver::waitForExpectedResponse(	char *expectedResponse, uint16_t _timeOut ){
+bool SMTPClient::waitForExpectedResponse(	char *expectedResponse, uint16_t _timeOut ){
 
   bool status = false;
 
@@ -173,7 +173,7 @@ bool SMTPdriver::waitForExpectedResponse(	char *expectedResponse, uint16_t _time
 	return ( SMTP_RESPONSE_TIMEOUT != this->m_responseReaderStatus ) && status ;
 }
 
-bool SMTPdriver::sendCommandAndExpect( char *command, char *expectedResponse, uint16_t _timeOut ){
+bool SMTPClient::sendCommandAndExpect( char *command, char *expectedResponse, uint16_t _timeOut ){
 
   bool status = false;
 
@@ -195,7 +195,7 @@ bool SMTPdriver::sendCommandAndExpect( char *command, char *expectedResponse, ui
 	return status;
 }
 
-int SMTPdriver::sendCommandAndGetCode( PGM_P command, uint16_t _timeOut ){
+int SMTPClient::sendCommandAndGetCode( PGM_P command, uint16_t _timeOut ){
 
   int respcode = SMTP_STATUS_MAX;
 
@@ -224,7 +224,7 @@ int SMTPdriver::sendCommandAndGetCode( PGM_P command, uint16_t _timeOut ){
 	return respcode;
 }
 
-int SMTPdriver::sendCommandAndGetCode( char *command, uint16_t _timeOut ){
+int SMTPClient::sendCommandAndGetCode( char *command, uint16_t _timeOut ){
 
   int respcode = SMTP_STATUS_MAX;
 
@@ -253,7 +253,7 @@ int SMTPdriver::sendCommandAndGetCode( char *command, uint16_t _timeOut ){
 	return respcode;
 }
 
-bool SMTPdriver::sendHello( char *domain ){
+bool SMTPClient::sendHello( char *domain ){
 
   int respcode = SMTP_STATUS_MAX;
   char *cmd = new char[100];
@@ -271,7 +271,7 @@ bool SMTPdriver::sendHello( char *domain ){
 	return ( SMTP_STATUS_ACTION_COMPLETED == respcode );
 }
 
-bool SMTPdriver::sendAuthLogin( char *username, char *password ){
+bool SMTPClient::sendAuthLogin( char *username, char *password ){
 
   char *_username = (char *) malloc(400  *sizeof(char));
   char *_password = (char *) malloc(400  *sizeof(char));
@@ -294,7 +294,7 @@ bool SMTPdriver::sendAuthLogin( char *username, char *password ){
 	return ( respcode < SMTP_STATUS_SERVICE_UNAVAILABLE );
 }
 
-bool SMTPdriver::sendFrom( char *sender ){
+bool SMTPClient::sendFrom( char *sender ){
 
   int respcode = SMTP_STATUS_MAX;
   char *cmd = new char[128];
@@ -314,7 +314,7 @@ bool SMTPdriver::sendFrom( char *sender ){
 	return ( SMTP_STATUS_ACTION_COMPLETED == respcode );
 }
 
-bool SMTPdriver::sendTo( char *recipient ){
+bool SMTPClient::sendTo( char *recipient ){
 
   int respcode = SMTP_STATUS_MAX;
   char *cmd = new char[128];
@@ -334,13 +334,13 @@ bool SMTPdriver::sendTo( char *recipient ){
 	return ( SMTP_STATUS_ACTION_COMPLETED == respcode );
 }
 
-bool SMTPdriver::sendDataCommand(){
+bool SMTPClient::sendDataCommand(){
 
   int respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA );
   return ( SMTP_STATUS_START_MAIL_INPUT == respcode );
 }
 
-void SMTPdriver::sendDataHeader( char *sender, char *recipient, char *subject ){
+void SMTPClient::sendDataHeader( char *sender, char *recipient, char *subject ){
 
   if( nullptr != this->m_client ){
     this->m_client->write((const uint8_t*)SMTP_COMMAND_DATA_HEADER_TO);
@@ -358,7 +358,7 @@ void SMTPdriver::sendDataHeader( char *sender, char *recipient, char *subject ){
   }
 }
 
-bool SMTPdriver::sendDataBody( String &body ){
+bool SMTPClient::sendDataBody( String &body ){
 
   int respcode = SMTP_STATUS_MAX;
 
@@ -372,7 +372,7 @@ bool SMTPdriver::sendDataBody( String &body ){
   return respcode < SMTP_STATUS_SERVICE_UNAVAILABLE;
 }
 
-bool SMTPdriver::sendDataBody( char *body ){
+bool SMTPClient::sendDataBody( char *body ){
 
   int respcode = SMTP_STATUS_MAX;
 
@@ -386,7 +386,7 @@ bool SMTPdriver::sendDataBody( char *body ){
   return respcode < SMTP_STATUS_SERVICE_UNAVAILABLE;
 }
 
-bool SMTPdriver::sendDataBody( PGM_P body ){
+bool SMTPClient::sendDataBody( PGM_P body ){
 
   int respcode = SMTP_STATUS_MAX;
 
@@ -400,13 +400,13 @@ bool SMTPdriver::sendDataBody( PGM_P body ){
   return respcode < SMTP_STATUS_SERVICE_UNAVAILABLE;
 }
 
-bool SMTPdriver::sendQuit(){
+bool SMTPClient::sendQuit(){
 
   int respcode = this->sendCommandAndGetCode( SMTP_COMMAND_QUIT );
   return ( SMTP_STATUS_SERVER_ENDING_CON == respcode );
 }
 
-void SMTPdriver::end(){
+void SMTPClient::end(){
 
   if( nullptr != this->m_client ){
     disconnect( this->m_client );

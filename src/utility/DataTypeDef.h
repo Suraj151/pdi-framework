@@ -19,6 +19,10 @@ created Date    : 1st June 2019
 #include <cstring>
 #include <functional>
 
+// option to define the attribute for read only data
+// redefine this in derived interface
+#define RODT_ATTR(x) x
+
 typedef uint8_t gpio_id_t;
 typedef int64_t gpio_val_t;
 
@@ -98,7 +102,14 @@ struct ipaddress_t
 /* Http defs */
 typedef enum {
     HTTP_RESP_OK = 200,
+    HTTP_RESP_MULTIPLE_CHOICES = 300,
     HTTP_RESP_MOVED_PERMANENTLY = 301,
+    HTTP_RESP_FOUND = 302,
+    HTTP_RESP_SEE_OTHER = 303,
+    HTTP_RESP_NOT_MODIFIED = 304,
+    HTTP_RESP_USE_PROXY = 305,
+    HTTP_RESP_TEMPORARY_REDIRECT = 307,
+    HTTP_RESP_PERMANENT_REDIRECT = 308,
     HTTP_RESP_BAD_REQUEST = 400,
     HTTP_RESP_UNAUTHORIZED = 401,
     HTTP_RESP_PAYMENT_REQUIRED = 402,
@@ -113,6 +124,20 @@ typedef enum {
     HTTP_RESP_GATEWAY_TIMEOUT = 504,
     HTTP_RESP_HTTP_VERSION_NOT_SUPPORTED = 505,
     HTTP_RESP_VARIANT_ALSO_NEGOTIATES = 506,
+    HTTP_RESP_MAX = 999
 } http_resp_code_t;
+
+typedef enum {
+    HTTP_ERROR_CONNECTION_FAILED = -1,
+    HTTP_ERROR_MAX = -999
+} http_err_code_t;
+
+typedef enum {
+    HTTP_VERSION_1_0,
+    HTTP_VERSION_1_1,
+    HTTP_VERSION_2,
+    HTTP_VERSION_3,
+    HTTP_VERSION_MAX
+} http_version_t;
 
 #endif

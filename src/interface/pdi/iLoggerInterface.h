@@ -13,10 +13,6 @@ created Date    : 1st Jan 2024
 
 #include <interface/interface_includes.h>
 
-// option to define the attribute for read only data
-// redefine this in derived interface
-#define RODT_ATTR(x) x
-
 
 // forward declaration of derived class for this interface
 class LoggerInterface;

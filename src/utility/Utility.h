@@ -23,6 +23,7 @@ created Date    : 1st June 2019
 #include "DataTypeConversions.h"
 #include "StringOperations.h"
 #include "queue/queue.h"
+#include "Base64.h"
 
 /**
  * This template clone program memory object to data memory.

@@ -15,7 +15,7 @@ created Date    : 1st June 2019
 #ifdef ENABLE_GPIO_SERVICE
 #include <service_provider/GpioServiceProvider.h>
 #endif
-#include <helpers/SMTPDriver.h>
+#include <transports/smtp/SMTPClient.h>
 
 /**
  * EmailServiceProvider class
@@ -49,7 +49,7 @@ public:
 protected:
   iClientInterface *m_client;
   iWiFiInterface *m_wifi;
-  SMTPdriver m_smtp;
+  SMTPClient m_smtp;
 };
 
 extern EmailServiceProvider __email_service;

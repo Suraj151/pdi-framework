@@ -39,7 +39,7 @@ created Date    : 1st June 2019
 /**
  * enable/disable device iot feature here
  */
-#define ENABLE_DEVICE_IOT
+// #define ENABLE_DEVICE_IOT
 
 /**
  * enable/disable logging
@@ -57,7 +57,7 @@ created Date    : 1st June 2019
 /**
  * enable/disable exception notifier
  */
-#define ENABLE_EXCEPTION_NOTIFIER
+// #define ENABLE_EXCEPTION_NOTIFIER
 
 /**
  * ignore free relay connections created by same ssid
@@ -82,7 +82,7 @@ created Date    : 1st June 2019
 /**
  * enable/disable esp now feature here
  */
-#define ENABLE_ESP_NOW
+// #define ENABLE_ESP_NOW
 
 /**
  * @define wifi & internet connectivity check cycle durations

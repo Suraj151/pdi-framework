@@ -17,7 +17,7 @@ created Date    : 1st June 2019
 #ifdef ENABLE_GPIO_SERVICE
 #include <service_provider/GpioServiceProvider.h>
 #endif
-#include <mqtt_client/Mqtt.h>
+#include <transports/mqtt/MqttClient.h>
 
 #define MQTT_PAYLOAD_BUF_SIZE 400
 

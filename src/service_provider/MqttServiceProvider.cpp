@@ -189,7 +189,7 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
       __find_and_replace( _mqtt_general_configs.client_id, "[mac]", macStr, 2 );
       __find_and_replace( _mqtt_lwt_configs.will_message, "[mac]", macStr, 2 );
 
-      if( this->m_mqtt_client.begin( this->m_wifi, &_mqtt_general_configs, &_mqtt_lwt_configs ) ){
+      if( this->m_mqtt_client.begin( &_mqtt_general_configs, &_mqtt_lwt_configs ) ){
         this->m_mqtt_timer_cb_id = __task_scheduler.updateInterval(
           this->m_mqtt_timer_cb_id,
           [&]() { this->m_mqtt_client.mqtt_timer(); },

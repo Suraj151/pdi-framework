@@ -14,12 +14,6 @@ created Date    : 1st Jan 2024
 #include "esp8266.h"
 #include <interface/pdi/iLoggerInterface.h>
 
-// redefines
-#ifdef RODT_ATTR
-#undef RODT_ATTR
-#define RODT_ATTR(v) (const char*)F(v)
-#endif
-
 
 #ifdef LogI
 #undef LogI

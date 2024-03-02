@@ -1,4 +1,4 @@
-/*********** SMTP (Simple Mail Transfer Protocol) Driver **********************
+/*********** SMTP (Simple Mail Transfer Protocol) Client **********************
 This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
@@ -137,14 +137,14 @@ enum smtp_command_status
 #define SMTP_DEFAULT_TIMEOUT MILLISECOND_DURATION_5000
 
 /**
- * SMTPdriver class
+ * SMTPClient class
  */
-class SMTPdriver
+class SMTPClient
 {
 
 public:
-   SMTPdriver();
-   ~SMTPdriver();
+   SMTPClient();
+   ~SMTPClient();
 
    bool begin(iClientInterface *_client, char *_host, uint16_t _port);
    void readResponse(void);
