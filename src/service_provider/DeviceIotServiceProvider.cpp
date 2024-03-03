@@ -25,12 +25,8 @@ DeviceIotServiceProvider::DeviceIotServiceProvider():
   m_handle_sensor_data_cb_id(0),
   m_mqtt_connection_check_cb_id(0),
   m_device_config_request_cb_id(0),
-  #ifdef ENABLE_LED_INDICATION
-  m_wifi_led(0),
-  #endif
-  m_wifi(nullptr),
-  m_wifi_client(nullptr),
-  m_device_iot(nullptr)
+  m_device_iot(nullptr),
+  m_http_client(Http_Client::GetStaticInstance())
 {
 }
 
@@ -38,18 +34,18 @@ DeviceIotServiceProvider::DeviceIotServiceProvider():
  * DeviceIotServiceProvider destructor
  */
 DeviceIotServiceProvider::~DeviceIotServiceProvider(){
-  this->m_wifi = nullptr;
-  this->m_wifi_client = nullptr;
   this->m_device_iot = nullptr;
+  this->m_http_client = nullptr;
 }
 
 /**
  * start device registration services if enabled
  */
-void DeviceIotServiceProvider::init( iWiFiInterface *_wifi, iWiFiClientInterface *_wifi_client ){
+void DeviceIotServiceProvider::init( iClientInterface *_iclient ){
 
-  this->m_wifi = _wifi;
-  this->m_wifi_client = _wifi_client;
+  if( nullptr != this->m_http_client ){
+    this->m_http_client->SetClient(_iclient);
+  }
 
   // __task_scheduler.setInterval( [&]() { this->handleDeviceIotConfigRequest(); }, HTTP_REQUEST_DURATION, __i_dvc_ctrl.millis_now() );
   this->m_device_config_request_cb_id = __task_scheduler.updateInterval(
@@ -59,11 +55,6 @@ void DeviceIotServiceProvider::init( iWiFiInterface *_wifi, iWiFiClientInterface
     },
     this->m_mqtt_keep_alive*MILLISECOND_DURATION_1000
   );
-
-  #ifdef ENABLE_LED_INDICATION
-  this->beginWifiStatusLed();
-  __task_scheduler.setInterval( [&]() { this->handleWifiStatusLed(); }, 2.5*MILLISECOND_DURATION_1000, __i_dvc_ctrl.millis_now() );
-  #endif
 
   // clear all mqtt old configs
   __mqtt_general_table.clear();
@@ -76,35 +67,39 @@ void DeviceIotServiceProvider::init( iWiFiInterface *_wifi, iWiFiClientInterface
  */
 void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_table *_device_iot_configs, String &_response ){
 
-  if( nullptr == _device_iot_configs || nullptr == this->m_wifi_client ){
-    return;
+  std::string otpurl;
+
+  if( nullptr != _device_iot_configs ){
+
+    otpurl = _device_iot_configs->device_iot_host;
+    otpurl += DEVICE_IOT_OTP_REQ_URL;
+
+    size_t mac_index = otpurl.find("[mac]");
+    if( std::string::npos != mac_index )
+    {
+      otpurl.replace( mac_index, 5, __i_dvc_ctrl.getDeviceMac().c_str() );
+    }
   }
 
-  memset( __http_service.m_host, 0, HTTP_HOST_ADDR_MAX_SIZE);
-  strcpy( __http_service.m_host, _device_iot_configs->device_iot_host );
-  strcat_P( __http_service.m_host, DEVICE_IOT_OTP_REQ_URL );
+  LogFmtI("Handling device otp Http Request : %s\n", otpurl.c_str());
 
-  uint8_t mac[6];  char macStr[18] = { 0 };
-  wifi_get_macaddr(STATION_IF, mac);
-  sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-  __find_and_replace( __http_service.m_host, "[mac]", macStr, 2 );
+  if( otpurl.size() > 5 && nullptr != this->m_http_client ){
 
-  LogFmtI("Handling device otp Http Request : %s\n", __http_service.m_host );
+    this->m_http_client->Begin();
+    this->m_http_client->SetUserAgent("esp");
+    this->m_http_client->SetBasicAuthorization("iot-otp", __i_dvc_ctrl.getDeviceMac().c_str());
+    this->m_http_client->SetTimeout(2*MILLISECOND_DURATION_1000);
 
-  if( strlen( __http_service.m_host ) > 5 &&
-    __http_service.m_http_client->begin( *this->m_wifi_client, __http_service.m_host )
-  ){
-
-    __http_service.m_http_client->setUserAgent("esp");
-    __http_service.m_http_client->setAuthorization("iot-otp", macStr);
-    __http_service.m_http_client->setTimeout(2*MILLISECOND_DURATION_1000);
-
-    int _httpCode = __http_service.m_http_client->GET();
+    int _httpCode = this->m_http_client->Get(otpurl.c_str());
+    
+    char *http_resp = nullptr;
+    int16_t httl_resp_len = 0;
+    this->m_http_client->GetResponse( http_resp, httl_resp_len );
 
     LogFmtI("Http device otp Response code : %d\n", _httpCode );
-    if ( (_httpCode == HTTP_RESP_OK || _httpCode == HTTP_RESP_MOVED_PERMANENTLY) && __http_service.m_http_client->getSize() <= DEVICE_IOT_OTP_API_RESP_LENGTH ) {
+    if ( _httpCode == HTTP_RESP_OK && nullptr != http_resp && httl_resp_len <= DEVICE_IOT_OTP_API_RESP_LENGTH ) {
 
-      _response = __http_service.m_http_client->getString();
+      _response = http_resp;
     }else{
 
       _response = "{\"status\":false,\"remark\":";
@@ -112,66 +107,63 @@ void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_t
       _response += _httpCode;
       _response += ") !\"}";
     }
-    __http_service.m_http_client->end();
 
+    this->m_http_client->End(true);
   }else{
     LogE("Device otp Request not initializing or failed or Not Configured Correctly\n");
   }
 }
 
 /**
- * handle connect mqtt request request
+ * handle config request
  */
 void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
 
-  if( this->m_token_validity || nullptr == this->m_wifi_client ) {
+  // do not proceed if already validated
+  if( this->m_token_validity ) {
     return;
   }
 
   __database_service.get_device_iot_config_table(&this->m_device_iot_configs);
-  // strcat_P( this->m_device_iot_configs.device_iot_host, DEVICE_IOT_CONFIG_REQ_URL );
-  memset( __http_service.m_host, 0, HTTP_HOST_ADDR_MAX_SIZE);
-  strcpy( __http_service.m_host, this->m_device_iot_configs.device_iot_host );
-  strcat_P( __http_service.m_host, DEVICE_IOT_CONFIG_REQ_URL );
 
-  uint8_t mac[6];
-  char macStr[18] = { 0 };
-  wifi_get_macaddr(STATION_IF, mac);
-  sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-  __find_and_replace( __http_service.m_host, "[mac]", macStr, 2 );
-  LogI("Handling device iot config Request\n");
+  std::string configurl = this->m_device_iot_configs.device_iot_host;
+  configurl += DEVICE_IOT_CONFIG_REQ_URL;
 
-  if( strlen( __http_service.m_host ) > 5 &&
-    __http_service.m_http_client->begin( *this->m_wifi_client, __http_service.m_host )
-  ){
-    __http_service.m_http_client->setUserAgent("esp");
-    __http_service.m_http_client->setAuthorization("iot-otp", macStr);
-    __http_service.m_http_client->setTimeout(3*MILLISECOND_DURATION_1000);
-    int _httpCode = __http_service.m_http_client->GET();
+  size_t mac_index = configurl.find("[mac]");
+  if( std::string::npos != mac_index )
+  {
+    configurl.replace( mac_index, 5, __i_dvc_ctrl.getDeviceMac().c_str() );
+  }
 
-    LogFmtI("Device iot config request Status Code : %d\n", _httpCode);
-    if ( _httpCode == HTTP_RESP_OK || _httpCode == HTTP_RESP_MOVED_PERMANENTLY ) {
+  LogFmtI("Handling device iot config Request : %s\n", configurl.c_str());
 
-      if( __http_service.m_http_client->getSize() < DEVICE_IOT_CONFIG_RESP_MAX_SIZE ){
+  if( configurl.size() > 5 && nullptr != this->m_http_client ){
 
-        String _response = __http_service.m_http_client->getString();
-        LogFmtI("Http Response : %d\n",_response);
+    this->m_http_client->Begin();
+    this->m_http_client->SetUserAgent("esp");
+    this->m_http_client->SetBasicAuthorization("iot-otp", __i_dvc_ctrl.getDeviceMac().c_str());
+    this->m_http_client->SetTimeout(2*MILLISECOND_DURATION_1000);
+    int _httpCode = this->m_http_client->Get(configurl.c_str());
 
-        char *_buf = new char[DEVICE_IOT_CONFIG_RESP_MAX_SIZE];
-        memset( _buf, 0, DEVICE_IOT_CONFIG_RESP_MAX_SIZE );
-        _response.toCharArray( _buf, _response.length()+1 );
+    char *http_resp = nullptr;
+    int16_t httl_resp_len = 0;
+    this->m_http_client->GetResponse( http_resp, httl_resp_len );
 
-        if( 0 <= __strstr( _buf, (char*)DEVICE_IOT_CONFIG_TOKEN_KEY, DEVICE_IOT_CONFIG_RESP_MAX_SIZE - strlen(DEVICE_IOT_CONFIG_TOKEN_KEY) ) ){
+    if ( _httpCode == HTTP_RESP_OK && nullptr != http_resp ) {
 
-          bool _json_result = __get_from_json( _buf, (char*)DEVICE_IOT_CONFIG_TOKEN_KEY, this->m_device_iot_configs.device_iot_token, DEVICE_IOT_CONFIG_TOKEN_MAX_SIZE );
-          _json_result = __get_from_json( _buf, (char*)DEVICE_IOT_CONFIG_TOPIC_KEY, this->m_device_iot_configs.device_iot_topic, DEVICE_IOT_CONFIG_TOPIC_MAX_SIZE );
+      if( httl_resp_len < DEVICE_IOT_CONFIG_RESP_MAX_SIZE ){
+
+        if( 0 <= __strstr( http_resp, (char*)DEVICE_IOT_CONFIG_TOKEN_KEY, DEVICE_IOT_CONFIG_RESP_MAX_SIZE - strlen(DEVICE_IOT_CONFIG_TOKEN_KEY) ) ){
+
+          bool _json_result = __get_from_json( http_resp, (char*)DEVICE_IOT_CONFIG_TOKEN_KEY, this->m_device_iot_configs.device_iot_token, DEVICE_IOT_CONFIG_TOKEN_MAX_SIZE );
+          _json_result = __get_from_json( http_resp, (char*)DEVICE_IOT_CONFIG_TOPIC_KEY, this->m_device_iot_configs.device_iot_topic, DEVICE_IOT_CONFIG_TOPIC_MAX_SIZE );
           if(  _json_result && strlen( this->m_device_iot_configs.device_iot_token ) && strlen( this->m_device_iot_configs.device_iot_topic ) ){
 
             LogFmtI("Got Token : %s\n", this->m_device_iot_configs.device_iot_token );
             LogFmtI("Got Topic : %s\n", this->m_device_iot_configs.device_iot_topic );
             __database_service.set_device_iot_config_table( &this->m_device_iot_configs );
 
-            this->handleServerConfigurableParameters( _buf );
+            this->handleServerConfigurableParameters( http_resp );
 
             this->m_mqtt_connection_check_cb_id = __task_scheduler.updateInterval(
               this->m_mqtt_connection_check_cb_id,
@@ -192,17 +184,16 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
 
           this->m_token_validity = false;
         }
-        delete[] _buf;
       }else{
         LogW("Http Response : response size over !\n");
       }
     }
-    __http_service.m_http_client->end();
+
+    this->m_http_client->End(true);
   }else{
 
     LogE("Device iot config request not initializing or failed or Not Configured Correctly\n");
   }
-
 }
 
 /**
@@ -235,7 +226,10 @@ void DeviceIotServiceProvider::configureMQTT(){
   memset( &_mqtt_pubsub_configs, 0, sizeof(mqtt_pubsub_config_table));
   memset( &_mqtt_lwt_configs, 0, sizeof(mqtt_lwt_config_table));
 
-  memcpy( _mqtt_general_configs.host, DEVICE_IOT_MQTT_DATA_HOST, strlen( DEVICE_IOT_MQTT_DATA_HOST ) );
+  // parse the host from iot host config
+  httt_req_t httpreq; httpreq.init(this->m_device_iot_configs.device_iot_host);
+
+  memcpy( _mqtt_general_configs.host, httpreq.host, strlen( httpreq.host ) );
   _mqtt_general_configs.port = DEVICE_IOT_MQTT_DATA_PORT;
   strcpy_P( _mqtt_general_configs.client_id, PSTR("[mac]") );
   strcpy_P( _mqtt_general_configs.username, PSTR("[mac]") );
@@ -365,46 +359,6 @@ void DeviceIotServiceProvider::handleSensorData(){
     this->m_smaple_index++;
   }
 }
-
-/**
- * enable wifi status led indication
- */
-#ifdef ENABLE_LED_INDICATION
-
-void DeviceIotServiceProvider::beginWifiStatusLed( int _wifi_led ){
-
-  this->m_wifi_led = _wifi_led;
-  pinMode( _wifi_led, OUTPUT );
-  __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, this->m_wifi_led, HIGH );
-}
-
-void DeviceIotServiceProvider::handleWifiStatusLed(){
-
-  if( nullptr == this->m_wifi ){
-    return;
-  }
-
-  LogI("Handling LED Status Indications\n");
-  LogFmtI("RSSI : %d\n", this->m_wifi->RSSI());
-
-  if( !this->m_wifi->localIP().isSet() || !this->m_wifi->isConnected() || ( this->m_wifi->RSSI() < (int)WIFI_RSSI_THRESHOLD ) ){
-
-    LogW("WiFi not connected.\n");
-    __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, this->m_wifi_led, LOW );
-  }else{
-
-    if( this->m_token_validity ){
-
-      __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, this->m_wifi_led, HIGH );
-      __i_dvc_ctrl.wait(40);
-      __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, this->m_wifi_led, LOW );
-    }else{
-      __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, this->m_wifi_led, HIGH );
-    }
-  }
-
-}
-#endif
 
 /**
  * print device register configs

@@ -18,7 +18,6 @@ created Date    : 1st June 2019
  * EmailServiceProvider constructor.
  */
 EmailServiceProvider::EmailServiceProvider() : m_mail_handler_cb_id(0),
-                                               m_wifi(nullptr),
                                                m_client(nullptr)
 {
 }
@@ -29,19 +28,16 @@ EmailServiceProvider::EmailServiceProvider() : m_mail_handler_cb_id(0),
 EmailServiceProvider::~EmailServiceProvider()
 {
   this->m_client = nullptr;
-  this->m_wifi = nullptr;
   this->m_smtp.end();
 }
 
 /**
- * begin email service with wifi and client
+ * begin email service with client
  *
- * @param iWiFiInterface*	  _wifi
- * @param iClientInterface*	      _wifi_client
+ * @param iClientInterface*	      _client
  */
-void EmailServiceProvider::begin(iWiFiInterface *_wifi, iClientInterface *_client)
+void EmailServiceProvider::begin(iClientInterface *_client)
 {
-  this->m_wifi = _wifi;
   this->m_client = _client;
   this->m_mail_handler_cb_id = 0;
 }
@@ -69,11 +65,7 @@ void EmailServiceProvider::handleEmail()
 #endif
 
           *_payload += "\n\nRegards\n";
-
-          if (nullptr != this->m_wifi)
-          {
-            *_payload += this->m_wifi->macAddress();
-          }
+          *_payload += __i_dvc_ctrl.getDeviceMac().c_str();
 
           if (this->sendMail(*_payload))
           {
@@ -100,7 +92,7 @@ void EmailServiceProvider::handleEmail()
 //
 //   bool ret = false;
 //
-//   if( __status_wifi.wifi_connected && __status_wifi.internet_available &&
+//   if(
 //     strlen(_email_config.mail_host) > 0 && strlen(_email_config.sending_domain) > 0 &&
 //     strlen(_email_config.mail_from) > 0 && strlen(_email_config.mail_to) > 0
 //   ){
@@ -150,7 +142,7 @@ bool EmailServiceProvider::sendMail(String &mail_body)
 
   bool ret = false;
 
-  if (__status_wifi.wifi_connected && __status_wifi.internet_available &&
+  if (
       strlen(_email_config.mail_host) > 0 && strlen(_email_config.sending_domain) > 0 &&
       strlen(_email_config.mail_from) > 0 && strlen(_email_config.mail_to) > 0)
   {
@@ -206,7 +198,7 @@ bool EmailServiceProvider::sendMail(char *mail_body)
 
   bool ret = false;
 
-  if (__status_wifi.wifi_connected && __status_wifi.internet_available &&
+  if (
       strlen(_email_config.mail_host) > 0 && strlen(_email_config.sending_domain) > 0 &&
       strlen(_email_config.mail_from) > 0 && strlen(_email_config.mail_to) > 0)
   {
@@ -262,7 +254,9 @@ bool EmailServiceProvider::sendMail(PGM_P mail_body)
 
   bool ret = false;
 
-  if (__status_wifi.wifi_connected && __status_wifi.internet_available)
+  if (
+      strlen(_email_config.mail_host) > 0 && strlen(_email_config.sending_domain) > 0 &&
+      strlen(_email_config.mail_from) > 0 && strlen(_email_config.mail_to) > 0)
   {
     ret = this->m_smtp.begin(this->m_client, _email_config.mail_host, _email_config.mail_port);
     if (ret)

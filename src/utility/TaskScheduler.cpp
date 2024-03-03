@@ -198,9 +198,13 @@ void TaskScheduler::handle_tasks()
 			unsigned long _task_end_ms = m_util->millis_now();
 			this->m_tasks[_priority_indices[i]]._task_exec_millis = _task_end_ms > _last_start_ms ? (_task_end_ms - _last_start_ms) : 0;
 		}
+
+		if( nullptr != m_util )
+		{
+			m_util->yield();
+		}
 	}
 	this->remove_expired_tasks();
-	//__i_dvc_ctrl.wait(0);
 }
 
 /**

@@ -13,9 +13,9 @@ created Date    : 1st June 2019
 
 
 #include <service_provider/ServiceProvider.h>
-#include <service_provider/HttpServiceProvider.h>
 #include <service_provider/MqttServiceProvider.h>
 #include <service_provider/DatabaseServiceProvider.h>
+#include <transports/http/HTTPClient.h>
 
 /**
  * DeviceIotServiceProvider class
@@ -33,7 +33,7 @@ class DeviceIotServiceProvider : public ServiceProvider {
 		 */
     ~DeviceIotServiceProvider();
 
-    void init( iWiFiInterface *_wifi, iWiFiClientInterface *_wifi_client );
+    void init( iClientInterface *_iclient );
     void handleRegistrationOtpRequest(  device_iot_config_table *_device_iot_configs, String &_response  );
     void handleDeviceIotConfigRequest( void );
     void handleConnectivityCheck( void );
@@ -42,10 +42,6 @@ class DeviceIotServiceProvider : public ServiceProvider {
     void beginSensorData( void );
     void handleSensorData( void );
     void initDeviceIotSensor( iDeviceIotInterface *_device );
-    #ifdef ENABLE_LED_INDICATION
-    void beginWifiStatusLed( void );
-    void handleWifiStatusLed( void );
-    #endif
     void printDeviceIotConfigLogs( void );
 
   protected:
@@ -63,21 +59,14 @@ class DeviceIotServiceProvider : public ServiceProvider {
     int16_t   m_mqtt_connection_check_cb_id;
     int16_t   m_device_config_request_cb_id;
 
-    #ifdef ENABLE_LED_INDICATION
-    int16_t   m_wifi_led;
-    #endif
-    /**
-		 * @var	iWiFiInterface*   m_wifi
-		 */
-    iWiFiInterface        *m_wifi;
-    /**
-		 * @var	iWiFiClientInterface*  m_wifi_client
-		 */
-    iWiFiClientInterface  *m_wifi_client;
     /**
 		 * @var	iDeviceIotInterface*  m_device_iot
 		 */
     iDeviceIotInterface   *m_device_iot;
+    /**
+     * @var	Http_Client  *m_http_client
+     */
+    Http_Client           *m_http_client;
 };
 
 extern DeviceIotServiceProvider __device_iot_service;

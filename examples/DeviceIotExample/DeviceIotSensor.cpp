@@ -1,5 +1,4 @@
 /*************************** Device IOT Sensor ********************************
-
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
 
@@ -58,19 +57,16 @@ void DeviceIotSensor::sampleHook(){
  */
 void DeviceIotSensor::dataHook( String &_payload ){
 
-  Log(F("Gathering sensor data samples : "));
+  LogI("Gathering sensor data samples : ");
 
   float _total = 0;
   for (int i = 0; i < this->m_sensor_sample_index; i++) {
     _total += this->m_sensor_samples[i];
-
-    Log(this->m_sensor_samples[i]);
-    Log(F(" "));
+    LogFmtI("%f ", this->m_sensor_samples[i]);
   }
   this->m_sensor_sample_value = _total/this->m_sensor_sample_index;
 
-  Log(F("\nAverage : "));
-  Logln(this->m_sensor_sample_value);
+  LogFmtI("\nAverage : %f\n", this->m_sensor_sample_value);
 
   this->m_sensor_sample_index = 0;
 

@@ -50,14 +50,14 @@ GpioServiceProvider::~GpioServiceProvider(){
 /**
  * start gpio services if enabled
  */
-void GpioServiceProvider::begin( iWiFiClientInterface* _wifi_client ){
+void GpioServiceProvider::begin( iClientInterface* _client ){
 
-  if( nullptr == _wifi_client ){
+  if( nullptr == _client ){
     return;
   }
 
   if( nullptr != this->m_http_client ){
-    this->m_http_client->SetClient(_wifi_client);
+    this->m_http_client->SetClient(_client);
   }
 
   this->handleGpioModes();
@@ -98,26 +98,21 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isAlertPost ){
       this->m_http_client->Begin();
 
       #ifdef ENABLE_DEVICE_IOT
-      uint8_t mac[6];
-      char macStr[18] = { 0 };
-      wifi_get_macaddr(STATION_IF, mac);
-      sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-
       this->m_http_client->SetUserAgent("esp");
-      this->m_http_client->SetBasicAuthorization("iot-otp", macStr);
-      this->m_http_client->SetTimeout(3*MILLISECOND_DURATION_1000);
+      this->m_http_client->SetBasicAuthorization("iot-otp", __i_dvc_ctrl.getDeviceMac().c_str());
       #else
       this->m_http_client->SetUserAgent("Ewings");
       this->m_http_client->SetBasicAuthorization("user", "password");
-      this->m_http_client->SetTimeout(2*MILLISECOND_DURATION_1000);
       #endif
 
       this->m_http_client->AddReqHeader(HTTP_HEADER_KEY_CONTENT_TYPE, "application/json");
+      this->m_http_client->SetTimeout(2*MILLISECOND_DURATION_1000);
 
       LogFmtI("posting data : %s\n", _payload->c_str());
 
       status = ( HTTP_RESP_OK == this->m_http_client->Post( posturl.c_str(), _payload->c_str() ) );
-
+      
+      this->m_http_client->End(true);
       delete _payload;
     }
   }else{

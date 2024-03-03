@@ -30,8 +30,6 @@ created Date    : 1st June 2019
 #define SENSOR_DATA_SAMPLES_PER_PUBLISH_MAX_BUFF	100
 #define SENSOR_DATA_SAMPLES_PER_PUBLISH_MAX_LIMIT	60
 
-#define WIFI_RSSI_THRESHOLD				            -82
-
 #define DEVICE_IOT_CONFIG_REQ_URL             "/api/fordevice/get-config?mac_id=[mac]"
 #define DEVICE_IOT_ALERTS_REQ_URL             "/api/fordevice/get-alerts?mac_id=[mac]"
 #define DEVICE_IOT_CONFIG_RESP_MAX_SIZE       300

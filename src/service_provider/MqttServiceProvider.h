@@ -40,7 +40,7 @@ public:
    */
   ~MqttServiceProvider();
 
-  void begin(iWiFiInterface *_wifi);
+  void begin();
   void handleMqttPublish(void);
   void handleMqttSubScribe(void);
   void handleMqttConfigChange(int _mqtt_config_type = MQTT_GENERAL_CONFIG);
@@ -80,10 +80,7 @@ public:
   MQTTClient m_mqtt_client;
 
 protected:
-  /**
-   * @var	iWiFiInterface*|&WiFi wifi
-   */
-  iWiFiInterface *m_wifi;
+
 };
 
 extern MqttServiceProvider __mqtt_service;

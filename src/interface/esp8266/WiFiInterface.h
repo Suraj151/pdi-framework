@@ -13,6 +13,8 @@ created Date    : 1st June 2019
 
 #include "esp8266.h"
 #include <interface/pdi/iWiFiInterface.h>
+#include "LoggerInterface.h"
+#include "DeviceControlInterface.h"
 
 /**
  * WiFiInterface class
@@ -93,6 +95,8 @@ public:
   String BSSIDstr(uint8_t _networkItem) override;
   int32_t channel(uint8_t _networkItem = 0) override;
 
+  void enableNetworkStatusIndication() override;
+
   // misc api's
   static void preinitWiFiOff();
 
@@ -101,6 +105,11 @@ private:
    * @var	ESP8266WiFiClass*|&WiFi m_wifi
    */
   ESP8266WiFiClass *m_wifi;
+
+  /**
+   * @var	int16_t for network indication
+   */
+  int16_t   m_wifi_led;
 };
 
 #endif

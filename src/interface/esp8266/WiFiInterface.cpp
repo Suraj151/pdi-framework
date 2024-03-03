@@ -13,7 +13,7 @@ created Date    : 1st June 2019
 /**
  * WiFiInterface constructor.
  */
-WiFiInterface::WiFiInterface() : m_wifi(&WiFi)
+WiFiInterface::WiFiInterface() : m_wifi(&WiFi), m_wifi_led(0)
 {
 }
 
@@ -683,6 +683,35 @@ int32_t WiFiInterface::channel(uint8_t _networkItem)
     channel = this->m_wifi->channel();
   }
   return channel;
+}
+
+/**
+ * n/w status indication
+ */
+void WiFiInterface::enableNetworkStatusIndication()
+{
+  m_wifi_led = 4;
+
+  __i_dvc_ctrl.gpioMode(DIGITAL_WRITE, this->m_wifi_led);
+  __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, this->m_wifi_led, HIGH );
+
+  __task_scheduler.setInterval( [&]() { 
+
+      LogI("Handling LED Status Indications\n");
+      LogFmtI("RSSI : %d\n", this->m_wifi->RSSI());
+
+      if( !this->m_wifi->localIP().isSet() || !this->m_wifi->isConnected() || ( this->m_wifi->RSSI() < (int)WIFI_RSSI_THRESHOLD ) ){
+
+        LogW("WiFi not connected.\n");
+        __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, this->m_wifi_led, LOW );
+      }else{
+
+        __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, this->m_wifi_led, HIGH );
+        __i_dvc_ctrl.wait(40);
+        __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, this->m_wifi_led, LOW );
+      }
+
+    }, 2.5*MILLISECOND_DURATION_1000, __i_dvc_ctrl.millis_now() );
 }
 
 /**

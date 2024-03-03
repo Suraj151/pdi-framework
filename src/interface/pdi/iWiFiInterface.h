@@ -13,6 +13,9 @@ created Date    : 1st June 2019
 
 #include <interface/interface_includes.h>
 
+#define WIFI_RSSI_THRESHOLD	-82
+
+
 // forward declaration of derived class for this interface
 class WiFiInterface;
 class IPAddress;
@@ -95,6 +98,7 @@ public:
   virtual uint8_t *BSSID(uint8_t _networkItem) = 0;
   virtual String BSSIDstr(uint8_t _networkItem) = 0;
   virtual int32_t channel(uint8_t _networkItem = 0) = 0;
+  virtual void enableNetworkStatusIndication() = 0;
 };
 
 // derived class must define this

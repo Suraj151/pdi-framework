@@ -1,5 +1,4 @@
 /*************************** Device IOT Sensor ********************************
-
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
 

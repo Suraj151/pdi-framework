@@ -117,7 +117,7 @@ public:
    */
   ~GpioServiceProvider();
 
-  void begin(iWiFiClientInterface *_wifi_client);
+  void begin(iClientInterface *_client);
   void enable_update_gpio_table_from_copy(void);
   void appendGpioJsonPayload(String &_payload, bool isAlertPost = false);
   void applyGpioJsonPayload(char *_payload, uint16_t _payload_length);

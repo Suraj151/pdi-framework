@@ -20,7 +20,7 @@ created Date    : 1st June 2019
  * @param   int|300	_len
  * @return  int
  */
-int __strstr(char *str, char *substr, int _len)
+int __strstr(char *str, const char *substr, int _len)
 {
 	if (nullptr == str || nullptr == substr || 0 == strlen(str) || 0 == strlen(substr))
 	{
@@ -32,7 +32,7 @@ int __strstr(char *str, char *substr, int _len)
 	while (*str && n < _len)
 	{
 		char *Begin = str;
-		char *pattern = substr;
+		char *pattern = (char*)substr;
 
 		while (*str && *pattern && *str == *pattern)
 		{
@@ -244,7 +244,7 @@ void __str_ip_to_int(char *_str, uint8_t *_ip, int _len, bool _clear_str_after_d
  * @param	char* _replace_with
  * @param 	int	_occurence
  */
-void __find_and_replace(char *_str, char *_find_str, char *_replace_with, int _occurence)
+void __find_and_replace(char *_str, const char *_find_str, const char *_replace_with, int _occurence)
 {
 
 	if (nullptr == _str || nullptr == _find_str || nullptr == _replace_with)

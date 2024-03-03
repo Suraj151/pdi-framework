@@ -66,11 +66,11 @@ void EwingsEspStack::initialize(){
   __gpio_service.begin( this->m_wifi_client );
   #endif
   #ifdef ENABLE_MQTT_SERVICE
-  __mqtt_service.begin( this->m_wifi );
+  __mqtt_service.begin();
   #endif
 
   #ifdef ENABLE_EMAIL_SERVICE
-  __email_service.begin( this->m_wifi, this->m_wifi_client );
+  __email_service.begin( this->m_wifi_client );
   #endif
 
   __task_scheduler.setInterval( this->handleLogPrints, MILLISECOND_DURATION_5000, __i_dvc_ctrl.millis_now() );
@@ -84,7 +84,7 @@ void EwingsEspStack::initialize(){
   #endif
 
   #ifdef ENABLE_DEVICE_IOT
-  __device_iot_service.init( this->m_wifi, this->m_wifi_client );
+  __device_iot_service.init( this->m_wifi_client );
   #endif
 
   #ifdef ENABLE_EXCEPTION_NOTIFIER

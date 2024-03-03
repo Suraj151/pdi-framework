@@ -21,7 +21,6 @@ created Date    : 1st June 2019
 
 #include <service_provider/DatabaseServiceProvider.h>
 #include <service_provider/NtpServiceProvider.h>
-#include <service_provider/HttpServiceProvider.h>
 #include <service_provider/OtaServiceProvider.h>
 #include <service_provider/WiFiServiceProvider.h>
 #include <service_provider/EventServiceProvider.h>

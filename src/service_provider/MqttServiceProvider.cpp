@@ -23,8 +23,7 @@ MqttServiceProvider::MqttServiceProvider():
   m_mqtt_subscribe_cb_id(0),
   m_mqtt_payload(nullptr),
   m_mqtt_publish_data_cb(nullptr),
-  m_mqtt_subscribe_data_cb(nullptr),
-  m_wifi(nullptr)
+  m_mqtt_subscribe_data_cb(nullptr)
 {
 }
 
@@ -37,7 +36,6 @@ MqttServiceProvider::~MqttServiceProvider(){
     delete[] this->m_mqtt_payload;
     this->m_mqtt_payload = nullptr;
   }
-  this->m_wifi = nullptr;
   this->m_mqtt_publish_data_cb = nullptr;
   this->m_mqtt_subscribe_data_cb = nullptr;
 }
@@ -45,9 +43,8 @@ MqttServiceProvider::~MqttServiceProvider(){
 /**
  * start mqtt service. initialize it with mqtt configs at database
  */
-void MqttServiceProvider::begin( iWiFiInterface* _wifi ){
+void MqttServiceProvider::begin(){
 
-  this->m_wifi = _wifi;
   this->m_mqtt_payload = new char[ MQTT_PAYLOAD_BUF_SIZE ];
   if( nullptr != this->m_mqtt_payload ){
     memset( this->m_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
@@ -68,14 +65,10 @@ void MqttServiceProvider::handleMqttPublish(){
 
   mqtt_pubsub_config_table _mqtt_pubsub_configs;
   __database_service.get_mqtt_pubsub_config_table(&_mqtt_pubsub_configs);
-  uint8_t mac[6];
-  char macStr[18] = { 0 };
-  wifi_get_macaddr(STATION_IF, mac);
-  sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
   for (uint8_t i = 0; i < MQTT_MAX_PUBLISH_TOPIC; i++) {
 
-    __find_and_replace( _mqtt_pubsub_configs.publish_topics[i].topic, "[mac]", macStr, 2 );
+    __find_and_replace( _mqtt_pubsub_configs.publish_topics[i].topic, "[mac]", __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
     LogFmtI("MQTT: publishing on topic : %s\n", _mqtt_pubsub_configs.publish_topics[i].topic);
     if( nullptr != this->m_mqtt_payload && strlen(_mqtt_pubsub_configs.publish_topics[i].topic) > 0 ){
 
@@ -107,7 +100,7 @@ void MqttServiceProvider::handleMqttPublish(){
       if( nullptr != this->m_mqtt_publish_data_cb ){
         this->m_mqtt_publish_data_cb( this->m_mqtt_payload, MQTT_PAYLOAD_BUF_SIZE );
       }
-      __find_and_replace( this->m_mqtt_payload, "[mac]", macStr, 2 );
+      __find_and_replace( this->m_mqtt_payload, "[mac]", __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
 
       this->m_mqtt_client.Publish(
         _mqtt_pubsub_configs.publish_topics[i].topic,
@@ -180,14 +173,9 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
       __database_service.get_mqtt_general_config_table(&_mqtt_general_configs);
       __database_service.get_mqtt_lwt_config_table(&_mqtt_lwt_configs);
 
-      uint8_t mac[6];
-      char macStr[18] = { 0 };
-      wifi_get_macaddr(STATION_IF, mac);
-      sprintf(macStr, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-
-      __find_and_replace( _mqtt_general_configs.username, "[mac]", macStr, 2 );
-      __find_and_replace( _mqtt_general_configs.client_id, "[mac]", macStr, 2 );
-      __find_and_replace( _mqtt_lwt_configs.will_message, "[mac]", macStr, 2 );
+      __find_and_replace( _mqtt_general_configs.username, "[mac]", __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
+      __find_and_replace( _mqtt_general_configs.client_id, "[mac]", __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
+      __find_and_replace( _mqtt_lwt_configs.will_message, "[mac]", __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
 
       if( this->m_mqtt_client.begin( &_mqtt_general_configs, &_mqtt_lwt_configs ) ){
         this->m_mqtt_timer_cb_id = __task_scheduler.updateInterval(

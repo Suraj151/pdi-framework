@@ -33,7 +33,7 @@ public:
    */
   ~EmailServiceProvider();
 
-  void begin(iWiFiInterface *_wifi, iClientInterface *_client);
+  void begin(iClientInterface *_client);
   bool sendMail(String &mail_body);
   bool sendMail(char *mail_body);
   bool sendMail(PGM_P mail_body);
@@ -48,7 +48,6 @@ public:
 
 protected:
   iClientInterface *m_client;
-  iWiFiInterface *m_wifi;
   SMTPClient m_smtp;
 };
 
