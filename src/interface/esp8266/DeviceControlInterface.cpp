@@ -182,4 +182,38 @@ void DeviceControlInterface::yield()
     delay(0);
 }
 
+/**
+ * Upgrade device with provided binary path and new version
+ */
+upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *version)
+{
+    String binary_path = path;
+    upgrade_status_t status = UPGRADE_STATUS_MAX;
+
+    ESPhttpUpdate.rebootOnUpdate(false);
+    ESPhttpUpdate.followRedirects(true);
+    ESPhttpUpdate.setAuthorization("ota", __i_dvc_ctrl.getDeviceMac().c_str());
+    t_httpUpdate_return ret = ESPhttpUpdate.update( *(__i_wifi_client.getWiFiClient()), binary_path );
+
+    if( ret == HTTP_UPDATE_FAILED ){
+
+        LogE("DEVICE_UPGRADE_FAILD\n");
+        status = UPGRADE_STATUS_FAILED;
+    }else if( ret == HTTP_UPDATE_NO_UPDATES ){
+
+        LogI("DEVICE_UPGRADE_NO_UPDATES\n");
+        status = UPGRADE_STATUS_IGNORE;
+    }else if( ret == HTTP_UPDATE_OK ){
+
+        LogS("DEVICE_UPGRADE_OK\n");
+        status = UPGRADE_STATUS_SUCCESS;
+    }else{
+
+        LogW("DEVICE_UPGRADE_UNKNOWN_RETURN\n");
+        status = UPGRADE_STATUS_MAX;
+    }
+
+    return status;
+}
+
 DeviceControlInterface __i_dvc_ctrl;

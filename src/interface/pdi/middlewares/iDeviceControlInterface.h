@@ -14,6 +14,7 @@ created Date    : 1st Jan 2024
 #include <interface/interface_includes.h>
 #include <interface/pdi/drivers/iGpioInterface.h>
 #include <interface/pdi/drivers/iWdtInterface.h>
+#include "iUpgradeInterface.h"
 
 // forward declaration of derived class for this interface
 class DeviceControlInterface;
@@ -26,7 +27,8 @@ class DeviceControlInterface;
  */
 class iDeviceControlInterface : public iGpioInterface,
                                 public iWdtInterface,
-                                public iUtilityInterface
+                                public iUtilityInterface,
+                                public iUpgradeInterface
 {
 
 public:
@@ -66,6 +68,9 @@ public:
   // virtual uint32_t millis_now() = 0;
   // virtual void log(const char *format, logger_type_t log_type, ...) = 0;
   // virtual void yield() = 0;
+
+  // upgrade api
+  // virtual upgrade_status_t Upgrade(const char *path, const char *version) = 0;
 };
 
 // derived class must define this

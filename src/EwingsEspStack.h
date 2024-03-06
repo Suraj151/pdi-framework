@@ -92,10 +92,6 @@ class EwingsEspStack {
 		 * @var	iWiFiClientInterface*  m_wifi_client
 		 */
     iWiFiClientInterface  *m_wifi_client;
-    /**
-		 * @var	iHttpClientInterface*  m_http_client
-		 */
-    iHttpClientInterface  *m_http_client;
 };
 
 extern EwingsEspStack EwStack;

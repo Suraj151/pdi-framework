@@ -14,8 +14,7 @@ created Date    : 1st June 2019
  */
 EwingsEspStack::EwingsEspStack():
   m_wifi(&__i_wifi),
-  m_wifi_client(&__i_wifi_client),
-  m_http_client(&__i_http_client)
+  m_wifi_client(&__i_wifi_client)
 {
   __task_scheduler.setUtilityInterface(&__i_dvc_ctrl);
   __task_scheduler.setMaxTasksLimit(MAX_SCHEDULABLE_TASKS);
@@ -27,7 +26,6 @@ EwingsEspStack::EwingsEspStack():
 EwingsEspStack::~EwingsEspStack(){
   this->m_wifi = nullptr;
   this->m_wifi_client = nullptr;
-  this->m_http_client = nullptr;
 }
 
 /**
@@ -61,7 +59,7 @@ void EwingsEspStack::initialize(){
   #ifdef ENABLE_EWING_HTTP_SERVER
   __web_server.start_server( this->m_wifi );
   #endif
-  __ota_service.begin_ota( this->m_wifi_client, this->m_http_client );
+  __ota_service.begin_ota( this->m_wifi_client );
   #ifdef ENABLE_GPIO_SERVICE
   __gpio_service.begin( this->m_wifi_client );
   #endif

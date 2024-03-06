@@ -13,18 +13,14 @@ created Date    : 1st June 2019
 
 #include <service_provider/ServiceProvider.h>
 #include <service_provider/DatabaseServiceProvider.h>
-#include <ESP8266httpUpdate.h>
+#include <transports/http/HTTPClient.h>
 
 /**
  * ota status enum
  */
 enum http_ota_status{
-
-  BEGIN_FAILED,
-  CONFIG_ERROR,
-  VERSION_CHECK_FAILED,
-  VERSION_JSON_ERROR,
-  ALREADY_LATEST_VERSION,
+  GET_VERSION_FAILED,
+  VERSION_NOT_FOUND,
   UPDATE_FAILD,
   NO_UPDATES,
   UPDATE_OK,
@@ -47,20 +43,15 @@ class OtaServiceProvider : public ServiceProvider{
      */
     ~OtaServiceProvider();
 
-    void begin_ota( iWiFiClientInterface* _wifi_client, iHttpClientInterface* _http_client );
-    void handleOta( void );
-    http_ota_status handle( void );
-    void printOtaConfigLogs( void );
+    void begin_ota(iClientInterface *_client);
+    void handleOta();
+    http_ota_status handle();
+    void printOtaConfigLogs();
 
     /**
-     * @var	iWiFiClientInterface*|nullptr	m_wifi_client
+     * @var	Http_Client*|nullptr	m_http_client
      */
-    iWiFiClientInterface  *m_wifi_client;
-
-    /**
-     * @var	iHttpClientInterface*|nullptr	m_http_client
-     */
-    iHttpClientInterface  *m_http_client;
+    Http_Client  *m_http_client;
 };
 
 extern OtaServiceProvider __ota_service;

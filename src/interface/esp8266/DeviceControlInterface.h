@@ -14,6 +14,7 @@ created Date    : 1st Jan 2024
 #include "esp8266.h"
 #include <interface/pdi/middlewares/iDeviceControlInterface.h>
 #include "LoggerInterface.h"
+#include "WiFiClientInterface.h"
 
 /**
  * DeviceControlInterface class
@@ -42,9 +43,9 @@ public:
   void restartDevice() override;
 
   // wdt methods
-  virtual void enableWdt(uint8_t mode_if_any=0) override {} // bypassing these methods since not used
-  virtual void disableWdt() override {} // bypassing these methods since not used
-  virtual void feedWdt() override;
+  void enableWdt(uint8_t mode_if_any=0) override {} // bypassing these methods since not used
+  void disableWdt() override {} // bypassing these methods since not used
+  void feedWdt() override;
 
   // misc methods
   void eraseConfig() override;
@@ -57,6 +58,9 @@ public:
   uint32_t millis_now() override;
   void log(logger_type_t log_type, const char *content) override;
   void yield() override;
+
+  // upgrade api
+  upgrade_status_t Upgrade(const char *path, const char *version) override;
 };
 
 #endif

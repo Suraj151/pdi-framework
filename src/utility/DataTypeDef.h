@@ -140,4 +140,12 @@ typedef enum {
     HTTP_VERSION_MAX
 } http_version_t;
 
+/* upgrade defs */
+typedef enum {
+    UPGRADE_STATUS_FAILED = -1,
+    UPGRADE_STATUS_SUCCESS,
+    UPGRADE_STATUS_IGNORE,  // no update available
+    UPGRADE_STATUS_MAX
+} upgrade_status_t;
+
 #endif

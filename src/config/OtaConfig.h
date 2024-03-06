@@ -18,6 +18,9 @@ created Date    : 1st June 2019
 #define OTA_VERSION_API_RESP_LENGTH OTA_HOST_BUF_SIZE
 #define OTA_API_CHECK_DURATION      15000
 
+#define OTA_VERSION_CHECK_URL       "/api/fordevice/ota-version?mac_id=[mac]"
+#define OTA_BINARY_DOWNLOAD_URL     "/api/fordevice/ota-bin?mac_id=[mac]&version="
+
 /**
  * enable/disable ota config modification here
  */
