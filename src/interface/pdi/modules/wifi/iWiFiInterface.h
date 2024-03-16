@@ -39,7 +39,6 @@ public:
   // generic api's
   virtual void setOutputPower(float _dBm) = 0;
   virtual void persistent(bool _persistent) = 0;
-  // virtual bool getPersistent() = 0;
   virtual bool setMode(wifi_mode_t _mode) = 0;
   virtual bool setSleepMode(sleep_mode_t type, uint8_t listenInterval = 0) = 0;
   virtual sleep_mode_t getSleepMode() = 0;
@@ -57,7 +56,6 @@ public:
   virtual bool getAutoConnect() = 0;
   virtual bool setAutoReconnect(bool _autoReconnect) = 0;
   virtual bool getAutoReconnect() = 0;
-  // virtual int8_t waitForConnectResult(uint32_t _timeoutLength = 60000) = 0;
 
   // STA network info
   virtual IPAddress localIP() = 0;
@@ -89,10 +87,6 @@ public:
   // n/w scan api's
   virtual int8_t scanNetworks(bool _async = false, bool _show_hidden = false, uint8_t _channel = 0, uint8_t *ssid = nullptr) = 0;
   virtual void scanNetworksAsync(std::function<void(int)> _onComplete, bool _show_hidden = false) = 0;
-  // virtual int8_t scanComplete() = 0;
-  // virtual void scanDelete() = 0;
-  // virtual uint8_t encryptionType(uint8_t _networkItem) = 0;
-  // virtual bool isHidden(uint8_t _networkItem) = 0;
   virtual String SSID(uint8_t _networkItem) = 0;
   virtual int32_t RSSI(uint8_t _networkItem) = 0;
   virtual uint8_t *BSSID(uint8_t _networkItem) = 0;

@@ -1,4 +1,4 @@
-/******************************* ESPNOW service ********************************
+/********************************* ESPNOW  ************************************
 This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
@@ -7,18 +7,18 @@ warranty.
 Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
-#ifndef _ESPNOW_SERVICE_PROVIDER_H_
-#define _ESPNOW_SERVICE_PROVIDER_H_
+#ifndef _ESPNOW_H_
+#define _ESPNOW_H_
 
-#include <service_provider/ServiceProvider.h>
-#include <service_provider/DatabaseServiceProvider.h>
+#include "EspnowConfig.h"
+#include <interface/esp8266/WiFiInterface.h>
 
 typedef struct
 {
   uint8_t mesh_level;
-  struct global_config global_config;
-  uint8_t ssid[WIFI_CONFIGS_BUF_SIZE];
-  uint8_t pswd[WIFI_CONFIGS_BUF_SIZE];
+  // struct global_config global_config;
+  // uint8_t ssid[WIFI_CONFIGS_BUF_SIZE];
+  // uint8_t pswd[WIFI_CONFIGS_BUF_SIZE];
   esp_now_device_t device_table[ESP_NOW_DEVICE_TABLE_MAX_SIZE];
   uint8_t device_count;
 } esp_now_payload_t;
@@ -35,22 +35,22 @@ void esp_now_recv_cb(uint8_t *macaddr, uint8_t *data, uint8_t len);
 void esp_now_send_cb(uint8_t *macaddr, uint8_t status);
 
 /**
- * ESPNOWServiceProvider class
+ * Espnow class
  */
-class ESPNOWServiceProvider : public ServiceProvider
+class Espnow
 {
 
 public:
   /**
-   * ESPNOWServiceProvider constructor.
+   * Espnow constructor.
    */
-  ESPNOWServiceProvider();
+  Espnow();
   /**
-   * ESPNOWServiceProvider destructor.
+   * Espnow destructor.
    */
-  ~ESPNOWServiceProvider();
+  ~Espnow();
 
-  void beginEspNow(iWiFiInterface *_wifi);
+  void begin(iWiFiInterface *_wifi);
   void handlePeers(void);
   void scanPeers(void);
   void printPeers(void);
@@ -83,6 +83,6 @@ protected:
   iWiFiInterface *m_wifi;
 };
 
-extern ESPNOWServiceProvider __espnow_service;
+extern Espnow __espnow;
 
 #endif

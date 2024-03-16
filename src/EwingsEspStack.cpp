@@ -14,7 +14,7 @@ created Date    : 1st June 2019
  */
 EwingsEspStack::EwingsEspStack():
   m_wifi(&__i_wifi),
-  m_wifi_client(&__i_wifi_client)
+  m_client(&__i_wifi_client)
 {
   __task_scheduler.setUtilityInterface(&__i_dvc_ctrl);
   __task_scheduler.setMaxTasksLimit(MAX_SCHEDULABLE_TASKS);
@@ -25,7 +25,7 @@ EwingsEspStack::EwingsEspStack():
  */
 EwingsEspStack::~EwingsEspStack(){
   this->m_wifi = nullptr;
-  this->m_wifi_client = nullptr;
+  this->m_client = nullptr;
 }
 
 /**
@@ -59,16 +59,16 @@ void EwingsEspStack::initialize(){
   #ifdef ENABLE_EWING_HTTP_SERVER
   __web_server.start_server( this->m_wifi );
   #endif
-  __ota_service.begin_ota( this->m_wifi_client );
+  __ota_service.begin_ota( this->m_client );
   #ifdef ENABLE_GPIO_SERVICE
-  __gpio_service.begin( this->m_wifi_client );
+  __gpio_service.begin( this->m_client );
   #endif
   #ifdef ENABLE_MQTT_SERVICE
-  __mqtt_service.begin();
+  __mqtt_service.begin( this->m_client );
   #endif
 
   #ifdef ENABLE_EMAIL_SERVICE
-  __email_service.begin( this->m_wifi_client );
+  __email_service.begin( this->m_client );
   #endif
 
   __task_scheduler.setInterval( this->handleLogPrints, MILLISECOND_DURATION_5000, __i_dvc_ctrl.millis_now() );
@@ -77,12 +77,11 @@ void EwingsEspStack::initialize(){
   __factory_reset.run_while_factory_reset( [&]() { __database_service.clear_default_tables(); this->m_wifi->disconnect(true); } );
 
   #ifdef ENABLE_ESP_NOW
-  __espnow_service.beginEspNow( this->m_wifi );
-  __task_scheduler.setInterval( [&]() { __espnow_service.handlePeers(); }, ESP_NOW_HANDLE_DURATION, __i_dvc_ctrl.millis_now() );
+  __espnow.begin( this->m_wifi );
   #endif
 
   #ifdef ENABLE_DEVICE_IOT
-  __device_iot_service.init( this->m_wifi_client );
+  __device_iot_service.init( this->m_client );
   #endif
 
   #ifdef ENABLE_EXCEPTION_NOTIFIER
@@ -160,8 +159,8 @@ void EwingsEspStack::handleLogPrints(){
   __device_iot_service.printDeviceIotConfigLogs();
   #endif
   __task_scheduler.printTaskSchedulerLogs();
-  LogFmtI("\nNTP Validity : %d\n", __nw_time_service.is_valid_ntptime());
-  LogFmtI("NTP Time : %d\n", (int)__nw_time_service.get_ntp_time());
+  LogFmtI("\nNTP Validity : %d\n", __i_ntp.is_valid_ntptime());
+  LogFmtI("NTP Time : %d\n", (int)__i_ntp.get_ntp_time());
 }
 
 EwingsEspStack EwStack;

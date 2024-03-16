@@ -12,11 +12,10 @@ created Date    : 1st June 2019
 #define _I_WIFI_CLIENT_INTERFACE_H_
 
 #include <interface/interface_includes.h>
-#include "iClientInterface.h"
+#include <interface/pdi/middlewares/iClientInterface.h>
 
 // forward declaration of derived class for this interface
 class WiFiClientInterface;
-class WiFiClient;
 
 /**
  * iWiFiClientInterface class
@@ -33,8 +32,6 @@ public:
    * iWiFiClientInterface destructor.
    */
   virtual ~iWiFiClientInterface() {}
-
-  virtual WiFiClient *getWiFiClient() = 0;
 };
 
 // derived class must define this

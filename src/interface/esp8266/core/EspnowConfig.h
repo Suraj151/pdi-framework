@@ -10,7 +10,7 @@ created Date    : 1st June 2019
 #ifndef _ESPNOW_CONFIG_H_
 #define _ESPNOW_CONFIG_H_
 
-#include "Common.h"
+#include <config/Common.h>
 
 // #define ESP_NOW_KEY                  "jo bole so nihal"
 #define ESP_NOW_KEY                     "lets kill people"

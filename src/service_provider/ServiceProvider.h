@@ -16,10 +16,6 @@ created Date    : 1st June 2019
 #include <config/Config.h>
 #include <utility/Utility.h>
 
-extern "C" {
-#include "user_interface.h"
-}
-
 /**
  * ServiceProvider class
  */

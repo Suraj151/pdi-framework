@@ -40,7 +40,7 @@ public:
    */
   ~MqttServiceProvider();
 
-  void begin();
+  void begin( iClientInterface* _client );
   void handleMqttPublish(void);
   void handleMqttSubScribe(void);
   void handleMqttConfigChange(int _mqtt_config_type = MQTT_GENERAL_CONFIG);
@@ -78,6 +78,10 @@ public:
    * @var	MQTTClient  m_mqtt_client
    */
   MQTTClient m_mqtt_client;
+  /**
+   * @var	iClientInterface*  m_client
+   */
+  iClientInterface *m_client;
 
 protected:
 

@@ -23,7 +23,8 @@ MqttServiceProvider::MqttServiceProvider():
   m_mqtt_subscribe_cb_id(0),
   m_mqtt_payload(nullptr),
   m_mqtt_publish_data_cb(nullptr),
-  m_mqtt_subscribe_data_cb(nullptr)
+  m_mqtt_subscribe_data_cb(nullptr),
+  m_client(nullptr)
 {
 }
 
@@ -43,8 +44,9 @@ MqttServiceProvider::~MqttServiceProvider(){
 /**
  * start mqtt service. initialize it with mqtt configs at database
  */
-void MqttServiceProvider::begin(){
+void MqttServiceProvider::begin( iClientInterface* _client ){
 
+  m_client = _client;
   this->m_mqtt_payload = new char[ MQTT_PAYLOAD_BUF_SIZE ];
   if( nullptr != this->m_mqtt_payload ){
     memset( this->m_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
@@ -177,7 +179,7 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
       __find_and_replace( _mqtt_general_configs.client_id, "[mac]", __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
       __find_and_replace( _mqtt_lwt_configs.will_message, "[mac]", __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
 
-      if( this->m_mqtt_client.begin( &_mqtt_general_configs, &_mqtt_lwt_configs ) ){
+      if( this->m_mqtt_client.begin( m_client, &_mqtt_general_configs, &_mqtt_lwt_configs ) ){
         this->m_mqtt_timer_cb_id = __task_scheduler.updateInterval(
           this->m_mqtt_timer_cb_id,
           [&]() { this->m_mqtt_client.mqtt_timer(); },

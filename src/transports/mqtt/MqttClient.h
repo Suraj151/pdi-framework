@@ -115,7 +115,7 @@ public:
 	MQTTClient();
 	~MQTTClient();
 
-	bool begin(mqtt_general_config_table *_mqtt_general_configs, mqtt_lwt_config_table *_mqtt_lwt_configs);
+	bool begin(iClientInterface *_client, mqtt_general_config_table *_mqtt_general_configs, mqtt_lwt_config_table *_mqtt_lwt_configs);
 	void InitConnection(char *host, int port = MQTT_DEFAULT_PORT, uint8_t security = 0);
 	void InitClient(char *client_id, char *client_user, char *client_pass, uint32_t keepAliveTime = MQTT_DEFAULT_KEEPALIVE, uint8_t cleanSession = 1);
 	void InitLWT(char *will_topic, char *will_msg, uint8_t will_qos, uint8_t will_retain);
@@ -153,6 +153,7 @@ protected:
 	uint8_t m_security;
 
 	iClientInterface *m_client;
+	iClientInterface *m_baseclient;
 
 	MqttCallback m_connectedCb;
 	MqttCallback m_disconnectedCb;

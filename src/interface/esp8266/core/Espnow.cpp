@@ -1,4 +1,4 @@
-/******************************* ESPNOW service ********************************
+/********************************* ESPNOW  ************************************
 This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
@@ -11,24 +11,24 @@ created Date    : 1st June 2019
 
 #if defined(ENABLE_ESP_NOW)
 
-#include "ESPNOWServiceProvider.h"
+#include "Espnow.h"
 
 esp_now_peer_t esp_now_peers[ESP_NOW_MAX_PEER];
 std::vector<esp_now_device_t> esp_now_device_table;
 
 /**
- * ESPNOWServiceProvider constructor.
+ * Espnow constructor.
  */
-ESPNOWServiceProvider::ESPNOWServiceProvider():
+Espnow::Espnow():
   m_wifi(nullptr)
 {
   // this->flushPeersToDefaults();
 }
 
 /**
- * ESPNOWServiceProvider destructor.
+ * Espnow destructor.
  */
-ESPNOWServiceProvider::~ESPNOWServiceProvider(){
+Espnow::~Espnow(){
 
   this->closeAll();
   this->m_wifi = nullptr;
@@ -188,21 +188,21 @@ void esp_now_recv_cb(uint8_t *macaddr, uint8_t *data, uint8_t len){
 
 }
 
-void ESPNOWServiceProvider::registerCallbacks(void) {
+void Espnow::registerCallbacks(void) {
 
   LogI("espnow: registering callbacks\n");
   esp_now_register_send_cb(esp_now_send_cb);
   esp_now_register_recv_cb(esp_now_recv_cb);
 }
 
-void ESPNOWServiceProvider::unregisterCallbacks(void) {
+void Espnow::unregisterCallbacks(void) {
 
   LogI("espnow: unregistering callbacks\n");
   esp_now_unregister_send_cb();
   esp_now_unregister_recv_cb();
 }
 
-void ESPNOWServiceProvider::beginEspNow( iWiFiInterface* _wifi ){
+void Espnow::begin( iWiFiInterface* _wifi ){
 
   LogI("espnow: begin\n");
   this->m_wifi= _wifi;
@@ -220,9 +220,11 @@ void ESPNOWServiceProvider::beginEspNow( iWiFiInterface* _wifi ){
     this->closeAll();
     LogE("espnow: init failed !\n");
   }
+
+  __task_scheduler.setInterval( [&]() { this->handlePeers(); }, ESP_NOW_HANDLE_DURATION, __i_dvc_ctrl.millis_now() );
 }
 
-void ESPNOWServiceProvider::scanPeers(void) {
+void Espnow::scanPeers(void) {
 
   if( nullptr == this->m_wifi ) return;
 
@@ -278,7 +280,7 @@ void ESPNOWServiceProvider::scanPeers(void) {
 
 }
 
-void ESPNOWServiceProvider::handlePeers(void) {
+void Espnow::handlePeers(void) {
 
   if( nullptr == this->m_wifi ) return;
 
@@ -291,7 +293,7 @@ void ESPNOWServiceProvider::handlePeers(void) {
   // this->broadcastToPeers((uint8_t*)"Hello",5);
 }
 
-void ESPNOWServiceProvider::broadcastConfigData(void){
+void Espnow::broadcastConfigData(void){
 
   esp_now_payload_t* payload = new esp_now_payload_t;
 
@@ -305,15 +307,15 @@ void ESPNOWServiceProvider::broadcastConfigData(void){
       payload->mesh_level = this->m_wifi->softAPIP()[2];
     }
 
-    global_config_table _global_configs;
-    wifi_config_table _wifi_configs;
-    __database_service.get_global_config_table(&_global_configs);
-    __database_service.get_wifi_config_table(&_wifi_configs);
-    // memcpy( reinterpret_cast<global_config>(payload->global_config), reinterpret_cast<global_config>(_global_configs), sizeof(global_config_table) );
-    memcpy( &payload->global_config, &_global_configs, sizeof(global_config_table) );
-    memcpy( &payload->ssid, &_wifi_configs.sta_ssid, WIFI_CONFIGS_BUF_SIZE );
-    memcpy( &payload->pswd, &_wifi_configs.sta_password, WIFI_CONFIGS_BUF_SIZE );
-    // memcpy( &payload->device_table, &esp_now_device_table, esp_now_device_table.size()*sizeof(esp_now_device_t) );
+    // global_config_table _global_configs;
+    // wifi_config_table _wifi_configs;
+    // __database_service.get_global_config_table(&_global_configs);
+    // __database_service.get_wifi_config_table(&_wifi_configs);
+    // // memcpy( reinterpret_cast<global_config>(payload->global_config), reinterpret_cast<global_config>(_global_configs), sizeof(global_config_table) );
+    // memcpy( &payload->global_config, &_global_configs, sizeof(global_config_table) );
+    // memcpy( &payload->ssid, &_wifi_configs.sta_ssid, WIFI_CONFIGS_BUF_SIZE );
+    // memcpy( &payload->pswd, &_wifi_configs.sta_password, WIFI_CONFIGS_BUF_SIZE );
+    // // memcpy( &payload->device_table, &esp_now_device_table, esp_now_device_table.size()*sizeof(esp_now_device_t) );
     for (int i=0; i<ESP_NOW_DEVICE_TABLE_MAX_SIZE; i++){
       memset( &payload->device_table[i], 0, sizeof(esp_now_device_t) );
     }
@@ -329,7 +331,7 @@ void ESPNOWServiceProvider::broadcastConfigData(void){
   }
 }
 
-void ESPNOWServiceProvider::freePeers(void) {
+void Espnow::freePeers(void) {
 
   for (uint8_t i = 0; i < ESP_NOW_MAX_PEER; i++) {
 
@@ -339,13 +341,13 @@ void ESPNOWServiceProvider::freePeers(void) {
   }
 }
 
-bool ESPNOWServiceProvider::isApPeer(uint8_t *mac_addr) {
+bool Espnow::isApPeer(uint8_t *mac_addr) {
 
   return ( nullptr != this->m_wifi ) &&
   this->m_wifi->isConnected() && this->m_wifi->localIP().isSet() && __are_arrays_equal( (char*)this->m_wifi->BSSID(), (char*)mac_addr, 6 );
 }
 
-void ESPNOWServiceProvider::printPeers(void) {
+void Espnow::printPeers(void) {
 
   LogI("espnow: peer list\n");
   for (uint8_t i = 0; i < ESP_NOW_MAX_PEER; i++) {
@@ -369,7 +371,7 @@ void ESPNOWServiceProvider::printPeers(void) {
   }
 }
 
-void ESPNOWServiceProvider::receiveFromPeers(void) {
+void Espnow::receiveFromPeers(void) {
 
   if( nullptr == this->m_wifi ) return;
 
@@ -392,7 +394,7 @@ void ESPNOWServiceProvider::receiveFromPeers(void) {
   }
 }
 
-bool ESPNOWServiceProvider::sendToPeer(uint8_t *mac_addr, uint8_t *packet, uint8_t len) {
+bool Espnow::sendToPeer(uint8_t *mac_addr, uint8_t *packet, uint8_t len) {
 
   uint8_t no_of_devices, no_of_encrypted_devices;
   esp_now_get_cnt_info(&no_of_devices,&no_of_encrypted_devices);
@@ -423,7 +425,7 @@ bool ESPNOWServiceProvider::sendToPeer(uint8_t *mac_addr, uint8_t *packet, uint8
 
 }
 
-bool ESPNOWServiceProvider::broadcastToPeers(uint8_t *packet, uint8_t len) {
+bool Espnow::broadcastToPeers(uint8_t *packet, uint8_t len) {
 
   uint8_t no_of_devices, no_of_encrypted_devices;
   esp_now_get_cnt_info(&no_of_devices,&no_of_encrypted_devices);
@@ -447,7 +449,7 @@ bool ESPNOWServiceProvider::broadcastToPeers(uint8_t *packet, uint8_t len) {
   }
 }
 
-bool ESPNOWServiceProvider::broadcastToAll(uint8_t *packet, uint8_t len) {
+bool Espnow::broadcastToAll(uint8_t *packet, uint8_t len) {
 
   LogFmtI("espnow: broadcasting to all : %s", (char*)packet);
 
@@ -461,7 +463,7 @@ bool ESPNOWServiceProvider::broadcastToAll(uint8_t *packet, uint8_t len) {
   }
 }
 
-bool ESPNOWServiceProvider::setPeerRole(uint8_t *mac_addr, uint8_t role) {
+bool Espnow::setPeerRole(uint8_t *mac_addr, uint8_t role) {
 
   LogFmtI("espnow: settting role to %x%x%x%x%x%x : %d\n", 
   mac_addr[0],mac_addr[1],mac_addr[2],
@@ -487,7 +489,7 @@ bool ESPNOWServiceProvider::setPeerRole(uint8_t *mac_addr, uint8_t role) {
   }
 }
 
-bool ESPNOWServiceProvider::isPeerExist(uint8_t *mac_addr) {
+bool Espnow::isPeerExist(uint8_t *mac_addr) {
 
   LogFmtI("espnow: isExist : %x%x%x%x%x%x\n", 
   mac_addr[0],mac_addr[1],mac_addr[2],
@@ -510,7 +512,7 @@ bool ESPNOWServiceProvider::isPeerExist(uint8_t *mac_addr) {
   }
 }
 
-bool ESPNOWServiceProvider::addPeer(uint8_t *mac_addr, uint8_t role, uint8_t channel, uint8_t *key, uint8_t key_len) {
+bool Espnow::addPeer(uint8_t *mac_addr, uint8_t role, uint8_t channel, uint8_t *key, uint8_t key_len) {
 
   uint8_t no_of_devices, no_of_encrypted_devices;
   esp_now_get_cnt_info(&no_of_devices,&no_of_encrypted_devices);
@@ -529,7 +531,7 @@ bool ESPNOWServiceProvider::addPeer(uint8_t *mac_addr, uint8_t role, uint8_t cha
   }
 }
 
-bool ESPNOWServiceProvider::addInPeers(uint8_t *mac_addr, uint8_t role, uint8_t channel) {
+bool Espnow::addInPeers(uint8_t *mac_addr, uint8_t role, uint8_t channel) {
 
     for (uint8_t i = 0; i < ESP_NOW_MAX_PEER; i++) {
 
@@ -556,7 +558,7 @@ bool ESPNOWServiceProvider::addInPeers(uint8_t *mac_addr, uint8_t role, uint8_t 
     } return false;
 }
 
-void ESPNOWServiceProvider::closeAll(void) {
+void Espnow::closeAll(void) {
 
   LogI("espnow: closing all\n");
 
@@ -569,7 +571,7 @@ void ESPNOWServiceProvider::closeAll(void) {
 }
 
 
-bool ESPNOWServiceProvider::deletePeer(uint8_t _peer_index) {
+bool Espnow::deletePeer(uint8_t _peer_index) {
 
   LogI("espnow: deleting peer\n");
 
@@ -590,7 +592,7 @@ bool ESPNOWServiceProvider::deletePeer(uint8_t _peer_index) {
   } return true;
 }
 
-void ESPNOWServiceProvider::flushPeersToDefaults(void) {
+void Espnow::flushPeersToDefaults(void) {
 
   for (uint8_t i = 0; i < ESP_NOW_MAX_PEER; i++) {
 
@@ -598,7 +600,7 @@ void ESPNOWServiceProvider::flushPeersToDefaults(void) {
   }
 }
 
-void ESPNOWServiceProvider::setPeerToDefaults(uint8_t _peer_index) {
+void Espnow::setPeerToDefaults(uint8_t _peer_index) {
 
   if ( _peer_index < ESP_NOW_MAX_PEER && nullptr != this->m_wifi ) {
 
@@ -615,6 +617,6 @@ void ESPNOWServiceProvider::setPeerToDefaults(uint8_t _peer_index) {
   }
 }
 
-ESPNOWServiceProvider __espnow_service;
+Espnow __espnow;
 
 #endif

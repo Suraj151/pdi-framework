@@ -12,7 +12,7 @@ created Date    : 1st June 2019
 #define _WIFI_CLIENT_INTERFACE_H_
 
 #include "esp8266.h"
-#include <interface/pdi/middlewares/iWiFiClientInterface.h>
+#include <interface/pdi/modules/wifi/iWiFiClientInterface.h>
 
 /**
  * WiFiClientInterface class
@@ -48,8 +48,9 @@ public:
   int8_t connected() override;
   void setTimeout(uint32_t timeout) override;
   void flush() override;
+  iClientInterface* getNewInstance() override;
 
-  WiFiClient *getWiFiClient() override { return &this->m_wifi_client; }
+  WiFiClient *getWiFiClient() { return &this->m_wifi_client; }
 
   using Print::write;
 

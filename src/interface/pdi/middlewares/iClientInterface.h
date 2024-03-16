@@ -47,6 +47,15 @@ public:
   virtual int8_t connected() = 0;
   virtual void setTimeout(uint32_t timeout) = 0;
   virtual void flush() = 0;
+  virtual iClientInterface* getNewInstance() = 0;
+  static void releaseInstance( iClientInterface **instance )
+  {
+    if( nullptr != *instance )
+    {
+      delete *instance;
+      *instance = nullptr;
+    }
+  }
 };
 
 #endif

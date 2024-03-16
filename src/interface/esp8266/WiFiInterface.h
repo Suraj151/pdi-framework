@@ -12,7 +12,7 @@ created Date    : 1st June 2019
 #define _WIFI_INTERFACE_H_
 
 #include "esp8266.h"
-#include <interface/pdi/iWiFiInterface.h>
+#include <interface/pdi/modules/wifi/iWiFiInterface.h>
 #include "LoggerInterface.h"
 #include "DeviceControlInterface.h"
 

@@ -20,15 +20,10 @@ created Date    : 1st June 2019
 #endif
 
 #include <service_provider/DatabaseServiceProvider.h>
-#include <service_provider/NtpServiceProvider.h>
 #include <service_provider/OtaServiceProvider.h>
 #include <service_provider/WiFiServiceProvider.h>
 #include <service_provider/EventServiceProvider.h>
 #include <service_provider/FactoryResetServiceProvider.h>
-
-#ifdef ENABLE_ESP_NOW
-#include <service_provider/ESPNOWServiceProvider.h>
-#endif
 
 #ifdef ENABLE_GPIO_SERVICE
 #include <service_provider/GpioServiceProvider.h>
@@ -89,9 +84,9 @@ class EwingsEspStack {
 		 */
     iWiFiInterface        *m_wifi;
     /**
-		 * @var	iWiFiClientInterface*  m_wifi_client
+		 * @var	iClientInterface*  m_client
 		 */
-    iWiFiClientInterface  *m_wifi_client;
+    iClientInterface  *m_client;
 };
 
 extern EwingsEspStack EwStack;

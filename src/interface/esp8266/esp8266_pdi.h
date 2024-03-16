@@ -17,5 +17,7 @@ created Date    : 1st Jan 2024
 #include "WiFiInterface.h"
 #include "WiFiClientInterface.h"
 #include "WiFiServerInterface.h"
+#include "NtpInterface.h"
+#include "core/Espnow.h"
 
 #endif  // _ESP8266_PORTABLE_DEVICE_INTERFACE_H_

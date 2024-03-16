@@ -22,10 +22,6 @@ created Date    : 1st June 2019
 #include "MqttConfig.h"
 #endif
 
-#ifdef ENABLE_ESP_NOW
-#include "EspnowConfig.h"
-#endif
-
 #ifdef ENABLE_GPIO_SERVICE
 #include "GpioConfig.h"
 #endif

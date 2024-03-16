@@ -12,7 +12,7 @@ created Date    : 1st June 2019
 #define _WIFI_SERVER_INTERFACE_H_
 
 #include "esp8266.h"
-#include <interface/pdi/iWiFiServerInterface.h>
+#include <interface/pdi/modules/wifi/iWiFiServerInterface.h>
 
 // enum HTTP_Method { HTTP_ANY, HTTP_GET, HTTP_HEAD, HTTP_POST, HTTP_PUT, HTTP_PATCH, HTTP_DELETE, HTTP_OPTIONS };
 // enum HTTP_Upload_Status { UPLOAD_FILE_START, UPLOAD_FILE_WRITE, UPLOAD_FILE_END,
