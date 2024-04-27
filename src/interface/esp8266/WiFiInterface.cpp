@@ -9,12 +9,21 @@ created Date    : 1st June 2019
 ******************************************************************************/
 
 #include "WiFiInterface.h"
+#if defined( ENABLE_NAPT_FEATURE )
+#include "lwip/lwip_napt.h"
+#include "lwip/app/dhcpserver.h"
+#elif defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
+#include <lwip/napt.h>
+#include <lwip/dns.h>
+#include <LwipDhcpServer-NonOS.h>
+#endif
 
 /**
  * WiFiInterface constructor.
  */
 WiFiInterface::WiFiInterface() : m_wifi(&WiFi), m_wifi_led(0)
 {
+  wifi_set_event_handler_cb( (wifi_event_handler_cb_t)&WiFiInterface::wifi_event_handler_cb );
 }
 
 /**
@@ -712,6 +721,66 @@ void WiFiInterface::enableNetworkStatusIndication()
       }
 
     }, 2.5*MILLISECOND_DURATION_1000, __i_dvc_ctrl.millis_now() );
+}
+
+/**
+ * enable napt feature
+ */
+void WiFiInterface::enableNAPT()
+{
+#if defined( ENABLE_NAPT_FEATURE )
+  // Initialize the NAT feature
+  ip_napt_init(IP_NAPT_MAX, IP_PORTMAP_MAX);
+  // Enable NAT on the AP interface
+  ip_napt_enable_no(1, 1);
+  // Set the DNS server for clients of the AP to the one we also use for the STA interface
+  dhcps_set_DNS(__i_wifi.dnsIP());
+  LogFmtS("NAPT(lwip %d) initialization done\n", (int)LWIP_VERSION_MAJOR);
+#elif defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
+  // Initialize the NAPT feature
+  err_t ret = ip_napt_init(IP_NAPT_MAX, IP_PORTMAP_MAX);
+  if (ret == ERR_OK) {
+    // Enable NAT on the AP interface
+    ret = ip_napt_enable_no(SOFTAP_IF, 1);
+    if (ret == ERR_OK) {
+      LogFmtS("NAPT(lwip %d) initialization done\n", (int)LWIP_VERSION_MAJOR);
+      // Set the DNS server for clients of the AP to the one we also use for the STA interface
+      getNonOSDhcpServer().setDns(__i_wifi.dnsIP(0));
+      //dhcpSoftAP.dhcps_set_dns(1, __i_wifi.dnsIP(1));
+    }
+  }
+  if (ret != ERR_OK) {
+    LogE("NAPT initialization failed\n");
+  }
+#endif
+}
+
+/**
+ * static wifi event handler
+ *
+ */
+void WiFiInterface::wifi_event_handler_cb(System_Event_t *_event)
+{
+  if( nullptr != _event ){
+
+    LogFmtI("\nwifi event : %d\n", (int)_event->event);
+    event_name_t e = EVENT_NAME_MAX;
+
+    if ( EVENT_STAMODE_CONNECTED == _event->event ) {
+      __task_scheduler.setTimeout( [&]() { __i_wifi.enableNAPT(); }, NAPT_INIT_DURATION_AFTER_WIFI_CONNECT, __i_dvc_ctrl.millis_now() );
+      e = EVENT_WIFI_STA_CONNECTED;
+    }else if( EVENT_STAMODE_DISCONNECTED == _event->event ){
+      e = EVENT_WIFI_STA_DISCONNECTED;
+    }else if( EVENT_SOFTAPMODE_STACONNECTED == _event->event ){
+      e = EVENT_WIFI_AP_STACONNECTED;
+    }else if( EVENT_SOFTAPMODE_STADISCONNECTED == _event->event ){
+      e = EVENT_WIFI_AP_STADISCONNECTED;
+    }
+
+    if( EVENT_NAME_MAX != e ){
+      __utl_event.execute_event(e, _event);
+    }
+  }
 }
 
 /**

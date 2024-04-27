@@ -1,4 +1,4 @@
-/****************************** ping service **********************************
+/****************************** Ping Interface *******************************
 This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
@@ -8,40 +8,38 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
-#ifndef _PING_SERVICE_PROVIDER_H_
-#define _PING_SERVICE_PROVIDER_H_
+#ifndef _PING_INTERFACE_H_
+#define _PING_INTERFACE_H_
 
-#include <service_provider/ServiceProvider.h>
-
-extern "C" {
-  #include <ping.h>
-}
+#include "esp8266.h"
+#include <interface/pdi/middlewares/iPingInterface.h>
+#include "LoggerInterface.h"
 
 // This function is called when a ping is received or the request times out:
 static void ICACHE_FLASH_ATTR ping_recv_cb(void* arg, void* pdata);
 
 /**
- * PingServiceProvider class
+ * PingInterface class
  */
-class PingServiceProvider : public ServiceProvider {
+class PingInterface : public iPingInterface {
 
   public:
 
     /**
-     * PingServiceProvider constructor.
+     * PingInterface constructor.
      */
-    PingServiceProvider();
+    PingInterface();
     /**
-		 * PingServiceProvider destructor
+		 * PingInterface destructor
 		 */
-    ~PingServiceProvider();
+    ~PingInterface();
 
     /**
      * initialize ping
      */
-    void init_ping( iWiFiInterface* _wifi );
-    bool ping( void );
-    bool isHostRespondingToPing( void );
+    void init_ping( iWiFiInterface* _wifi ) override;
+    bool ping( void ) override;
+    bool isHostRespondingToPing( void ) override;
 
     ping_option m_opt;
     // bool host_resp;
@@ -52,7 +50,5 @@ class PingServiceProvider : public ServiceProvider {
 		 */
     iWiFiInterface  *m_wifi;
 };
-
-extern PingServiceProvider __ping_service;
 
 #endif

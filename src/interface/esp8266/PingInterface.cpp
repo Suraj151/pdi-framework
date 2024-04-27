@@ -1,4 +1,4 @@
-/****************************** ping service **********************************
+/****************************** Ping Interface *******************************
 This file is part of the Ewings Esp Stack.
 
 This is free software. you can redistribute it and/or modify it but without any
@@ -8,7 +8,7 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
-#include "PingServiceProvider.h"
+#include "PingInterface.h"
 
 volatile bool _host_resp = false;
 const uint32_t _pinghostip = 0x08080808;
@@ -30,21 +30,21 @@ static void ICACHE_FLASH_ATTR ping_recv_cb (void* arg, void *pdata){
 }
 
 /**
- * PingServiceProvider constructor.
+ * PingInterface constructor.
  */
-PingServiceProvider::PingServiceProvider():
+PingInterface::PingInterface():
   m_wifi(nullptr)
 {
 }
 
 /**
- * PingServiceProvider destructor
+ * PingInterface destructor
  */
-PingServiceProvider::~PingServiceProvider(){
+PingInterface::~PingInterface(){
   this->m_wifi = nullptr;
 }
 
-void PingServiceProvider::init_ping( iWiFiInterface* _wifi ){
+void PingInterface::init_ping( iWiFiInterface* _wifi ){
 
   this->m_wifi = _wifi;
   memset(&this->m_opt, 0, sizeof(struct ping_option));
@@ -55,11 +55,11 @@ void PingServiceProvider::init_ping( iWiFiInterface* _wifi ){
   // m_opt.recv_function = NULL;
   // m_opt.reverse = NULL;
   ping_regist_sent(&this->m_opt, NULL);
-  // ping_regist_recv(&this->m_opt, reinterpret_cast<ping_recv_function>(&PingServiceProvider::ping_recv));
+  // ping_regist_recv(&this->m_opt, reinterpret_cast<ping_recv_function>(&PingInterface::ping_recv));
   ping_regist_recv(&this->m_opt, ping_recv_cb);
 }
 
-bool PingServiceProvider::ping(){
+bool PingInterface::ping(){
 
   IPAddress _ip(this->m_opt.ip);
 
@@ -71,9 +71,9 @@ bool PingServiceProvider::ping(){
   return _ip.isSet() ? ping_start(&this->m_opt) : false;
 }
 
-bool PingServiceProvider::isHostRespondingToPing(){
+bool PingInterface::isHostRespondingToPing(){
 
   return _host_resp;
 }
 
-PingServiceProvider __ping_service;
+PingInterface __i_ping;

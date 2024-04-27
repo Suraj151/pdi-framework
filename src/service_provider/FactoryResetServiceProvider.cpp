@@ -41,34 +41,10 @@ bool DeviceFactoryReset::initService()
  */
 void DeviceFactoryReset::factory_reset()
 {
-  for (uint16_t i = 0; i < this->m_factory_reset_cbs.size(); i++)
-  {
-    if (nullptr != this->m_factory_reset_cbs[i]._cb)
-    {
-      this->m_factory_reset_cbs[i]._cb();
-    }
-  }
+  __utl_event.execute_event(EVENT_FACTORY_RESET);
   __i_dvc_ctrl.wait(200);
   __i_dvc_ctrl.eraseConfig();
   __i_dvc_ctrl.resetDevice();
-}
-
-/**
- * this function register the callback tasks which needs to be done before factory reset.
- *
- * @param		CallBackVoidArgFn	_fn
- * @return	bool
- */
-bool DeviceFactoryReset::run_while_factory_reset(CallBackVoidArgFn _fn)
-{
-  if (this->m_factory_reset_cbs.size() < MAX_FACTORY_RESET_CALLBACKS)
-  {
-    factory_reset_cb_ _new_factory_reset_cb;
-    _new_factory_reset_cb._cb = _fn;
-    this->m_factory_reset_cbs.push_back(_new_factory_reset_cb);
-    return true;
-  }
-  return false;
 }
 
 /**

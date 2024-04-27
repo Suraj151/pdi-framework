@@ -19,7 +19,6 @@ created Date    : 1st June 2019
 #define MILLISECOND_DURATION_5000   5000
 #define MILLISECOND_DURATION_10000  10000
 
-
 /**
  * @define task scheduler which makes use of timers
  */
@@ -80,11 +79,6 @@ created Date    : 1st June 2019
 #define ENABLE_INTERNET_BASED_CONNECTIONS
 
 /**
- * enable/disable esp now feature here
- */
-// #define ENABLE_ESP_NOW
-
-/**
  * @define wifi & internet connectivity check cycle durations
  */
 #define WIFI_STATION_CONNECT_ATTEMPT_TIMEOUT  5  // will try to connect within this seconds
@@ -97,20 +91,6 @@ created Date    : 1st June 2019
  */
 #ifdef ENABLE_INTERNET_BASED_CONNECTIONS
 #define SWITCHING_DURATION_FOR_NO_INTERNET_CONNECTION INTERNET_CONNECTIVITY_CHECK_DURATION*6
-#endif
-
-/**
- * @define network address & port translation feature
- */
-#if IP_NAPT && LWIP_VERSION_MAJOR == 1
-  #define ENABLE_NAPT_FEATURE
-#elif IP_NAPT && LWIP_VERSION_MAJOR >= 2
-  #define ENABLE_NAPT_FEATURE_LWIP_V2
-#endif
-
-
-#if defined( ENABLE_NAPT_FEATURE ) || defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
-  #define NAPT_INIT_DURATION_AFTER_WIFI_CONNECT MILLISECOND_DURATION_5000
 #endif
 
 /**
@@ -131,6 +111,5 @@ created Date    : 1st June 2019
  */
 #define MAX_SCHEDULABLE_TASKS	25
 #define MAX_FACTORY_RESET_CALLBACKS	MAX_SCHEDULABLE_TASKS
-#define MAX_EVENT_CALLBACK_TASKS	MAX_SCHEDULABLE_TASKS
 
 #endif

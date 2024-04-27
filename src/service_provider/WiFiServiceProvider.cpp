@@ -74,6 +74,11 @@ void WiFiServiceProvider::begin( iWiFiInterface* _wifi ){
   //   this->handleInternetConnectivity();
   // }, INTERNET_CONNECTIVITY_CHECK_DURATION, __i_dvc_ctrl.millis_now() );
   _ClearObject(&_wifi_credentials);
+
+  // disconnect on factory reset event
+  __utl_event.add_event_listener(EVENT_FACTORY_RESET, [&](void *e){
+    this->m_wifi->disconnect(true);
+  });
 }
 
 /**
@@ -91,8 +96,8 @@ void WiFiServiceProvider::handleInternetConnectivity(){
     __status_wifi.last_internet_millis = __i_dvc_ctrl.millis_now();
   }else{
 
-    bool ping_ret = __ping_service.ping();
-    bool ping_resp = __ping_service.isHostRespondingToPing();
+    bool ping_ret = __i_ping.ping();
+    bool ping_resp = __i_ping.isHostRespondingToPing();
 
     if( ping_ret && ping_resp ){
 

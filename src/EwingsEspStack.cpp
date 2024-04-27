@@ -8,6 +8,7 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 #include "EwingsEspStack.h"
+#include <utility/EventUtil.h>
 
 /**
  * EwingsEspStack constructor.
@@ -16,6 +17,7 @@ EwingsEspStack::EwingsEspStack():
   m_wifi(&__i_wifi),
   m_client(&__i_wifi_client)
 {
+  __utl_event.begin(&__i_dvc_ctrl);
   __task_scheduler.setUtilityInterface(&__i_dvc_ctrl);
   __task_scheduler.setMaxTasksLimit(MAX_SCHEDULABLE_TASKS);
 }
@@ -37,25 +39,11 @@ void EwingsEspStack::initialize(){
   LogI("Initializing...\n");
 
   __database_service.init_default_database();
-  #ifdef AUTO_FACTORY_RESET_ON_INVALID_CONFIGS
-  __task_scheduler.setInterval( [&]() {
-    if ( !__i_db.isValidConfigs() ){
-      LogE("\n\nFound invalid configs.. starting factory reset..!\n\n");
-      __factory_reset.factory_reset();
-    }
-  }, MILLISECOND_DURATION_5000, __i_dvc_ctrl.millis_now() );
-
-  #endif
   
-  __event_service.begin();
-  #if defined( ENABLE_NAPT_FEATURE ) || defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
-  __event_service.add_event_listener( EVENT_WIFI_STA_CONNECTED, [&](void*sta_connected) {
-    __task_scheduler.setTimeout( [&]() { this->enable_napt_service(); }, NAPT_INIT_DURATION_AFTER_WIFI_CONNECT, __i_dvc_ctrl.millis_now() );
-  } );
-  #endif
+  __i_dvc_ctrl.initDeviceSpecificFeatures();
 
   __wifi_service.begin( this->m_wifi );
-  __ping_service.init_ping( this->m_wifi );
+
   #ifdef ENABLE_EWING_HTTP_SERVER
   __web_server.start_server( this->m_wifi );
   #endif
@@ -74,11 +62,6 @@ void EwingsEspStack::initialize(){
   __task_scheduler.setInterval( this->handleLogPrints, MILLISECOND_DURATION_5000, __i_dvc_ctrl.millis_now() );
 
   __factory_reset.initService();
-  __factory_reset.run_while_factory_reset( [&]() { __database_service.clear_default_tables(); this->m_wifi->disconnect(true); } );
-
-  #ifdef ENABLE_ESP_NOW
-  __espnow.begin( this->m_wifi );
-  #endif
 
   #ifdef ENABLE_DEVICE_IOT
   __device_iot_service.init( this->m_client );
@@ -88,44 +71,6 @@ void EwingsEspStack::initialize(){
   beginCrashHandler();
   #endif
 }
-
-#if defined( ENABLE_NAPT_FEATURE )
-/**
- * enable napt feature
- */
-void EwingsEspStack::enable_napt_service(){
-
-  // Initialize the NAT feature
-  ip_napt_init(IP_NAPT_MAX, IP_PORTMAP_MAX);
-  // Enable NAT on the AP interface
-  ip_napt_enable_no(1, 1);
-  // Set the DNS server for clients of the AP to the one we also use for the STA interface
-  dhcps_set_DNS(this->m_wifi->dnsIP());
-  LogFmtS("NAPT(lwip %d) initialization done\n", (int)LWIP_VERSION_MAJOR);
-}
-#elif defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
-/**
- * enable napt feature
- */
-void EwingsEspStack::enable_napt_service(){
-
-  // Initialize the NAPT feature
-  err_t ret = ip_napt_init(IP_NAPT_MAX, IP_PORTMAP_MAX);
-  if (ret == ERR_OK) {
-    // Enable NAT on the AP interface
-    ret = ip_napt_enable_no(SOFTAP_IF, 1);
-    if (ret == ERR_OK) {
-      LogFmtS("NAPT(lwip %d) initialization done\n", (int)LWIP_VERSION_MAJOR);
-      // Set the DNS server for clients of the AP to the one we also use for the STA interface
-      getNonOSDhcpServer().setDns(this->m_wifi->dnsIP(0));
-      //dhcpSoftAP.dhcps_set_dns(1, this->m_wifi->dnsIP(1));
-    }
-  }
-  if (ret != ERR_OK) {
-    LogE("NAPT initialization failed\n");
-  }
-}
-#endif
 
 /**
  * serve each internal action, client request, auto operations

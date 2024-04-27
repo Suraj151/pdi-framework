@@ -49,6 +49,7 @@ public:
   // virtual gpio_val_t gpioRead( GPIO_MODE mode, gpio_id_t pin ) = 0;
 
   // device control methods
+  virtual void initDeviceSpecificFeatures() = 0;
   virtual void resetDevice() = 0;
   virtual void restartDevice() = 0;
 

@@ -15,6 +15,8 @@ created Date    : 1st Jan 2024
 #include <interface/pdi/middlewares/iDeviceControlInterface.h>
 #include "LoggerInterface.h"
 #include "WiFiClientInterface.h"
+#include "core/Espnow.h"
+#include "PingInterface.h"
 
 /**
  * DeviceControlInterface class
@@ -39,6 +41,7 @@ public:
   gpio_val_t gpioRead( GPIO_MODE mode, gpio_id_t pin ) override;
 
   // device control methods
+  void initDeviceSpecificFeatures() override;
   void resetDevice() override;
   void restartDevice() override;
 

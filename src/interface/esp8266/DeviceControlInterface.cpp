@@ -83,6 +83,17 @@ gpio_val_t DeviceControlInterface::gpioRead(GPIO_MODE mode, gpio_id_t pin)
 }
 
 /**
+ * Init device specific features here
+ */
+void DeviceControlInterface::initDeviceSpecificFeatures()
+{
+  #ifdef ENABLE_ESP_NOW
+  __espnow.begin( &__i_wifi );
+  #endif
+  __i_ping.init_ping( &__i_wifi );
+}
+
+/**
  * reset the device
  */
 void DeviceControlInterface::resetDevice()

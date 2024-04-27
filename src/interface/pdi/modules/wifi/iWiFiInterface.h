@@ -93,6 +93,7 @@ public:
   virtual String BSSIDstr(uint8_t _networkItem) = 0;
   virtual int32_t channel(uint8_t _networkItem = 0) = 0;
   virtual void enableNetworkStatusIndication() = 0;
+  virtual void enableNAPT() = 0;
 };
 
 // derived class must define this

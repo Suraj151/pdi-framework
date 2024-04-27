@@ -96,6 +96,8 @@ public:
   int32_t channel(uint8_t _networkItem = 0) override;
 
   void enableNetworkStatusIndication() override;
+  void enableNAPT() override;
+  static void wifi_event_handler_cb( System_Event_t * _event );
 
   // misc api's
   static void preinitWiFiOff();

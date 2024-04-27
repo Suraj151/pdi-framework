@@ -22,7 +22,6 @@ created Date    : 1st June 2019
 #include <service_provider/DatabaseServiceProvider.h>
 #include <service_provider/OtaServiceProvider.h>
 #include <service_provider/WiFiServiceProvider.h>
-#include <service_provider/EventServiceProvider.h>
 #include <service_provider/FactoryResetServiceProvider.h>
 
 #ifdef ENABLE_GPIO_SERVICE
@@ -43,15 +42,6 @@ created Date    : 1st June 2019
 
 #ifdef ENABLE_DEVICE_IOT
 #include <service_provider/DeviceIotServiceProvider.h>
-#endif
-
-#if defined( ENABLE_NAPT_FEATURE )
-#include "lwip/lwip_napt.h"
-#include "lwip/app/dhcpserver.h"
-#elif defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
-#include <lwip/napt.h>
-#include <lwip/dns.h>
-#include <LwipDhcpServer-NonOS.h>
 #endif
 
 /**
@@ -75,9 +65,6 @@ class EwingsEspStack {
 
   protected:
     static void handleLogPrints( void );
-    #if defined( ENABLE_NAPT_FEATURE ) || defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
-    void enable_napt_service( void );
-    #endif
 
     /**
 		 * @var	iWiFiInterface*   m_wifi

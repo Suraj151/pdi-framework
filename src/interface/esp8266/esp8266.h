@@ -28,6 +28,7 @@ extern "C"
 {
 #include "user_interface.h"
 #include <espnow.h>
+#include <ping.h>
 }
 
 // redefines
@@ -42,5 +43,24 @@ extern "C"
  */
 #define FLASH_KEY_PIN D3
 #define FLASH_KEY_PRESS_COUNT_THR 5
+
+/**
+ * enable/disable esp now feature here
+ */
+// #define ENABLE_ESP_NOW
+
+/**
+ * @define network address & port translation feature
+ */
+#if IP_NAPT && LWIP_VERSION_MAJOR == 1
+  #define ENABLE_NAPT_FEATURE
+#elif IP_NAPT && LWIP_VERSION_MAJOR >= 2
+  #define ENABLE_NAPT_FEATURE_LWIP_V2
+#endif
+
+
+#if defined( ENABLE_NAPT_FEATURE ) || defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
+  #define NAPT_INIT_DURATION_AFTER_WIFI_CONNECT MILLISECOND_DURATION_5000
+#endif
 
 #endif // _ESP8266_COMMON_CONFIG_H_

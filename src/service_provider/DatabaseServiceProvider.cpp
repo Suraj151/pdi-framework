@@ -9,6 +9,7 @@ created Date    : 1st June 2019
 ******************************************************************************/
 
 #include "DatabaseServiceProvider.h"
+#include "FactoryResetServiceProvider.h"
 
 /**
  * @var	GlobalTable	__global_table
@@ -87,6 +88,16 @@ void DatabaseServiceProvider::init_default_database()
 {
   __i_db.beginConfigs(__i_db.getMaxDBSize());
   __database.init_database(__i_db.getMaxDBSize());
+
+  #ifdef AUTO_FACTORY_RESET_ON_INVALID_CONFIGS
+  __task_scheduler.setInterval( [&]() {
+    if ( !__i_db.isValidConfigs() ){
+      LogE("\n\nFound invalid configs.. starting factory reset..!\n\n");
+      __database_service.clear_default_tables();
+      __factory_reset.factory_reset();
+    }
+  }, MILLISECOND_DURATION_5000, __i_dvc_ctrl.millis_now() );
+  #endif
 }
 
 /**
