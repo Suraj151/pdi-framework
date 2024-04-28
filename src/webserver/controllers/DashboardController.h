@@ -102,7 +102,7 @@ class DashboardController : public Controller {
 			_response += "}";
 
 			this->m_web_resource->m_server->sendHeader("Cache-Control", "no-cache");
-			this->m_web_resource->m_server->send(HTTP_OK, EW_HTML_CONTENT, _response);
+			this->m_web_resource->m_server->send(HTTP_OK, EW_HTML_CONTENT, _response.c_str());
 		}
 
 		/**

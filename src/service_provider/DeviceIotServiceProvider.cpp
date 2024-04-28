@@ -65,7 +65,7 @@ void DeviceIotServiceProvider::init( iClientInterface *_iclient ){
 /**
  * handle registration otp request
  */
-void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_table *_device_iot_configs, String &_response ){
+void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_table *_device_iot_configs, std::string &_response ){
 
   std::string otpurl;
 
@@ -342,7 +342,7 @@ void DeviceIotServiceProvider::handleSensorData(){
   if( this->m_smaple_index >= this->m_smaple_per_publish-1 ){
 
     this->m_smaple_index = 0;
-    String _payload = "{\"head\":{\"uid\":\"[mac]\",\"packet_type\":\"data\",\"packet_version\":\"";
+    std::string _payload = "{\"head\":{\"uid\":\"[mac]\",\"packet_type\":\"data\",\"packet_version\":\"";
     _payload += DEVICE_IOT_PACKET_VERSION;
     _payload += "\"},\"payload\":";
     this->m_device_iot->dataHook(_payload);
@@ -350,8 +350,9 @@ void DeviceIotServiceProvider::handleSensorData(){
     __task_scheduler.setTimeout( [&]() { __mqtt_service.handleMqttPublish(); }, 1, __i_dvc_ctrl.millis_now() );
 
     memset( __mqtt_service.m_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
-    if( _payload.length()+1 < MQTT_PAYLOAD_BUF_SIZE ){
-      _payload.toCharArray( __mqtt_service.m_mqtt_payload, _payload.length()+1);
+    if( _payload.size()+1 < MQTT_PAYLOAD_BUF_SIZE ){
+      // _payload.toCharArray( __mqtt_service.m_mqtt_payload, _payload.size()+1);
+      strncpy(__mqtt_service.m_mqtt_payload, _payload.c_str(), _payload.size()); 
     }else{
       strcat_P( __mqtt_service.m_mqtt_payload, PSTR("mqtt data is too big to fit in buffer !"));
     }

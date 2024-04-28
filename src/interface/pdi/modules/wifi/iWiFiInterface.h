@@ -52,14 +52,10 @@ public:
   virtual bool reconnect() = 0;
   virtual bool disconnect(bool _wifioff = false) = 0;
   virtual bool isConnected() = 0;
-  virtual bool setAutoConnect(bool _autoConnect) = 0;
-  virtual bool getAutoConnect() = 0;
   virtual bool setAutoReconnect(bool _autoReconnect) = 0;
-  virtual bool getAutoReconnect() = 0;
 
   // STA network info
   virtual IPAddress localIP() = 0;
-  virtual uint8_t *macAddress(uint8_t *_mac) = 0;
   virtual String macAddress() = 0;
   virtual IPAddress subnetMask() = 0;
   virtual IPAddress gatewayIP() = 0;
@@ -68,21 +64,14 @@ public:
   // STA WiFi info
   virtual wifi_status_t status() = 0;
   virtual String SSID() const = 0;
-  virtual String psk() const = 0;
   virtual uint8_t *BSSID() = 0;
-  virtual String BSSIDstr() = 0;
   virtual int32_t RSSI() = 0;
 
   // Soft AP api's
   virtual bool softAP(const char *_ssid, const char *_passphrase = nullptr, int _channel = 1, int _ssid_hidden = 0, int _max_connection = 4) = 0;
   virtual bool softAPConfig(IPAddress _local_ip, IPAddress _gateway, IPAddress _subnet) = 0;
   virtual bool softAPdisconnect(bool _wifioff = false) = 0;
-  virtual uint8_t softAPgetStationNum() = 0;
   virtual IPAddress softAPIP() = 0;
-  virtual uint8_t *softAPmacAddress(uint8_t *_mac) = 0;
-  virtual String softAPmacAddress(void) = 0;
-  virtual String softAPSSID() const = 0;
-  virtual String softAPPSK() const = 0;
 
   // n/w scan api's
   virtual int8_t scanNetworks(bool _async = false, bool _show_hidden = false, uint8_t _channel = 0, uint8_t *ssid = nullptr) = 0;
@@ -90,8 +79,7 @@ public:
   virtual String SSID(uint8_t _networkItem) = 0;
   virtual int32_t RSSI(uint8_t _networkItem) = 0;
   virtual uint8_t *BSSID(uint8_t _networkItem) = 0;
-  virtual String BSSIDstr(uint8_t _networkItem) = 0;
-  virtual int32_t channel(uint8_t _networkItem = 0) = 0;
+  
   virtual void enableNetworkStatusIndication() = 0;
   virtual void enableNAPT() = 0;
 };

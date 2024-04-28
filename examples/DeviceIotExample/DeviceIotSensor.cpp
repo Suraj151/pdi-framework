@@ -55,7 +55,7 @@ void DeviceIotSensor::sampleHook(){
  * this method get called from internal service while sending data to iot server
  * make sure that data should be in json format enclosed within curly brackets i.e. "{... data in json format ....}"
  */
-void DeviceIotSensor::dataHook( String &_payload ){
+void DeviceIotSensor::dataHook( std::string &_payload ){
 
   LogI("Gathering sensor data samples : ");
 

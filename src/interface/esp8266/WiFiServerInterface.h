@@ -41,32 +41,18 @@ public:
   void begin(uint16_t port) override;
   void handleClient() override;
   void close() override;
-  void stop() override;
 
   void on(const String &uri, CallBackVoidArgFn handler) override;
-  void on(const String &uri, http_method_t method, CallBackVoidArgFn fn) override;
   void onNotFound(CallBackVoidArgFn fn) override;   // called when handler is not assigned
   void onFileUpload(CallBackVoidArgFn fn) override; // handle file uploads
 
   String arg(const String &name) override;                                              // get request argument value by name
-  String arg(int i) override;                                                           // get request argument value by number
-  String argName(int i) override;                                                       // get request argument name by number
-  int args() const override;                                                            // get arguments count
   bool hasArg(const String &name) const override;                                       // check if argument exists
   void collectHeaders(const char *headerKeys[], const size_t headerKeysCount) override; // set the request headers to collect
   String header(const String &name) override;                                           // get request header value by name
-  String header(int i) override;                                                        // get request header value by number
-  String headerName(int i) override;                                                    // get request header name by number
-  int headers() const override;                                                         // get header count
   bool hasHeader(const String &name) const override;                                    // check if header exists
-  String hostHeader() override;                                                         // get request host header if available or empty String if not
 
-  void send(int code, const char *content_type = nullptr, const String &content = String("")) override;
-  void send(int code, char *content_type, const String &content) override;
-  void send(int code, const String &content_type, const String &content) override;
-  void send(int code, const char *content_type, const char *content) override;
-  void send(int code, const char *content_type, const char *content, size_t content_length) override;
-  void send(int code, const char *content_type, const uint8_t *content, size_t content_length) override;
+  void send(int code, const char *content_type = nullptr, const char *content = nullptr) override;
   void sendHeader(const String &name, const String &value, bool first = false) override;
 
 private:

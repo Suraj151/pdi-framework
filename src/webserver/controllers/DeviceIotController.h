@@ -43,7 +43,6 @@ public:
 	 */
 	void boot(void)
 	{
-
 		if (nullptr != this->m_route_handler)
 		{
 			this->m_route_handler->register_route(
@@ -61,7 +60,6 @@ public:
 	 */
 	void build_device_register_config_html(char *_page, int _max_size = EW_HTML_MAX_SIZE)
 	{
-
 		if (nullptr == this->m_web_resource || nullptr == this->m_web_resource->m_db_conn)
 		{
 			return;
@@ -93,7 +91,6 @@ public:
 
 		if (this->m_web_resource->m_server->hasArg("dhst"))
 		{
-
 			String _device_iot_host = this->m_web_resource->m_server->arg("dhst");
 
 			LogI("\nSubmitted info :\n");
@@ -104,15 +101,14 @@ public:
 			_device_iot_host.toCharArray(_device_iot_configs.device_iot_host, _device_iot_host.length() + 1);
 			this->m_web_resource->m_db_conn->set_device_iot_config_table(&_device_iot_configs);
 
-			String _response = "";
+			std::string _response = "";
 			__device_iot_service.handleRegistrationOtpRequest(&_device_iot_configs, _response);
 
 			this->m_web_resource->m_server->sendHeader("Cache-Control", "no-cache");
-			this->m_web_resource->m_server->send(HTTP_OK, EW_HTML_CONTENT, _response);
+			this->m_web_resource->m_server->send(HTTP_OK, EW_HTML_CONTENT, _response.c_str());
 		}
 		else
 		{
-
 			char *_page = new char[EW_HTML_MAX_SIZE];
 			this->build_device_register_config_html(_page);
 

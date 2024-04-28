@@ -132,7 +132,7 @@ public:
 			this->_last_monitor_point.x = x2;
 			this->_last_monitor_point.y = y2;
 			this->m_web_resource->m_server->sendHeader("Cache-Control", "no-cache");
-			this->m_web_resource->m_server->send(HTTP_OK, EW_HTML_CONTENT, *_response);
+			this->m_web_resource->m_server->send(HTTP_OK, EW_HTML_CONTENT, _response->c_str());
 
 			delete _response;
 		}

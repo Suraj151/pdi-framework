@@ -34,7 +34,7 @@ class DeviceIotServiceProvider : public ServiceProvider {
     ~DeviceIotServiceProvider();
 
     void init( iClientInterface *_iclient );
-    void handleRegistrationOtpRequest(  device_iot_config_table *_device_iot_configs, String &_response  );
+    void handleRegistrationOtpRequest(  device_iot_config_table *_device_iot_configs, std::string &_response  );
     void handleDeviceIotConfigRequest( void );
     void handleConnectivityCheck( void );
     void configureMQTT( void );

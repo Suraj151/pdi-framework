@@ -57,19 +57,6 @@ void WiFiInterface::persistent(bool _persistent)
 }
 
 /**
- * get Persistent
- */
-// bool WiFiInterface::getPersistent()
-// {
-//   bool persistent = false;
-//   if (nullptr != this->m_wifi)
-//   {
-//     persistent = this->m_wifi->getPersistent();
-//   }
-//   return persistent;
-// }
-
-/**
  * setMode
  */
 bool WiFiInterface::setMode(wifi_mode_t _mode)
@@ -229,32 +216,6 @@ bool WiFiInterface::isConnected()
 }
 
 /**
- * setAutoConnect
- */
-bool WiFiInterface::setAutoConnect(bool _autoConnect)
-{
-  bool status = false;
-  if (nullptr != this->m_wifi)
-  {
-    status = this->m_wifi->setAutoConnect(_autoConnect);
-  }
-  return status;
-}
-
-/**
- * getAutoConnect
- */
-bool WiFiInterface::getAutoConnect()
-{
-  bool status = false;
-  if (nullptr != this->m_wifi)
-  {
-    status = this->m_wifi->getAutoConnect();
-  }
-  return status;
-}
-
-/**
  * setAutoReconnect
  */
 bool WiFiInterface::setAutoReconnect(bool _autoReconnect)
@@ -268,30 +229,6 @@ bool WiFiInterface::setAutoReconnect(bool _autoReconnect)
 }
 
 /**
- * getAutoReconnect
- */
-bool WiFiInterface::getAutoReconnect()
-{
-  bool status = false;
-  if (nullptr != this->m_wifi)
-  {
-    status = this->m_wifi->getAutoReconnect();
-  }
-  return status;
-}
-
-// /**
-//  * waitForConnectResult
-//  */
-// int8_t WiFiInterface::waitForConnectResult(uint32_t _timeoutLength){
-//   int8_t result = false;
-//   if( nullptr != this->m_wifi ){
-//     result = this->m_wifi->waitForConnectResult(_timeoutLength);
-//   }
-//   return result;
-// }
-
-/**
  * localIP
  */
 IPAddress WiFiInterface::localIP()
@@ -302,19 +239,6 @@ IPAddress WiFiInterface::localIP()
     ip = this->m_wifi->localIP();
   }
   return ip;
-}
-
-/**
- * macAddress
- */
-uint8_t *WiFiInterface::macAddress(uint8_t *_mac)
-{
-  uint8_t *mac = nullptr;
-  if (nullptr != this->m_wifi)
-  {
-    mac = this->m_wifi->macAddress(_mac);
-  }
-  return mac;
 }
 
 /**
@@ -396,19 +320,6 @@ String WiFiInterface::SSID() const
 }
 
 /**
- * psk
- */
-String WiFiInterface::psk() const
-{
-  String psk;
-  if (nullptr != this->m_wifi)
-  {
-    psk = this->m_wifi->psk();
-  }
-  return psk;
-}
-
-/**
  * BSSID
  */
 uint8_t *WiFiInterface::BSSID()
@@ -419,19 +330,6 @@ uint8_t *WiFiInterface::BSSID()
     bssid = this->m_wifi->BSSID();
   }
   return bssid;
-}
-
-/**
- * BSSIDstr
- */
-String WiFiInterface::BSSIDstr()
-{
-  String bssid_str;
-  if (nullptr != this->m_wifi)
-  {
-    bssid_str = this->m_wifi->BSSIDstr();
-  }
-  return bssid_str;
 }
 
 /**
@@ -487,19 +385,6 @@ bool WiFiInterface::softAPdisconnect(bool _wifioff)
 }
 
 /**
- * softAPgetStationNum
- */
-uint8_t WiFiInterface::softAPgetStationNum()
-{
-  uint8_t sta_num = 0;
-  if (nullptr != this->m_wifi)
-  {
-    sta_num = this->m_wifi->softAPgetStationNum();
-  }
-  return sta_num;
-}
-
-/**
  * softAPIP
  */
 IPAddress WiFiInterface::softAPIP()
@@ -510,58 +395,6 @@ IPAddress WiFiInterface::softAPIP()
     ip = this->m_wifi->softAPIP();
   }
   return ip;
-}
-
-/**
- * softAPmacAddress
- */
-uint8_t *WiFiInterface::softAPmacAddress(uint8_t *_mac)
-{
-  uint8_t *mac = nullptr;
-  if (nullptr != this->m_wifi)
-  {
-    mac = this->m_wifi->softAPmacAddress(_mac);
-  }
-  return mac;
-}
-
-/**
- * softAPmacAddress
- */
-String WiFiInterface::softAPmacAddress(void)
-{
-  String mac;
-  if (nullptr != this->m_wifi)
-  {
-    mac = this->m_wifi->softAPmacAddress();
-  }
-  return mac;
-}
-
-/**
- * softAPSSID
- */
-String WiFiInterface::softAPSSID() const
-{
-  String ssid;
-  if (nullptr != this->m_wifi)
-  {
-    ssid = this->m_wifi->softAPSSID();
-  }
-  return ssid;
-}
-
-/**
- * softAPPSK
- */
-String WiFiInterface::softAPPSK() const
-{
-  String psk;
-  if (nullptr != this->m_wifi)
-  {
-    psk = this->m_wifi->softAPPSK();
-  }
-  return psk;
 }
 
 /**
@@ -587,47 +420,6 @@ void WiFiInterface::scanNetworksAsync(std::function<void(int)> _onComplete, bool
     this->m_wifi->scanNetworksAsync(_onComplete, _show_hidden);
   }
 }
-
-// /**
-//  * scanComplete
-//  */
-// int8_t WiFiInterface::scanComplete(){
-//   int8_t num = 0;
-//   if( nullptr != this->m_wifi ){
-//     num = this->m_wifi->scanComplete();
-//   }
-//   return num;
-// }
-//
-// /**
-//  * scanDelete
-//  */
-// void WiFiInterface::scanDelete(){
-//   if( nullptr != this->m_wifi ){
-//     this->m_wifi->scanDelete();
-//   }
-// }
-//
-// /**
-//  * encryptionType
-//  */
-// uint8_t WiFiInterface::encryptionType(uint8_t _networkItem){
-//   uint8_t enc_type = 0;
-//   if( nullptr != this->m_wifi ){
-//     enc_type = this->m_wifi->encryptionType(_networkItem);
-//   }
-//   return enc_type;
-// }
-// /**
-//  * isHidden
-//  */
-// bool WiFiInterface::isHidden(uint8_t _networkItem){
-//   bool is_hidden = false;
-//   if( nullptr != this->m_wifi ){
-//     is_hidden = this->m_wifi->isHidden(_networkItem);
-//   }
-//   return is_hidden;
-// }
 
 /**
  * SSID
@@ -666,32 +458,6 @@ uint8_t *WiFiInterface::BSSID(uint8_t _networkItem)
     bssid = this->m_wifi->BSSID(_networkItem);
   }
   return bssid;
-}
-
-/**
- * BSSIDstr
- */
-String WiFiInterface::BSSIDstr(uint8_t _networkItem)
-{
-  String bssid;
-  if (nullptr != this->m_wifi)
-  {
-    bssid = this->m_wifi->BSSIDstr(_networkItem);
-  }
-  return bssid;
-}
-
-/**
- * channel
- */
-int32_t WiFiInterface::channel(uint8_t _networkItem)
-{
-  int32_t channel = 0;
-  if (nullptr != this->m_wifi)
-  {
-    channel = this->m_wifi->channel();
-  }
-  return channel;
 }
 
 /**

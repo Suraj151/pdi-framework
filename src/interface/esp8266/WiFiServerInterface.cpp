@@ -57,27 +57,11 @@ void WiFiServerInterface::close()
 }
 
 /**
- * stop
- */
-void WiFiServerInterface::stop()
-{
-  this->m_server.stop();
-}
-
-/**
  * on
  */
 void WiFiServerInterface::on(const String &uri, CallBackVoidArgFn handler)
 {
   this->m_server.on(uri, handler);
-}
-
-/**
- * on
- */
-void WiFiServerInterface::on(const String &uri, http_method_t method, CallBackVoidArgFn fn)
-{
-  this->m_server.on(uri, (HTTPMethod)method, fn);
 }
 
 /**
@@ -108,33 +92,6 @@ String WiFiServerInterface::arg(const String &name)
 }
 
 /**
- * arg
- * get request argument value by number
- */
-String WiFiServerInterface::arg(int i)
-{
-  return this->m_server.arg(i);
-}
-
-/**
- * argName
- * get request argument name by number
- */
-String WiFiServerInterface::argName(int i)
-{
-  return this->m_server.argName(i);
-}
-
-/**
- * args
- * get arguments count
- */
-int WiFiServerInterface::args() const
-{
-  return this->m_server.args();
-}
-
-/**
  * hasArg
  * check if argument exists
  */
@@ -162,33 +119,6 @@ String WiFiServerInterface::header(const String &name)
 }
 
 /**
- * header
- * get request header value by number
- */
-String WiFiServerInterface::header(int i)
-{
-  return this->m_server.header(i);
-}
-
-/**
- * headerName
- * get request header name by number
- */
-String WiFiServerInterface::headerName(int i)
-{
-  return this->m_server.headerName(i);
-}
-
-/**
- * headers
- * get header count
- */
-int WiFiServerInterface::headers() const
-{
-  return this->m_server.headers();
-}
-
-/**
  * hasHeader
  * check if header exists
  */
@@ -198,60 +128,15 @@ bool WiFiServerInterface::hasHeader(const String &name) const
 }
 
 /**
- * hostHeader
- * get request host header if available or empty String if not
- */
-String WiFiServerInterface::hostHeader()
-{
-  return this->m_server.hostHeader();
-}
-
-/**
- * send
- */
-void WiFiServerInterface::send(int code, const char *content_type, const String &content)
-{
-  this->m_server.send(code, content_type, content);
-}
-
-/**
- * send
- */
-void WiFiServerInterface::send(int code, char *content_type, const String &content)
-{
-  this->m_server.send(code, content_type, content);
-}
-
-/**
- * send
- */
-void WiFiServerInterface::send(int code, const String &content_type, const String &content)
-{
-  this->m_server.send(code, content_type, content);
-}
-
-/**
  * send
  */
 void WiFiServerInterface::send(int code, const char *content_type, const char *content)
 {
-  this->m_server.send(code, content_type, content);
-}
-
-/**
- * send
- */
-void WiFiServerInterface::send(int code, const char *content_type, const char *content, size_t content_length)
-{
-  this->m_server.send(code, content_type, content, content_length);
-}
-
-/**
- * send
- */
-void WiFiServerInterface::send(int code, const char *content_type, const uint8_t *content, size_t content_length)
-{
-  this->m_server.send(code, content_type, content, content_length);
+  if( nullptr != content_type ){
+    this->m_server.send(code, content_type, content);
+  }else{
+    this->m_server.send(code, "", "");
+  }
 }
 
 /**
