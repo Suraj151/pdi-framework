@@ -72,7 +72,7 @@ public:
   // n/w scan api's
   int8_t scanNetworks(bool _async = false, bool _show_hidden = false, uint8_t _channel = 0, uint8_t *ssid = nullptr) override;
   void scanNetworksAsync(std::function<void(int)> _onComplete, bool _show_hidden = false) override;
-  String SSID(uint8_t _networkItem) override;
+  std::string SSID(uint8_t _networkItem) override;
   int32_t RSSI(uint8_t _networkItem) override;
   uint8_t *BSSID(uint8_t _networkItem) override;
 

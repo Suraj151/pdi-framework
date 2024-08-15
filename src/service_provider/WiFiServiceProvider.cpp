@@ -384,10 +384,11 @@ bool WiFiServiceProvider::scan_within_station_async( char* ssid, uint8_t* bssid,
 
   for (int i = 0; i < n; ++i) {
 
-    String _ssid = this->m_wifi->SSID(i);
-    _ssid.toCharArray( _ssid_buff, _ssid.length()+1 );
+    std::string _ssid = this->m_wifi->SSID(i);
+    // _ssid.toCharArray( _ssid_buff, _ssid.length()+1 );
+    strncpy(_ssid_buff, _ssid.c_str(), _ssid.size());
 
-    if( __are_arrays_equal( ssid, _ssid_buff, _ssid.length()+1 ) ){
+    if( __are_arrays_equal( ssid, _ssid_buff, _ssid.size() ) ){
 
       bool _found = false;
       stat_info = stat_info_copy;

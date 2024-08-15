@@ -424,12 +424,12 @@ void WiFiInterface::scanNetworksAsync(std::function<void(int)> _onComplete, bool
 /**
  * SSID
  */
-String WiFiInterface::SSID(uint8_t _networkItem)
+std::string WiFiInterface::SSID(uint8_t _networkItem)
 {
-  String ssid;
+  std::string ssid;
   if (nullptr != this->m_wifi)
   {
-    ssid = this->m_wifi->SSID(_networkItem);
+    ssid = this->m_wifi->SSID(_networkItem).c_str();
   }
   return ssid;
 }

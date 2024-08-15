@@ -76,7 +76,7 @@ public:
   // n/w scan api's
   virtual int8_t scanNetworks(bool _async = false, bool _show_hidden = false, uint8_t _channel = 0, uint8_t *ssid = nullptr) = 0;
   virtual void scanNetworksAsync(std::function<void(int)> _onComplete, bool _show_hidden = false) = 0;
-  virtual String SSID(uint8_t _networkItem) = 0;
+  virtual std::string SSID(uint8_t _networkItem) = 0;
   virtual int32_t RSSI(uint8_t _networkItem) = 0;
   virtual uint8_t *BSSID(uint8_t _networkItem) = 0;
   
