@@ -56,14 +56,14 @@ public:
 
   // STA network info
   virtual IPAddress localIP() = 0;
-  virtual String macAddress() = 0;
+  virtual std::string macAddress() = 0;
   virtual IPAddress subnetMask() = 0;
   virtual IPAddress gatewayIP() = 0;
   virtual IPAddress dnsIP(uint8_t _dns_no = 0) = 0;
 
   // STA WiFi info
   virtual wifi_status_t status() = 0;
-  virtual String SSID() const = 0;
+  virtual std::string SSID() const = 0;
   virtual uint8_t *BSSID() = 0;
   virtual int32_t RSSI() = 0;
 

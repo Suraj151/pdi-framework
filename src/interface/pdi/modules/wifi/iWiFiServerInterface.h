@@ -38,18 +38,18 @@ public:
   virtual void handleClient() = 0;
   virtual void close() = 0;
 
-  virtual void on(const String &uri, CallBackVoidArgFn handler) = 0;
+  virtual void on(const std::string &uri, CallBackVoidArgFn handler) = 0;
   virtual void onNotFound(CallBackVoidArgFn fn) = 0;   // called when handler is not assigned
   virtual void onFileUpload(CallBackVoidArgFn fn) = 0; // handle file uploads
 
-  virtual String arg(const String &name) = 0;                                              // get request argument value by name
-  virtual bool hasArg(const String &name) const = 0;                                       // check if argument exists
+  virtual std::string arg(const std::string &name) = 0;                                    // get request argument value by name
+  virtual bool hasArg(const std::string &name) const = 0;                                  // check if argument exists
   virtual void collectHeaders(const char *headerKeys[], const size_t headerKeysCount) = 0; // set the request headers to collect
-  virtual String header(const String &name) = 0;                                           // get request header value by name
-  virtual bool hasHeader(const String &name) const = 0;                                    // check if header exists
+  virtual std::string header(const std::string &name) = 0;                                 // get request header value by name
+  virtual bool hasHeader(const std::string &name) const = 0;                               // check if header exists
 
   virtual void send(int code, const char *content_type = nullptr, const char *content = nullptr) = 0;
-  virtual void sendHeader(const String &name, const String &value, bool first = false) = 0;
+  virtual void sendHeader(const std::string &name, const std::string &value, bool first = false) = 0;
 };
 
 // derived class must define this

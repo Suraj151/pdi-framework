@@ -110,20 +110,20 @@ public:
 
 		y2 = GPIO_MAX_GRAPH_HEIGHT - y2;
 
-		String *_response = new String("");
+		std::string *_response = new std::string();
 
 		if (nullptr != _response)
 		{
 			*_response = "{\"x1\":";
-			*_response += x1;
+			*_response += std::to_string(x1);
 			*_response += ",\"y1\":";
-			*_response += y1;
+			*_response += std::to_string(y1);
 			*_response += ",\"x2\":";
-			*_response += x2;
+			*_response += std::to_string(x2);
 			*_response += ",\"y2\":";
-			*_response += y2;
+			*_response += std::to_string(y2);
 			*_response += ",\"r\":";
-			*_response += !this->m_route_handler->has_active_session();
+			*_response += std::to_string(!this->m_route_handler->has_active_session());
 			*_response += ",\"d\":";
 			__gpio_service.appendGpioJsonPayload(*_response);
 			*_response += ",\"md\":[\"OFF\", \"DOUT\", \"DIN\", \"BLINK\", \"AOUT\", \"AIN\"]";
@@ -293,18 +293,18 @@ public:
 
 		if (this->m_web_resource->m_server->hasArg("hst") && this->m_web_resource->m_server->hasArg("prt"))
 		{
-			String _gpio_host = this->m_web_resource->m_server->arg("hst");
-			String _gpio_port = this->m_web_resource->m_server->arg("prt");
-			String _post_freq = this->m_web_resource->m_server->arg("frq");
+			std::string _gpio_host = this->m_web_resource->m_server->arg("hst");
+			std::string _gpio_port = this->m_web_resource->m_server->arg("prt");
+			std::string _post_freq = this->m_web_resource->m_server->arg("frq");
 
 			LogI("\nSubmitted info :\n");
 			LogFmtI("gpio host : %s\n", _gpio_host.c_str());
 			LogFmtI("gpio port : %s\n", _gpio_port.c_str());
 			LogFmtI("post freq : %s\n\n", _post_freq.c_str());
 
-			_gpio_host.toCharArray(__gpio_service.m_gpio_config_copy.gpio_host, _gpio_host.length() + 1);
-			__gpio_service.m_gpio_config_copy.gpio_port = (int)_gpio_port.toInt();
-			__gpio_service.m_gpio_config_copy.gpio_post_frequency = (int)_post_freq.toInt() < 0 ? GPIO_DATA_POST_FREQ : (int)_post_freq.toInt();
+			strncpy(__gpio_service.m_gpio_config_copy.gpio_host, _gpio_host.c_str(), _gpio_host.size());
+			__gpio_service.m_gpio_config_copy.gpio_port = StringToUint16(_gpio_port.c_str());
+			__gpio_service.m_gpio_config_copy.gpio_post_frequency = StringToUint32(_post_freq.c_str()) < 0 ? GPIO_DATA_POST_FREQ : StringToUint32(_post_freq.c_str());
 			this->m_web_resource->m_db_conn->set_gpio_config_table(&__gpio_service.m_gpio_config_copy);
 
 			_is_posted = true;
@@ -404,9 +404,10 @@ public:
 			for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS; _pin++)
 			{
 				_label[1] = (0x30 + _pin);
-				__gpio_service.m_gpio_config_copy.gpio_mode[_pin] = !__gpio_service.is_exceptional_gpio_pin(_pin) ? (int)this->m_web_resource->m_server->arg(_label).toInt() : 0;
+				uint8_t _val = StringToUint8(this->m_web_resource->m_server->arg(_label).c_str());
+				__gpio_service.m_gpio_config_copy.gpio_mode[_pin] = !__gpio_service.is_exceptional_gpio_pin(_pin) ? _val : 0;
 
-				LogFmtI("Pin D%d : %d\n", _pin, (int)this->m_web_resource->m_server->arg(_label).toInt());
+				LogFmtI("Pin D%d : %d\n", _pin, _val);
 
 				if (__gpio_service.m_gpio_config_copy.gpio_mode[_pin] == OFF || __gpio_service.m_gpio_config_copy.gpio_mode[_pin] == DIGITAL_WRITE || __gpio_service.m_gpio_config_copy.gpio_mode[_pin] == ANALOG_WRITE)
 				{
@@ -421,9 +422,10 @@ public:
 			for (uint8_t _pin = 0; _pin < MAX_ANALOG_GPIO_PINS; _pin++)
 			{
 				_label[1] = (0x30 + _pin);
-				__gpio_service.m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS + _pin] = !__gpio_service.is_exceptional_gpio_pin(_pin) ? (int)this->m_web_resource->m_server->arg(_label).toInt() : 0;
+				uint16_t _val = StringToUint16(this->m_web_resource->m_server->arg(_label).c_str());
+				__gpio_service.m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS + _pin] = !__gpio_service.is_exceptional_gpio_pin(_pin) ? _val : 0;
 
-				LogFmtI("Pin A%d : %d\n", _pin, (int)this->m_web_resource->m_server->arg(_label).toInt());
+				LogFmtI("Pin A%d : %d\n", _pin, _val);
 
 				if (__gpio_service.m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS + _pin] == OFF)
 				{
@@ -541,12 +543,12 @@ public:
 			for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS; _pin++)
 			{
 				_label[1] = (0x30 + _pin);
+				uint8_t _val = StringToUint8(this->m_web_resource->m_server->arg(_label).c_str());
 				if (this->m_web_resource->m_server->hasArg(_label))
 				{
-					__gpio_service.m_gpio_config_copy.gpio_readings[_pin] = __gpio_service.is_exceptional_gpio_pin(_pin) ? 0 : (int)this->m_web_resource->m_server->arg(_label).toInt();
+					__gpio_service.m_gpio_config_copy.gpio_readings[_pin] = __gpio_service.is_exceptional_gpio_pin(_pin) ? 0 : _val;
 
-					LogFmtI("Pin %d : %d\n",_pin, (int)this->m_web_resource->m_server->arg(_label).toInt());
-
+					LogFmtI("Pin %d : %d\n", _pin, _val);
 					_is_posted = true;
 				}
 			}
@@ -700,8 +702,8 @@ public:
 				if (this->m_web_resource->m_server->hasArg(_label) && this->m_web_resource->m_server->hasArg(_alert_label))
 				{
 					__gpio_service.m_gpio_config_copy.gpio_alert_comparator[_pin] = EQUAL;
-					__gpio_service.m_gpio_config_copy.gpio_alert_values[_pin] = (int)this->m_web_resource->m_server->arg(_label).toInt();
-					__gpio_service.m_gpio_config_copy.gpio_alert_channel[_pin] = (int)this->m_web_resource->m_server->arg(_alert_label).toInt();
+					__gpio_service.m_gpio_config_copy.gpio_alert_values[_pin] = StringToUint16(this->m_web_resource->m_server->arg(_label).c_str());
+					__gpio_service.m_gpio_config_copy.gpio_alert_channel[_pin] = StringToUint8(this->m_web_resource->m_server->arg(_alert_label).c_str());
 
 					LogFmtI("Pin D%d : %d : %d\n", _pin, 
 					__gpio_service.m_gpio_config_copy.gpio_alert_values[_pin], 
@@ -725,9 +727,9 @@ public:
 
 				if (this->m_web_resource->m_server->hasArg(_label) && this->m_web_resource->m_server->hasArg(_alert_value) && this->m_web_resource->m_server->hasArg(_alert_label))
 				{
-					__gpio_service.m_gpio_config_copy.gpio_alert_comparator[MAX_DIGITAL_GPIO_PINS + _pin] = (int)this->m_web_resource->m_server->arg(_label).toInt();
-					__gpio_service.m_gpio_config_copy.gpio_alert_values[MAX_DIGITAL_GPIO_PINS + _pin] = (int)this->m_web_resource->m_server->arg(_alert_value).toInt();
-					__gpio_service.m_gpio_config_copy.gpio_alert_channel[MAX_DIGITAL_GPIO_PINS + _pin] = (int)this->m_web_resource->m_server->arg(_alert_label).toInt();
+					__gpio_service.m_gpio_config_copy.gpio_alert_comparator[MAX_DIGITAL_GPIO_PINS + _pin] = StringToUint8(this->m_web_resource->m_server->arg(_label).c_str());
+					__gpio_service.m_gpio_config_copy.gpio_alert_values[MAX_DIGITAL_GPIO_PINS + _pin] = StringToUint16(this->m_web_resource->m_server->arg(_alert_value).c_str());
+					__gpio_service.m_gpio_config_copy.gpio_alert_channel[MAX_DIGITAL_GPIO_PINS + _pin] = StringToUint8(this->m_web_resource->m_server->arg(_alert_label).c_str());
 
 					LogFmtI("Pin A%d : %d : %d\n", _pin, 
 					__gpio_service.m_gpio_config_copy.gpio_alert_values[MAX_DIGITAL_GPIO_PINS + _pin], 

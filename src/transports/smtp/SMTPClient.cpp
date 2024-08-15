@@ -358,14 +358,14 @@ void SMTPClient::sendDataHeader( char *sender, char *recipient, char *subject ){
   }
 }
 
-bool SMTPClient::sendDataBody( String &body ){
+bool SMTPClient::sendDataBody( std::string &body ){
 
   int respcode = SMTP_STATUS_MAX;
 
 	LogFmtI("SMTP sending data: %s\n", body.c_str());
 
   if( nullptr != this->m_client ){
-    sendPacket( this->m_client, (uint8_t*)body.c_str(), body.length()+1 );
+    sendPacket( this->m_client, (uint8_t*)body.c_str(), body.size() );
     this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
     respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA_TERMINATOR );
   }

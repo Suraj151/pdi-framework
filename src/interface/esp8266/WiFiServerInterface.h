@@ -42,18 +42,18 @@ public:
   void handleClient() override;
   void close() override;
 
-  void on(const String &uri, CallBackVoidArgFn handler) override;
+  void on(const std::string &uri, CallBackVoidArgFn handler) override;
   void onNotFound(CallBackVoidArgFn fn) override;   // called when handler is not assigned
   void onFileUpload(CallBackVoidArgFn fn) override; // handle file uploads
 
-  String arg(const String &name) override;                                              // get request argument value by name
-  bool hasArg(const String &name) const override;                                       // check if argument exists
+  std::string arg(const std::string &name) override;                                    // get request argument value by name
+  bool hasArg(const std::string &name) const override;                                  // check if argument exists
   void collectHeaders(const char *headerKeys[], const size_t headerKeysCount) override; // set the request headers to collect
-  String header(const String &name) override;                                           // get request header value by name
-  bool hasHeader(const String &name) const override;                                    // check if header exists
+  std::string header(const std::string &name) override;                                 // get request header value by name
+  bool hasHeader(const std::string &name) const override;                               // check if header exists
 
   void send(int code, const char *content_type = nullptr, const char *content = nullptr) override;
-  void sendHeader(const String &name, const String &value, bool first = false) override;
+  void sendHeader(const std::string &name, const std::string &value, bool first = false) override;
 
 private:
   /**

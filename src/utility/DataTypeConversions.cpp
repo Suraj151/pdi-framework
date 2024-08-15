@@ -35,11 +35,11 @@ uint8_t Uint8ToBcd(uint8_t val)
 /**
  * This function convert string to uint32_t.
  *
- * @param   char* pString
+ * @param   const char* pString
  * @param   uint8_t _len|32
  * @return  uint32_t
  */
-uint32_t StringToUint32(char *pString, uint8_t _len)
+uint32_t StringToUint32(const char *pString, uint8_t _len)
 {
 
 	if (nullptr == pString)
@@ -69,11 +69,11 @@ uint32_t StringToUint32(char *pString, uint8_t _len)
 /**
  * This function convert string to uint16_t.
  *
- * @param   char* pString
+ * @param   const char* pString
  * @param   uint8_t _len|32
  * @return  uint16_t
  */
-uint16_t StringToUint16(char *pString, uint8_t _len)
+uint16_t StringToUint16(const char *pString, uint8_t _len)
 {
 
 	if (nullptr == pString)
@@ -103,11 +103,11 @@ uint16_t StringToUint16(char *pString, uint8_t _len)
 /**
  * This function convert string to uint8_t.
  *
- * @param   char* pString
+ * @param   const char* pString
  * @param   uint8_t _len|32
  * @return  uint8_t
  */
-uint8_t StringToUint8(char *pString, uint8_t _len)
+uint8_t StringToUint8(const char *pString, uint8_t _len)
 {
 
 	if (nullptr == pString)
@@ -136,11 +136,11 @@ uint8_t StringToUint8(char *pString, uint8_t _len)
 /**
  * This function convert string to hex16.
  *
- * @param   char* pString
+ * @param   const char* pString
  * @param   uint8_t _strlen
  * @return  uint16_t
  */
-uint16_t StringToHex16(char *pString, uint8_t _strlen)
+uint16_t StringToHex16(const char *pString, uint8_t _strlen)
 {
 
 	if (nullptr == pString)

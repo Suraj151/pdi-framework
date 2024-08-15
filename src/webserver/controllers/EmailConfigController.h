@@ -137,17 +137,17 @@ public:
 		if (this->m_web_resource->m_server->hasArg("ml_dmn") && this->m_web_resource->m_server->hasArg("ml_srvr"))
 		{
 
-			String _mail_domain = this->m_web_resource->m_server->arg("ml_dmn");
-			String _mail_server = this->m_web_resource->m_server->arg("ml_srvr");
-			String _mail_port = this->m_web_resource->m_server->arg("ml_prt");
-			String _mail_username = this->m_web_resource->m_server->arg("ml_usr");
-			String _mail_password = this->m_web_resource->m_server->arg("ml_psw");
-			String _mail_from = this->m_web_resource->m_server->arg("ml_frm");
-			String _mail_from_name = this->m_web_resource->m_server->arg("ml_frnm");
-			String _mail_to = this->m_web_resource->m_server->arg("ml_to");
-			String _mail_subject = this->m_web_resource->m_server->arg("ml_sub");
-			// String _mail_frequency = this->m_web_resource->m_server->arg("ml_freq");
-			String _test_mail = this->m_web_resource->m_server->arg("tstml");
+			std::string _mail_domain = this->m_web_resource->m_server->arg("ml_dmn");
+			std::string _mail_server = this->m_web_resource->m_server->arg("ml_srvr");
+			std::string _mail_port = this->m_web_resource->m_server->arg("ml_prt");
+			std::string _mail_username = this->m_web_resource->m_server->arg("ml_usr");
+			std::string _mail_password = this->m_web_resource->m_server->arg("ml_psw");
+			std::string _mail_from = this->m_web_resource->m_server->arg("ml_frm");
+			std::string _mail_from_name = this->m_web_resource->m_server->arg("ml_frnm");
+			std::string _mail_to = this->m_web_resource->m_server->arg("ml_to");
+			std::string _mail_subject = this->m_web_resource->m_server->arg("ml_sub");
+			// std::string _mail_frequency = this->m_web_resource->m_server->arg("ml_freq");
+			std::string _test_mail = this->m_web_resource->m_server->arg("tstml");
 
 			LogI("\nSubmitted info :\n");
 			LogFmtI("mail domain : %s\n",_mail_domain.c_str());
@@ -161,23 +161,23 @@ public:
 			LogFmtI("mail subject : %s\n",_mail_subject.c_str());
 			LogFmtI("test mail : %s\n\n",_test_mail.c_str());
 
-			if (_mail_domain.length() <= DEFAULT_SENDING_DOMAIN_MAX_SIZE && _mail_server.length() <= DEFAULT_MAIL_HOST_MAX_SIZE &&
-				_mail_username.length() <= DEFAULT_MAIL_USERNAME_MAX_SIZE && _mail_password.length() <= DEFAULT_MAIL_PASSWORD_MAX_SIZE &&
-				_mail_from.length() <= DEFAULT_MAIL_FROM_MAX_SIZE && _mail_from_name.length() <= DEFAULT_MAIL_FROM_NAME_MAX_SIZE &&
-				_mail_to.length() <= DEFAULT_MAIL_TO_MAX_SIZE && _mail_subject.length() <= DEFAULT_MAIL_SUBJECT_MAX_SIZE)
+			if (_mail_domain.size() <= DEFAULT_SENDING_DOMAIN_MAX_SIZE && _mail_server.size() <= DEFAULT_MAIL_HOST_MAX_SIZE &&
+				_mail_username.size() <= DEFAULT_MAIL_USERNAME_MAX_SIZE && _mail_password.size() <= DEFAULT_MAIL_PASSWORD_MAX_SIZE &&
+				_mail_from.size() <= DEFAULT_MAIL_FROM_MAX_SIZE && _mail_from_name.size() <= DEFAULT_MAIL_FROM_NAME_MAX_SIZE &&
+				_mail_to.size() <= DEFAULT_MAIL_TO_MAX_SIZE && _mail_subject.size() <= DEFAULT_MAIL_SUBJECT_MAX_SIZE)
 			{
 
 				_ClearObject(&this->email_configs);
 
-				_mail_domain.toCharArray(this->email_configs.sending_domain, _mail_domain.length() + 1);
-				_mail_server.toCharArray(this->email_configs.mail_host, _mail_server.length() + 1);
-				this->email_configs.mail_port = (uint16_t)_mail_port.toInt();
-				_mail_username.toCharArray(this->email_configs.mail_username, _mail_username.length() + 1);
-				_mail_password.toCharArray(this->email_configs.mail_password, _mail_password.length() + 1);
-				_mail_from.toCharArray(this->email_configs.mail_from, _mail_from.length() + 1);
-				_mail_from_name.toCharArray(this->email_configs.mail_from_name, _mail_from_name.length() + 1);
-				_mail_to.toCharArray(this->email_configs.mail_to, _mail_to.length() + 1);
-				_mail_subject.toCharArray(this->email_configs.mail_subject, _mail_subject.length() + 1);
+				strncpy(this->email_configs.sending_domain, _mail_domain.c_str(), _mail_domain.size());
+				strncpy(this->email_configs.mail_host, _mail_server.c_str(), _mail_server.size());
+				this->email_configs.mail_port = StringToUint16(_mail_port.c_str());
+				strncpy(this->email_configs.mail_username, _mail_username.c_str(), _mail_username.size());
+				strncpy(this->email_configs.mail_password, _mail_password.c_str(), _mail_password.size());
+				strncpy(this->email_configs.mail_from, _mail_from.c_str(), _mail_from.size());
+				strncpy(this->email_configs.mail_from_name, _mail_from_name.c_str(), _mail_from_name.size());
+				strncpy(this->email_configs.mail_to, _mail_to.c_str(), _mail_to.size());
+				strncpy(this->email_configs.mail_subject, _mail_subject.c_str(), _mail_subject.size());
 				// this->email_configs.mail_frequency = (uint16_t)_mail_frequency.toInt();
 				_is_test_mail = (bool)(_test_mail == "test");
 

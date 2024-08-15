@@ -170,17 +170,17 @@ public:
     if (this->m_web_resource->m_server->hasArg("sta_ssid") && this->m_web_resource->m_server->hasArg("sta_pswd"))
     {
 
-      String _sta_ssid = this->m_web_resource->m_server->arg("sta_ssid");
-      String _sta_pswd = this->m_web_resource->m_server->arg("sta_pswd");
-      String _sta_lip = this->m_web_resource->m_server->arg("sta_lip");
-      String _sta_gip = this->m_web_resource->m_server->arg("sta_gip");
-      String _sta_sip = this->m_web_resource->m_server->arg("sta_sip");
+      std::string _sta_ssid = this->m_web_resource->m_server->arg("sta_ssid");
+      std::string _sta_pswd = this->m_web_resource->m_server->arg("sta_pswd");
+      std::string _sta_lip = this->m_web_resource->m_server->arg("sta_lip");
+      std::string _sta_gip = this->m_web_resource->m_server->arg("sta_gip");
+      std::string _sta_sip = this->m_web_resource->m_server->arg("sta_sip");
 
-      String _ap_ssid = this->m_web_resource->m_server->arg("ap_ssid");
-      String _ap_pswd = this->m_web_resource->m_server->arg("ap_pswd");
-      String _ap_lip = this->m_web_resource->m_server->arg("ap_lip");
-      String _ap_gip = this->m_web_resource->m_server->arg("ap_gip");
-      String _ap_sip = this->m_web_resource->m_server->arg("ap_sip");
+      std::string _ap_ssid = this->m_web_resource->m_server->arg("ap_ssid");
+      std::string _ap_pswd = this->m_web_resource->m_server->arg("ap_pswd");
+      std::string _ap_lip = this->m_web_resource->m_server->arg("ap_lip");
+      std::string _ap_gip = this->m_web_resource->m_server->arg("ap_gip");
+      std::string _ap_sip = this->m_web_resource->m_server->arg("ap_sip");
 
       LogI("\nSubmitted info :\n");
       LogFmtI("sta ssid : %s\n", _sta_ssid.c_str());
@@ -194,11 +194,11 @@ public:
       LogFmtI("ap gateway : %s\n", _ap_gip.c_str());
       LogFmtI("ap subnet : %s\n\n", _ap_sip.c_str());
 
-      if (_sta_ssid.length() <= WIFI_CONFIGS_BUF_SIZE && _sta_pswd.length() <= WIFI_CONFIGS_BUF_SIZE
+      if (_sta_ssid.size() <= WIFI_CONFIGS_BUF_SIZE && _sta_pswd.size() <= WIFI_CONFIGS_BUF_SIZE
 
 #ifdef ALLOW_WIFI_CONFIG_MODIFICATION
-          && _ap_ssid.length() <= WIFI_CONFIGS_BUF_SIZE && _ap_pswd.length() <= WIFI_CONFIGS_BUF_SIZE &&
-          _sta_ssid.length() > MIN_ACCEPTED_ARG_SIZE && _ap_ssid.length() > MIN_ACCEPTED_ARG_SIZE
+          && _ap_ssid.size() <= WIFI_CONFIGS_BUF_SIZE && _ap_pswd.size() <= WIFI_CONFIGS_BUF_SIZE &&
+          _sta_ssid.size() > MIN_ACCEPTED_ARG_SIZE && _ap_ssid.size() > MIN_ACCEPTED_ARG_SIZE
 #endif
 
       )
@@ -211,28 +211,28 @@ public:
 
         _ClearObject(&this->wifi_configs);
 
-        _sta_ssid.toCharArray(this->wifi_configs.sta_ssid, _sta_ssid.length() + 1);
-        _sta_pswd.toCharArray(this->wifi_configs.sta_password, _sta_pswd.length() + 1);
-        _sta_lip.toCharArray(_ip_address, _sta_lip.length() + 1);
+        strncpy(this->wifi_configs.sta_ssid, _sta_ssid.c_str(), _sta_ssid.size());
+        strncpy(this->wifi_configs.sta_password, _sta_pswd.c_str(), _sta_pswd.size());
+        strncpy(_ip_address, _sta_lip.c_str(), _sta_lip.size());
         __str_ip_to_int(_ip_address, this->wifi_configs.sta_local_ip, 20);
-        _sta_gip.toCharArray(_ip_address, _sta_gip.length() + 1);
+        strncpy(_ip_address, _sta_gip.c_str(), _sta_gip.size());
         __str_ip_to_int(_ip_address, this->wifi_configs.sta_gateway, 20);
-        _sta_sip.toCharArray(_ip_address, _sta_sip.length() + 1);
+        strncpy(_ip_address, _sta_sip.c_str(), _sta_sip.size());
         __str_ip_to_int(_ip_address, this->wifi_configs.sta_subnet, 20);
 
-        _ap_ssid.toCharArray(this->wifi_configs.ap_ssid, _ap_ssid.length() + 1);
-        _ap_pswd.toCharArray(this->wifi_configs.ap_password, _ap_pswd.length() + 1);
-        _ap_lip.toCharArray(_ip_address, _ap_lip.length() + 1);
+        strncpy(this->wifi_configs.ap_ssid, _ap_ssid.c_str(), _ap_ssid.size());
+        strncpy(this->wifi_configs.ap_password, _ap_pswd.c_str(), _ap_pswd.size());
+        strncpy(_ip_address, _ap_lip.c_str(), _ap_lip.size());
         __str_ip_to_int(_ip_address, this->wifi_configs.ap_local_ip, 20);
-        _ap_gip.toCharArray(_ip_address, _ap_gip.length() + 1);
+        strncpy(_ip_address, _ap_gip.c_str(), _ap_gip.size());
         __str_ip_to_int(_ip_address, this->wifi_configs.ap_gateway, 20);
-        _ap_sip.toCharArray(_ip_address, _ap_sip.length() + 1);
+        strncpy(_ip_address, _ap_sip.c_str(), _ap_sip.size());
         __str_ip_to_int(_ip_address, this->wifi_configs.ap_subnet, 20);
 
 #else
 
-        _sta_ssid.toCharArray(this->wifi_configs.sta_ssid, _sta_ssid.length() + 1);
-        _sta_pswd.toCharArray(this->wifi_configs.sta_password, _sta_pswd.length() + 1);
+        strncpy(this->wifi_configs.sta_ssid, _sta_ssid.c_str(), _sta_ssid.size());
+        strncpy(this->wifi_configs.sta_password, _sta_pswd.c_str(), _sta_pswd.size());
 
 #endif
 

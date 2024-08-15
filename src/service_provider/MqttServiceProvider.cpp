@@ -76,7 +76,7 @@ void MqttServiceProvider::handleMqttPublish(){
 
       #ifdef ENABLE_MQTT_DEFAULT_PAYLOAD
 
-        String *_payload = new String("");
+        std::string *_payload = new std::string();
 
         if( nullptr != _payload ){
 
@@ -90,7 +90,8 @@ void MqttServiceProvider::handleMqttPublish(){
           #endif
 
           memset( this->m_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
-          _payload->toCharArray( this->m_mqtt_payload, MQTT_PAYLOAD_BUF_SIZE );
+          // _payload->toCharArray( this->m_mqtt_payload, MQTT_PAYLOAD_BUF_SIZE );
+          strncpy(this->m_mqtt_payload, _payload->c_str(), _payload->size());
 
           delete _payload;
         }

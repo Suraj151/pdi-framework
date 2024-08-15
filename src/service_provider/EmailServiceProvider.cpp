@@ -54,7 +54,7 @@ void EmailServiceProvider::handleEmail()
       {
         LogI("Handling email\n");
 
-        String *_payload = new String("");
+        std::string *_payload = new std::string();
 
         if (nullptr != _payload)
         {
@@ -131,10 +131,10 @@ void EmailServiceProvider::handleEmail()
 /**
  * send email and return the result of operation
  *
- * @param	  String*	mail_body
+ * @param	  std::string*	mail_body
  * @return  bool
  */
-bool EmailServiceProvider::sendMail(String &mail_body)
+bool EmailServiceProvider::sendMail(std::string &mail_body)
 {
 
   email_config_table _email_config;

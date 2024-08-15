@@ -114,18 +114,18 @@ public:
 #ifdef ALLOW_OTA_CONFIG_MODIFICATION
 		if (this->m_web_resource->m_server->hasArg("hst") && this->m_web_resource->m_server->hasArg("prt"))
 		{
-			String _ota_host = this->m_web_resource->m_server->arg("hst");
-			String _ota_port = this->m_web_resource->m_server->arg("prt");
+			std::string _ota_host = this->m_web_resource->m_server->arg("hst");
+			std::string _ota_port = this->m_web_resource->m_server->arg("prt");
 
 			LogI("\nSubmitted info :\n");
 			LogFmtI("ota host : %s\n", _ota_host.c_str());
 			LogFmtI("ota port : %s\n\n", _ota_port.c_str());
 
 			ota_config_table _ota_configs;
-			this->m_web_resource->m_db_conn->get_ota_config_table(&_ota_configs);
+			// this->m_web_resource->m_db_conn->get_ota_config_table(&_ota_configs);
 
-			_ota_host.toCharArray(_ota_configs.ota_host, _ota_host.length() + 1);
-			_ota_configs.ota_port = (int)_ota_port.toInt();
+			strncpy(_ota_configs.ota_host, _ota_host.c_str(), _ota_host.size());
+			_ota_configs.ota_port = StringToUint16(_ota_port.c_str());
 
 			this->m_web_resource->m_db_conn->set_ota_config_table(&_ota_configs);
 

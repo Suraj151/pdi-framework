@@ -68,6 +68,7 @@ margin:10px 3px;\
 padding:10px 0px;\
 border:1px solid #d0d0d0;\
 border-radius:4px;\
+font-size:12px;\
 }\
 .btn,.btnd{\
 padding:6px;\

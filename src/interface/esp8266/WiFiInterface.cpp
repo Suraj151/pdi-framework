@@ -244,12 +244,12 @@ IPAddress WiFiInterface::localIP()
 /**
  * macAddress
  */
-String WiFiInterface::macAddress()
+std::string WiFiInterface::macAddress()
 {
-  String mac;
+  std::string mac;
   if (nullptr != this->m_wifi)
   {
-    mac = this->m_wifi->macAddress();
+    mac = this->m_wifi->macAddress().c_str();
   }
   return mac;
 }
@@ -309,12 +309,12 @@ wifi_status_t WiFiInterface::status()
 /**
  * SSID
  */
-String WiFiInterface::SSID() const
+std::string WiFiInterface::SSID() const
 {
-  String ssid;
+  std::string ssid;
   if (nullptr != this->m_wifi)
   {
-    ssid = this->m_wifi->SSID();
+    ssid = this->m_wifi->SSID().c_str();
   }
   return ssid;
 }

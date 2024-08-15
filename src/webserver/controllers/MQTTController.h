@@ -170,13 +170,13 @@ public:
 #ifdef ALLOW_MQTT_CONFIG_MODIFICATION
     if (this->m_web_resource->m_server->hasArg("hst") && this->m_web_resource->m_server->hasArg("prt"))
     {
-      String _mqtt_host = this->m_web_resource->m_server->arg("hst");
-      String _mqtt_port = this->m_web_resource->m_server->arg("prt");
-      String _client_id = this->m_web_resource->m_server->arg("clid");
-      String _username = this->m_web_resource->m_server->arg("usrn");
-      String _password = this->m_web_resource->m_server->arg("pswd");
-      String _keep_alive = this->m_web_resource->m_server->arg("kpalv");
-      String _clean_session = this->m_web_resource->m_server->arg("cln");
+      std::string _mqtt_host = this->m_web_resource->m_server->arg("hst");
+      std::string _mqtt_port = this->m_web_resource->m_server->arg("prt");
+      std::string _client_id = this->m_web_resource->m_server->arg("clid");
+      std::string _username = this->m_web_resource->m_server->arg("usrn");
+      std::string _password = this->m_web_resource->m_server->arg("pswd");
+      std::string _keep_alive = this->m_web_resource->m_server->arg("kpalv");
+      std::string _clean_session = this->m_web_resource->m_server->arg("cln");
 
       LogI("\nSubmitted info :\n");
       LogFmtI("mqtt host : %s\n", _mqtt_host.c_str());
@@ -192,12 +192,12 @@ public:
       // mqtt_general_config_table _mqtt_general_configs;
       // this->m_db_conn->get_mqtt_general_config_table(&_mqtt_general_configs);
 
-      _mqtt_host.toCharArray(_mqtt_general_configs->host, _mqtt_host.length() + 1);
-      _mqtt_general_configs->port = (int)_mqtt_port.toInt();
-      _client_id.toCharArray(_mqtt_general_configs->client_id, _client_id.length() + 1);
-      _username.toCharArray(_mqtt_general_configs->username, _username.length() + 1);
-      _password.toCharArray(_mqtt_general_configs->password, _password.length() + 1);
-      _mqtt_general_configs->keepalive = (int)_keep_alive.toInt();
+      strncpy(_mqtt_general_configs->host, _mqtt_host.c_str(), _mqtt_host.size());
+      _mqtt_general_configs->port = StringToUint16(_mqtt_port.c_str());
+      strncpy(_mqtt_general_configs->client_id, _client_id.c_str(), _client_id.size());
+      strncpy(_mqtt_general_configs->username, _username.c_str(), _username.size());
+      strncpy(_mqtt_general_configs->password, _password.c_str(), _password.size());
+      _mqtt_general_configs->keepalive = StringToUint16(_keep_alive.c_str());
       _mqtt_general_configs->clean_session = (int)(_clean_session == "clean");
 
       this->m_web_resource->m_db_conn->set_mqtt_general_config_table(_mqtt_general_configs);
@@ -287,10 +287,10 @@ public:
 #ifdef ALLOW_MQTT_CONFIG_MODIFICATION
     if (this->m_web_resource->m_server->hasArg("wtpc") && this->m_web_resource->m_server->hasArg("wmsg"))
     {
-      String _will_topic = this->m_web_resource->m_server->arg("wtpc");
-      String _will_message = this->m_web_resource->m_server->arg("wmsg");
-      String _will_qos = this->m_web_resource->m_server->arg("wqos");
-      String _will_retain = this->m_web_resource->m_server->arg("wrtn");
+      std::string _will_topic = this->m_web_resource->m_server->arg("wtpc");
+      std::string _will_message = this->m_web_resource->m_server->arg("wmsg");
+      std::string _will_qos = this->m_web_resource->m_server->arg("wqos");
+      std::string _will_retain = this->m_web_resource->m_server->arg("wrtn");
 
       LogI("\nSubmitted info :\n");
       LogFmtI("will topic : %s\n", _will_topic.c_str());
@@ -301,9 +301,9 @@ public:
       mqtt_lwt_config_table *_mqtt_lwt_configs = new mqtt_lwt_config_table;
       memset((void *)_mqtt_lwt_configs, 0, sizeof(mqtt_lwt_config_table));
 
-      _will_topic.toCharArray(_mqtt_lwt_configs->will_topic, _will_topic.length() + 1);
-      _will_message.toCharArray(_mqtt_lwt_configs->will_message, _will_message.length() + 1);
-      _mqtt_lwt_configs->will_qos = (int)_will_qos.toInt();
+      strncpy(_mqtt_lwt_configs->will_topic, _will_topic.c_str(), _will_topic.size());
+      strncpy(_mqtt_lwt_configs->will_message, _will_message.c_str(), _will_message.size());
+      _mqtt_lwt_configs->will_qos = StringToUint16(_will_qos.c_str());
       _mqtt_lwt_configs->will_retain = (int)(_will_retain == "retain");
 
       this->m_web_resource->m_db_conn->set_mqtt_lwt_config_table(_mqtt_lwt_configs);
@@ -479,12 +479,12 @@ public:
         _qos_name[4] = (0x30 + i);
         _retain_name[4] = (0x30 + i);
 
-        String _topic = this->m_web_resource->m_server->arg(_topic_name);
-        String _qos = this->m_web_resource->m_server->arg(_qos_name);
-        String _retain = this->m_web_resource->m_server->arg(_retain_name);
+        std::string _topic = this->m_web_resource->m_server->arg(_topic_name);
+        std::string _qos = this->m_web_resource->m_server->arg(_qos_name);
+        std::string _retain = this->m_web_resource->m_server->arg(_retain_name);
 
-        _topic.toCharArray(_mqtt_pubsub_configs->publish_topics[i].topic, _topic.length() + 1);
-        _mqtt_pubsub_configs->publish_topics[i].qos = (int)_qos.toInt();
+        strncpy(_mqtt_pubsub_configs->publish_topics[i].topic, _topic.c_str(), _topic.size());
+        _mqtt_pubsub_configs->publish_topics[i].qos = StringToUint8(_qos.c_str());
         _mqtt_pubsub_configs->publish_topics[i].retain = (int)(_retain == "retain");
 
         LogFmtI("%d : Topic(%s), Qos(%s), Retain(%s)\n", i, _topic.c_str(),_qos.c_str(),_retain.c_str());
@@ -500,15 +500,15 @@ public:
         _topic_name[4] = (0x30 + i);
         _qos_name[4] = (0x30 + i);
 
-        String _topic = this->m_web_resource->m_server->arg(_topic_name);
-        String _qos = this->m_web_resource->m_server->arg(_qos_name);
+        std::string _topic = this->m_web_resource->m_server->arg(_topic_name);
+        std::string _qos = this->m_web_resource->m_server->arg(_qos_name);
 
-        _topic.toCharArray(_mqtt_pubsub_configs->subscribe_topics[i].topic, _topic.length() + 1);
-        _mqtt_pubsub_configs->subscribe_topics[i].qos = (int)_qos.toInt();
+        strncpy(_mqtt_pubsub_configs->subscribe_topics[i].topic, _topic.c_str(), _topic.size());
+        _mqtt_pubsub_configs->subscribe_topics[i].qos = StringToUint8(_qos.c_str());
 
         LogFmtI("%d : Topic(%s), Qos(%s), Retain(%s)\n", i, _topic.c_str(),_qos.c_str());
       }
-      _mqtt_pubsub_configs->publish_frequency = (int)this->m_web_resource->m_server->arg("pfrq").toInt();
+      _mqtt_pubsub_configs->publish_frequency = StringToUint16(this->m_web_resource->m_server->arg("pfrq").c_str());
 
       this->m_web_resource->m_db_conn->set_mqtt_pubsub_config_table(_mqtt_pubsub_configs);
 

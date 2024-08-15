@@ -60,20 +60,20 @@ class DashboardController : public Controller {
 			struct station_info *stat_info = wifi_softap_get_station_info();
 			int n = 1;
 
-			String _response = "{\"nm\":\"";
+			std::string _response = "{\"nm\":\"";
 			_response += this->m_web_resource->m_wifi->SSID();
 			_response += "\",\"ip\":\"";
-			_response += this->m_web_resource->m_wifi->localIP().toString();
+			_response += this->m_web_resource->m_wifi->localIP().toString().c_str();
 			_response += "\",\"rs\":\"";
-			_response += this->m_web_resource->m_wifi->RSSI();
+			_response += std::to_string(this->m_web_resource->m_wifi->RSSI());
 			_response += "\",\"mc\":\"";
 			_response += this->m_web_resource->m_wifi->macAddress();
 			_response += "\",\"st\":";
-			_response += this->m_web_resource->m_wifi->status();
+			_response += std::to_string(this->m_web_resource->m_wifi->status());
 			_response += ",\"nt\":";
-			_response += __status_wifi.internet_available;
+			_response += std::to_string(__status_wifi.internet_available);
 			_response += ",\"nwt\":";
-			_response += __i_ntp.get_ntp_time();
+			_response += std::to_string(__i_ntp.get_ntp_time());
 			_response += ",\"dl\":\"";
 
 			while (nullptr != stat_info)
@@ -85,20 +85,20 @@ class DashboardController : public Controller {
 					"%02X:%02X:%02X:%02X:%02X:%02X",
 					stat_info->bssid[0], stat_info->bssid[1], stat_info->bssid[2], stat_info->bssid[3], stat_info->bssid[4], stat_info->bssid[5]);
 				_response += "<tr><td>";
-				_response += String(macStr);
+				_response += std::string(macStr);
 				_response += "</td><td>";
-				_response += (uint8_t)stat_info->ip.addr;
+				_response += std::to_string((uint8_t)stat_info->ip.addr);
 				_response += ".";
-				_response += (uint8_t)(stat_info->ip.addr >> 8);
+				_response += std::to_string((uint8_t)(stat_info->ip.addr >> 8));
 				_response += ".";
-				_response += (uint8_t)(stat_info->ip.addr >> 16);
+				_response += std::to_string((uint8_t)(stat_info->ip.addr >> 16));
 				_response += ".";
-				_response += (uint8_t)(stat_info->ip.addr >> 24);
+				_response += std::to_string((uint8_t)(stat_info->ip.addr >> 24));
 				_response += "</td></tr>";
 				stat_info = STAILQ_NEXT(stat_info, next);
 			}
 			_response += "\",\"r\":";
-			_response += !this->m_route_handler->has_active_session();
+			_response += std::to_string(!this->m_route_handler->has_active_session());
 			_response += "}";
 
 			this->m_web_resource->m_server->sendHeader("Cache-Control", "no-cache");

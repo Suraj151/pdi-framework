@@ -52,14 +52,14 @@ public:
 
   // STA network info
   IPAddress localIP() override;
-  String macAddress() override;
+  std::string macAddress() override;
   IPAddress subnetMask() override;
   IPAddress gatewayIP() override;
   IPAddress dnsIP(uint8_t _dns_no = 0) override;
 
   // STA WiFi info
   wifi_status_t status() override;
-  String SSID() const override;
+  std::string SSID() const override;
   uint8_t *BSSID() override;
   int32_t RSSI() override;
 

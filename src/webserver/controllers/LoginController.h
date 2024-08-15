@@ -133,21 +133,21 @@ class LoginController : public Controller {
 
       if ( this->m_web_resource->m_server->hasArg("usrnm") && this->m_web_resource->m_server->hasArg("pswd") ) {
 
-        String _username = this->m_web_resource->m_server->arg("usrnm");
-        String _password = this->m_web_resource->m_server->arg("pswd");
+        std::string _username = this->m_web_resource->m_server->arg("usrnm");
+        std::string _password = this->m_web_resource->m_server->arg("pswd");
 
         LogI("\nSubmitted info :\n");
         LogFmtI("Username : %s\n", _username.c_str());
         LogFmtI("Password : %s\n\n", _password.c_str());
 
-        if( _username.length() <= LOGIN_CONFIGS_BUF_SIZE && _password.length() <= LOGIN_CONFIGS_BUF_SIZE &&
-          _username.length() > MIN_ACCEPTED_ARG_SIZE && _password.length() > MIN_ACCEPTED_ARG_SIZE
+        if( _username.size() <= LOGIN_CONFIGS_BUF_SIZE && _password.size() <= LOGIN_CONFIGS_BUF_SIZE &&
+          _username.size() > MIN_ACCEPTED_ARG_SIZE && _password.size() > MIN_ACCEPTED_ARG_SIZE
         ){
 
           memset( this->login_credentials.username, 0, LOGIN_CONFIGS_BUF_SIZE );
           memset( this->login_credentials.password, 0, LOGIN_CONFIGS_BUF_SIZE );
-          _username.toCharArray( this->login_credentials.username, _username.length()+1 );
-          _password.toCharArray( this->login_credentials.password, _password.length()+1 );
+          strncpy( this->login_credentials.username, _username.c_str(), _username.size() );
+          strncpy( this->login_credentials.password, _password.c_str(), _password.size() );
           this->m_web_resource->m_db_conn->set_login_credential_table( &this->login_credentials );
           // this->set_login_credential_table( &this->login_credentials );
 

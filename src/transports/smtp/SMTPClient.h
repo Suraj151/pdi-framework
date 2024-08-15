@@ -162,7 +162,7 @@ public:
    bool sendTo(char *recipient);
    bool sendDataCommand(void);
    void sendDataHeader(char *sender, char *recipient, char *subject);
-   bool sendDataBody(String &body);
+   bool sendDataBody(std::string &body);
    bool sendDataBody(char *body);
    bool sendDataBody(PGM_P body);
    bool sendQuit(void);

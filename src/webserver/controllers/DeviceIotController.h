@@ -91,14 +91,14 @@ public:
 
 		if (this->m_web_resource->m_server->hasArg("dhst"))
 		{
-			String _device_iot_host = this->m_web_resource->m_server->arg("dhst");
+			std::string _device_iot_host = this->m_web_resource->m_server->arg("dhst");
 
 			LogI("\nSubmitted info :\n");
 			LogFmtI("device reg. host : %s\n\n", _device_iot_host.c_str());
 
 			device_iot_config_table _device_iot_configs;
 			this->m_web_resource->m_db_conn->get_device_iot_config_table(&_device_iot_configs);
-			_device_iot_host.toCharArray(_device_iot_configs.device_iot_host, _device_iot_host.length() + 1);
+			strncpy(_device_iot_configs.device_iot_host, _device_iot_host.c_str(), _device_iot_host.size()); 
 			this->m_web_resource->m_db_conn->set_device_iot_config_table(&_device_iot_configs);
 
 			std::string _response = "";

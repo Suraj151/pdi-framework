@@ -59,9 +59,9 @@ void WiFiServerInterface::close()
 /**
  * on
  */
-void WiFiServerInterface::on(const String &uri, CallBackVoidArgFn handler)
+void WiFiServerInterface::on(const std::string &uri, CallBackVoidArgFn handler)
 {
-  this->m_server.on(uri, handler);
+  this->m_server.on(uri.c_str(), handler);
 }
 
 /**
@@ -86,18 +86,18 @@ void WiFiServerInterface::onFileUpload(CallBackVoidArgFn fn)
  * arg
  * get request argument value by name
  */
-String WiFiServerInterface::arg(const String &name)
+std::string WiFiServerInterface::arg(const std::string &name)
 {
-  return this->m_server.arg(name);
+  return this->m_server.arg(name.c_str()).c_str();
 }
 
 /**
  * hasArg
  * check if argument exists
  */
-bool WiFiServerInterface::hasArg(const String &name) const
+bool WiFiServerInterface::hasArg(const std::string &name) const
 {
-  return this->m_server.hasArg(name);
+  return this->m_server.hasArg(name.c_str());
 }
 
 /**
@@ -113,18 +113,18 @@ void WiFiServerInterface::collectHeaders(const char *headerKeys[], const size_t 
  * header
  * get request header value by name
  */
-String WiFiServerInterface::header(const String &name)
+std::string WiFiServerInterface::header(const std::string &name)
 {
-  return this->m_server.header(name);
+  return this->m_server.header(name.c_str()).c_str();
 }
 
 /**
  * hasHeader
  * check if header exists
  */
-bool WiFiServerInterface::hasHeader(const String &name) const
+bool WiFiServerInterface::hasHeader(const std::string &name) const
 {
-  return this->m_server.hasHeader(name);
+  return this->m_server.hasHeader(name.c_str());
 }
 
 /**
@@ -142,9 +142,9 @@ void WiFiServerInterface::send(int code, const char *content_type, const char *c
 /**
  * sendHeader
  */
-void WiFiServerInterface::sendHeader(const String &name, const String &value, bool first)
+void WiFiServerInterface::sendHeader(const std::string &name, const std::string &value, bool first)
 {
-  this->m_server.sendHeader(name, value, first);
+  this->m_server.sendHeader(name.c_str(), value.c_str(), first);
 }
 
 WiFiServerInterface __i_wifi_server;
