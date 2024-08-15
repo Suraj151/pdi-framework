@@ -305,35 +305,35 @@ void GpioServiceProvider::handleGpioOperations(){
 
       default:
       case OFF:{
-        this->m_gpio_config_copy.gpio_readings[_pin] = LOW;
+        this->m_gpio_config_copy.gpio_readings[_pin] = 0;
         break;
       }
       case DIGITAL_WRITE:{
-        __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, __i_dvc_ctrl.gpioFromPinMap( _pin ), this->m_gpio_config_copy.gpio_readings[_pin] );
+        __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, _pin, this->m_gpio_config_copy.gpio_readings[_pin] );
         break;
       }
       case DIGITAL_READ:{
-        this->m_gpio_config_copy.gpio_readings[_pin] = __i_dvc_ctrl.gpioRead(DIGITAL_READ, __i_dvc_ctrl.gpioFromPinMap( _pin ) );
+        this->m_gpio_config_copy.gpio_readings[_pin] = __i_dvc_ctrl.gpioRead(DIGITAL_READ, _pin);
         break;
       }
       case DIGITAL_BLINK:{
         if( nullptr != this->m_digital_blinker[_pin] ){
 
-          this->m_digital_blinker[_pin]->updateConfig( __i_dvc_ctrl.gpioFromPinMap( _pin ), this->m_gpio_config_copy.gpio_readings[_pin] );
+          this->m_digital_blinker[_pin]->updateConfig( _pin, this->m_gpio_config_copy.gpio_readings[_pin] );
           this->m_digital_blinker[_pin]->start();
         }else{
 
-          this->m_digital_blinker[_pin] = __i_dvc_ctrl.createGpioBlinkerInstance( __i_dvc_ctrl.gpioFromPinMap( _pin ), this->m_gpio_config_copy.gpio_readings[_pin] );
+          this->m_digital_blinker[_pin] = __i_dvc_ctrl.createGpioBlinkerInstance( _pin, this->m_gpio_config_copy.gpio_readings[_pin] );
         }
         break;
       }
       case ANALOG_WRITE:{
-        __i_dvc_ctrl.gpioWrite(ANALOG_WRITE, __i_dvc_ctrl.gpioFromPinMap( _pin ), this->m_gpio_config_copy.gpio_readings[_pin] );
+        __i_dvc_ctrl.gpioWrite(ANALOG_WRITE, _pin, this->m_gpio_config_copy.gpio_readings[_pin] );
         break;
       }
       case ANALOG_READ:{
         if( MAX_DIGITAL_GPIO_PINS <= _pin  ){
-          this->m_gpio_config_copy.gpio_readings[_pin] = __i_dvc_ctrl.gpioRead(ANALOG_READ, A0 );
+          this->m_gpio_config_copy.gpio_readings[_pin] = __i_dvc_ctrl.gpioRead(ANALOG_READ,(_pin-MAX_DIGITAL_GPIO_PINS));
         }
         break;
       }
@@ -412,7 +412,7 @@ void GpioServiceProvider::handleGpioModes( int _gpio_config_type ){
 
   for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
 
-    __i_dvc_ctrl.gpioMode((GPIO_MODE)_gpio_configs.gpio_mode[_pin], __i_dvc_ctrl.gpioFromPinMap( _pin ));
+    __i_dvc_ctrl.gpioMode((GPIO_MODE)_gpio_configs.gpio_mode[_pin], _pin);
   }
 
   this->m_gpio_config_copy = _gpio_configs;

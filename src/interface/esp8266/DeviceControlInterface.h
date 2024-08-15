@@ -44,7 +44,7 @@ public:
   void gpioMode( GPIO_MODE mode, gpio_id_t pin ) override;
   void gpioWrite( GPIO_MODE mode, gpio_id_t pin, gpio_val_t value ) override;
   gpio_val_t gpioRead( GPIO_MODE mode, gpio_id_t pin ) override;
-  gpio_id_t gpioFromPinMap( gpio_id_t pin ) override;
+  gpio_id_t gpioFromPinMap( gpio_id_t pin, bool isAnalog=false ) override;
   bool isExceptionalGpio( gpio_id_t pin ) override;
   iGpioBlinkerInterface *createGpioBlinkerInstance(gpio_id_t pin, gpio_val_t duration) override;
   void releaseGpioBlinkerInstance(iGpioBlinkerInterface *instance) override;

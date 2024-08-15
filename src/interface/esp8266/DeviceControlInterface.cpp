@@ -30,16 +30,19 @@ DeviceControlInterface::~DeviceControlInterface()
  */
 void DeviceControlInterface::gpioMode(GPIO_MODE mode, gpio_id_t pin)
 {
+    // get the hw pin from map
+    gpio_id_t hwpin = gpioFromPinMap(pin, (ANALOG_READ==mode));
+
     switch (mode)
     {
     case DIGITAL_WRITE:
     case DIGITAL_BLINK:
     case ANALOG_WRITE:
-        pinMode(pin, OUTPUT);
+        pinMode(hwpin, OUTPUT);
         break;
     case DIGITAL_READ:
     case OFF:
-        pinMode(pin, INPUT);
+        pinMode(hwpin, INPUT);
         break;
     default:
         break;
@@ -51,16 +54,19 @@ void DeviceControlInterface::gpioMode(GPIO_MODE mode, gpio_id_t pin)
  */
 void DeviceControlInterface::gpioWrite(GPIO_MODE mode, gpio_id_t pin, gpio_val_t value)
 {
+    // get the hw pin from map
+    gpio_id_t hwpin = gpioFromPinMap(pin, (ANALOG_READ==mode));
+
     switch (mode)
     {
     case DIGITAL_WRITE:
-        digitalWrite(pin, value);
+        digitalWrite(hwpin, value);
         break;
     case DIGITAL_BLINK:
-        digitalWrite(pin, !gpioRead(DIGITAL_READ, pin));
+        digitalWrite(hwpin, !gpioRead(DIGITAL_READ, pin));
         break;
     case ANALOG_WRITE:
-        analogWrite(pin, value);
+        analogWrite(hwpin, value);
         break;
     default:
         break;
@@ -72,15 +78,18 @@ void DeviceControlInterface::gpioWrite(GPIO_MODE mode, gpio_id_t pin, gpio_val_t
  */
 gpio_val_t DeviceControlInterface::gpioRead(GPIO_MODE mode, gpio_id_t pin)
 {
+    // get the hw pin from map
+    gpio_id_t hwpin = gpioFromPinMap(pin, (ANALOG_READ==mode));
+
     gpio_val_t value = -1;
 
     switch (mode)
     {
     case DIGITAL_READ:
-        value = digitalRead(pin);
+        value = digitalRead(hwpin);
         break;
     case ANALOG_READ:
-        value = analogRead(pin);
+        value = analogRead(hwpin);
         break;
     default:
         break;
@@ -92,7 +101,7 @@ gpio_val_t DeviceControlInterface::gpioRead(GPIO_MODE mode, gpio_id_t pin)
 /**
  * return HW gpio pin number from its digital gpio number
  */
-gpio_id_t DeviceControlInterface::gpioFromPinMap(gpio_id_t pin)
+gpio_id_t DeviceControlInterface::gpioFromPinMap(gpio_id_t pin, bool isAnalog)
 {
   gpio_id_t mapped_pin;
 
@@ -100,7 +109,7 @@ gpio_id_t DeviceControlInterface::gpioFromPinMap(gpio_id_t pin)
   switch ( pin ) {
 
     case 0:
-      mapped_pin = 16;
+      mapped_pin = isAnalog ? 17 : 16;
       break;
     case 1:
       mapped_pin = 5;

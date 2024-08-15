@@ -465,7 +465,7 @@ uint8_t *WiFiInterface::BSSID(uint8_t _networkItem)
  */
 void WiFiInterface::enableNetworkStatusIndication()
 {
-  m_wifi_led = 4;
+  m_wifi_led = 2;
 
   __i_dvc_ctrl.gpioMode(DIGITAL_WRITE, this->m_wifi_led);
   __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, this->m_wifi_led, HIGH );

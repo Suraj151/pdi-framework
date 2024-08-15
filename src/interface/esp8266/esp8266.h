@@ -43,7 +43,7 @@ extern "C"
 /**
  * @define flash key parameters for reset factory
  */
-#define FLASH_KEY_PIN D3
+#define FLASH_KEY_PIN 3
 #define FLASH_KEY_PRESS_COUNT_THR 5
 
 /**

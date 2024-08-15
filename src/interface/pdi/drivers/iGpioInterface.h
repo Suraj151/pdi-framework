@@ -69,7 +69,7 @@ public:
   virtual void gpioMode( GPIO_MODE mode, gpio_id_t pin ) = 0;
   virtual void gpioWrite( GPIO_MODE mode, gpio_id_t pin, gpio_val_t value ) = 0;
   virtual gpio_val_t gpioRead( GPIO_MODE mode, gpio_id_t pin ) = 0;
-  virtual gpio_id_t gpioFromPinMap( gpio_id_t pin ) = 0;
+  virtual gpio_id_t gpioFromPinMap( gpio_id_t pin, bool isAnalog=false ) = 0;
   virtual bool isExceptionalGpio( gpio_id_t pin ) = 0;
 
   // GPIO Blinker object create/destroy methods
