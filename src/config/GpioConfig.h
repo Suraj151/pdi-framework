@@ -49,7 +49,6 @@ struct last_gpio_monitor_point{
   int x;
   int y;
 };
-const uint8_t EXCEPTIONAL_GPIO_PINS[] = {3};
 
 enum GPIO_CONFIG_TYPE {
   GPIO_MODE_CONFIG,

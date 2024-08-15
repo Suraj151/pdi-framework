@@ -15,7 +15,6 @@ created Date    : 1st June 2019
 #include <service_provider/EmailServiceProvider.h>
 #include <service_provider/DatabaseServiceProvider.h>
 
-#include <Ticker.h>
 #include <transports/http/HTTPClient.h>
 
 #define GPIO_PAYLOAD_DATA_KEY "data"
@@ -23,83 +22,6 @@ created Date    : 1st June 2019
 #define GPIO_PAYLOAD_VALUE_KEY "val"
 #define GPIO_PAYLOAD_MAC_KEY "mac_id"
 #define GPIO_ALERT_PIN_KEY "alrtkey"
-
-// currently 100 ms is kept as lowest blink time
-#define GPIO_DIGITAL_BLINK_MIN_DURATION_MS 100
-
-class DigitalBlinker
-{
-
-private:
-  uint8_t m_pin;
-  uint32_t m_duration;
-  Ticker m_ticker;
-
-public:
-  /**
-   * DigitalBlinker constructor.
-   */
-  DigitalBlinker(uint8_t pin, uint32_t duration) : m_pin(pin),
-                                                   m_duration(duration)
-  {
-    pinMode(this->m_pin, OUTPUT);
-    this->start();
-  }
-
-  /**
-   * DigitalBlinker destructor.
-   */
-  ~DigitalBlinker()
-  {
-    this->stop();
-  };
-
-  /**
-   * blink callback function
-   */
-  void blink()
-  {
-    __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, this->m_pin, !__i_dvc_ctrl.gpioRead(DIGITAL_READ, this->m_pin));
-  }
-
-  void setConfig(uint8_t pin, uint32_t duration)
-  {
-    this->m_pin = pin;
-    this->m_duration = duration;
-  }
-
-  void updateConfig(uint8_t pin, uint32_t duration)
-  {
-    if (this->m_pin != pin || this->m_duration != duration)
-    {
-      this->setConfig(pin, duration);
-
-      if (this->isRunning())
-      {
-        this->stop();
-        this->start();
-      }
-    }
-  }
-
-  void start()
-  {
-    if (!this->isRunning() && GPIO_DIGITAL_BLINK_MIN_DURATION_MS <= this->m_duration)
-    {
-      this->m_ticker.attach_ms(this->m_duration, std::bind(&DigitalBlinker::blink, this));
-    }
-  }
-
-  void stop()
-  {
-    this->m_ticker.detach();
-  }
-
-  bool isRunning()
-  {
-    return this->m_ticker.active();
-  }
-};
 
 /**
  * GpioServiceProvider class
@@ -126,10 +48,8 @@ public:
 #endif
   void handleGpioOperations(void);
   void handleGpioModes(int _gpio_config_type = GPIO_MODE_CONFIG);
-  uint8_t getGpioFromPinMap(uint8_t _pin);
   bool handleGpioHttpRequest(bool isAlertPost = false);
   void printGpioConfigLogs(void);
-  bool is_exceptional_gpio_pin(uint8_t _pin);
 
   /**
    * @var gpio_config_table m_gpio_config_copy
@@ -151,7 +71,7 @@ protected:
    */
   Http_Client *m_http_client;
 
-  DigitalBlinker *m_digital_blinker[MAX_DIGITAL_GPIO_PINS];
+  iGpioBlinkerInterface *m_digital_blinker[MAX_DIGITAL_GPIO_PINS];
 };
 
 extern GpioServiceProvider __gpio_service;

@@ -15,6 +15,8 @@ created Date    : 1st Jan 2024
 #include <Esp.h>
 #include <Print.h>
 
+#include <FS.h>
+#include <Ticker.h>
 #include <ESP8266HTTPClient.h>
 #include <IPAddress.h>
 #include <ESP8266WiFi.h>
@@ -43,6 +45,11 @@ extern "C"
  */
 #define FLASH_KEY_PIN D3
 #define FLASH_KEY_PRESS_COUNT_THR 5
+
+/**
+ * enable/disable exception notifier
+ */
+#define ENABLE_EXCEPTION_NOTIFIER
 
 /**
  * enable/disable esp now feature here

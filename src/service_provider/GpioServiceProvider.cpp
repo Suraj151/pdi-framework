@@ -41,7 +41,7 @@ GpioServiceProvider::~GpioServiceProvider(){
 
   for (size_t i = 0; i < MAX_DIGITAL_GPIO_PINS; i++) {
     if( nullptr != this->m_digital_blinker[i] ){
-      delete this->m_digital_blinker[i];
+      __i_dvc_ctrl.releaseGpioBlinkerInstance(this->m_digital_blinker[i]);
       this->m_digital_blinker[i] = nullptr;
     }
   }
@@ -163,7 +163,7 @@ void GpioServiceProvider::appendGpioJsonPayload( std::string &_payload, bool isA
 
   for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS; _pin++) {
 
-    if( !this->is_exceptional_gpio_pin(_pin) ){
+    if( !__i_dvc_ctrl.isExceptionalGpio(_pin) ){
 
       _payload += "\"D";
       _payload += std::to_string(_pin);
@@ -233,7 +233,7 @@ void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payloa
 
       _pin_label[1] = ( 0x30 + _pin_label_n ); memset( _pin_data, 0, _pin_data_max_len);
       memset( _pin_mode, 0, _pin_values_max_len); memset( _pin_value, 0, _pin_values_max_len);
-      if( !this->is_exceptional_gpio_pin(_pin) && __get_from_json( _payload, _pin_label, _pin_data, _pin_data_max_len ) ){
+      if( !__i_dvc_ctrl.isExceptionalGpio(_pin) && __get_from_json( _payload, _pin_label, _pin_data, _pin_data_max_len ) ){
 
         if( __get_from_json( _pin_data, (char*)GPIO_PAYLOAD_MODE_KEY, _pin_mode, _pin_values_max_len ) ){
 
@@ -296,12 +296,12 @@ void GpioServiceProvider::handleGpioOperations(){
     if( DIGITAL_BLINK != this->m_gpio_config_copy.gpio_mode[_pin] ){
 
       if( _pin < MAX_DIGITAL_GPIO_PINS && nullptr != this->m_digital_blinker[_pin] ){
-        delete this->m_digital_blinker[_pin];
+        __i_dvc_ctrl.releaseGpioBlinkerInstance(this->m_digital_blinker[_pin]);
         this->m_digital_blinker[_pin] = nullptr;
       }
     }
 
-    switch ( this->is_exceptional_gpio_pin(_pin) ? OFF : this->m_gpio_config_copy.gpio_mode[_pin] ) {
+    switch ( __i_dvc_ctrl.isExceptionalGpio(_pin) ? OFF : this->m_gpio_config_copy.gpio_mode[_pin] ) {
 
       default:
       case OFF:{
@@ -309,26 +309,26 @@ void GpioServiceProvider::handleGpioOperations(){
         break;
       }
       case DIGITAL_WRITE:{
-        __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, this->getGpioFromPinMap( _pin ), this->m_gpio_config_copy.gpio_readings[_pin] );
+        __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, __i_dvc_ctrl.gpioFromPinMap( _pin ), this->m_gpio_config_copy.gpio_readings[_pin] );
         break;
       }
       case DIGITAL_READ:{
-        this->m_gpio_config_copy.gpio_readings[_pin] = __i_dvc_ctrl.gpioRead(DIGITAL_READ, this->getGpioFromPinMap( _pin ) );
+        this->m_gpio_config_copy.gpio_readings[_pin] = __i_dvc_ctrl.gpioRead(DIGITAL_READ, __i_dvc_ctrl.gpioFromPinMap( _pin ) );
         break;
       }
       case DIGITAL_BLINK:{
         if( nullptr != this->m_digital_blinker[_pin] ){
 
-          this->m_digital_blinker[_pin]->updateConfig( this->getGpioFromPinMap( _pin ), this->m_gpio_config_copy.gpio_readings[_pin] );
+          this->m_digital_blinker[_pin]->updateConfig( __i_dvc_ctrl.gpioFromPinMap( _pin ), this->m_gpio_config_copy.gpio_readings[_pin] );
           this->m_digital_blinker[_pin]->start();
         }else{
 
-          this->m_digital_blinker[_pin] = new DigitalBlinker( this->getGpioFromPinMap( _pin ), this->m_gpio_config_copy.gpio_readings[_pin] );
+          this->m_digital_blinker[_pin] = __i_dvc_ctrl.createGpioBlinkerInstance( __i_dvc_ctrl.gpioFromPinMap( _pin ), this->m_gpio_config_copy.gpio_readings[_pin] );
         }
         break;
       }
       case ANALOG_WRITE:{
-        __i_dvc_ctrl.gpioWrite(ANALOG_WRITE, this->getGpioFromPinMap( _pin ), this->m_gpio_config_copy.gpio_readings[_pin] );
+        __i_dvc_ctrl.gpioWrite(ANALOG_WRITE, __i_dvc_ctrl.gpioFromPinMap( _pin ), this->m_gpio_config_copy.gpio_readings[_pin] );
         break;
       }
       case ANALOG_READ:{
@@ -339,7 +339,7 @@ void GpioServiceProvider::handleGpioOperations(){
       }
     }
 
-    if( !this->is_exceptional_gpio_pin(_pin) && this->m_gpio_config_copy.gpio_alert_channel[_pin] != NO_ALERT ){
+    if( !__i_dvc_ctrl.isExceptionalGpio(_pin) && this->m_gpio_config_copy.gpio_alert_channel[_pin] != NO_ALERT ){
 
       bool _is_alert_condition = false;
 
@@ -412,22 +412,7 @@ void GpioServiceProvider::handleGpioModes( int _gpio_config_type ){
 
   for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
 
-    switch ( _gpio_configs.gpio_mode[_pin] ) {
-
-      case OFF:
-      case DIGITAL_READ:
-      default:
-        pinMode( this->getGpioFromPinMap( _pin ), INPUT );
-        break;
-      case DIGITAL_BLINK:
-      case DIGITAL_WRITE:
-      case ANALOG_WRITE:
-        pinMode( this->getGpioFromPinMap( _pin ), OUTPUT );
-        break;
-      case ANALOG_READ:
-      break;
-    }
-
+    __i_dvc_ctrl.gpioMode((GPIO_MODE)_gpio_configs.gpio_mode[_pin], __i_dvc_ctrl.gpioFromPinMap( _pin ));
   }
 
   this->m_gpio_config_copy = _gpio_configs;
@@ -482,78 +467,6 @@ void GpioServiceProvider::printGpioConfigLogs(){
   LogFmtI("%s\t%d\t%d\n\n", this->m_gpio_config_copy.gpio_host, this->m_gpio_config_copy.gpio_port, 
   this->m_gpio_config_copy.gpio_post_frequency);
 }
-
-/**
- * get gpio mapped pin from its no.
- */
-uint8_t GpioServiceProvider::getGpioFromPinMap( uint8_t _pin ){
-
-  uint8_t mapped_pin;
-
-  // Map
-  switch ( _pin ) {
-
-    case 0:
-      mapped_pin = 16;
-      break;
-    case 1:
-      mapped_pin = 5;
-      break;
-    case 2:
-      mapped_pin = 4;
-      break;
-    case 3:
-      mapped_pin = 0;
-      break;
-    case 4:
-      mapped_pin = 2;
-      break;
-    case 5:
-      mapped_pin = 14;
-      break;
-    case 6:
-      mapped_pin = 12;
-      break;
-    case 7:
-      mapped_pin = 13;
-      break;
-    case 8:
-      mapped_pin = 15;
-      break;
-    case 9:
-      mapped_pin = 3;
-      break;
-    case 10:
-      mapped_pin = 1;
-      break;
-    default:
-      mapped_pin = 0;
-  }
-
-  return mapped_pin;
-}
-
-bool GpioServiceProvider::is_exceptional_gpio_pin (uint8_t _pin) {
-
-  for (uint8_t j = 0; j < sizeof(EXCEPTIONAL_GPIO_PINS); j++) {
-
-    if( EXCEPTIONAL_GPIO_PINS[j] == _pin )return true;
-  }
-  return false;
-}
-
-// int getPinMode(uint8_t pin){
-//
-//   if (pin >= NUM_DIGITAL_PINS) return (-1);
-//
-//   uint8_t bit = digitalPinToBitMask(pin);
-//   uint8_t port = digitalPinToPort(pin);
-//   volatile uint8_t *reg = portModeRegister(port);
-//   if (*reg & bit) return (OUTPUT);
-//
-//   volatile uint8_t *out = portOutputRegister(port);
-//   return ((*out & bit) ? INPUT_PULLUP : INPUT);
-// }
 
 
 GpioServiceProvider __gpio_service;

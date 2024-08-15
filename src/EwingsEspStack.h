@@ -36,10 +36,6 @@ created Date    : 1st June 2019
 #include <service_provider/EmailServiceProvider.h>
 #endif
 
-#ifdef ENABLE_EXCEPTION_NOTIFIER
-#include <helpers/ExceptionsNotifier.h>
-#endif
-
 #ifdef ENABLE_DEVICE_IOT
 #include <service_provider/DeviceIotServiceProvider.h>
 #endif

@@ -54,11 +54,6 @@ created Date    : 1st June 2019
 #define AUTO_FACTORY_RESET_ON_INVALID_CONFIGS
 
 /**
- * enable/disable exception notifier
- */
-#define ENABLE_EXCEPTION_NOTIFIER
-
-/**
  * ignore free relay connections created by same ssid
  */
 #define IGNORE_FREE_RELAY_CONNECTIONS

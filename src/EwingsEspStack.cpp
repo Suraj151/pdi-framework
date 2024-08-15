@@ -66,10 +66,6 @@ void EwingsEspStack::initialize(){
   #ifdef ENABLE_DEVICE_IOT
   __device_iot_service.init( this->m_client );
   #endif
-
-  #ifdef ENABLE_EXCEPTION_NOTIFIER
-  beginCrashHandler();
-  #endif
 }
 
 /**

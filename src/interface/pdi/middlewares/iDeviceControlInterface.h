@@ -47,6 +47,10 @@ public:
   // virtual void gpioMode( GPIO_MODE mode, gpio_id_t pin ) = 0;
   // virtual void gpioWrite( GPIO_MODE mode, gpio_id_t pin, gpio_val_t value ) = 0;
   // virtual gpio_val_t gpioRead( GPIO_MODE mode, gpio_id_t pin ) = 0;
+  // virtual gpio_id_t gpioFromPinMap( gpio_id_t pin ) = 0;
+  // virtual bool isExceptionalGpio( gpio_id_t pin ) = 0;
+  // virtual iGpioBlinkerInterface *createGpioBlinkerInstance(gpio_id_t pin, gpio_val_t duration) = 0;
+  // virtual void releaseGpioBlinkerInstance(iGpioBlinkerInterface *instance) = 0;
 
   // device control methods
   virtual void initDeviceSpecificFeatures() = 0;

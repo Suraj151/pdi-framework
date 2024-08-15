@@ -7,11 +7,10 @@ warranty.
 Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
-#include <config/Config.h>
+#include "ExceptionsNotifier.h"
 
 #if defined(ENABLE_EXCEPTION_NOTIFIER)
 
-#include "ExceptionsNotifier.h"
 /**
  * begin crash handler
  */
@@ -88,7 +87,7 @@ void handleCrashData()
 		_filedata += WiFi.macAddress();
 		bool _candeletefile = false;
 #ifdef ENABLE_EMAIL_SERVICE
-		if (__email_service.sendMail(_filedata))
+		if (__email_service.sendMail(_filedata.c_str()))
 		{
 			_candeletefile = true;
 		}

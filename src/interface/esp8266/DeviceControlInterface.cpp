@@ -8,6 +8,7 @@ Author          : Suraj I.
 created Date    : 1st Jan 2024
 ******************************************************************************/
 
+#include "ExceptionsNotifier.h"
 #include "DeviceControlInterface.h"
 
 /**
@@ -32,9 +33,12 @@ void DeviceControlInterface::gpioMode(GPIO_MODE mode, gpio_id_t pin)
     switch (mode)
     {
     case DIGITAL_WRITE:
+    case DIGITAL_BLINK:
+    case ANALOG_WRITE:
         pinMode(pin, OUTPUT);
         break;
     case DIGITAL_READ:
+    case OFF:
         pinMode(pin, INPUT);
         break;
     default:
@@ -51,6 +55,9 @@ void DeviceControlInterface::gpioWrite(GPIO_MODE mode, gpio_id_t pin, gpio_val_t
     {
     case DIGITAL_WRITE:
         digitalWrite(pin, value);
+        break;
+    case DIGITAL_BLINK:
+        digitalWrite(pin, !gpioRead(DIGITAL_READ, pin));
         break;
     case ANALOG_WRITE:
         analogWrite(pin, value);
@@ -83,6 +90,87 @@ gpio_val_t DeviceControlInterface::gpioRead(GPIO_MODE mode, gpio_id_t pin)
 }
 
 /**
+ * return HW gpio pin number from its digital gpio number
+ */
+gpio_id_t DeviceControlInterface::gpioFromPinMap(gpio_id_t pin)
+{
+  gpio_id_t mapped_pin;
+
+  // Map
+  switch ( pin ) {
+
+    case 0:
+      mapped_pin = 16;
+      break;
+    case 1:
+      mapped_pin = 5;
+      break;
+    case 2:
+      mapped_pin = 4;
+      break;
+    case 3:
+      mapped_pin = 0;
+      break;
+    case 4:
+      mapped_pin = 2;
+      break;
+    case 5:
+      mapped_pin = 14;
+      break;
+    case 6:
+      mapped_pin = 12;
+      break;
+    case 7:
+      mapped_pin = 13;
+      break;
+    case 8:
+      mapped_pin = 15;
+      break;
+    case 9:
+      mapped_pin = 3;
+      break;
+    case 10:
+      mapped_pin = 1;
+      break;
+    default:
+      mapped_pin = 0;
+  }
+
+  return mapped_pin;
+}
+
+/**
+ * return whether gpio is exceptional
+ */
+bool DeviceControlInterface::isExceptionalGpio(gpio_id_t pin)
+{
+  for (uint8_t j = 0; j < sizeof(EXCEPTIONAL_GPIO_PINS); j++) {
+
+    if( EXCEPTIONAL_GPIO_PINS[j] == pin )return true;
+  }
+  return false;
+}
+
+/**
+ * Get new GpioBlinkerInterface instance.
+ */
+iGpioBlinkerInterface *DeviceControlInterface::createGpioBlinkerInstance(gpio_id_t pin, gpio_val_t duration)
+{
+    return new GpioBlinkerInterface(pin, duration);
+}
+
+/**
+ * Delete GpioBlinkerInterface instance.
+ */
+void DeviceControlInterface::releaseGpioBlinkerInstance(iGpioBlinkerInterface *instance)
+{
+    if (nullptr != instance)
+    {
+        delete instance;
+    }
+}
+
+/**
  * Init device specific features here
  */
 void DeviceControlInterface::initDeviceSpecificFeatures()
@@ -91,6 +179,10 @@ void DeviceControlInterface::initDeviceSpecificFeatures()
   __espnow.begin( &__i_wifi );
   #endif
   __i_ping.init_ping( &__i_wifi );
+
+  #ifdef ENABLE_EXCEPTION_NOTIFIER
+  beginCrashHandler();
+  #endif
 }
 
 /**

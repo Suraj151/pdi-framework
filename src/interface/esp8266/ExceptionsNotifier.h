@@ -10,13 +10,11 @@ created Date    : 1st June 2019
 #ifndef _ESPSAVECRASHSPIFFS_H_
 #define _ESPSAVECRASHSPIFFS_H_
 
-#include <utility/Utility.h>
+#include "esp8266.h"
+#include <config/Config.h>
 #ifdef ENABLE_EMAIL_SERVICE
 #include <service_provider/EmailServiceProvider.h>
 #endif
-#include <FS.h>
-#include "user_interface.h"
-#include <interface/pdi.h>
 
 
 /**
