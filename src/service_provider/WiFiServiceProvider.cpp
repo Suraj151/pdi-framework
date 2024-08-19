@@ -188,13 +188,13 @@ bool WiFiServiceProvider::configure_wifi_station( wifi_config_table* _wifi_crede
             mac[3], mac[4], mac[5]);
   }
 
-  IPAddress local_IP(
+  ipaddress_t local_IP(
     _wifi_credentials->sta_local_ip[0],_wifi_credentials->sta_local_ip[1],_wifi_credentials->sta_local_ip[2],_wifi_credentials->sta_local_ip[3]
   );
-  IPAddress gateway(
+  ipaddress_t gateway(
     _wifi_credentials->sta_gateway[0],_wifi_credentials->sta_gateway[1],_wifi_credentials->sta_gateway[2],_wifi_credentials->sta_gateway[3]
   );
-  IPAddress subnet(
+  ipaddress_t subnet(
     _wifi_credentials->sta_subnet[0],_wifi_credentials->sta_subnet[1],_wifi_credentials->sta_subnet[2],_wifi_credentials->sta_subnet[3]
   );
 
@@ -220,7 +220,7 @@ bool WiFiServiceProvider::configure_wifi_station( wifi_config_table* _wifi_crede
 
   if( this->m_wifi->status() == WL_CONNECTED ){
     LogFmtI("Connected to %s\n", _wifi_credentials->sta_ssid);
-    LogFmtI("IP address: %s\n", this->m_wifi->localIP().toString().c_str());
+    LogFmtI("IP address: %s\n", ((std::string)this->m_wifi->localIP()).c_str());
     // this->m_wifi->setAutoConnect(true);
     // this->m_wifi->setAutoReconnect(true);
     return true;
@@ -269,8 +269,8 @@ void WiFiServiceProvider::reconfigure_wifi_access_point( void ){
     }
   }else{
 
-    IPAddress gateway_IP = this->m_wifi->gatewayIP();
-    IPAddress sta_subnet_ip = IPAddress(this->getStationSubnetIP());
+    ipaddress_t gateway_IP = this->m_wifi->gatewayIP();
+    ipaddress_t sta_subnet_ip = ipaddress_t(this->getStationSubnetIP());
 
     if(
       (( gateway_IP[3] - sta_subnet_ip[3] ) == 1 &&
@@ -323,13 +323,13 @@ bool WiFiServiceProvider::configure_wifi_access_point( wifi_config_table* _wifi_
 
   LogFmtI("Configuring access point %s..\n", _wifi_credentials->ap_ssid);
 
-  IPAddress local_IP(
+  ipaddress_t local_IP(
     _wifi_credentials->ap_local_ip[0],_wifi_credentials->ap_local_ip[1],_wifi_credentials->ap_local_ip[2],_wifi_credentials->ap_local_ip[3]
   );
-  IPAddress gateway(
+  ipaddress_t gateway(
     _wifi_credentials->ap_gateway[0],_wifi_credentials->ap_gateway[1],_wifi_credentials->ap_gateway[2],_wifi_credentials->ap_gateway[3]
   );
-  IPAddress subnet(
+  ipaddress_t subnet(
     _wifi_credentials->ap_subnet[0],_wifi_credentials->ap_subnet[1],_wifi_credentials->ap_subnet[2],_wifi_credentials->ap_subnet[3]
   );
 
@@ -338,7 +338,7 @@ bool WiFiServiceProvider::configure_wifi_access_point( wifi_config_table* _wifi_
   if( this->m_wifi->softAPConfig( local_IP, gateway, subnet ) &&
     this->m_wifi->softAP( _wifi_credentials->ap_ssid, _wifi_credentials->ap_password, 1, 0, 8 )
   ){
-    LogFmtI("AP IP address: %s\n", this->m_wifi->softAPIP().toString().c_str());
+    LogFmtI("AP IP address: %s\n", ((std::string)this->m_wifi->softAPIP()).c_str());
     return true;
   }else{
     LogE("Configuring access point failed!\n");
@@ -489,7 +489,7 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
 
   if( !this->m_wifi->localIP().isSet() || !this->m_wifi->isConnected() ){
 
-    LogFmtI("Handeling WiFi Reconnect Manually : %s\n", this->m_wifi->softAPIP().toString().c_str());
+    LogFmtI("Handeling WiFi Reconnect Manually : %s\n", ((std::string)this->m_wifi->softAPIP()).c_str());
 
     #ifdef IGNORE_FREE_RELAY_CONNECTIONS
     this->m_wifi->reconnect();
@@ -508,9 +508,9 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
   }else{
     __status_wifi.wifi_connected = true;
     LogFmtI("IP address: %s : %s : %s\n", 
-    this->m_wifi->gatewayIP().toString().c_str(), 
-    this->m_wifi->localIP().toString().c_str(), 
-    this->m_wifi->softAPIP().toString().c_str());
+    ((std::string)this->m_wifi->gatewayIP()).c_str(), 
+    ((std::string)this->m_wifi->localIP()).c_str(), 
+    ((std::string)this->m_wifi->softAPIP()).c_str());
   }
 }
 

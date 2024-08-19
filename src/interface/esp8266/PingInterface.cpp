@@ -62,9 +62,11 @@ void PingInterface::init_ping( iWiFiInterface* _wifi ){
 bool PingInterface::ping(){
 
   IPAddress _ip(this->m_opt.ip);
+  ipaddress_t _ipt((uint32_t)_ip);
 
   if( nullptr != this->m_wifi ){
-    this->m_wifi->hostByName(_pinghostname, _ip, 1500);
+    this->m_wifi->hostByName(_pinghostname, _ipt, 1500);
+    _ip = (uint32_t)_ipt;
     this->m_opt.ip = (uint32_t)_ip;
   }
   LogFmtI("\nPing ip: %s\n", _ip.toString().c_str());

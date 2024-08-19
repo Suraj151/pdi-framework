@@ -140,12 +140,14 @@ bool WiFiInterface::enableAP(bool _enable)
 /**
  * hostByName
  */
-int WiFiInterface::hostByName(const char *aHostname, IPAddress &aResult, uint32_t timeout_ms)
+int WiFiInterface::hostByName(const char *aHostname, ipaddress_t &aResult, uint32_t timeout_ms)
 {
   int status = 0;
   if (nullptr != this->m_wifi)
   {
-    status = this->m_wifi->hostByName(aHostname, aResult, timeout_ms);
+    IPAddress ip = (uint32_t)aResult;
+    status = this->m_wifi->hostByName(aHostname, ip, timeout_ms);
+    aResult = (uint32_t)ip;
   }
   return status;
 }
@@ -166,12 +168,12 @@ wifi_status_t WiFiInterface::begin(char *_ssid, char *_passphrase, int32_t _chan
 /**
  * config
  */
-bool WiFiInterface::config(IPAddress &_local_ip, IPAddress &_gateway, IPAddress &_subnet)
+bool WiFiInterface::config(ipaddress_t &_local_ip, ipaddress_t &_gateway, ipaddress_t &_subnet)
 {
   bool status = false;
   if (nullptr != this->m_wifi)
   {
-    status = this->m_wifi->config(_local_ip, _gateway, _subnet);
+    status = this->m_wifi->config((uint32_t)_local_ip, (uint32_t)_gateway, (uint32_t)_subnet);
   }
   return status;
 }
@@ -231,14 +233,14 @@ bool WiFiInterface::setAutoReconnect(bool _autoReconnect)
 /**
  * localIP
  */
-IPAddress WiFiInterface::localIP()
+ipaddress_t WiFiInterface::localIP()
 {
   IPAddress ip(0);
   if (nullptr != this->m_wifi)
   {
     ip = this->m_wifi->localIP();
   }
-  return ip;
+  return (uint32_t)ip;
 }
 
 /**
@@ -257,40 +259,40 @@ std::string WiFiInterface::macAddress()
 /**
  * subnetMask
  */
-IPAddress WiFiInterface::subnetMask()
+ipaddress_t WiFiInterface::subnetMask()
 {
   IPAddress ip(0);
   if (nullptr != this->m_wifi)
   {
     ip = this->m_wifi->subnetMask();
   }
-  return ip;
+  return (uint32_t)ip;
 }
 
 /**
  * gatewayIP
  */
-IPAddress WiFiInterface::gatewayIP()
+ipaddress_t WiFiInterface::gatewayIP()
 {
   IPAddress ip(0);
   if (nullptr != this->m_wifi)
   {
     ip = this->m_wifi->gatewayIP();
   }
-  return ip;
+  return (uint32_t)ip;
 }
 
 /**
  * dnsIP
  */
-IPAddress WiFiInterface::dnsIP(uint8_t _dns_no)
+ipaddress_t WiFiInterface::dnsIP(uint8_t _dns_no)
 {
   IPAddress ip(0);
   if (nullptr != this->m_wifi)
   {
     ip = this->m_wifi->dnsIP(_dns_no);
   }
-  return ip;
+  return (uint32_t)ip;
 }
 
 /**
@@ -361,12 +363,12 @@ bool WiFiInterface::softAP(const char *_ssid, const char *_passphrase, int _chan
 /**
  * softAPConfig
  */
-bool WiFiInterface::softAPConfig(IPAddress _local_ip, IPAddress _gateway, IPAddress _subnet)
+bool WiFiInterface::softAPConfig(ipaddress_t _local_ip, ipaddress_t _gateway, ipaddress_t _subnet)
 {
   bool status = false;
   if (nullptr != this->m_wifi)
   {
-    status = this->m_wifi->softAPConfig(_local_ip, _gateway, _subnet);
+    status = this->m_wifi->softAPConfig((uint32_t)_local_ip, (uint32_t)_gateway, (uint32_t)_subnet);
   }
   return status;
 }
@@ -387,14 +389,14 @@ bool WiFiInterface::softAPdisconnect(bool _wifioff)
 /**
  * softAPIP
  */
-IPAddress WiFiInterface::softAPIP()
+ipaddress_t WiFiInterface::softAPIP()
 {
   IPAddress ip(0);
   if (nullptr != this->m_wifi)
   {
     ip = this->m_wifi->softAPIP();
   }
-  return ip;
+  return (uint32_t)ip;
 }
 
 /**
@@ -500,7 +502,8 @@ void WiFiInterface::enableNAPT()
   // Enable NAT on the AP interface
   ip_napt_enable_no(1, 1);
   // Set the DNS server for clients of the AP to the one we also use for the STA interface
-  dhcps_set_DNS(__i_wifi.dnsIP());
+  IPAddress _ip((uint32_t)__i_wifi.dnsIP());
+  dhcps_set_DNS(_ip);
   LogFmtS("NAPT(lwip %d) initialization done\n", (int)LWIP_VERSION_MAJOR);
 #elif defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
   // Initialize the NAPT feature
@@ -511,7 +514,8 @@ void WiFiInterface::enableNAPT()
     if (ret == ERR_OK) {
       LogFmtS("NAPT(lwip %d) initialization done\n", (int)LWIP_VERSION_MAJOR);
       // Set the DNS server for clients of the AP to the one we also use for the STA interface
-      getNonOSDhcpServer().setDns(__i_wifi.dnsIP(0));
+      IPAddress _ip((uint32_t)__i_wifi.dnsIP(0));
+      getNonOSDhcpServer().setDns(_ip);
       //dhcpSoftAP.dhcps_set_dns(1, __i_wifi.dnsIP(1));
     }
   }

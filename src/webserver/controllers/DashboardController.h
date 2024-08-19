@@ -63,7 +63,7 @@ class DashboardController : public Controller {
 			std::string _response = "{\"nm\":\"";
 			_response += this->m_web_resource->m_wifi->SSID();
 			_response += "\",\"ip\":\"";
-			_response += this->m_web_resource->m_wifi->localIP().toString().c_str();
+			_response += (std::string)this->m_web_resource->m_wifi->localIP();
 			_response += "\",\"rs\":\"";
 			_response += std::to_string(this->m_web_resource->m_wifi->RSSI());
 			_response += "\",\"mc\":\"";

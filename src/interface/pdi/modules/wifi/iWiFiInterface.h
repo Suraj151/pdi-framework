@@ -18,7 +18,6 @@ created Date    : 1st June 2019
 
 // forward declaration of derived class for this interface
 class WiFiInterface;
-class IPAddress;
 
 /**
  * iWiFiInterface class
@@ -45,21 +44,21 @@ public:
   virtual wifi_mode_t getMode() = 0;
   virtual bool enableSTA(bool _enable) = 0;
   virtual bool enableAP(bool _enable) = 0;
-  virtual int hostByName(const char *aHostname, IPAddress &aResult, uint32_t timeout_ms) = 0;
+  virtual int hostByName(const char *aHostname, ipaddress_t &aResult, uint32_t timeout_ms) = 0;
 
   virtual wifi_status_t begin(char *_ssid, char *_passphrase = nullptr, int32_t _channel = 0, const uint8_t *_bssid = nullptr, bool _connect = true) = 0;
-  virtual bool config(IPAddress &_local_ip, IPAddress &_gateway, IPAddress &_subnet) = 0;
+  virtual bool config(ipaddress_t &_local_ip, ipaddress_t &_gateway, ipaddress_t &_subnet) = 0;
   virtual bool reconnect() = 0;
   virtual bool disconnect(bool _wifioff = false) = 0;
   virtual bool isConnected() = 0;
   virtual bool setAutoReconnect(bool _autoReconnect) = 0;
 
   // STA network info
-  virtual IPAddress localIP() = 0;
+  virtual ipaddress_t localIP() = 0;
   virtual std::string macAddress() = 0;
-  virtual IPAddress subnetMask() = 0;
-  virtual IPAddress gatewayIP() = 0;
-  virtual IPAddress dnsIP(uint8_t _dns_no = 0) = 0;
+  virtual ipaddress_t subnetMask() = 0;
+  virtual ipaddress_t gatewayIP() = 0;
+  virtual ipaddress_t dnsIP(uint8_t _dns_no = 0) = 0;
 
   // STA WiFi info
   virtual wifi_status_t status() = 0;
@@ -69,9 +68,9 @@ public:
 
   // Soft AP api's
   virtual bool softAP(const char *_ssid, const char *_passphrase = nullptr, int _channel = 1, int _ssid_hidden = 0, int _max_connection = 4) = 0;
-  virtual bool softAPConfig(IPAddress _local_ip, IPAddress _gateway, IPAddress _subnet) = 0;
+  virtual bool softAPConfig(ipaddress_t _local_ip, ipaddress_t _gateway, ipaddress_t _subnet) = 0;
   virtual bool softAPdisconnect(bool _wifioff = false) = 0;
-  virtual IPAddress softAPIP() = 0;
+  virtual ipaddress_t softAPIP() = 0;
 
   // n/w scan api's
   virtual int8_t scanNetworks(bool _async = false, bool _show_hidden = false, uint8_t _channel = 0, uint8_t *ssid = nullptr) = 0;

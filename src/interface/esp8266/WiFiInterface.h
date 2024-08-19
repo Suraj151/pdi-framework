@@ -16,6 +16,9 @@ created Date    : 1st June 2019
 #include "LoggerInterface.h"
 #include "DeviceControlInterface.h"
 
+// declare device specific
+class IPAddress;
+
 /**
  * WiFiInterface class
  */
@@ -41,21 +44,21 @@ public:
   sleep_mode_t getSleepMode() override;
   bool enableSTA(bool _enable) override;
   bool enableAP(bool _enable) override;
-  int hostByName(const char *aHostname, IPAddress &aResult, uint32_t timeout_ms) override;
+  int hostByName(const char *aHostname, ipaddress_t &aResult, uint32_t timeout_ms) override;
 
   wifi_status_t begin(char *_ssid, char *_passphrase = nullptr, int32_t _channel = 0, const uint8_t *_bssid = nullptr, bool _connect = true) override;
-  bool config(IPAddress &_local_ip, IPAddress &_gateway, IPAddress &_subnet) override;
+  bool config(ipaddress_t &_local_ip, ipaddress_t &_gateway, ipaddress_t &_subnet) override;
   bool reconnect() override;
   bool disconnect(bool _wifioff = false) override;
   bool isConnected() override;
   bool setAutoReconnect(bool _autoReconnect) override;
 
   // STA network info
-  IPAddress localIP() override;
+  ipaddress_t localIP() override;
   std::string macAddress() override;
-  IPAddress subnetMask() override;
-  IPAddress gatewayIP() override;
-  IPAddress dnsIP(uint8_t _dns_no = 0) override;
+  ipaddress_t subnetMask() override;
+  ipaddress_t gatewayIP() override;
+  ipaddress_t dnsIP(uint8_t _dns_no = 0) override;
 
   // STA WiFi info
   wifi_status_t status() override;
@@ -65,9 +68,9 @@ public:
 
   // Soft AP api's
   bool softAP(const char *_ssid, const char *_passphrase = nullptr, int _channel = 1, int _ssid_hidden = 0, int _max_connection = 4) override;
-  bool softAPConfig(IPAddress _local_ip, IPAddress _gateway, IPAddress _subnet) override;
+  bool softAPConfig(ipaddress_t _local_ip, ipaddress_t _gateway, ipaddress_t _subnet) override;
   bool softAPdisconnect(bool _wifioff = false) override;
-  IPAddress softAPIP() override;
+  ipaddress_t softAPIP() override;
 
   // n/w scan api's
   int8_t scanNetworks(bool _async = false, bool _show_hidden = false, uint8_t _channel = 0, uint8_t *ssid = nullptr) override;
