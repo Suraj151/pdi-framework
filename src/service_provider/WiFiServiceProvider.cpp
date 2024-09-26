@@ -10,17 +10,6 @@ created Date    : 1st June 2019
 
 #include "WiFiServiceProvider.h"
 
-extern "C" void preinit() {
-#ifdef ENABLE_NAPT_FEATURE_LWIP_V2
-  WiFiInterface::preinitWiFiOff();
-#endif
-  __i_dvc_ctrl.eraseConfig();
-	uint8_t sta_mac[6];
-  wifi_get_macaddr(STATION_IF, sta_mac);
-  sta_mac[0] +=2;
-	wifi_set_macaddr(SOFTAP_IF, sta_mac);
-}
-
 __status_wifi_t __status_wifi = {
   false, false, 0, {0}
 };
@@ -112,11 +101,13 @@ void WiFiServiceProvider::handleInternetConnectivity(){
       this->m_wifi->disconnect(false);
       __status_wifi.last_internet_millis = __i_dvc_ctrl.millis_now();
 
+      #ifndef IGNORE_FREE_RELAY_CONNECTIONS
       __task_scheduler.setTimeout( [&]() {
         this->m_wifi->scanNetworksAsync( [&](int _scanCount) {
           this->scan_aps_and_configure_wifi_station_async(_scanCount);
         }, false);
       }, 500, __i_dvc_ctrl.millis_now() );
+      #endif
 
       __task_scheduler.setTimeout( [&]() {
         LogI("\nhandle station reconnecting...\n");
@@ -346,97 +337,7 @@ bool WiFiServiceProvider::configure_wifi_access_point( wifi_config_table* _wifi_
   }
 }
 
-/**
- * scan ssid in connected stations and return bssid and found result
- *
- * @param   char*     ssid
- * @param   uint8_t*  bssid
- * @return  bool
- */
-bool WiFiServiceProvider::scan_within_station_async( char* ssid, uint8_t* bssid, int _scanCount ){
-
-  if( nullptr == this->m_wifi || nullptr == ssid || nullptr == bssid ){
-    return false;
-  }
-
-  LogI("Scanning stations\n");
-
-  int n = _scanCount;
-  // int indices[n];
-  // for (int i = 0; i < n; i++) {
-  //   indices[i] = i;
-  // }
-  // for (int i = 0; i < n; i++) {
-  //   for (int j = i + 1; j < n; j++) {
-  //     if (this->m_wifi->RSSI(indices[j]) > this->m_wifi->RSSI(indices[i])) {
-  //       std::swap(indices[i], indices[j]);
-  //     }
-  //   }
-  // }
-  struct station_info * stat_info = wifi_softap_get_station_info();
-  struct station_info * stat_info_copy = stat_info;
-  char* _ssid_buff = new char[WIFI_CONFIGS_BUF_SIZE];
-
-  if( nullptr == _ssid_buff ){
-    return false;
-  }
-  memset( _ssid_buff, 0, WIFI_CONFIGS_BUF_SIZE );
-
-  for (int i = 0; i < n; ++i) {
-
-    std::string _ssid = this->m_wifi->SSID(i);
-    // _ssid.toCharArray( _ssid_buff, _ssid.length()+1 );
-    strncpy(_ssid_buff, _ssid.c_str(), _ssid.size());
-
-    if( __are_arrays_equal( ssid, _ssid_buff, _ssid.size() ) ){
-
-      bool _found = false;
-      stat_info = stat_info_copy;
-      while ( nullptr != stat_info ) {
-
-        memcpy(bssid, stat_info->bssid, 6);
-        bssid[0] +=2;
-
-        if( __are_arrays_equal( (char*)bssid, (char*)this->m_wifi->BSSID(i), 6 ) ){
-
-          _found = true;
-          break;
-        }
-
-        stat_info = STAILQ_NEXT(stat_info, next);
-      }
-
-      if( !_found ){
-
-        if( !__are_arrays_equal( (char*)__status_wifi.ignore_bssid, (char*)this->m_wifi->BSSID(i), 6 ) ){
-          memcpy(bssid, this->m_wifi->BSSID(i), 6);
-          delete[] _ssid_buff;
-          return true;
-        }
-      }
-    }
-  }
-
-  delete[] _ssid_buff;
-  return false;
-}
-
-/**
- * scan ssid in connected stations and return bssid and found result
- *
- * @param   char*     ssid
- * @param   uint8_t*  bssid
- * @return  bool
- */
-bool WiFiServiceProvider::scan_within_station( char* ssid, uint8_t* bssid ){
-
-  if( nullptr == this->m_wifi || nullptr == ssid || nullptr == bssid ){
-    return false;
-  }
-  int n = this->m_wifi->scanNetworks();
-  return scan_within_station_async( ssid, bssid, n );
-}
-
+#ifndef IGNORE_FREE_RELAY_CONNECTIONS
 /**
  * scan connected stations then configure and start wifi station functionality
  *
@@ -446,7 +347,7 @@ void WiFiServiceProvider::scan_aps_and_configure_wifi_station_async( int _scanCo
 
   wifi_config_table _wifi_credentials;
   __database_service.get_wifi_config_table(&_wifi_credentials);
-  if( this->scan_within_station_async( _wifi_credentials.sta_ssid, this->m_temp_mac, _scanCount ) ) {
+  if( this->m_wifi->get_bssid_within_scanned_nw_ignoring_connected_stations( _wifi_credentials.sta_ssid, this->m_temp_mac, __status_wifi.ignore_bssid, _scanCount ) ) {
     __task_scheduler.setTimeout([&](){
       wifi_config_table __wifi_credentials;
       __database_service.get_wifi_config_table(&__wifi_credentials);
@@ -456,25 +357,7 @@ void WiFiServiceProvider::scan_aps_and_configure_wifi_station_async( int _scanCo
   }
   _ClearObject(&_wifi_credentials);
 }
-
-/**
- * scan connected stations then configure and start wifi station functionality
- *
- */
-void WiFiServiceProvider::scan_aps_and_configure_wifi_station( ){
-
-  wifi_config_table _wifi_credentials;
-  __database_service.get_wifi_config_table(&_wifi_credentials);
-  if( this->scan_within_station( _wifi_credentials.sta_ssid, this->m_temp_mac) ){
-    __task_scheduler.setTimeout([&](){
-      wifi_config_table __wifi_credentials;
-      __database_service.get_wifi_config_table(&__wifi_credentials);
-      this->configure_wifi_station( &__wifi_credentials, this->m_temp_mac );
-      _ClearObject(&__wifi_credentials);
-    }, 1, __i_dvc_ctrl.millis_now());
-  }
-  _ClearObject(&_wifi_credentials);
-}
+#endif
 
 /**
  * check wifi connectivity after each wifi activity cycle. try to reconnect if failed

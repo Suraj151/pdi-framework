@@ -35,10 +35,9 @@ public:
   bool configure_wifi_access_point(wifi_config_table *_wifi_credentials);
   bool configure_wifi_station(wifi_config_table *_wifi_credentials, uint8_t *mac = nullptr);
 
-  bool scan_within_station(char *ssid, uint8_t *bssid);
-  bool scan_within_station_async(char *ssid, uint8_t *bssid, int _scanCount);
-  void scan_aps_and_configure_wifi_station(void);
+#ifndef IGNORE_FREE_RELAY_CONNECTIONS
   void scan_aps_and_configure_wifi_station_async(int _scanCount);
+#endif
 
 #ifdef ENABLE_DYNAMIC_SUBNETTING
   void reconfigure_wifi_access_point(void);

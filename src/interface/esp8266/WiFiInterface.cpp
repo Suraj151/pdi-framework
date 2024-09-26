@@ -18,6 +18,17 @@ created Date    : 1st June 2019
 #include <LwipDhcpServer-NonOS.h>
 #endif
 
+extern "C" void preinit() {
+#ifdef ENABLE_NAPT_FEATURE_LWIP_V2
+  WiFiInterface::preinitWiFiOff();
+#endif
+  __i_dvc_ctrl.eraseConfig();
+	uint8_t sta_mac[6];
+  wifi_get_macaddr(STATION_IF, sta_mac);
+  sta_mac[0] +=2;
+	wifi_set_macaddr(SOFTAP_IF, sta_mac);
+}
+
 /**
  * WiFiInterface constructor.
  */
@@ -460,6 +471,86 @@ uint8_t *WiFiInterface::BSSID(uint8_t _networkItem)
     bssid = this->m_wifi->BSSID(_networkItem);
   }
   return bssid;
+}
+
+/**
+ * scan ssid not in connected stations and return bssid and found result
+ * 1. Get connected stations list
+ * 2. Check whether scan result items are already in connected list
+ * 3. If scanned ssid not in connected stations list then it can be connected
+ * 4. Check its bssid marked as not ignored before make confimation on connection
+ *
+ * @param   char*     ssid
+ * @param   uint8_t*  bssid
+ * @return  bool
+ */
+bool WiFiInterface::get_bssid_within_scanned_nw_ignoring_connected_stations(char *ssid, uint8_t *bssid, uint8_t *ignorebssid, int _scanCount)
+{
+
+  if( nullptr == this->m_wifi || nullptr == ssid || nullptr == bssid || nullptr == ignorebssid ){
+    return false;
+  }
+
+  LogI("Scanning stations\n");
+
+  int n = _scanCount;
+  // int indices[n];
+  // for (int i = 0; i < n; i++) {
+  //   indices[i] = i;
+  // }
+  // for (int i = 0; i < n; i++) {
+  //   for (int j = i + 1; j < n; j++) {
+  //     if (this->m_wifi->RSSI(indices[j]) > this->m_wifi->RSSI(indices[i])) {
+  //       std::swap(indices[i], indices[j]);
+  //     }
+  //   }
+  // }
+  struct station_info * stat_info = wifi_softap_get_station_info();
+  struct station_info * stat_info_copy = stat_info;
+  char* _ssid_buff = new char[WIFI_CONFIGS_BUF_SIZE];
+
+  if( nullptr == _ssid_buff ){
+    return false;
+  }
+  memset( _ssid_buff, 0, WIFI_CONFIGS_BUF_SIZE );
+
+  for (int i = 0; i < n; ++i) {
+
+    std::string _ssid = this->SSID(i);
+    // _ssid.toCharArray( _ssid_buff, _ssid.length()+1 );
+    strncpy(_ssid_buff, _ssid.c_str(), _ssid.size());
+
+    if( __are_arrays_equal( ssid, _ssid_buff, _ssid.size() ) ){
+
+      bool _found = false;
+      stat_info = stat_info_copy;
+      while ( nullptr != stat_info ) {
+
+        memcpy(bssid, stat_info->bssid, 6);
+        bssid[0] +=2;
+
+        if( __are_arrays_equal( (char*)bssid, (char*)this->BSSID(i), 6 ) ){
+
+          _found = true;
+          break;
+        }
+
+        stat_info = STAILQ_NEXT(stat_info, next);
+      }
+
+      if( !_found ){
+
+        if( !__are_arrays_equal( (char*)ignorebssid, (char*)this->BSSID(i), 6 ) ){
+          memcpy(bssid, this->BSSID(i), 6);
+          delete[] _ssid_buff;
+          return true;
+        }
+      }
+    }
+  }
+
+  delete[] _ssid_buff;
+  return false;
 }
 
 /**
