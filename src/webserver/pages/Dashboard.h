@@ -8,12 +8,12 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
-#ifndef _EW_SERVER_DASHBOARD_PAGE_H_
-#define _EW_SERVER_DASHBOARD_PAGE_H_
+#ifndef _WEB_SERVER_DASHBOARD_PAGE_H_
+#define _WEB_SERVER_DASHBOARD_PAGE_H_
 
 #include <Arduino.h>
 
-static const char EW_SERVER_DASHBOARD_PAGE[] PROGMEM = "\
+static const char WEB_SERVER_DASHBOARD_PAGE[] PROGMEM = "\
 <h2>Dashboard</h2>\
 \
 <style>\

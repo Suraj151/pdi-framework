@@ -86,7 +86,7 @@ void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_t
   if( otpurl.size() > 5 && nullptr != this->m_http_client ){
 
     this->m_http_client->Begin();
-    this->m_http_client->SetUserAgent("esp");
+    this->m_http_client->SetUserAgent("pdistack");
     this->m_http_client->SetBasicAuthorization("iot-otp", __i_dvc_ctrl.getDeviceMac().c_str());
     this->m_http_client->SetTimeout(2*MILLISECOND_DURATION_1000);
 
@@ -140,7 +140,7 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
   if( configurl.size() > 5 && nullptr != this->m_http_client ){
 
     this->m_http_client->Begin();
-    this->m_http_client->SetUserAgent("esp");
+    this->m_http_client->SetUserAgent("pdistack");
     this->m_http_client->SetBasicAuthorization("iot-otp", __i_dvc_ctrl.getDeviceMac().c_str());
     this->m_http_client->SetTimeout(2*MILLISECOND_DURATION_1000);
     int _httpCode = this->m_http_client->Get(configurl.c_str());

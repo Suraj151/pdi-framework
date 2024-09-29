@@ -8,15 +8,15 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
-#ifndef _EW_SERVER_EMAIL_CONFIG_CONTROLLER_
-#define _EW_SERVER_EMAIL_CONFIG_CONTROLLER_
+#ifndef _WEB_SERVER_EMAIL_CONFIG_CONTROLLER_
+#define _WEB_SERVER_EMAIL_CONFIG_CONTROLLER_
 
 #include "Controller.h"
 #include <service_provider/EmailServiceProvider.h>
 #include <webserver/pages/EmailConfigPage.h>
 #include <webserver/pages/WiFiConfigPage.h>
 
-#define TEST_EMAIL_MESSAGE "this is test mail from esp"
+#define TEST_EMAIL_MESSAGE "this is test mail from pdistack"
 
 /**
  * EmailConfigController class
@@ -59,7 +59,7 @@ public:
 		if (nullptr != this->m_route_handler)
 		{
 			this->m_route_handler->register_route(
-				EW_SERVER_EMAIL_CONFIG_ROUTE, [&]()
+				WEB_SERVER_EMAIL_CONFIG_ROUTE, [&]()
 				{ this->handleEmailConfigRoute(); },
 				AUTH_MIDDLEWARE);
 		}
@@ -72,14 +72,14 @@ public:
 	 * @param	bool|false	_is_error
 	 * @param	bool|false	_enable_flash
 	 * @param	bool|false	_is_test_mail
-	 * @param	int|EW_HTML_MAX_SIZE	_max_size
+	 * @param	int|PAGE_HTML_MAX_SIZE	_max_size
 	 */
-	void build_email_config_html(char *_page, bool _is_error = false, bool _enable_flash = false, bool _is_test_mail = false, int _max_size = EW_HTML_MAX_SIZE)
+	void build_email_config_html(char *_page, bool _is_error = false, bool _enable_flash = false, bool _is_test_mail = false, int _max_size = PAGE_HTML_MAX_SIZE)
 	{
 
 		memset(_page, 0, _max_size);
-		strcat_P(_page, EW_SERVER_HEADER_HTML);
-		strcat_P(_page, EW_SERVER_EMAIL_CONFIG_PAGE_TOP);
+		strcat_P(_page, WEB_SERVER_HEADER_HTML);
+		strcat_P(_page, WEB_SERVER_EMAIL_CONFIG_PAGE_TOP);
 
 		char _port[10];
 		memset(_port, 0, 10);
@@ -102,13 +102,13 @@ public:
 		concat_tr_input_html_tags(_page, PSTR("Send Test Mail ?"), PSTR("tstml"), "test", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, false);
 		// concat_tr_input_html_tags( _page, PSTR("Mail Frequency:"), PSTR("ml_freq"), _freq );
 
-		strcat_P(_page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
+		strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 
 		if (_enable_flash)
 			concat_flash_message_div(_page, _is_error ? PSTR("Invalid length error") : _is_test_mail ? HTML_EMAIL_SUCCESS_FLASH
 																									 : HTML_SUCCESS_FLASH,
 									 _is_error ? ALERT_DANGER : ALERT_SUCCESS);
-		strcat_P(_page, EW_SERVER_FOOTER_HTML);
+		strcat_P(_page, WEB_SERVER_FOOTER_HTML);
 	}
 
 	/**
@@ -187,10 +187,10 @@ public:
 			_is_posted = true;
 		}
 
-		char *_page = new char[EW_HTML_MAX_SIZE];
+		char *_page = new char[PAGE_HTML_MAX_SIZE];
 		this->build_email_config_html(_page, _is_error, _is_posted, _is_test_mail);
 
-		this->m_web_resource->m_server->send(HTTP_OK, EW_HTML_CONTENT, _page);
+		this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
 		delete[] _page;
 
 		if (_is_posted && !_is_error && _is_test_mail)

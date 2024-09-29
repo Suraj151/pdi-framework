@@ -98,6 +98,14 @@ void DatabaseServiceProvider::init_default_database()
     }
   }, MILLISECOND_DURATION_5000, __i_dvc_ctrl.millis_now() );
   #endif
+
+  // clear config to default on factory reset event if enabled
+  #ifdef CONFIG_CLEAR_TO_DEFAULT_ON_FACTORY_RESET
+  __utl_event.add_event_listener(EVENT_FACTORY_RESET, [&](void *e){
+      LogI("\n\nClearing configs to default on factory reset event!\n\n");
+    __database_service.clear_default_tables();
+  });
+  #endif
 }
 
 /**

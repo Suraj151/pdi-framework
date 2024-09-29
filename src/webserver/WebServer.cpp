@@ -15,17 +15,17 @@ created Date    : 1st June 2019
 #include "WebServer.h"
 
 /**
- * EwWebServer constructor.
+ * WebServer constructor.
  */
-EwWebServer::EwWebServer() : m_wifi(nullptr),
+WebServer::WebServer() : m_wifi(nullptr),
                              m_server(&__i_wifi_server)
 {
 }
 
 /**
- * EwWebServer destructor.
+ * WebServer destructor.
  */
-EwWebServer::~EwWebServer()
+WebServer::~WebServer()
 {
   this->m_wifi = nullptr;
 }
@@ -33,7 +33,7 @@ EwWebServer::~EwWebServer()
 /**
  * start http server functionality. this requires wifi should work as access point
  */
-void EwWebServer::start_server(iWiFiInterface *_wifi)
+void WebServer::start_server(iWiFiInterface *_wifi)
 {
   this->m_wifi = _wifi;
   __web_resource.collect_resource(this->m_wifi, this->m_server);
@@ -59,11 +59,11 @@ void EwWebServer::start_server(iWiFiInterface *_wifi)
 /**
  * handle server functionality.
  */
-void EwWebServer::handle_clients()
+void WebServer::handle_clients()
 {
   this->m_server->handleClient();
 }
 
-EwWebServer __web_server;
+WebServer __web_server;
 
 #endif

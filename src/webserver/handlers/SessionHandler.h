@@ -8,8 +8,8 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
-#ifndef _EW_SERVER_SESSION_HANDLER_
-#define _EW_SERVER_SESSION_HANDLER_
+#ifndef _WEB_SERVER_SESSION_HANDLER_
+#define _WEB_SERVER_SESSION_HANDLER_
 
 #include <webserver/resources/WebResource.h>
 

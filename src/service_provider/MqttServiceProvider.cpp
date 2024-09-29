@@ -85,7 +85,7 @@ void MqttServiceProvider::handleMqttPublish(){
             __gpio_service.appendGpioJsonPayload( *_payload );
           #else
 
-            *_payload += "Hello from Esp Client : ";
+            *_payload += "Hello from PDI Client : ";
             *_payload += __i_dvc_ctrl.getDeviceId();
           #endif
 

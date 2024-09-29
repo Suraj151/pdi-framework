@@ -8,17 +8,17 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
-#ifndef _EW_SERVER_WIFI_CONFIG_PAGE_H_
-#define _EW_SERVER_WIFI_CONFIG_PAGE_H_
+#ifndef _WEB_SERVER_WIFI_CONFIG_PAGE_H_
+#define _WEB_SERVER_WIFI_CONFIG_PAGE_H_
 
 #include <Arduino.h>
 
-static const char EW_SERVER_WIFI_CONFIG_PAGE_TOP[] PROGMEM = "\
+static const char WEB_SERVER_WIFI_CONFIG_PAGE_TOP[] PROGMEM = "\
 <h2>WiFi Configuration</h2>\
 <form action='/wifi-config' method='POST'>\
 <table>";
 
-static const char EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM[] PROGMEM = "\
+static const char WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM[] PROGMEM = "\
 <tr>\
 <td></td>\
 <td>\

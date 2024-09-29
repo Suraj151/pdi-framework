@@ -8,8 +8,8 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
-#ifndef _EW_SERVER_DASHBOARD_CONTROLLER_
-#define _EW_SERVER_DASHBOARD_CONTROLLER_
+#ifndef _WEB_SERVER_DASHBOARD_CONTROLLER_
+#define _WEB_SERVER_DASHBOARD_CONTROLLER_
 
 #include "Controller.h"
 #include <webserver/pages/Dashboard.h>
@@ -40,8 +40,8 @@ class DashboardController : public Controller {
 		void boot( void ){
 
 			if( nullptr != this->m_route_handler ){
-				this->m_route_handler->register_route( EW_SERVER_DASHBOARD_ROUTE, [&]() { this->handleDashboardRoute(); }, AUTH_MIDDLEWARE );
-	      		this->m_route_handler->register_route( EW_SERVER_DASHBOARD_MONITOR_ROUTE, [&]() { this->handleDashboardMonitor(); } );
+				this->m_route_handler->register_route( WEB_SERVER_DASHBOARD_ROUTE, [&]() { this->handleDashboardRoute(); }, AUTH_MIDDLEWARE );
+	      		this->m_route_handler->register_route( WEB_SERVER_DASHBOARD_MONITOR_ROUTE, [&]() { this->handleDashboardMonitor(); } );
 			}
 		}
 
@@ -101,7 +101,7 @@ class DashboardController : public Controller {
 			_response += "}";
 
 			this->m_web_resource->m_server->sendHeader("Cache-Control", "no-cache");
-			this->m_web_resource->m_server->send(HTTP_OK, EW_HTML_CONTENT, _response.c_str());
+			this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _response.c_str());
 		}
 
 		/**
@@ -113,14 +113,14 @@ class DashboardController : public Controller {
 
 			bool _is_posted = false;
 
-			char *_page = new char[EW_HTML_MAX_SIZE];
-			memset(_page, 0, EW_HTML_MAX_SIZE);
+			char *_page = new char[PAGE_HTML_MAX_SIZE];
+			memset(_page, 0, PAGE_HTML_MAX_SIZE);
 
-			strcat_P(_page, EW_SERVER_HEADER_HTML);
-			strcat_P(_page, EW_SERVER_DASHBOARD_PAGE);
-			strcat_P(_page, EW_SERVER_FOOTER_WITH_DASHBOARD_MONITOR_HTML);
+			strcat_P(_page, WEB_SERVER_HEADER_HTML);
+			strcat_P(_page, WEB_SERVER_DASHBOARD_PAGE);
+			strcat_P(_page, WEB_SERVER_FOOTER_WITH_DASHBOARD_MONITOR_HTML);
 
-			this->m_web_resource->m_server->send(HTTP_OK, EW_HTML_CONTENT, _page);
+			this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
 			delete[] _page;
 		}
 };

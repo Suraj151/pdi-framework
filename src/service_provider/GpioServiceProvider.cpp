@@ -98,7 +98,7 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isAlertPost ){
       this->m_http_client->Begin();
 
       #ifdef ENABLE_DEVICE_IOT
-      this->m_http_client->SetUserAgent("esp");
+      this->m_http_client->SetUserAgent("pdistack");
       this->m_http_client->SetBasicAuthorization("iot-otp", __i_dvc_ctrl.getDeviceMac().c_str());
       #else
       this->m_http_client->SetUserAgent("pdistack");

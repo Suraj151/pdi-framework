@@ -8,8 +8,8 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
-#ifndef _EW_SERVER_WIFI_CONFIG_CONTROLLER_
-#define _EW_SERVER_WIFI_CONFIG_CONTROLLER_
+#ifndef _WEB_SERVER_WIFI_CONFIG_CONTROLLER_
+#define _WEB_SERVER_WIFI_CONFIG_CONTROLLER_
 
 #include "Controller.h"
 #include <webserver/pages/WiFiConfigPage.h>
@@ -54,7 +54,7 @@ public:
     if (nullptr != this->m_route_handler)
     {
       this->m_route_handler->register_route(
-          EW_SERVER_WIFI_CONFIG_ROUTE, [&]()
+          WEB_SERVER_WIFI_CONFIG_ROUTE, [&]()
           { this->handleWiFiConfigRoute(); },
           AUTH_MIDDLEWARE);
     }
@@ -66,15 +66,15 @@ public:
    * @param	char*	_page
    * @param	bool|false	_is_error
    * @param	bool|false	_enable_flash
-   * @param	int|EW_HTML_MAX_SIZE	_max_size
+   * @param	int|PAGE_HTML_MAX_SIZE	_max_size
    */
-  void build_wifi_config_html(char *_page, bool _is_error = false, bool _enable_flash = false, int _max_size = EW_HTML_MAX_SIZE)
+  void build_wifi_config_html(char *_page, bool _is_error = false, bool _enable_flash = false, int _max_size = PAGE_HTML_MAX_SIZE)
   {
 
     memset(_page, 0, _max_size);
     char _ip_address[20];
-    strcat_P(_page, EW_SERVER_HEADER_HTML);
-    strcat_P(_page, EW_SERVER_WIFI_CONFIG_PAGE_TOP);
+    strcat_P(_page, WEB_SERVER_HEADER_HTML);
+    strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_TOP);
 
 #ifdef ALLOW_WIFI_CONFIG_MODIFICATION
 
@@ -98,7 +98,7 @@ public:
     __int_ip_to_str(_ip_address, this->wifi_configs.ap_subnet, 20);
     concat_tr_input_html_tags(_page, PSTR("Access Subnet:"), PSTR("ap_sip"), _ip_address);
 
-    strcat_P(_page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
+    strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 
 #else
 
@@ -133,7 +133,7 @@ public:
 
 #ifdef ALLOW_WIFI_SSID_PASSKEY_CONFIG_MODIFICATION_ONLY
 
-    strcat_P(_page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
+    strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 
 #endif
 
@@ -141,7 +141,7 @@ public:
 
     if (_enable_flash)
       concat_flash_message_div(_page, _is_error ? PSTR("Invalid length error(3-20)") : PSTR("Config saved Successfully..applying new configs."), _is_error ? ALERT_DANGER : ALERT_SUCCESS);
-    strcat_P(_page, EW_SERVER_FOOTER_HTML);
+    strcat_P(_page, WEB_SERVER_FOOTER_HTML);
   }
 
   /**
@@ -244,14 +244,14 @@ public:
     }
 #endif
 
-    char *_page = new char[EW_HTML_MAX_SIZE];
+    char *_page = new char[PAGE_HTML_MAX_SIZE];
     this->build_wifi_config_html(_page, _is_error, _is_posted);
 
     if (_is_posted && !_is_error)
     {
       this->m_route_handler->send_inactive_session_headers();
     }
-    this->m_web_resource->m_server->send(HTTP_OK, EW_HTML_CONTENT, _page);
+    this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
     delete[] _page;
     if (_is_posted && !_is_error)
     {

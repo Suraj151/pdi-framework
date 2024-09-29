@@ -8,13 +8,13 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
-#ifndef _EW_SERVER_FOOTER_HTML_H_
-#define _EW_SERVER_FOOTER_HTML_H_
+#ifndef _WEB_SERVER_FOOTER_HTML_H_
+#define _WEB_SERVER_FOOTER_HTML_H_
 
 #include <Arduino.h>
 #include <config/Config.h>
 
-static const char EW_SERVER_FOOTER_HTML[] PROGMEM = "\
+static const char WEB_SERVER_FOOTER_HTML[] PROGMEM = "\
 </div>\
 <script>\
 setTimeout(function(){\
@@ -24,7 +24,7 @@ document.getElementsByClassName('msg')[0].style.display='none';\
 </body>\
 </html>";
 
-static const char EW_SERVER_FOOTER_WITH_ANALOG_MONITOR_HTML[] PROGMEM = "\
+static const char WEB_SERVER_FOOTER_WITH_ANALOG_MONITOR_HTML[] PROGMEM = "\
 </div>\
 <script>\
 var rq=new XMLHttpRequest();\
@@ -66,7 +66,7 @@ rq.send();\
 </html>\
 ";
 
-static const char EW_SERVER_FOOTER_WITH_DASHBOARD_MONITOR_HTML[] PROGMEM = "\
+static const char WEB_SERVER_FOOTER_WITH_DASHBOARD_MONITOR_HTML[] PROGMEM = "\
 </div>\
 <script>\
 var rq=new XMLHttpRequest();\
@@ -92,7 +92,7 @@ rq.send();\
 </html>\
 ";
 
-static const char EW_SERVER_FOOTER_WITH_CLIENT_LISTEN_HTML[] PROGMEM = "\
+static const char WEB_SERVER_FOOTER_WITH_CLIENT_LISTEN_HTML[] PROGMEM = "\
 </div>\
 <script>\
 setTimeout(function(){\
@@ -116,7 +116,7 @@ rq.send();\
 
 #ifdef ENABLE_DEVICE_IOT
 
-static const char EW_SERVER_FOOTER_WITH_OTP_MONITOR_HTML[] PROGMEM = "\
+static const char WEB_SERVER_FOOTER_WITH_OTP_MONITOR_HTML[] PROGMEM = "\
 <tr>\
 <td></td>\
 <td>\

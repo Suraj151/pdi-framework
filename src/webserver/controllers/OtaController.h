@@ -8,8 +8,8 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
-#ifndef _EW_SERVER_OTA_CONTROLLER_
-#define _EW_SERVER_OTA_CONTROLLER_
+#ifndef _WEB_SERVER_OTA_CONTROLLER_
+#define _WEB_SERVER_OTA_CONTROLLER_
 
 #include "Controller.h"
 #include <webserver/pages/WiFiConfigPage.h>
@@ -45,7 +45,7 @@ public:
 		if (nullptr != this->m_route_handler)
 		{
 			this->m_route_handler->register_route(
-				EW_SERVER_OTA_CONFIG_ROUTE, [&]()
+				WEB_SERVER_OTA_CONFIG_ROUTE, [&]()
 				{ this->handleOtaServerConfigRoute(); },
 				AUTH_MIDDLEWARE);
 		}
@@ -56,9 +56,9 @@ public:
 	 *
 	 * @param	char*	_page
 	 * @param	bool|false	_enable_flash
-	 * @param	int|EW_HTML_MAX_SIZE	_max_size
+	 * @param	int|PAGE_HTML_MAX_SIZE	_max_size
 	 */
-	void build_ota_server_config_html(char *_page, bool _enable_flash = false, int _max_size = EW_HTML_MAX_SIZE)
+	void build_ota_server_config_html(char *_page, bool _enable_flash = false, int _max_size = PAGE_HTML_MAX_SIZE)
 	{
 		if (nullptr == this->m_web_resource ||
 			nullptr == this->m_web_resource->m_db_conn)
@@ -67,8 +67,8 @@ public:
 		}
 
 		memset(_page, 0, _max_size);
-		strcat_P(_page, EW_SERVER_HEADER_HTML);
-		strcat_P(_page, EW_SERVER_OTA_CONFIG_PAGE_TOP);
+		strcat_P(_page, WEB_SERVER_HEADER_HTML);
+		strcat_P(_page, WEB_SERVER_OTA_CONFIG_PAGE_TOP);
 
 		ota_config_table _ota_configs;
 		this->m_web_resource->m_db_conn->get_ota_config_table(&_ota_configs);
@@ -82,7 +82,7 @@ public:
 		concat_tr_input_html_tags(_page, PSTR("OTA Host:"), PSTR("hst"), _ota_configs.ota_host, OTA_HOST_BUF_SIZE - 1);
 		concat_tr_input_html_tags(_page, PSTR("OTA Port:"), PSTR("prt"), _port);
 
-		strcat_P(_page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
+		strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 #else
 
 		concat_tr_input_html_tags(_page, PSTR("OTA Host:"), PSTR("hst"), _ota_configs.ota_host, OTA_HOST_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
@@ -91,7 +91,7 @@ public:
 
 		if (_enable_flash)
 			concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
-		strcat_P(_page, EW_SERVER_FOOTER_HTML);
+		strcat_P(_page, WEB_SERVER_FOOTER_HTML);
 	}
 
 	/**
@@ -133,10 +133,10 @@ public:
 		}
 #endif
 
-		char *_page = new char[EW_HTML_MAX_SIZE];
+		char *_page = new char[PAGE_HTML_MAX_SIZE];
 		this->build_ota_server_config_html(_page, _is_posted);
 
-		this->m_web_resource->m_server->send(HTTP_OK, EW_HTML_CONTENT, _page);
+		this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
 		delete[] _page;
 	}
 };

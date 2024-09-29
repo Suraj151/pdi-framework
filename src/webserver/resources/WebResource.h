@@ -20,12 +20,12 @@ created Date    : 1st June 2019
 #include <webserver/pages/NotFound.h>
 #include <webserver/helpers/DynamicPageBuildHelper.h>
 
-static const char EW_HTML_CONTENT[] PROGMEM = "text/html";
+static const char TEXT_HTML_CONTENT[] PROGMEM = "text/html";
 
 /**
  * @define html page max size
  */
-#define EW_HTML_MAX_SIZE 5000
+#define PAGE_HTML_MAX_SIZE 5000
 #define MIN_ACCEPTED_ARG_SIZE 3
 
 /**

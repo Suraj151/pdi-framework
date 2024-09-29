@@ -8,8 +8,8 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
-#ifndef _EW_SERVER_ROUTE_HANDLER_
-#define _EW_SERVER_ROUTE_HANDLER_
+#ifndef _WEB_SERVER_ROUTE_HANDLER_
+#define _WEB_SERVER_ROUTE_HANDLER_
 
 #include <webserver/middlewares/Middleware.h>
 
@@ -29,7 +29,7 @@ class RouteHandler : public Middleware{
 		 */
     ~RouteHandler();
 
-    void register_route( const char* _uri, CallBackVoidArgFn _fn, middlwares _middleware_level=NO_MIDDLEWARE, const char* _redirect_uri=EW_SERVER_LOGIN_ROUTE );
+    void register_route( const char* _uri, CallBackVoidArgFn _fn, middlwares _middleware_level=NO_MIDDLEWARE, const char* _redirect_uri=WEB_SERVER_LOGIN_ROUTE );
     void register_not_found_fn( CallBackVoidArgFn _fn );
 };
 

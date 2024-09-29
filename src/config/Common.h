@@ -59,6 +59,11 @@ created Date    : 1st June 2019
 #define AUTO_FACTORY_RESET_ON_INVALID_CONFIGS
 
 /**
+ * enable/disable config clear/reset on factory reset event
+ */
+#define CONFIG_CLEAR_TO_DEFAULT_ON_FACTORY_RESET
+
+/**
  * ignore free relay connections created by same ssid
  */
 #define IGNORE_FREE_RELAY_CONNECTIONS
@@ -96,8 +101,8 @@ created Date    : 1st June 2019
 /**
  * @define default username/ssid and password
  */
-#define USER            "esp8266Stack"
-#define PASSPHRASE      "espStack@8266"
+#define USER            "pdiStack"
+#define PASSPHRASE      "pdiStack@123"
 
 /**
  * @define general http parameters

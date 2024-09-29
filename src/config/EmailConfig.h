@@ -35,7 +35,7 @@ created Date    : 1st June 2019
 #define DEFAULT_MAIL_TO                   DEFAULT_MAIL_FROM
 #define DEFAULT_MAIL_SUBJECT              "device status"
 #define DEFAULT_MAIL_FREQUENCY            300
-#define DEFAULT_MAIL_FROM_NAME            "esp8266"
+#define DEFAULT_MAIL_FROM_NAME            "pdiStack"
 // #define DEFAULT_MAIL_ENCRYPTION           "tls"
 
 

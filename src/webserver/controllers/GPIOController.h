@@ -8,8 +8,8 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
-#ifndef _EW_SERVER_GPIO_CONTROLLER_
-#define _EW_SERVER_GPIO_CONTROLLER_
+#ifndef _WEB_SERVER_GPIO_CONTROLLER_
+#define _WEB_SERVER_GPIO_CONTROLLER_
 
 #include "Controller.h"
 #include <webserver/pages/GpioConfigPage.h>
@@ -56,31 +56,31 @@ public:
 		if (nullptr != this->m_route_handler)
 		{
 			this->m_route_handler->register_route(
-				EW_SERVER_GPIO_MANAGE_CONFIG_ROUTE, [&]()
+				WEB_SERVER_GPIO_MANAGE_CONFIG_ROUTE, [&]()
 				{ this->handleGpioManageRoute(); },
 				AUTH_MIDDLEWARE);
 			this->m_route_handler->register_route(
-				EW_SERVER_GPIO_SERVER_CONFIG_ROUTE, [&]()
+				WEB_SERVER_GPIO_SERVER_CONFIG_ROUTE, [&]()
 				{ this->handleGpioServerConfigRoute(); },
 				AUTH_MIDDLEWARE);
 			this->m_route_handler->register_route(
-				EW_SERVER_GPIO_MODE_CONFIG_ROUTE, [&]()
+				WEB_SERVER_GPIO_MODE_CONFIG_ROUTE, [&]()
 				{ this->handleGpioModeConfigRoute(); },
 				AUTH_MIDDLEWARE);
 			this->m_route_handler->register_route(
-				EW_SERVER_GPIO_WRITE_CONFIG_ROUTE, [&]()
+				WEB_SERVER_GPIO_WRITE_CONFIG_ROUTE, [&]()
 				{ this->handleGpioWriteConfigRoute(); },
 				AUTH_MIDDLEWARE);
 			this->m_route_handler->register_route(
-				EW_SERVER_GPIO_ALERT_CONFIG_ROUTE, [&]()
+				WEB_SERVER_GPIO_ALERT_CONFIG_ROUTE, [&]()
 				{ this->handleGpioAlertConfigRoute(); },
 				AUTH_MIDDLEWARE);
 			this->m_route_handler->register_route(
-				EW_SERVER_GPIO_MONITOR_ROUTE, [&]()
+				WEB_SERVER_GPIO_MONITOR_ROUTE, [&]()
 				{ this->handleGpioMonitorRoute(); },
 				AUTH_MIDDLEWARE);
 			this->m_route_handler->register_route(
-				EW_SERVER_GPIO_ANALOG_MONITOR_ROUTE, [&]()
+				WEB_SERVER_GPIO_ANALOG_MONITOR_ROUTE, [&]()
 				{ this->handleAnalogMonitor(); });
 		}
 		// this->m_web_resource->m_db_conn->get_gpio_config_table(&this->gpio_configs);
@@ -132,7 +132,7 @@ public:
 			this->_last_monitor_point.x = x2;
 			this->_last_monitor_point.y = y2;
 			this->m_web_resource->m_server->sendHeader("Cache-Control", "no-cache");
-			this->m_web_resource->m_server->send(HTTP_OK, EW_HTML_CONTENT, _response->c_str());
+			this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _response->c_str());
 
 			delete _response;
 		}
@@ -151,22 +151,22 @@ public:
 			return;
 		}
 
-		char *_page = new char[EW_HTML_MAX_SIZE];
-		memset(_page, 0, EW_HTML_MAX_SIZE);
+		char *_page = new char[PAGE_HTML_MAX_SIZE];
+		memset(_page, 0, PAGE_HTML_MAX_SIZE);
 
-		strcat_P(_page, EW_SERVER_HEADER_HTML);
-		strcat_P(_page, EW_SERVER_MENU_CARD_PAGE_WRAP_TOP);
+		strcat_P(_page, WEB_SERVER_HEADER_HTML);
+		strcat_P(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_TOP);
 
-		concat_svg_menu_card(_page, EW_SERVER_GPIO_MENU_TITLE_MODES, SVG_ICON48_PATH_TUNE, EW_SERVER_GPIO_MODE_CONFIG_ROUTE);
-		concat_svg_menu_card(_page, EW_SERVER_GPIO_MENU_TITLE_CONTROL, SVG_ICON48_PATH_GAME_ASSET, EW_SERVER_GPIO_WRITE_CONFIG_ROUTE);
-		concat_svg_menu_card(_page, EW_SERVER_GPIO_MENU_TITLE_SERVER, SVG_ICON48_PATH_COMPUTER, EW_SERVER_GPIO_SERVER_CONFIG_ROUTE);
-		concat_svg_menu_card(_page, EW_SERVER_GPIO_MENU_TITLE_MONITOR, SVG_ICON48_PATH_EYE, EW_SERVER_GPIO_MONITOR_ROUTE);
-		concat_svg_menu_card(_page, EW_SERVER_GPIO_MENU_TITLE_ALERT, SVG_ICON48_PATH_NOTIFICATION, EW_SERVER_GPIO_ALERT_CONFIG_ROUTE);
+		concat_svg_menu_card(_page, WEB_SERVER_GPIO_MENU_TITLE_MODES, SVG_ICON48_PATH_TUNE, WEB_SERVER_GPIO_MODE_CONFIG_ROUTE);
+		concat_svg_menu_card(_page, WEB_SERVER_GPIO_MENU_TITLE_CONTROL, SVG_ICON48_PATH_GAME_ASSET, WEB_SERVER_GPIO_WRITE_CONFIG_ROUTE);
+		concat_svg_menu_card(_page, WEB_SERVER_GPIO_MENU_TITLE_SERVER, SVG_ICON48_PATH_COMPUTER, WEB_SERVER_GPIO_SERVER_CONFIG_ROUTE);
+		concat_svg_menu_card(_page, WEB_SERVER_GPIO_MENU_TITLE_MONITOR, SVG_ICON48_PATH_EYE, WEB_SERVER_GPIO_MONITOR_ROUTE);
+		concat_svg_menu_card(_page, WEB_SERVER_GPIO_MENU_TITLE_ALERT, SVG_ICON48_PATH_NOTIFICATION, WEB_SERVER_GPIO_ALERT_CONFIG_ROUTE);
 
-		strcat_P(_page, EW_SERVER_MENU_CARD_PAGE_WRAP_BOTTOM);
-		strcat_P(_page, EW_SERVER_FOOTER_HTML);
+		strcat_P(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_BOTTOM);
+		strcat_P(_page, WEB_SERVER_FOOTER_HTML);
 
-		this->m_web_resource->m_server->send(HTTP_OK, EW_HTML_CONTENT, _page);
+		this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
 		delete[] _page;
 	}
 
@@ -174,13 +174,13 @@ public:
 	 * build gpio monitor html page
 	 *
 	 * @param	char*	_page
-	 * @param	int|EW_HTML_MAX_SIZE	_max_size
+	 * @param	int|PAGE_HTML_MAX_SIZE	_max_size
 	 */
-	void build_gpio_monitor_html(char *_page, int _max_size = EW_HTML_MAX_SIZE)
+	void build_gpio_monitor_html(char *_page, int _max_size = PAGE_HTML_MAX_SIZE)
 	{
 		memset(_page, 0, _max_size);
-		strcat_P(_page, EW_SERVER_HEADER_HTML);
-		strcat_P(_page, EW_SERVER_GPIO_MONITOR_PAGE_TOP);
+		strcat_P(_page, WEB_SERVER_HEADER_HTML);
+		strcat_P(_page, WEB_SERVER_GPIO_MONITOR_PAGE_TOP);
 
 		char *_gpio_monitor_table_heading[] = {"Pin", "Mode", "value"};
 		strcat_P(_page, HTML_TABLE_OPEN_TAG);
@@ -217,10 +217,10 @@ public:
 		concat_style_attribute(_page, PSTR("display:inline-flex;margin-top:25px;"));
 		strcat_P(_page, HTML_TAG_CLOSE_BRACKET);
 		concat_graph_axis_title_div(_page, (char *)"A0 ( 0 - 1024 )", (char *)"writing-mode:vertical-lr");
-		strcat_P(_page, EW_SERVER_GPIO_MONITOR_SVG_ELEMENT);
+		strcat_P(_page, WEB_SERVER_GPIO_MONITOR_SVG_ELEMENT);
 		strcat_P(_page, HTML_DIV_CLOSE_TAG);
 		concat_graph_axis_title_div(_page, (char *)"Time");
-		strcat_P(_page, EW_SERVER_FOOTER_WITH_ANALOG_MONITOR_HTML);
+		strcat_P(_page, WEB_SERVER_FOOTER_WITH_ANALOG_MONITOR_HTML);
 	}
 
 	/**
@@ -236,12 +236,12 @@ public:
 			return;
 		}
 
-		char *_page = new char[EW_HTML_MAX_SIZE];
+		char *_page = new char[PAGE_HTML_MAX_SIZE];
 		this->build_gpio_monitor_html(_page);
 
 		this->_last_monitor_point.x = 0;
 		this->_last_monitor_point.y = GPIO_MAX_GRAPH_HEIGHT - GPIO_GRAPH_BOTTOM_MARGIN;
-		this->m_web_resource->m_server->send(HTTP_OK, EW_HTML_CONTENT, _page);
+		this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
 		delete[] _page;
 	}
 
@@ -250,13 +250,13 @@ public:
 	 *
 	 * @param	char*		_page
 	 * @param	bool|false	_enable_flash
-	 * @param	int|EW_HTML_MAX_SIZE	_max_size
+	 * @param	int|PAGE_HTML_MAX_SIZE	_max_size
 	 */
-	void build_gpio_server_config_html(char *_page, bool _enable_flash = false, int _max_size = EW_HTML_MAX_SIZE)
+	void build_gpio_server_config_html(char *_page, bool _enable_flash = false, int _max_size = PAGE_HTML_MAX_SIZE)
 	{
 		memset(_page, 0, _max_size);
-		strcat_P(_page, EW_SERVER_HEADER_HTML);
-		strcat_P(_page, EW_SERVER_GPIO_SERVER_PAGE_TOP);
+		strcat_P(_page, WEB_SERVER_HEADER_HTML);
+		strcat_P(_page, WEB_SERVER_GPIO_SERVER_PAGE_TOP);
 
 		char _port[10], _freq[10];
 		memset(_port, 0, 10);
@@ -268,10 +268,10 @@ public:
 		concat_tr_input_html_tags(_page, PSTR("Host Port:"), PSTR("prt"), _port);
 		concat_tr_input_html_tags(_page, PSTR("Post Frequency:"), PSTR("frq"), _freq);
 
-		strcat_P(_page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
+		strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 		if (_enable_flash)
 			concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
-		strcat_P(_page, EW_SERVER_FOOTER_HTML);
+		strcat_P(_page, WEB_SERVER_FOOTER_HTML);
 	}
 
 	/**
@@ -310,10 +310,10 @@ public:
 			_is_posted = true;
 		}
 
-		char *_page = new char[EW_HTML_MAX_SIZE];
+		char *_page = new char[PAGE_HTML_MAX_SIZE];
 		this->build_gpio_server_config_html(_page, _is_posted);
 
-		this->m_web_resource->m_server->send(HTTP_OK, EW_HTML_CONTENT, _page);
+		this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
 		delete[] _page;
 		if (_is_posted)
 		{
@@ -326,13 +326,13 @@ public:
 	 *
 	 * @param	char*	_page
 	 * @param	bool|false	_enable_flash
-	 * @param	int|EW_HTML_MAX_SIZE	_max_size
+	 * @param	int|PAGE_HTML_MAX_SIZE	_max_size
 	 */
-	void build_gpio_mode_config_html(char *_page, bool _enable_flash = false, int _max_size = EW_HTML_MAX_SIZE)
+	void build_gpio_mode_config_html(char *_page, bool _enable_flash = false, int _max_size = PAGE_HTML_MAX_SIZE)
 	{
 		memset(_page, 0, _max_size);
-		strcat_P(_page, EW_SERVER_HEADER_HTML);
-		strcat_P(_page, EW_SERVER_GPIO_CONFIG_PAGE_TOP);
+		strcat_P(_page, WEB_SERVER_HEADER_HTML);
+		strcat_P(_page, WEB_SERVER_GPIO_CONFIG_PAGE_TOP);
 		char *_gpio_mode_general_options[] = {"OFF", "DOUT", "DIN", "BLINK", "AOUT"};
 		char *_gpio_mode_analog_options[] = {"OFF", "", "", "", "", "AIN"};
 		int _gpio_mode_general_options_size = sizeof(_gpio_mode_general_options) / sizeof(_gpio_mode_general_options[0]);
@@ -371,10 +371,10 @@ public:
 			}
 		}
 
-		strcat_P(_page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
+		strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 		if (_enable_flash)
 			concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
-		strcat_P(_page, EW_SERVER_FOOTER_HTML);
+		strcat_P(_page, WEB_SERVER_FOOTER_HTML);
 	}
 
 	/**
@@ -440,10 +440,10 @@ public:
 			_is_posted = true;
 		}
 
-		char *_page = new char[EW_HTML_MAX_SIZE];
+		char *_page = new char[PAGE_HTML_MAX_SIZE];
 		this->build_gpio_mode_config_html(_page, _is_posted);
 
-		this->m_web_resource->m_server->send(HTTP_OK, EW_HTML_CONTENT, _page);
+		this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
 		delete[] _page;
 		if (_is_posted)
 		{
@@ -456,14 +456,14 @@ public:
 	 *
 	 * @param	char*	_page
 	 * @param	bool|false	_enable_flash
-	 * @param	int|EW_HTML_MAX_SIZE	_max_size
+	 * @param	int|PAGE_HTML_MAX_SIZE	_max_size
 	 */
-	void build_gpio_write_config_html(char *_page, bool _enable_flash = false, int _max_size = EW_HTML_MAX_SIZE)
+	void build_gpio_write_config_html(char *_page, bool _enable_flash = false, int _max_size = PAGE_HTML_MAX_SIZE)
 	{
 
 		memset(_page, 0, _max_size);
-		strcat_P(_page, EW_SERVER_HEADER_HTML);
-		strcat_P(_page, EW_SERVER_GPIO_WRITE_PAGE_TOP);
+		strcat_P(_page, WEB_SERVER_HEADER_HTML);
+		strcat_P(_page, WEB_SERVER_GPIO_WRITE_PAGE_TOP);
 		char *_gpio_digital_write_options[] = {"LOW", "HIGH"};
 		int _gpio_digital_write_options_size = sizeof(_gpio_digital_write_options) / sizeof(_gpio_digital_write_options[0]);
 
@@ -507,15 +507,15 @@ public:
 
 		if (_added_options)
 		{
-			strcat_P(_page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
+			strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 		}
 		else
 		{
-			strcat_P(_page, EW_SERVER_GPIO_WRITE_EMPTY_MESSAGE);
+			strcat_P(_page, WEB_SERVER_GPIO_WRITE_EMPTY_MESSAGE);
 		}
 		if (_enable_flash)
 			concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
-		strcat_P(_page, EW_SERVER_FOOTER_HTML);
+		strcat_P(_page, WEB_SERVER_FOOTER_HTML);
 	}
 
 	/**
@@ -559,10 +559,10 @@ public:
 			}
 		}
 
-		char *_page = new char[EW_HTML_MAX_SIZE];
+		char *_page = new char[PAGE_HTML_MAX_SIZE];
 		this->build_gpio_write_config_html(_page, _is_posted);
 
-		this->m_web_resource->m_server->send(HTTP_OK, EW_HTML_CONTENT, _page);
+		this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
 		delete[] _page;
 		if (_is_posted)
 		{
@@ -575,13 +575,13 @@ public:
 	 *
 	 * @param	char*	_page
 	 * @param	bool|false	_enable_flash
-	 * @param	int|EW_HTML_MAX_SIZE	_max_size
+	 * @param	int|PAGE_HTML_MAX_SIZE	_max_size
 	 */
-	void build_gpio_alert_config_html(char *_page, bool _enable_flash = false, int _max_size = EW_HTML_MAX_SIZE)
+	void build_gpio_alert_config_html(char *_page, bool _enable_flash = false, int _max_size = PAGE_HTML_MAX_SIZE)
 	{
 		memset(_page, 0, _max_size);
-		strcat_P(_page, EW_SERVER_HEADER_HTML);
-		strcat_P(_page, EW_SERVER_GPIO_ALERT_PAGE_TOP);
+		strcat_P(_page, WEB_SERVER_HEADER_HTML);
+		strcat_P(_page, WEB_SERVER_GPIO_ALERT_PAGE_TOP);
 		char *_gpio_digital_alert_options[] = {"LOW", "HIGH"};
 #ifdef ENABLE_EMAIL_SERVICE
 		char *_gpio_alert_channels[] = {"NOALERT", "MAIL", "HTTPSERVER"};
@@ -660,15 +660,15 @@ public:
 
 		if (_added_options)
 		{
-			strcat_P(_page, EW_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
+			strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 		}
 		else
 		{
-			strcat_P(_page, EW_SERVER_GPIO_ALERT_EMPTY_MESSAGE);
+			strcat_P(_page, WEB_SERVER_GPIO_ALERT_EMPTY_MESSAGE);
 		}
 		if (_enable_flash)
 			concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
-		strcat_P(_page, EW_SERVER_FOOTER_HTML);
+		strcat_P(_page, WEB_SERVER_FOOTER_HTML);
 	}
 
 	/**
@@ -745,10 +745,10 @@ public:
 			}
 		}
 
-		char *_page = new char[EW_HTML_MAX_SIZE];
+		char *_page = new char[PAGE_HTML_MAX_SIZE];
 		this->build_gpio_alert_config_html(_page, _is_posted);
 
-		this->m_web_resource->m_server->send(HTTP_OK, EW_HTML_CONTENT, _page);
+		this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
 		delete[] _page;
 		if (_is_posted)
 		{
