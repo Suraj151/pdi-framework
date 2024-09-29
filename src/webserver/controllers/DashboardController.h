@@ -57,8 +57,8 @@ class DashboardController : public Controller {
 				return;
 			}
 
-			struct station_info *stat_info = wifi_softap_get_station_info();
-			int n = 1;
+			std::vector<wifi_station_info_t> stations;
+			this->m_web_resource->m_wifi->getApsConnectedStations(stations);
 
 			std::string _response = "{\"nm\":\"";
 			_response += this->m_web_resource->m_wifi->SSID();
@@ -76,26 +76,25 @@ class DashboardController : public Controller {
 			_response += std::to_string(__i_ntp.get_ntp_time());
 			_response += ",\"dl\":\"";
 
-			while (nullptr != stat_info)
+			for (uint32_t sta_indx=0; sta_indx < stations.size(); sta_indx++)
 			{
 				char macStr[30];
 				memset(macStr, 0, 30);
 				sprintf(
 					macStr,
 					"%02X:%02X:%02X:%02X:%02X:%02X",
-					stat_info->bssid[0], stat_info->bssid[1], stat_info->bssid[2], stat_info->bssid[3], stat_info->bssid[4], stat_info->bssid[5]);
+					stations[sta_indx].bssid[0], stations[sta_indx].bssid[1], stations[sta_indx].bssid[2], stations[sta_indx].bssid[3], stations[sta_indx].bssid[4], stations[sta_indx].bssid[5]);
 				_response += "<tr><td>";
 				_response += std::string(macStr);
 				_response += "</td><td>";
-				_response += std::to_string((uint8_t)stat_info->ip.addr);
+				_response += std::to_string((uint8_t)stations[sta_indx].ip4);
 				_response += ".";
-				_response += std::to_string((uint8_t)(stat_info->ip.addr >> 8));
+				_response += std::to_string((uint8_t)(stations[sta_indx].ip4 >> 8));
 				_response += ".";
-				_response += std::to_string((uint8_t)(stat_info->ip.addr >> 16));
+				_response += std::to_string((uint8_t)(stations[sta_indx].ip4 >> 16));
 				_response += ".";
-				_response += std::to_string((uint8_t)(stat_info->ip.addr >> 24));
+				_response += std::to_string((uint8_t)(stations[sta_indx].ip4 >> 24));
 				_response += "</td></tr>";
-				stat_info = STAILQ_NEXT(stat_info, next);
 			}
 			_response += "\",\"r\":";
 			_response += std::to_string(!this->m_route_handler->has_active_session());

@@ -79,6 +79,7 @@ public:
   int32_t RSSI(uint8_t _networkItem) override;
   uint8_t *BSSID(uint8_t _networkItem) override;
   bool get_bssid_within_scanned_nw_ignoring_connected_stations(char *ssid, uint8_t *bssid, uint8_t *ignorebssid, int _scanCount) override;
+  bool getApsConnectedStations(std::vector<wifi_station_info_t> &stations) override;
 
   void enableNetworkStatusIndication() override;
   void enableNAPT() override;

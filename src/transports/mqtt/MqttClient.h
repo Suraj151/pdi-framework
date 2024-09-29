@@ -88,7 +88,7 @@ typedef void (*MqttDataCallback)(uint32_t *args, const char *topic, uint32_t top
 
 typedef struct
 {
-	ip_addr_t ip;
+	// ip_addr_t ip;
 	mqtt_state_t mqtt_state;
 	mqtt_connect_info_t connect_info;
 	uint32_t keepAliveTick;

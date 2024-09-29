@@ -124,6 +124,23 @@ struct ipaddress_t
     }
 };
 
+/**
+ * Define wifi station info struct
+ * bssid - mac address of access point/connected station
+ */
+struct wifi_station_info_t
+{
+    uint8_t bssid[6];
+    uint32_t ip4;
+
+    wifi_station_info_t( uint8_t *_bssid, uint32_t _ip4 )
+    {
+        memcpy(bssid, _bssid, 6);
+        ip4 = _ip4;
+    }
+};
+
+
 /* upgrade defs */
 typedef enum
 {

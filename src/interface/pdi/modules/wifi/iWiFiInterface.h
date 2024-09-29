@@ -79,6 +79,7 @@ public:
   virtual int32_t RSSI(uint8_t _networkItem) = 0;
   virtual uint8_t *BSSID(uint8_t _networkItem) = 0;
   virtual bool get_bssid_within_scanned_nw_ignoring_connected_stations(char *ssid, uint8_t *bssid, uint8_t *ignorebssid, int _scanCount) = 0;
+  virtual bool getApsConnectedStations(std::vector<wifi_station_info_t> &stations) = 0;
 
   
   virtual void enableNetworkStatusIndication() = 0;

@@ -554,6 +554,23 @@ bool WiFiInterface::get_bssid_within_scanned_nw_ignoring_connected_stations(char
 }
 
 /**
+ * return the list of connected stations info to acess point
+ */
+bool WiFiInterface::getApsConnectedStations(std::vector<wifi_station_info_t> &stations)
+{
+  struct station_info *stat_info = wifi_softap_get_station_info();
+
+  while (nullptr != stat_info)
+  {
+    wifi_station_info_t _station(stat_info->bssid, stat_info->ip.addr);
+    stations.push_back(_station);
+    stat_info = STAILQ_NEXT(stat_info, next);
+  }
+
+  return true;
+}
+
+/**
  * n/w status indication
  */
 void WiFiInterface::enableNetworkStatusIndication()
