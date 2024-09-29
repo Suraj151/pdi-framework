@@ -8,7 +8,7 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 #include <config/Config.h>
-#include <interface/esp8266/esp8266.h>
+#include "../esp8266.h"
 
 #if defined(ENABLE_ESP_NOW)
 

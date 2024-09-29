@@ -8,6 +8,10 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 #include "ExceptionsNotifier.h"
+#include <config/Config.h>
+#ifdef ENABLE_EMAIL_SERVICE
+#include <service_provider/EmailServiceProvider.h>
+#endif
 
 #if defined(ENABLE_EXCEPTION_NOTIFIER)
 

@@ -44,10 +44,7 @@ void WiFiServiceProvider::begin( iWiFiInterface* _wifi ){
   wifi_config_table _wifi_credentials;
   __database_service.get_wifi_config_table( &_wifi_credentials );
 
-  // this->m_wifi->mode(WIFI_AP_STA);
-  this->m_wifi->setSleepMode(WIFI_NONE_SLEEP);  // WIFI_NONE_SLEEP = 0, WIFI_LIGHT_SLEEP = 1, WIFI_MODEM_SLEEP = 2
-  this->m_wifi->setOutputPower(21.0);  // dBm max: +20.5dBm  min: 0dBm
-  this->m_wifi->persistent(false);
+  this->m_wifi->init();
   this->m_wifi->setAutoReconnect(false);
   this->configure_wifi_station( &_wifi_credentials );
   this->configure_wifi_access_point( &_wifi_credentials );
@@ -209,15 +206,16 @@ bool WiFiServiceProvider::configure_wifi_station( wifi_config_table* _wifi_crede
 
   LogI("\n");
 
-  if( this->m_wifi->status() == WL_CONNECTED ){
+  wifi_status_t stat = this->m_wifi->status();
+  if( CONN_STATUS_CONNECTED == stat ){
     LogFmtI("Connected to %s\n", _wifi_credentials->sta_ssid);
     LogFmtI("IP address: %s\n", ((std::string)this->m_wifi->localIP()).c_str());
     // this->m_wifi->setAutoConnect(true);
     // this->m_wifi->setAutoReconnect(true);
     return true;
-  }else if( this->m_wifi->status() == WL_NO_SSID_AVAIL ){
+  }else if( CONN_STATUS_NOT_AVAILABLE == stat ){
     LogFmtW("%s Not Found/reachable. Make sure it's availability.\n", _wifi_credentials->sta_ssid);
-  }else if( this->m_wifi->status() == WL_CONNECT_FAILED ){
+  }else if( CONN_STATUS_CONNECTION_FAILED == stat || CONN_STATUS_CONFIG_ERROR == stat ){
     LogFmtW("%s is available but not connecting. Please check password.\n", _wifi_credentials->sta_ssid);
   }else{
     LogW("WiFi Not Connecting. Will try later soon..\n");

@@ -36,6 +36,7 @@ public:
   virtual ~iWiFiInterface() {}
 
   // generic api's
+  virtual void init() = 0;
   virtual void setOutputPower(float _dBm) = 0;
   virtual void persistent(bool _persistent) = 0;
   virtual bool setMode(wifi_mode_t _mode) = 0;
@@ -44,6 +45,7 @@ public:
   virtual wifi_mode_t getMode() = 0;
   virtual bool enableSTA(bool _enable) = 0;
   virtual bool enableAP(bool _enable) = 0;
+  virtual uint8_t channel() = 0;
   virtual int hostByName(const char *aHostname, ipaddress_t &aResult, uint32_t timeout_ms) = 0;
 
   virtual wifi_status_t begin(char *_ssid, char *_passphrase = nullptr, int32_t _channel = 0, const uint8_t *_bssid = nullptr, bool _connect = true) = 0;

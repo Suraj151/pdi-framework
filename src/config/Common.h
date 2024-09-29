@@ -25,6 +25,11 @@ created Date    : 1st June 2019
 // #define ENABLE_TIMER_TASK_SCHEDULER
 
 /**
+ * enable/disable mocking for test
+ */
+#define MOCK_DEVICE_TEST
+
+/**
  * enable/disable gpio and mqtt feature here
  */
 #define ENABLE_MQTT_SERVICE

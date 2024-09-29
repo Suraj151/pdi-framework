@@ -8,8 +8,12 @@ Author          : Suraj I.
 created Date    : 1st Jan 2024
 ******************************************************************************/
 
-#include "ExceptionsNotifier.h"
 #include "DeviceControlInterface.h"
+#include "ExceptionsNotifier.h"
+#include "LoggerInterface.h"
+#include "WiFiClientInterface.h"
+#include "core/Espnow.h"
+#include "PingInterface.h"
 
 /**
  * DeviceControlInterface constructor.

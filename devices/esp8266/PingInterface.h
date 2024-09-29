@@ -13,7 +13,6 @@ created Date    : 1st June 2019
 
 #include "esp8266.h"
 #include <interface/pdi/middlewares/iPingInterface.h>
-#include "LoggerInterface.h"
 
 // This function is called when a ping is received or the request times out:
 static void ICACHE_FLASH_ATTR ping_recv_cb(void* arg, void* pdata);

@@ -11,7 +11,7 @@ created Date    : 1st June 2019
 #define _ESPNOW_H_
 
 #include "EspnowConfig.h"
-#include <interface/esp8266/WiFiInterface.h>
+#include "../WiFiInterface.h"
 
 typedef struct
 {

@@ -9,6 +9,7 @@ created Date    : 1st June 2019
 ******************************************************************************/
 
 #include "PingInterface.h"
+#include "LoggerInterface.h"
 
 volatile bool _host_resp = false;
 const uint32_t _pinghostip = 0x08080808;

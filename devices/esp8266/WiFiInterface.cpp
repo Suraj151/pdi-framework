@@ -9,6 +9,9 @@ created Date    : 1st June 2019
 ******************************************************************************/
 
 #include "WiFiInterface.h"
+#include "LoggerInterface.h"
+#include "DeviceControlInterface.h"
+
 #if defined( ENABLE_NAPT_FEATURE )
 #include "lwip/lwip_napt.h"
 #include "lwip/app/dhcpserver.h"
@@ -30,6 +33,37 @@ extern "C" void preinit() {
 }
 
 /**
+ * begin wifi interface
+ */
+wifi_status_t toWifiStatus(wl_status_t stat)
+{
+  wifi_status_t _wifi_status = CONN_STATUS_MAX;
+  switch (stat)
+  {
+  case WL_CONNECTED:
+    _wifi_status = CONN_STATUS_CONNECTED;
+    break;    
+  case WL_NO_SSID_AVAIL:
+    _wifi_status = CONN_STATUS_NOT_AVAILABLE;
+    break;
+  case WL_CONNECT_FAILED:
+    _wifi_status = CONN_STATUS_CONNECTION_FAILED;
+    break;
+  case WL_WRONG_PASSWORD:
+    _wifi_status = CONN_STATUS_CONFIG_ERROR;
+    break;
+  case WL_DISCONNECTED:
+    _wifi_status = CONN_STATUS_DISCONNECTED;
+    break;
+  default:
+    _wifi_status = CONN_STATUS_MAX;
+    break;
+  }
+
+  return _wifi_status;
+}
+
+/**
  * WiFiInterface constructor.
  */
 WiFiInterface::WiFiInterface() : m_wifi(&WiFi), m_wifi_led(0)
@@ -43,6 +77,17 @@ WiFiInterface::WiFiInterface() : m_wifi(&WiFi), m_wifi_led(0)
 WiFiInterface::~WiFiInterface()
 {
   this->m_wifi = nullptr;
+}
+
+/**
+ * Init the wifi interface
+ */
+void WiFiInterface::init()
+{
+  // this->m_wifi->mode(WIFI_AP_STA);
+  setSleepMode(WIFI_NONE_SLEEP);  // WIFI_NONE_SLEEP = 0, WIFI_LIGHT_SLEEP = 1, WIFI_MODEM_SLEEP = 2
+  setOutputPower(21.0);  // dBm max: +20.5dBm  min: 0dBm
+  persistent(false);
 }
 
 /**
@@ -149,6 +194,19 @@ bool WiFiInterface::enableAP(bool _enable)
 }
 
 /**
+ * return the channel
+ */
+uint8_t WiFiInterface::channel()
+{
+  uint8_t channel = 0;
+  if (nullptr != this->m_wifi)
+  {
+    channel = this->m_wifi->channel();
+  }
+  return channel;
+}
+
+/**
  * hostByName
  */
 int WiFiInterface::hostByName(const char *aHostname, ipaddress_t &aResult, uint32_t timeout_ms)
@@ -164,14 +222,15 @@ int WiFiInterface::hostByName(const char *aHostname, ipaddress_t &aResult, uint3
 }
 
 /**
- * begin
+ * begin wifi interface
  */
 wifi_status_t WiFiInterface::begin(char *_ssid, char *_passphrase, int32_t _channel, const uint8_t *_bssid, bool _connect)
 {
-  wifi_status_t _wifi_status = 0;
+  wifi_status_t _wifi_status = CONN_STATUS_MAX;
   if (nullptr != this->m_wifi)
   {
-    _wifi_status = static_cast<wifi_status_t>(this->m_wifi->begin(_ssid, _passphrase, _channel, _bssid, _connect));
+    wl_status_t stat = this->m_wifi->begin(_ssid, _passphrase, _channel, _bssid, _connect);
+    _wifi_status = toWifiStatus(stat);
   }
   return _wifi_status;
 }
@@ -311,10 +370,11 @@ ipaddress_t WiFiInterface::dnsIP(uint8_t _dns_no)
  */
 wifi_status_t WiFiInterface::status()
 {
-  wifi_status_t _wifi_status = 0;
+  wifi_status_t _wifi_status = CONN_STATUS_MAX;
   if (nullptr != this->m_wifi)
   {
-    _wifi_status = static_cast<wifi_status_t>(this->m_wifi->status());
+    wl_status_t stat = this->m_wifi->status();
+    _wifi_status = toWifiStatus(stat);
   }
   return _wifi_status;
 }

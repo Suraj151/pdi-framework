@@ -17,18 +17,31 @@ created Date    : 1st June 2019
 #include <string>
 #include <cstdio>
 #include <cstring>
+#include <cmath>
 #include <functional>
 
 // option to define the attribute for read only data
 // redefine this in derived interface
 #define RODT_ATTR(x) x
 
+/* connection enums */
+typedef enum {
+    CONN_STATUS_IDLE = 0,
+    CONN_STATUS_CONNECTED,
+    CONN_STATUS_CONNECTION_FAILED,
+    CONN_STATUS_CONNECTION_LOST,
+    CONN_STATUS_CONFIG_ERROR,
+    CONN_STATUS_NOT_AVAILABLE,
+    CONN_STATUS_DISCONNECTED,
+    CONN_STATUS_MAX
+} conn_status_t;
+
 typedef uint8_t gpio_id_t;
 typedef int64_t gpio_val_t;
 
 typedef uint8_t wifi_mode_t;
 typedef uint8_t sleep_mode_t;
-typedef uint16_t wifi_status_t;
+typedef conn_status_t wifi_status_t;
 typedef uint8_t follow_redirects_t;
 
 typedef uint16_t http_method_t;

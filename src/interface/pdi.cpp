@@ -8,17 +8,10 @@ Author          : Suraj I.
 created Date    : 1st Jan 2024
 ******************************************************************************/
 
-#ifndef _PORTABLE_DEVICE_INTERFACE_H_
-#define _PORTABLE_DEVICE_INTERFACE_H_
-
-#include <config/Config.h>
+#include "pdi.h"
 
 #ifdef MOCK_DEVICE_TEST
-#include "../../devices/mockdevice/mockdevice_pdi.h"
+#include "../../devices/mockdevice/mockdevice_pdi.cpp"
 #else
-#include "../../devices/esp8266/esp8266_pdi.h"
+#include "../../devices/esp8266/esp8266_pdi.cpp"
 #endif
-
-#include <interface/pdi/iDeviceIotInterface.h>
-
-#endif  // _PORTABLE_DEVICE_INTERFACE_H_

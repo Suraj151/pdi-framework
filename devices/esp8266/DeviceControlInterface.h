@@ -13,10 +13,6 @@ created Date    : 1st Jan 2024
 
 #include "esp8266.h"
 #include <interface/pdi/middlewares/iDeviceControlInterface.h>
-#include "LoggerInterface.h"
-#include "WiFiClientInterface.h"
-#include "core/Espnow.h"
-#include "PingInterface.h"
 
 /**
  * Gpio's that should not be touched

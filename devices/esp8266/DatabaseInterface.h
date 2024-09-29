@@ -13,7 +13,7 @@ created Date    : 1st Jan 2024
 
 #include "esp8266.h"
 #include <interface/pdi/iDatabaseInterface.h>
-#include <interface/esp8266/core/EW_EEPROM.h>
+#include "core/EW_EEPROM.h"
 
 /**
  * define eeprom max size available here

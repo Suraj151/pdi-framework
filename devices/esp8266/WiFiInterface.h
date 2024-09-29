@@ -13,8 +13,6 @@ created Date    : 1st June 2019
 
 #include "esp8266.h"
 #include <interface/pdi/modules/wifi/iWiFiInterface.h>
-#include "LoggerInterface.h"
-#include "DeviceControlInterface.h"
 
 // declare device specific
 class IPAddress;
@@ -36,6 +34,7 @@ public:
   ~WiFiInterface();
 
   // generic api's
+  void init() override;
   void setOutputPower(float _dBm) override;
   void persistent(bool _persistent) override;
   bool setMode(wifi_mode_t _mode) override;
@@ -44,6 +43,7 @@ public:
   sleep_mode_t getSleepMode() override;
   bool enableSTA(bool _enable) override;
   bool enableAP(bool _enable) override;
+  uint8_t channel() override;
   int hostByName(const char *aHostname, ipaddress_t &aResult, uint32_t timeout_ms) override;
 
   wifi_status_t begin(char *_ssid, char *_passphrase = nullptr, int32_t _channel = 0, const uint8_t *_bssid = nullptr, bool _connect = true) override;
