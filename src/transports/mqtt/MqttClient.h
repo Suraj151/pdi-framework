@@ -1,5 +1,5 @@
 /******************************** MQTT File ***********************************
-This file is part of the Ewings Esp Stack. It is written with the reference
+This file is part of the pdi stack. It is written with the reference
 of https://github.com/tuanpmt/esp_mqtt
 
 
@@ -9,8 +9,8 @@ warranty.
 Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
-#ifndef EW_MQTT_CLIENT_SERVICE_H
-#define EW_MQTT_CLIENT_SERVICE_H
+#ifndef MQTT_CLIENT_SERVICE_H
+#define MQTT_CLIENT_SERVICE_H
 
 #include <interface/pdi.h>
 #include <helpers/ClientHelper.h>

@@ -1,5 +1,5 @@
 /************** Over The Air firmware update service **************************
-This file is part of the Ewings Esp Stack.
+This file is part of the pdi stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -102,7 +102,7 @@ http_ota_status OtaServiceProvider::handle()
   if (nullptr != this->m_http_client && firmware_url.size() > 0 && _ota_configs.ota_port > 0)
   {
     this->m_http_client->Begin();
-    this->m_http_client->SetUserAgent("Ewings");
+    this->m_http_client->SetUserAgent("pdistack");
     this->m_http_client->SetBasicAuthorization("ota", __i_dvc_ctrl.getDeviceMac().c_str());
     this->m_http_client->SetTimeout(2 * MILLISECOND_DURATION_1000);
 

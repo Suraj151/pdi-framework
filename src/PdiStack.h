@@ -1,5 +1,5 @@
-/***************************** Ewings Esp Stack *******************************
-This file is part of the Ewings Esp Stack.
+/********************************* PDI stack *********************************
+This file is part of the pdi stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -8,15 +8,13 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
-#ifndef _EWINGS_ESP_STACK_H_
-#define _EWINGS_ESP_STACK_H_
-
-#include <config/Config.h>
+#ifndef _PDI_STACK_H_
+#define _PDI_STACK_H_
 
 #include <interface/pdi.h>
 
-#ifdef ENABLE_EWING_HTTP_SERVER
-#include <webserver/EwingsWebServer.h>
+#ifdef ENABLE_HTTP_SERVER
+#include <webserver/WebServer.h>
 #endif
 
 #include <service_provider/DatabaseServiceProvider.h>
@@ -41,20 +39,20 @@ created Date    : 1st June 2019
 #endif
 
 /**
- * EwingsEspStack class
+ * PDIStack class
  */
-class EwingsEspStack {
+class PDIStack {
 
   public:
 
     /**
-     * EwingsEspStack constructor.
+     * PDIStack constructor.
      */
-    EwingsEspStack();
+    PDIStack();
     /**
-     * EwingsEspStack destructor.
+     * PDIStack destructor.
      */
-    ~EwingsEspStack();
+    ~PDIStack();
 
     void initialize( void );
     void serve( void );
@@ -72,6 +70,6 @@ class EwingsEspStack {
     iClientInterface  *m_client;
 };
 
-extern EwingsEspStack EwStack;
+extern PDIStack PdiStack;
 
 #endif

@@ -1,5 +1,5 @@
 /***************************** Custom EEPROM **********************************
-This file is part of the Ewings Esp Stack. It is modified/edited copy of
+This file is part of the pdi stack. It is modified/edited copy of
 arduino esp8266 eeprom library.
 
 This is free software. you can redistribute it and/or modify it but without any

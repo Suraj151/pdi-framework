@@ -1,5 +1,5 @@
 /*************************** Global Config page *******************************
-This file is part of the Ewings Esp Stack.
+This file is part of the pdi stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -13,7 +13,7 @@ created Date    : 1st June 2019
 #include "Common.h"
 
 /**
- * common default configurations for all ewings stack
+ * common default configurations for all stack
  */
 #define CONFIG_START      5
 #define CONFIG_VERSION    "1.0"

@@ -1,5 +1,5 @@
 /******************************** web server **********************************
-This file is part of the Ewings Esp Stack.
+This file is part of the pdi stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -10,9 +10,9 @@ created Date    : 1st June 2019
 
 #include <config/Config.h>
 
-#if defined(ENABLE_EWING_HTTP_SERVER)
+#if defined(ENABLE_HTTP_SERVER)
 
-#include "EwingsWebServer.h"
+#include "WebServer.h"
 
 /**
  * EwWebServer constructor.

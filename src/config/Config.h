@@ -1,5 +1,5 @@
 /******************************** Config page *********************************
-This file is part of the Ewings Esp Stack.
+This file is part of the pdi stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -48,7 +48,7 @@ created Date    : 1st June 2019
 // #endif
 
 /**
- * table addresses in ewings database.
+ * table addresses in database.
  */
 enum eeprom_db_table_address {
   GLOBAL_CONFIG_TABLE_ADDRESS = CONFIG_START,

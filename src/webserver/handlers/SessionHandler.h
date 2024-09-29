@@ -1,5 +1,5 @@
 /***************************** Session Handler ********************************
-This file is part of the Ewings Esp Stack.
+This file is part of the pdi stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -61,9 +61,9 @@ public:
    * @param	bool  _stat
    * @param	int   _max_size
    * @param	bool|false	_enable_max_age
-   * @param	uint32_t|EW_COOKIE_MAX_AGE  _max_age
+   * @param	uint32_t|SERVER_COOKIE_MAX_AGE  _max_age
    */
-  void build_session_cookie(char *_str, bool _stat, int _max_size, bool _enable_max_age = false, uint32_t _max_age = EW_COOKIE_MAX_AGE)
+  void build_session_cookie(char *_str, bool _stat, int _max_size, bool _enable_max_age = false, uint32_t _max_age = SERVER_COOKIE_MAX_AGE)
   {
 
     if (nullptr == __web_resource.m_db_conn)

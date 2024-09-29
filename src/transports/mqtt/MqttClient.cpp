@@ -1,5 +1,5 @@
 /******************************** MQTT File ***********************************
-This file is part of the Ewings Esp Stack. It is written with the reference
+This file is part of the pdi stack. It is written with the reference
 of https://github.com/tuanpmt/esp_mqtt
 
 

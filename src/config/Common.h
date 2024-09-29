@@ -1,5 +1,5 @@
 /*************************** Common Config page *******************************
-This file is part of the Ewings Esp Stack.
+This file is part of the pdi stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -27,7 +27,7 @@ created Date    : 1st June 2019
 /**
  * enable/disable mocking for test
  */
-#define MOCK_DEVICE_TEST
+// #define MOCK_DEVICE_TEST
 
 /**
  * enable/disable gpio and mqtt feature here
@@ -66,7 +66,7 @@ created Date    : 1st June 2019
 /**
  * enable/disable http server feature here
  */
-#define ENABLE_EWING_HTTP_SERVER
+#define ENABLE_HTTP_SERVER
 
 /**
  * enable/disable network subnetting ( dynamically set ap subnet,gateway etc. )

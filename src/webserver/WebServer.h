@@ -1,5 +1,5 @@
 /******************************** web server **********************************
-This file is part of the Ewings Esp Stack.
+This file is part of the pdi stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -8,8 +8,8 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
-#ifndef _EWINGS_WEB_SERVER_H_
-#define _EWINGS_WEB_SERVER_H_
+#ifndef _HTTP_WEB_SERVER_H_
+#define _HTTP_WEB_SERVER_H_
 
 #include <webserver/controllers/HomeController.h>
 #include <webserver/controllers/DashboardController.h>

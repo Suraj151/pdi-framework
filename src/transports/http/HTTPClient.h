@@ -1,5 +1,5 @@
 /******************************** HTTP Client *********************************
-This file is part of the Ewings Esp Stack.
+This file is part of the pdi stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -7,8 +7,8 @@ warranty.
 Author          : Suraj I.
 created Date    : 1st Jan 2024
 ******************************************************************************/
-#ifndef EW_HTTP_CLIENT_H
-#define EW_HTTP_CLIENT_H
+#ifndef HTTP_CLIENT_H
+#define HTTP_CLIENT_H
 
 #include <interface/pdi.h>
 #include <helpers/ClientHelper.h>

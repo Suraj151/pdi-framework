@@ -1,5 +1,5 @@
 /****************************** Gpio service **********************************
-This file is part of the Ewings Esp Stack.
+This file is part of the pdi stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -101,7 +101,7 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isAlertPost ){
       this->m_http_client->SetUserAgent("esp");
       this->m_http_client->SetBasicAuthorization("iot-otp", __i_dvc_ctrl.getDeviceMac().c_str());
       #else
-      this->m_http_client->SetUserAgent("Ewings");
+      this->m_http_client->SetUserAgent("pdistack");
       this->m_http_client->SetBasicAuthorization("user", "password");
       #endif
 

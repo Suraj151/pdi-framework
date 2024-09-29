@@ -1,5 +1,5 @@
-/**************************** Ewings Esp Stack *********************************
-This file is part of the Ewings Esp Stack.
+/**************************** pdi stack *********************************
+This file is part of the pdi stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -7,13 +7,13 @@ warranty.
 Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
-#include "EwingsEspStack.h"
+#include "PdiStack.h"
 #include <utility/EventUtil.h>
 
 /**
- * EwingsEspStack constructor.
+ * PDIStack constructor.
  */
-EwingsEspStack::EwingsEspStack():
+PDIStack::PDIStack():
   m_wifi(&__i_wifi),
   m_client(&__i_wifi_client)
 {
@@ -23,9 +23,9 @@ EwingsEspStack::EwingsEspStack():
 }
 
 /**
- * EwingsEspStack destructor.
+ * PDIStack destructor.
  */
-EwingsEspStack::~EwingsEspStack(){
+PDIStack::~PDIStack(){
   this->m_wifi = nullptr;
   this->m_client = nullptr;
 }
@@ -33,7 +33,7 @@ EwingsEspStack::~EwingsEspStack(){
 /**
  * initialize all required features/services/actions.
  */
-void EwingsEspStack::initialize(){
+void PDIStack::initialize(){
 
   LOGBEGIN;
   LogI("Initializing...\n");
@@ -44,7 +44,7 @@ void EwingsEspStack::initialize(){
 
   __wifi_service.begin( this->m_wifi );
 
-  #ifdef ENABLE_EWING_HTTP_SERVER
+  #ifdef ENABLE_HTTP_SERVER
   __web_server.start_server( this->m_wifi );
   #endif
   __ota_service.begin_ota( this->m_client );
@@ -71,9 +71,9 @@ void EwingsEspStack::initialize(){
 /**
  * serve each internal action, client request, auto operations
  */
-void EwingsEspStack::serve(){
+void PDIStack::serve(){
 
-  #ifdef ENABLE_EWING_HTTP_SERVER
+  #ifdef ENABLE_HTTP_SERVER
   __web_server.handle_clients();
   #endif
   __task_scheduler.handle_tasks();
@@ -83,7 +83,7 @@ void EwingsEspStack::serve(){
 /**
  * prints log as per defined duration
  */
-void EwingsEspStack::handleLogPrints(){
+void PDIStack::handleLogPrints(){
 
   __wifi_service.printWiFiConfigLogs();
   __ota_service.printOtaConfigLogs();
@@ -104,4 +104,4 @@ void EwingsEspStack::handleLogPrints(){
   LogFmtI("NTP Time : %d\n", (int)__i_ntp.get_ntp_time());
 }
 
-EwingsEspStack EwStack;
+PDIStack PdiStack;
