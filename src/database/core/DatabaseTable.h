@@ -18,7 +18,7 @@ created Date    : 1st June 2019
 /**
  * DatabaseTable class
  */
-template <class Table>
+template <uint16_t addr, class Table>
 class DatabaseTable : public DatabaseTableAbstractLayer
 {
 
@@ -37,6 +37,39 @@ public:
 	{
 	}
 
+    /**
+     * @purpose register table to database.
+     */
+    void boot()
+    {
+        this->register_table(addr);
+    }
+
+    /**
+     * @purpose get/fetch table from database.
+     */
+    bool get(Table *_table)
+    {
+        return this->get_table(addr, _table);
+    }
+
+    /**
+     * @purpose set table in database.
+     */
+    bool set(Table *_table)
+    {
+        return this->set_table(addr, _table);
+    }
+
+    /**
+     * @purpose clear table in database.
+     */
+    void clear()
+    {
+        this->clear_table(addr);
+    }
+
+private:
 	/**
 	 * register table with address
 	 *

@@ -88,67 +88,12 @@
                 "template": {
                     "isDeclaration": false,
                     "args": [
+                        "$$defItemAddress$$",
                         "$$defItemArg$$"
                     ]
                 }
             },
             "members": [
-                {
-                    "type": "constructor",
-                    "access": "public",
-                    "description": "Constructor"
-                },
-                {
-                    "type": "destructor",
-                    "access": "public",
-                    "description": "Destructor"
-                },
-                {
-                    "name": "boot",
-                    "type": "method",
-                    "access": "public",
-                    "description": "register table to database.",
-                    "returnType": "void",
-                    "args": [],
-                    "body": "    this->register_table( $$defItemAddress$$ );"
-                },
-                {
-                    "name": "get",
-                    "type": "method",
-                    "access": "public",
-                    "description": "get/fetch table from database.",
-                    "returnType": "bool",
-                    "args": [
-                        {
-                            "name": "_table",
-                            "type": "$$defItemArg$$*"
-                        }
-                    ],
-                    "body": "    return this->get_table( $$defItemAddress$$, _table );"
-                },
-                {
-                    "name": "set",
-                    "type": "method",
-                    "access": "public",
-                    "description": "set table from database.",
-                    "returnType": "bool",
-                    "args": [
-                        {
-                            "name": "_table",
-                            "type": "$$defItemArg$$*"
-                        }
-                    ],
-                    "body": "    return this->set_table( $$defItemAddress$$, _table );"
-                },
-                {
-                    "name": "clear",
-                    "type": "method",
-                    "access": "public",
-                    "description": "clear table in database.",
-                    "returnType": "void",
-                    "args": [],
-                    "body": "    this->clear_table( $$defItemAddress$$ );"
-                }
             ],
             "postclassdeclaration":[
                 {

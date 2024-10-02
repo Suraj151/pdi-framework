@@ -37,47 +37,7 @@ const student_table PROGMEM _student_table_defaults = {NULL, 0};
 /**
  * StudentTable class should extends public DatabaseTable as its base/parent class
  */
-class StudentTable : public DatabaseTable<student_table> {
-
-  public:
-    /**
-     * StudentTable constructor.
-     */
-    StudentTable(){
-	}
-
-	/**
-     * register tables to database
-     */
-    void boot(){
-      this->register_table( STUDENT_TABLE_ADDRESS );
-    }
-
-    /**
-     * get/fetch table from database.
-     *
-     * @return student_table
-     */
-    bool get( student_table* _table ){
-      return this->get_table( STUDENT_TABLE_ADDRESS, _table );
-    }
-
-    /**
-     * set table in database.
-     *
-     * @param student_table* _table
-     */
-    void set( student_table* _table ){
-      this->set_table( STUDENT_TABLE_ADDRESS, _table );
-    }
-
-    /**
-     * clear table in database.
-     */
-    void clear(){
-      this->clear_table( STUDENT_TABLE_ADDRESS );
-    }
-};
+class StudentTable : public DatabaseTable<STUDENT_TABLE_ADDRESS, student_table> {};
 
 /**
  * this should be defined before framework initialization
