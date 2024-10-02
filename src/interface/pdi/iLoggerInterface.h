@@ -48,7 +48,7 @@ extern LoggerInterface __i_logger;
 
 
 // redefine these in derived interface
-#define LOGBEGIN __i_logger.init()
+#define LOGBEGIN
 
 #define LogI(v) // info log
 #define LogE(v) // error log

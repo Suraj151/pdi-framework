@@ -15,42 +15,47 @@ created Date    : 1st Jan 2024
 #include <interface/pdi/iLoggerInterface.h>
 
 
-#ifdef LogI
+#if defined(LOGBEGIN) && ( defined(ENABLE_LOG_ALL) || defined(ENABLE_LOG_INFO) || defined(ENABLE_LOG_ERROR) || defined(ENABLE_LOG_WARNING) || defined(ENABLE_LOG_SUCCESS) )
+#undef LOGBEGIN
+#define LOGBEGIN __i_logger.init()
+#endif
+
+#if defined(LogI) && ( defined(ENABLE_LOG_INFO) || defined(ENABLE_LOG_ALL) )
 #undef LogI
 #define LogI(v) __i_logger.log_info(RODT_ATTR(v))
 #endif
 
-#ifdef LogE
+#if defined(LogE) && ( defined(ENABLE_LOG_ERROR) || defined(ENABLE_LOG_ALL) )
 #undef LogE
 #define LogE(v) __i_logger.log_error(RODT_ATTR(v))
 #endif
 
-#ifdef LogW
+#if defined(LogW) && ( defined(ENABLE_LOG_WARNING) || defined(ENABLE_LOG_ALL) )
 #undef LogW
 #define LogW(v) __i_logger.log_warning(RODT_ATTR(v))
 #endif
 
-#ifdef LogS
+#if defined(LogS) && ( defined(ENABLE_LOG_SUCCESS) || defined(ENABLE_LOG_ALL) )
 #undef LogS
 #define LogS(v) __i_logger.log_success(RODT_ATTR(v))
 #endif
 
-#ifdef LogFmtI
+#if defined(LogFmtI) && ( defined(ENABLE_LOG_INFO) || defined(ENABLE_LOG_ALL) )
 #undef LogFmtI
 #define LogFmtI(f, args...) __i_logger.log_format(RODT_ATTR(f), INFO_LOG, args)
 #endif
 
-#ifdef LogFmtE
+#if defined(LogFmtE) && ( defined(ENABLE_LOG_ERROR) || defined(ENABLE_LOG_ALL) )
 #undef LogFmtE
 #define LogFmtE(f, args...) __i_logger.log_format(RODT_ATTR(f), ERROR_LOG, args)
 #endif
 
-#ifdef LogFmtW
+#if defined(LogFmtW) && ( defined(ENABLE_LOG_WARNING) || defined(ENABLE_LOG_ALL) )
 #undef LogFmtW
 #define LogFmtW(f, args...) __i_logger.log_format(RODT_ATTR(f), WARNING_LOG, args)
 #endif
 
-#ifdef LogFmtS
+#if defined(LogFmtS) && ( defined(ENABLE_LOG_SUCCESS) || defined(ENABLE_LOG_ALL) )
 #undef LogFmtS
 #define LogFmtS(f, args...) __i_logger.log_format(RODT_ATTR(f), SUCCESS_LOG, args)
 #endif

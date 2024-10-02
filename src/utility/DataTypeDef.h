@@ -75,15 +75,15 @@ typedef enum
 } ip_addr_type;
 
 /** 255.255.255.255 */
-#define IP_ADDR_NONE        ((uint32_t)0xffffffffUL)
+#define IP4_ADDRESS_NONE        ((uint32_t)0xffffffffUL)
 /** 127.0.0.1 */
-#define IP_ADDR_LOOPBACK    ((uint32_t)0x7f000001UL)
+#define IP4_ADDRESS_LOOPBACK    ((uint32_t)0x7f000001UL)
 /** 0.0.0.0 */
-#define IP_ADDR_ANY         ((uint32_t)0x00000000UL)
+#define IP4_ADDRESS_ANY         ((uint32_t)0x00000000UL)
 /** 255.255.255.255 */
-#define IP_ADDR_BROADCAST   ((uint32_t)0xffffffffUL)
+#define IP4_ADDRESS_BROADCAST   ((uint32_t)0xffffffffUL)
 /** get byte from 32bit ipaddr */
-#define IP4_ADDR_BYTE(ipaddr, idx) (((const uint8_t *)(&ipaddr))[idx])
+#define IP4_ADDRESS_BYTE(ipaddr, idx) (((const uint8_t *)(&ipaddr))[idx])
 
 /** check the byte order */
 #define IS_BIG_ENDIAN() ({ uint32_t n = 0x11223344; uint8_t *p = (uint8_t *)&n; (*p == 0x11); })
@@ -95,10 +95,10 @@ struct ipaddress_t
 
     ipaddress_t(uint32_t _ip4) : type(IP_ADDR_TYPE_V4)
     {
-        ip4[0] = IP4_ADDR_BYTE(_ip4, 0);
-        ip4[1] = IP4_ADDR_BYTE(_ip4, 1);
-        ip4[2] = IP4_ADDR_BYTE(_ip4, 2);
-        ip4[3] = IP4_ADDR_BYTE(_ip4, 3);
+        ip4[0] = IP4_ADDRESS_BYTE(_ip4, 0);
+        ip4[1] = IP4_ADDRESS_BYTE(_ip4, 1);
+        ip4[2] = IP4_ADDRESS_BYTE(_ip4, 2);
+        ip4[3] = IP4_ADDRESS_BYTE(_ip4, 3);
     }
 
     ipaddress_t(uint8_t first_octet, uint8_t second_octet, uint8_t third_octet, uint8_t fourth_octet) : type(IP_ADDR_TYPE_V4)
@@ -133,7 +133,7 @@ struct ipaddress_t
 
     bool isSet()
     {
-        return (((uint32_t) * this) != IP_ADDR_NONE) && (((uint32_t) * this) != IP_ADDR_ANY);
+        return (((uint32_t) * this) != IP4_ADDRESS_NONE) && (((uint32_t) * this) != IP4_ADDRESS_ANY);
     }
 };
 

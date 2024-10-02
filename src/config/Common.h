@@ -117,4 +117,13 @@ created Date    : 1st June 2019
 #define MAX_SCHEDULABLE_TASKS	25
 #define MAX_FACTORY_RESET_CALLBACKS	MAX_SCHEDULABLE_TASKS
 
+/**
+ * enable/disable logs here
+ */
+#define ENABLE_LOG_ALL
+// #define ENABLE_LOG_INFO
+// #define ENABLE_LOG_WARNING
+// #define ENABLE_LOG_ERROR
+// #define ENABLE_LOG_SUCCESS
+
 #endif

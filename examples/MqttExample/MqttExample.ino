@@ -23,7 +23,7 @@
 #define MQTT_WILL_MESSAGE     "[mac] is disconnected" // [mac] will get replaced internally with actual mac id
 #define MQTT_WILL_QOS         0
 
-#if defined(ENABLE_EWING_HTTP_SERVER)
+#if defined(ENABLE_HTTP_SERVER)
 
 
 // mqtt service will call this function whenever it initiate publish process to set user data for publish in payload

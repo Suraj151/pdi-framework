@@ -41,19 +41,19 @@ void LoggerInterface::log(logger_type_t log_type, const char *content)
     switch (log_type)
     {
     case INFO_LOG:
-        this->log_info(content);
+        LogFmtI("%s", content);
         break;
 
     case ERROR_LOG:
-        this->log_error(content);
+        LogFmtE("%s", content);
         break;
 
     case WARNING_LOG:
-        this->log_warning(content);
+        LogFmtW("%s", content);
         break;
 
     case SUCCESS_LOG:
-        this->log_success(content);
+        LogFmtS("%s", content);
         break;
 
     default:

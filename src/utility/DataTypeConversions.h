@@ -19,5 +19,8 @@ uint32_t StringToUint32(const char *pString, uint8_t _len = 32);
 uint16_t StringToUint16(const char *pString, uint8_t _len = 32);
 uint8_t StringToUint8(const char *pString, uint8_t _len = 32);
 uint16_t StringToHex16(const char *pString, uint8_t _strlen);
+void Int32ToString(int32_t val, char *pString, uint8_t _maxlen, uint8_t _padmax=0);
+uint8_t Int32DigitCount(int32_t x);
+uint8_t Int64DigitCount(int64_t x);
 
 #endif

@@ -172,3 +172,117 @@ uint16_t StringToHex16(const char *pString, uint8_t _strlen)
 	}
 	return hexValue;
 }
+
+/**
+ * This function convert int32 to string.
+ *
+ * @param   int32_t val
+ * @param   char* pString
+ * @param   uint8_t _maxlen
+ * @param   uint8_t _padmax
+ */
+void Int32ToString(int32_t val, char *pString, uint8_t _maxlen, uint8_t _padmax)
+{
+	if( nullptr != pString )
+	{
+		memset(pString, 0, _maxlen);
+		sprintf(pString, "%d", val);
+		for(int l=strlen(pString); l<_padmax; l++) pString[l]=' '; 
+	}
+}
+
+/**
+ * This function returns the number of digits in integer.
+ *
+ * @param   int32_t x
+ * @return  uint8_t
+ */
+uint8_t Int32DigitCount(int32_t x)
+{
+    if (x == INT32_MIN) return 10 + 1;
+    if (x < 0) return Int32DigitCount(-x) + 1;
+
+    if (x >= 10000) {
+        if (x >= 10000000) {
+            if (x >= 100000000) {
+                if (x >= 1000000000)
+                    return 10;
+                return 9;
+            }
+            return 8;
+        }
+        if (x >= 100000) {
+            if (x >= 1000000)
+                return 7;
+            return 6;
+        }
+        return 5;
+    }
+    if (x >= 100) {
+        if (x >= 1000)
+            return 4;
+        return 3;
+    }
+    if (x >= 10)
+        return 2;
+    return 1;
+}
+
+/**
+ * This function returns the number of digits in integer.
+ *
+ * @param   int64_t x
+ * @return  uint8_t
+ */
+uint8_t Int64DigitCount(int64_t x) {
+    if (x == INT64_MIN) return 19 + 1;
+    if (x < 0) return Int64DigitCount(-x) + 1;
+
+    if (x >= 10000000000) {
+        if (x >= 100000000000000) {
+            if (x >= 10000000000000000) {
+                if (x >= 100000000000000000) {
+                    if (x >= 1000000000000000000)
+                        return 19;
+                    return 18;
+                }
+                return 17;
+            }
+            if (x >= 1000000000000000)
+                return 16;
+            return 15;
+        } 
+        if (x >= 1000000000000) {
+            if (x >= 10000000000000)
+                return 14;
+            return 13;
+        }
+        if (x >= 100000000000)
+            return 12;
+        return 11;
+    }
+    if (x >= 100000) {
+        if (x >= 10000000) {
+            if (x >= 100000000) {
+                if (x >= 1000000000)
+                    return 10;
+                return 9;
+            }
+            return 8;
+        }
+        if (x >= 1000000)
+            return 7;
+        return 6;
+    }
+    if (x >= 100) {
+        if (x >= 1000) {
+            if (x >= 10000)
+                return 5;
+            return 4;
+        }
+        return 3;
+    }
+    if (x >= 10)
+        return 2;
+    return 1;
+}

@@ -3,10 +3,10 @@
  * This example illustrate adding table to database
  */
 
-#include <EwingsEspStack.h>
+#include <PdiStack.h>
 
 
-#if defined(ENABLE_EWING_HTTP_SERVER)
+#if defined(ENABLE_HTTP_SERVER)
 
 // be carefull about table address or else table will not register.
 // it should be on minimum distant from last added table address + last added table size
@@ -15,7 +15,7 @@
 // Eeprom is using only one spi flash sector so we have max size of 4096 bytes only.
 // hence put only importanat configs in tables
 
-#define MAX_STUDENTS					5
+#define MAX_STUDENTS			5
 #define STUDENT_NAME_MAX_SIZE	20
 #define STUDENT_TABLE_ADDRESS	2500
 
@@ -28,14 +28,14 @@ typedef struct {
 } student_t;
 
 struct student_table {
-  student_t students[MAX_STUDENTS];
+  	student_t students[MAX_STUDENTS];
 	int student_count;
 };
 
 const student_table PROGMEM _student_table_defaults = {NULL, 0};
 
 /**
- * StudentTable should class extends public DatabaseTable as its base/parent class
+ * StudentTable class should extends public DatabaseTable as its base/parent class
  */
 class StudentTable : public DatabaseTable<student_table> {
 
@@ -44,9 +44,9 @@ class StudentTable : public DatabaseTable<student_table> {
      * StudentTable constructor.
      */
     StudentTable(){
-		}
+	}
 
-		/**
+	/**
      * register tables to database
      */
     void boot(){
@@ -59,7 +59,7 @@ class StudentTable : public DatabaseTable<student_table> {
      * @return student_table
      */
     bool get( student_table* _table ){
-      return this->get_table( _table, STUDENT_TABLE_ADDRESS );
+      return this->get_table( STUDENT_TABLE_ADDRESS, _table );
     }
 
     /**
@@ -68,7 +68,7 @@ class StudentTable : public DatabaseTable<student_table> {
      * @param student_table* _table
      */
     void set( student_table* _table ){
-      this->set_table( _table, STUDENT_TABLE_ADDRESS );
+      this->set_table( STUDENT_TABLE_ADDRESS, _table );
     }
 
     /**
@@ -84,18 +84,21 @@ class StudentTable : public DatabaseTable<student_table> {
  */
 StudentTable __student_table;
 #else
-  #error "Ewings HTTP server is disabled ( in config/Common.h of framework library ). please enable(uncomment) it for this example"
+  #error "HTTP server is disabled ( in config/Common.h of framework library ). please enable(uncomment) it for this example"
 #endif
 
 
 void setup() {
 
+	// NOTE : Please disable framework serial log for this demo or framework log will get printed alongwith this demo log
+	// Disable it by commenting ==> #define ENABLE_LOG_* lines in src/config/Common.h file of this framework library
+
 	Serial.begin(115200);
 	Serial.printf("Hold on!!!, Stack will initialize and begin within next %d seconds !\n", WIFI_STATION_CONNECT_ATTEMPT_TIMEOUT);
 
-	EwStack.initialize();
+	PdiStack.initialize();
 
-	auto _students_data = __student_table.get();
+	student_table _students_data;
 
 	// Adding sample records to table
 	memset(_students_data.students[0]._name, 0, STUDENT_NAME_MAX_SIZE);
@@ -137,7 +140,7 @@ void setup() {
 }
 
 void loop() {
-	EwStack.serve();
+	PdiStack.serve();
 }
 
 /**
@@ -147,7 +150,7 @@ void printStudents(){
 
 	//get student table from database
 	student_table _students_data;
-	__student_table.get(_students_data);
+	__student_table.get(&_students_data);
 
 	Serial.println(F("\n**************************Adding Database Example Log**************************"));
 	Serial.println( F("Student table : \nname\t\tage\tsex\n") );

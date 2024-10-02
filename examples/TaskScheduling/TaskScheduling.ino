@@ -3,17 +3,17 @@
  * This example illustrate adding tasks in framework
  */
 
-#include <EwingsEspStack.h>
+#include <PdiStack.h>
 
 int variable_time_task_id = 0;
 
-// should run only one time at specified duration after EwStack initialization
+// should run only one time at specified duration after PdiStack initialization
 void timeout_task(){
 	Serial.print(millis());
 	Serial.println(F(" : running timeout task once"));
 }
 
-// should run continueously at specific intervals after EwStack initialization
+// should run continueously at specific intervals after PdiStack initialization
 void interval_task(){
 	Serial.print(millis());
 	Serial.println(F(" : running interval task"));
@@ -41,18 +41,18 @@ void clear_interval_task(){
 void setup() {
 
 	// NOTE : Please disable framework serial log for this demo or framework log will get printed alongwith this demo log
-	// Disable it by commenting ==> #define EW_SERIAL_LOG line in src/config/Common.h file of this framework library
+	// Disable it by commenting ==> #define ENABLE_LOG_* lines in src/config/Common.h file of this framework library
 
 	Serial.begin(115200);
 	Serial.printf("Hold on!!!, Stack will initialize and begin within next %d seconds !\n", WIFI_STATION_CONNECT_ATTEMPT_TIMEOUT);
 
-	EwStack.initialize();
+	PdiStack.initialize();
 
-	// run timeout task one time at 1000 milliseconds after EwStack initialization
+	// run timeout task one time at 1000 milliseconds after PdiStack initialization
 	// dont worry about clearing timeout tasks, they will die automatically after their one time execution
 	__task_scheduler.setTimeout( timeout_task, MILLISECOND_DURATION_1000, millis() );
 
-	// run interval task every 3000 milliseconds after EwStack initialization
+	// run interval task every 3000 milliseconds after PdiStack initialization
 	// shcedular provide unique id for each task to update task later in runtime if we want
 	variable_time_task_id = __task_scheduler.setInterval( interval_task, MILLISECOND_DURATION_1000*3, millis() );
 
@@ -64,5 +64,5 @@ void setup() {
 }
 
 void loop() {
-	EwStack.serve();
+	PdiStack.serve();
 }
