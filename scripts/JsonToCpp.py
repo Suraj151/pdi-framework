@@ -50,6 +50,10 @@ class_header_template = """
 #endif  // _%UPPERNAME%_H_
 """
 
+class_header_macrodefine_template = """
+#define %MACRODEFINE%
+"""
+
 class_cpp_template = """
 %FILEHEADER%
 
@@ -269,7 +273,13 @@ def build_preclass_definition_template(definition):
 
 def build_preclass_declaration_template(definition):
 
-    template = ""  
+    template = ""
+
+    if "macrodefines" in definition:
+        for macrodef in definition["macrodefines"]:
+            if "macroDefine" in macrodef:
+                template += expand_token(class_header_macrodefine_template, '%MACRODEFINE%', macrodef["macroDefine"])
+
     return template
 
 def build_postclass_declaration_template(definition):
