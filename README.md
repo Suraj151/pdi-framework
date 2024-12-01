@@ -1,9 +1,9 @@
-# EwingsEspStack
+# Portable Device Interface Stack
 
-Ewings Framework covers all essential things to build ESP8266 IoT applications easily.
-Basically it is designed on the top of arduino-esp8266 layer to make things easy to understand for developers.
+PDIStack Framework covers all essential things to build IoT applications easily.
+Basically it is designed on the top of portable interface layers that any device can create their interface from. esp8266-arduino examples provided to make things easy to understand for developers.
 
-**Ewings Esp Framework Structure**
+**PDI Framework Structure**
 
 
 <p align="center">
@@ -11,32 +11,30 @@ Basically it is designed on the top of arduino-esp8266 layer to make things easy
 </p>
 
 
-ESP8266EX integrates an enhanced version of Tensilica’s L106 Diamond series 32-bit processor, with on-chip SRAM, on top of its Wi-Fi functionalities. Its non-OS SDK provides a set of application programming interfaces (APIs) for core ESP8266 functionalities such as data reception/transmission over Wi-Fi, TCP/IP stack functions, hardware interface functions and basic system management functions.
+Arduino has provided user-friendly libraries that use different devices SDK APIs at bottom. Since arduino has made its easy iot development environment impact over developers, it's easy for them to develop applications with Arduino ide.
 
-Arduino has provided user-friendly libraries that use these SDK APIs at bottom. Since arduino has made its easy iot development environment impact over developers, it's easy for them to develop applications with Arduino ide.
-
-Ewings framework sits on the top of these Arduino libraries. So the whole structure looks as shown in the above figure of Ewings Esp8266 Structure.
+PDI framework sits on the top of service layers which internally uses the portable interface. So the device which needs to run this framework should write the interface provided.
 
 # Installation
 
 **install from arduino ide**
 
-Goto Tools->Manage Libraries... then in library manager window type esp8266-framework in search bar then from results find esp8266-framework by Suraj I., select latest version and click on install.
+Goto Tools->Manage Libraries... then in library manager window type pdi-framework in search bar then from results find pdi-framework by Suraj I., select latest version and click on install.
 
 **install manually**
 
-To install manually clone or download source, copy folder to esp8266 libraries path ( in windows 10 generally path is like ==> C:\Users\suraj\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\2.6.2\libraries...).
+To install manually for esp8266 clone or download source, copy folder to esp8266 libraries path ( in windows 10 generally path is like ==> C:\Users\suraj\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\2.6.2\libraries...).
 
 # Usage
 
-Restart the arduino ide and navigate to File->Examples->esp8266-framework->EwStack example compile and upload.
+Restart the arduino ide and navigate to File->Examples->pdi-framework->PdiStack example compile and upload.
 
-**Note** that installed version of esp8266 should be > 3.0.x. 3.0.2 or greater is recommended. you can check your installed esp8266 version in tools->boards->board manager (type "esp" in top search bar).
+**Note** that, for esp8266 installed version of arduino-esp8266 should be > 3.1.x. or greater is recommended. you can check your installed esp8266 version in tools->boards->board manager (type "esp" in top search bar).
 
-* after initializing device completely, check in pc/mobile wifi list if **esp8266Stack** name appear.
-* select it and enter default password **espStack@8266**.
+* after initializing device completely, check in pc/mobile wifi list if **pdiStack** name appear.
+* select it and enter default password **pdiStack@123**.
 * finally after succesful connectinon to device open browser, type **192.168.0.1** in address bar and press enter
-* you will directed to login screen, enter default username and password **( username: esp8266Stack, password: espStack@8266 )**
+* you will directed to login screen, enter default username and password **( username: pdiStack, password: pdiStack@123 )**
 * now you will able to see below menu options
 
 <p align="center">
@@ -51,21 +49,12 @@ you can play with all settings. you can modify configs by making changes in file
 
 # Services
 
-Ewings provides some basic services that required to develop simple iot application. All services are available globally to each other. The services are
-
-* **HTTP Service:**
-The application can use this rest API service to make HTTP requests such as get, post, etc. this service is just extended version of arduino http client for esp8266.
-
-* **NTP Service:**
-This service provides network time to the application.
+PDI framework provides some basic services that required to develop simple iot application. All services are available globally to each other. The services are
 
 * **MQTT Service:**
 This lightweight messaging protocol can be used to monitor or operate device itself or sensors that are connected to the device.
 To configure and test MQTT go on device local server and select MQTT section under main menu.
 
-
-* **Event Service:**
-This service is introduced to handle specific event tasks that should be executed on event arrival. just register the event listener as task to perticular event and fire it when event happens.
 
 * **OTA Service:**
 Over The Air (OTA) feature has ability to update the device firmware remotely. By default OTA configurations are accessible with local server. OTA service is uses firmware version to decide whether start to update or not. OTA server can be set in OTA configuration which is accesible through local server.
@@ -86,29 +75,28 @@ Over The Air (OTA) feature has ability to update the device firmware remotely. B
 This service is extended version of ESPNOW feature available in esp8266 with some easy to use api. with help of this feature we can build mesh networking, broadcasting etc n/w as per requirements. this service is not configurable from server for now. but you can manage it with easily available api of this service.
 
 * **WiFi Service:**
-This is extended version of arduino wifi library. this service provides simplified api's to dynamically interact with wifi devices on practical field. it has internet based connection ability over same network configs devices which are usefull in mesh scenarios. it also has ability to enable dynamic subnetting heiraechy where each individual device sits in different network and knows how far (in hop distance manner) he is from main hub centre.
-
-* **PING Service:**
-As name suggest this service extends basic ping feature of esp8266 sdk api. this service is utilized in wifi service to check active internet.
+This service provides simplified api's to dynamically interact with wifi devices on practical field. it has internet based connection ability over same network configs devices which are usefull in mesh scenarios. it also has ability to enable dynamic subnetting heiraechy where each individual device sits in different network and knows how far (in hop distance manner) he is from main hub centre.
 
 * **GPIO Service:**
-GPIOs are actually going to interact with sensors. We can read sensor or we can drive appliances with the help of this GPIO services.
+GPIOs are actually going to interact with sensors. We can read sensor or we can drive appliances with the help of this GPIO services. More on this GPIO service can work with MQTT/HTTP transports provided to monitor/control the GPIO's remotely
 
 * **MAIL Service:**
-MAIL service is uses SMTP driver to connect and send mail to any account. you should have a SMTP server account credentials that device uses to send mail. to set configuration goto local server and select Email section under main menu.
+MAIL service is uses SMTP transport to connect and send mail to any account. you should have a SMTP server account credentials that device uses to send mail. to set configuration goto local server and select Email section under main menu.
 you can test it with tick option provided in email section before submit configuration form. the best demo way to test this section is create free mailtrap account where we get configurations.
 this service should be enabled from common configuration file wherever this service act as dependency service. for example GPIO alert system has alert channel of email. GPIO alerts generated on user selected alert channel.
 
 * **GPIO Alerts:**
-GPIO alerts are provided to get notified on specific condition met. from local server GPIO alert conditions can be set in GPIO alert section which is available under GPIO manage section.
+GPIO alerts are provided to get notified on specific condition met. from local web portal of device GPIO alert conditions can be set in GPIO alert section which is available under GPIO manage section.
+
+* **Database:**
+Database service can be used to get/set any config in device NVM memory.
 
 
+# Local Web Server
 
-# Ewings Local Server
+PDI framework has local web portal. In case if device supports the internet then web server can be enabled. As aexample Esp8266 has built in WiFi feature that work in both station as well as access point mode. Station mode is mode using which we can connect to other wifi network. Access point mode is mode using which Esp8266 create its own network. PDI stack comes with a local http server facility using access point mode of esp8266. By default this server has setting, monitor pages added.
 
-Esp8266 has built in WiFi feature that work in both station as well as access point mode. Station mode is mode using which we can connect to other wifi network. Access point mode is mode using which Esp8266 create its own network. Ewings stack comes with a local http server facility using access point mode of esp8266. By default this server has setting, monitor pages added.
-
-Ewings Server Framework has following components
+Web Server Framework has following components
 
 * **Controllers :**
 Controllers used to handle request from client. collecting user inputs, processing, building response for requests etc. works can be carried out in this component.
@@ -122,8 +110,8 @@ Session handler takes care of login sessions. By default, login session expire a
 * **Route Handler :**
 This handles routing operations of the server. It registers a specific controllers method to URL with facility of authentication through middlware.
 
-* **EEPROM Database :**
-Esp8266 has software eeprom library that actually uses space in flash memory to store Ewings framework related config data. Server uses this database to fetch and view settings and control panel of device.
+* **Database :**
+Devices can have non volatile memories where DB can store its data. Database service is used to store PDI framework related config data. Web Server uses this database service to fetch and view settings and control panel of device. For example Esp8266 has software eeprom library that actually uses space in flash memory
 
 * **View Helpers :**
 These helpers help to dynamically creates html elements.
@@ -136,7 +124,7 @@ These are required resources to server framework components.
 
 # Features
 
-Esp8266 has many built in features that will be useful in network applications. Those features are added with Ewings Framework structure.
+Devices might have many built in features that will be useful in network applications. Those features are added with PDI Framework structure.
 
 * **NAT :**
 Network address translation (NAT) is a method of remapping one IP address space into another by modifying network address information in the IP header of packets while they are in transit across a traffic routing device. With this feature we can extend station network ( network that has active internet ) range.
@@ -150,7 +138,7 @@ Network address translation (NAT) is a method of remapping one IP address space 
     By default this feature is active based on what lwip variant from ide tool option is selected.
 
 * **MESH :**
-This feature easily possible with esp8266 esponow feature. Ewings stack provided basic espnow service to make this available in application where mesh network is required. The basic motive to bring this feature is connectivity.
+This feature easily possible with esp device esponow feature. in devices with esp8266 provided basic espnow service to make this available in application where mesh network is required. The basic motive to bring this feature is connectivity.
 
 
 # Utilities
@@ -172,8 +160,8 @@ This helps to reset the whole device to its default settings in case of device m
 * **Data Type Converters :**
 As name clears the purpose of this utility. It just used to convert the data types from one to another like integer to string and vice versa.
 
-* **Logger :**
-Logger enables log on uart0 pins at 115200 baud rate. This is useful in case of debugging application flow.
+* **Event :**
+This is to handle specific event tasks that should be executed on event arrival. just register the event listener as task to perticular event and fire it when event happens.
 
 # Device Iot (beta)
 
