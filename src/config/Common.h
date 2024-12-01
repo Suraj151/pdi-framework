@@ -46,14 +46,6 @@ created Date    : 1st June 2019
 #define ENABLE_DEVICE_IOT
 
 /**
- * enable/disable logging
- */
-#define ENABLE_INFO_LOG
-#define ENABLE_ERROR_LOG
-#define ENABLE_WARNING_LOG
-#define ENABLE_SUCCESS_LOG
-
-/**
  * enable/disable auto factory reset on invalid database config found
  */
 #define AUTO_FACTORY_RESET_ON_INVALID_CONFIGS

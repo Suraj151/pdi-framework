@@ -7,10 +7,10 @@
 DeviceIotSensor sensor;
 
 void setup() {
-  EwStack.initialize();
+  PdiStack.initialize();
   __device_iot_service.initDeviceIotSensor(&sensor);
 }
 
 void loop() {
-  EwStack.serve();
+  PdiStack.serve();
 }

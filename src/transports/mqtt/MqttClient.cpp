@@ -205,7 +205,7 @@ void MQTTClient::mqtt_client_recv()
   LogI("MQTT: recieved packets : ");
   for (int i = 0; i < len; i++)
   {
-    LogFmtI("%x ", this->m_mqttClient.mqtt_state.in_buffer[i]);
+    LogFmtI("%c", this->m_mqttClient.mqtt_state.in_buffer[i]);
     __i_dvc_ctrl.wait(0);
   }
   LogI("\n");
@@ -523,10 +523,10 @@ void MQTTClient::MQTT_Task()
     }
     if (QUEUE_Gets(&this->m_mqttClient.msgQueue, dataBuffer, &dataLen, MQTT_BUF_SIZE) == 0)
     {
-      LogI("MQTT: getting qued packets :");
+      LogI("MQTT: getting queue packets :");
       for (int i = 0; i < dataLen; i++)
       {
-        LogFmtI("%c ", (char)dataBuffer[i]);
+        LogFmtI("%c", (char)dataBuffer[i]);
         __i_dvc_ctrl.wait(0);
       }
       LogI("\n");

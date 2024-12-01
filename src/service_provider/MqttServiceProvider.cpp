@@ -130,6 +130,8 @@ void MqttServiceProvider::handleMqttSubScribe(){
 
   for (uint8_t i = 0; i < MQTT_MAX_SUBSCRIBE_TOPIC; i++) {
 
+    __find_and_replace( _mqtt_pubsub_configs.subscribe_topics[i].topic, "[mac]", __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
+
     if( strlen(_mqtt_pubsub_configs.subscribe_topics[i].topic) > 0 && !this->m_mqtt_client.is_topic_subscribed(_mqtt_pubsub_configs.subscribe_topics[i].topic) ){
 
       this->m_mqtt_client.Subscribe(
@@ -228,7 +230,8 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
     this->m_mqtt_subscribe_cb_id = __task_scheduler.updateInterval(
       this->m_mqtt_subscribe_cb_id,
       [&]() { this->handleMqttSubScribe(); },
-      _mqtt_general_configs.keepalive*MILLISECOND_DURATION_1000
+      (_mqtt_general_configs.keepalive/2)*MILLISECOND_DURATION_1000,
+      DEFAULT_TASK_PRIORITY, ( __i_dvc_ctrl.millis_now() + MQTT_INITIALIZE_DURATION )
     );
   }else{
     __task_scheduler.clearInterval( this->m_mqtt_subscribe_cb_id );

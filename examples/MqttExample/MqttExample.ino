@@ -1,19 +1,19 @@
 /* Demo example about how to use mqtt service provider
  */
 
-#include <EwingsEspStack.h>
+#include <PdiStack.h>
 
 // mqtt grneral configuration
-#define MQTT_HOST             "---mqtt host---"
+#define MQTT_HOST             "test.mosquitto.org" // using mosquitto test server for example
 #define MQTT_PORT             1883
-#define MQTT_CLIENT_ID        "---client id---"
+#define MQTT_CLIENT_ID        "client_[mac]"
 #define MQTT_USERNAME         ""
 #define MQTT_PASSWORD         ""
-#define MQTT_KEEP_ALIVE       60
+#define MQTT_KEEP_ALIVE       30
 
 // mqtt publish / subscribe configuration
-#define MQTT_PUBLISH_TOPIC    "test_publish"
-#define MQTT_SUBSCRIBE_TOPIC  "test_subscribe"
+#define MQTT_PUBLISH_TOPIC    "pidstack_[mac]"
+#define MQTT_SUBSCRIBE_TOPIC  "pidstack_[mac]"
 #define MQTT_PUBLISH_FREQ     5   // publish after every 5 second
 #define MQTT_PUBLISH_QOS      0
 #define MQTT_SUBSCRIBE_QOS    0
@@ -52,7 +52,7 @@ void subscribe_callback( uint32_t *args, const char* topic, uint32_t topic_len, 
   memcpy(dataBuf, data, data_len);
   dataBuf[data_len] = 0;
 
-  Logln(F("\n\nMQTT: user data callback"));
+  Serial.println(F("\n\nMQTT: user data callback"));
   Serial.printf("MQTT: user Receive topic: %s, data: %s \n\n", topicBuf, dataBuf);
 
   delete[] topicBuf; delete[] dataBuf;
@@ -104,11 +104,11 @@ void configure_mqtt(){
 
 
 #else
-  #error "Mqtt service is disabled ( in config/Common.h of framework library ). please enable(uncomment) it for this example"
+  #error "Mqtt portal service is disabled ( in config/Common.h of framework library ). please enable(uncomment ENABLE_HTTP_SERVER) it for this example"
 #endif
 
 void setup() {
-  EwStack.initialize();
+  PdiStack.initialize();
 
   // call it only after framework initialization
   configure_mqtt();
@@ -116,5 +116,5 @@ void setup() {
 
 void loop() {
 
-  EwStack.serve();
+  PdiStack.serve();
 }

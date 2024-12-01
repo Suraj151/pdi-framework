@@ -292,7 +292,9 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
     [&]() {
       this->handleDeviceIotConfigRequest();
     },
-    this->m_mqtt_keep_alive*MILLISECOND_DURATION_1000
+    this->m_mqtt_keep_alive*MILLISECOND_DURATION_1000,
+    DEFAULT_TASK_PRIORITY,
+    ( __i_dvc_ctrl.millis_now() + MQTT_INITIALIZE_DURATION)
   );
 
   delete[] _value_buff;
