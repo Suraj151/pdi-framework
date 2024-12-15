@@ -44,9 +44,9 @@ protected:
   iUtilityInterface *m_util;
 
   /**
-   * @var	std::vector<event_listener_t> vector
+   * @var	pdiutil::vector<event_listener_t> vector
    */
-  std::vector<event_listener_t> m_event_listeners;
+  pdiutil::vector<event_listener_t> m_event_listeners;
 };
 
 extern EventUtil __utl_event;

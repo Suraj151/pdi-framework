@@ -34,9 +34,9 @@ public:
   ~EmailServiceProvider();
 
   void begin(iClientInterface *_client);
-  bool sendMail(std::string &mail_body);
+  bool sendMail(pdiutil::string &mail_body);
   bool sendMail(char *mail_body);
-  bool sendMail(PGM_P mail_body);
+  bool sendMail(const char * mail_body);
   // template <typename T> bool sendMail( T mail_body );
   void handleEmail(void);
   void printEmailConfigLogs(void);

@@ -21,7 +21,7 @@ created Date    : 1st June 2019
 
 #define MQTT_PAYLOAD_BUF_SIZE 400
 
-typedef std::function<void(char *, uint16_t)> MqttPublishDataCallback;
+typedef pdiutil::function<void(char *, uint16_t)> MqttPublishDataCallback;
 typedef MqttDataCallback MqttSubscribeDataCallback;
 
 /**

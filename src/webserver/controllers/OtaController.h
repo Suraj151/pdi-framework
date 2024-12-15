@@ -79,14 +79,14 @@ public:
 
 #ifdef ALLOW_OTA_CONFIG_MODIFICATION
 
-		concat_tr_input_html_tags(_page, PSTR("OTA Host:"), PSTR("hst"), _ota_configs.ota_host, OTA_HOST_BUF_SIZE - 1);
-		concat_tr_input_html_tags(_page, PSTR("OTA Port:"), PSTR("prt"), _port);
+		concat_tr_input_html_tags(_page, RODT_ATTR("OTA Host:"), RODT_ATTR("hst"), _ota_configs.ota_host, OTA_HOST_BUF_SIZE - 1);
+		concat_tr_input_html_tags(_page, RODT_ATTR("OTA Port:"), RODT_ATTR("prt"), _port);
 
 		strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 #else
 
-		concat_tr_input_html_tags(_page, PSTR("OTA Host:"), PSTR("hst"), _ota_configs.ota_host, OTA_HOST_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
-		concat_tr_input_html_tags(_page, PSTR("OTA Port:"), PSTR("prt"), _port, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true);
+		concat_tr_input_html_tags(_page, RODT_ATTR("OTA Host:"), RODT_ATTR("hst"), _ota_configs.ota_host, OTA_HOST_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
+		concat_tr_input_html_tags(_page, RODT_ATTR("OTA Port:"), RODT_ATTR("prt"), _port, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true);
 #endif
 
 		if (_enable_flash)
@@ -114,8 +114,8 @@ public:
 #ifdef ALLOW_OTA_CONFIG_MODIFICATION
 		if (this->m_web_resource->m_server->hasArg("hst") && this->m_web_resource->m_server->hasArg("prt"))
 		{
-			std::string _ota_host = this->m_web_resource->m_server->arg("hst");
-			std::string _ota_port = this->m_web_resource->m_server->arg("prt");
+			pdiutil::string _ota_host = this->m_web_resource->m_server->arg("hst");
+			pdiutil::string _ota_port = this->m_web_resource->m_server->arg("prt");
 
 			LogI("\nSubmitted info :\n");
 			LogFmtI("ota host : %s\n", _ota_host.c_str());

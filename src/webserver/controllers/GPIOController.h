@@ -110,20 +110,20 @@ public:
 
 		y2 = GPIO_MAX_GRAPH_HEIGHT - y2;
 
-		std::string *_response = new std::string();
+		pdiutil::string *_response = new pdiutil::string();
 
 		if (nullptr != _response)
 		{
 			*_response = "{\"x1\":";
-			*_response += std::to_string(x1);
+			*_response += pdiutil::to_string(x1);
 			*_response += ",\"y1\":";
-			*_response += std::to_string(y1);
+			*_response += pdiutil::to_string(y1);
 			*_response += ",\"x2\":";
-			*_response += std::to_string(x2);
+			*_response += pdiutil::to_string(x2);
 			*_response += ",\"y2\":";
-			*_response += std::to_string(y2);
+			*_response += pdiutil::to_string(y2);
 			*_response += ",\"r\":";
-			*_response += std::to_string(!this->m_route_handler->has_active_session());
+			*_response += pdiutil::to_string(!this->m_route_handler->has_active_session());
 			*_response += ",\"d\":";
 			__gpio_service.appendGpioJsonPayload(*_response);
 			*_response += ",\"md\":[\"OFF\", \"DOUT\", \"DIN\", \"BLINK\", \"AOUT\", \"AIN\"]";
@@ -184,9 +184,9 @@ public:
 
 		char *_gpio_monitor_table_heading[] = {"Pin", "Mode", "value"};
 		strcat_P(_page, HTML_TABLE_OPEN_TAG);
-		concat_style_attribute(_page, PSTR("width:92%"));
+		concat_style_attribute(_page, RODT_ATTR("width:92%"));
 		strcat_P(_page, HTML_TAG_CLOSE_BRACKET);
-		concat_table_heading_row(_page, _gpio_monitor_table_heading, 3, nullptr, nullptr, PSTR("btn"), nullptr);
+		concat_table_heading_row(_page, _gpio_monitor_table_heading, 3, nullptr, nullptr, RODT_ATTR("btn"), nullptr);
 
 		char _name[3];
 		memset(_name, 0, 3);
@@ -198,7 +198,7 @@ public:
 			if (!__i_dvc_ctrl.isExceptionalGpio(_pin))
 			{
 				_name[1] = (0x30 + _pin);
-				concat_table_data_row(_page, _gpio_monitor_table_data, 3, nullptr, nullptr, PSTR("btnd"), nullptr);
+				concat_table_data_row(_page, _gpio_monitor_table_data, 3, nullptr, nullptr, RODT_ATTR("btnd"), nullptr);
 			}
 		}
 		memset(_name, 0, 3);
@@ -208,13 +208,13 @@ public:
 			if (!__i_dvc_ctrl.isExceptionalGpio(_pin))
 			{
 				_name[1] = (0x30 + _pin);
-				concat_table_data_row(_page, _gpio_monitor_table_data, 3, nullptr, nullptr, PSTR("btnd"), nullptr);
+				concat_table_data_row(_page, _gpio_monitor_table_data, 3, nullptr, nullptr, RODT_ATTR("btnd"), nullptr);
 			}
 		}
 		strcat_P(_page, HTML_TABLE_CLOSE_TAG);
 
 		strcat_P(_page, HTML_DIV_OPEN_TAG);
-		concat_style_attribute(_page, PSTR("display:inline-flex;margin-top:25px;"));
+		concat_style_attribute(_page, RODT_ATTR("display:inline-flex;margin-top:25px;"));
 		strcat_P(_page, HTML_TAG_CLOSE_BRACKET);
 		concat_graph_axis_title_div(_page, (char *)"A0 ( 0 - 1024 )", (char *)"writing-mode:vertical-lr");
 		strcat_P(_page, WEB_SERVER_GPIO_MONITOR_SVG_ELEMENT);
@@ -264,9 +264,9 @@ public:
 		__appendUintToBuff(_port, "%d", __gpio_service.m_gpio_config_copy.gpio_port, 8);
 		__appendUintToBuff(_freq, "%d", __gpio_service.m_gpio_config_copy.gpio_post_frequency, 8);
 
-		concat_tr_input_html_tags(_page, PSTR("Host Address:"), PSTR("hst"), __gpio_service.m_gpio_config_copy.gpio_host, GPIO_HOST_BUF_SIZE - 1);
-		concat_tr_input_html_tags(_page, PSTR("Host Port:"), PSTR("prt"), _port);
-		concat_tr_input_html_tags(_page, PSTR("Post Frequency:"), PSTR("frq"), _freq);
+		concat_tr_input_html_tags(_page, RODT_ATTR("Host Address:"), RODT_ATTR("hst"), __gpio_service.m_gpio_config_copy.gpio_host, GPIO_HOST_BUF_SIZE - 1);
+		concat_tr_input_html_tags(_page, RODT_ATTR("Host Port:"), RODT_ATTR("prt"), _port);
+		concat_tr_input_html_tags(_page, RODT_ATTR("Post Frequency:"), RODT_ATTR("frq"), _freq);
 
 		strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 		if (_enable_flash)
@@ -293,9 +293,9 @@ public:
 
 		if (this->m_web_resource->m_server->hasArg("hst") && this->m_web_resource->m_server->hasArg("prt"))
 		{
-			std::string _gpio_host = this->m_web_resource->m_server->arg("hst");
-			std::string _gpio_port = this->m_web_resource->m_server->arg("prt");
-			std::string _post_freq = this->m_web_resource->m_server->arg("frq");
+			pdiutil::string _gpio_host = this->m_web_resource->m_server->arg("hst");
+			pdiutil::string _gpio_port = this->m_web_resource->m_server->arg("prt");
+			pdiutil::string _post_freq = this->m_web_resource->m_server->arg("frq");
 
 			LogI("\nSubmitted info :\n");
 			LogFmtI("gpio host : %s\n", _gpio_host.c_str());

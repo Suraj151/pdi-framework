@@ -241,9 +241,9 @@ uint32_t DeviceControlInterface::getDeviceId()
 /**
  * get device mac id if any
  */
-std::string DeviceControlInterface::getDeviceMac()
+pdiutil::string DeviceControlInterface::getDeviceMac()
 {
-    return std::string( WiFi.macAddress().c_str() );
+    return pdiutil::string( WiFi.macAddress().c_str() );
 }
 
 /**

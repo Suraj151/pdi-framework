@@ -14,11 +14,32 @@ created Date    : 1st June 2019
 #include <stdint.h>
 #include <stddef.h>
 #include <stdarg.h>
-#include <string>
-#include <cstdio>
-#include <cstring>
-#include <cmath>
-#include <functional>
+#include <utility/pdistl/functional>
+#include <utility/pdistl/string>
+#include <utility/pdistl/vector>
+#include <utility/pdistl/cstdio>
+#include <utility/pdistl/cstring>
+#include <utility/pdistl/cmath>
+
+
+// using namespace for defining stl under pdiutil
+namespace pdiutil{
+
+    // class string;
+    using string = pdistd::string;
+
+    // class vector;
+    template <class T, class A = pdistd::allocator<T>> 
+    using vector = pdistd::vector<T,A>;
+
+    // conversion to respective string type
+    using pdistd::to_string;
+
+    // class function
+    template<typename _Res, typename... _ArgTypes>
+    using function = pdistd::function<_Res, _ArgTypes...>;
+} // namespace pdiutil
+
 
 // option to define the attribute for read only data
 // redefine this in derived interface
@@ -49,9 +70,9 @@ typedef uint16_t http_method_t;
 /**
  * Define required callback type
  */
-typedef std::function<void(int)> CallBackIntArgFn;
-typedef std::function<void(void)> CallBackVoidArgFn;
-typedef std::function<void(void *)> CallBackVoidPointerArgFn;
+typedef pdiutil::function<void(int)> CallBackIntArgFn;
+typedef pdiutil::function<void(void)> CallBackVoidArgFn;
+typedef pdiutil::function<void(void *)> CallBackVoidPointerArgFn;
 
 /**
  * Define log types
@@ -109,9 +130,9 @@ struct ipaddress_t
         ip4[3] = fourth_octet;
     }
 
-    operator std::string()
+    operator pdiutil::string()
     {
-        return (std::to_string(ip4[0]) + "." + std::to_string(ip4[1]) + "." + std::to_string(ip4[2]) + "." + std::to_string(ip4[3]));
+        return (pdiutil::to_string(ip4[0]) + "." + pdiutil::to_string(ip4[1]) + "." + pdiutil::to_string(ip4[2]) + "." + pdiutil::to_string(ip4[3]));
     }
 
     operator uint32_t()

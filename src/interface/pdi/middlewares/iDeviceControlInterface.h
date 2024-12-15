@@ -65,7 +65,7 @@ public:
   // misc methods
   virtual void eraseConfig() = 0;
   virtual uint32_t getDeviceId() = 0;
-  virtual std::string getDeviceMac() = 0;
+  virtual pdiutil::string getDeviceMac() = 0;
   virtual bool isDeviceFactoryRequested() = 0;
 
   // below are the utility interface dependencies which needs to be satisfy

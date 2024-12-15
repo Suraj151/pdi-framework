@@ -14,8 +14,13 @@ created Date    : 1st June 2019
  * PDIStack constructor.
  */
 PDIStack::PDIStack():
-  m_wifi(&__i_wifi),
-  m_client(&__i_wifi_client)
+#ifdef ENABLE_WIFI_SERVICE
+  m_client(&__i_wifi_client),
+  m_server(&__i_wifi_server)
+#else
+  m_client(nullptr),
+  m_server(nullptr)
+#endif
 {
   __utl_event.begin(&__i_dvc_ctrl);
   __task_scheduler.setUtilityInterface(&__i_dvc_ctrl);
@@ -26,8 +31,8 @@ PDIStack::PDIStack():
  * PDIStack destructor.
  */
 PDIStack::~PDIStack(){
-  this->m_wifi = nullptr;
   this->m_client = nullptr;
+  this->m_server = nullptr;
 }
 
 /**
@@ -42,15 +47,22 @@ void PDIStack::initialize(){
   
   __i_dvc_ctrl.initDeviceSpecificFeatures();
 
-  __wifi_service.begin( this->m_wifi );
+  #ifdef ENABLE_WIFI_SERVICE
+  __wifi_service.begin( &__i_wifi );
+  #endif
 
   #ifdef ENABLE_HTTP_SERVER
-  __web_server.start_server( this->m_wifi );
+  __web_server.start_server( this->m_server );
   #endif
+  
+  #ifdef ENABLE_OTA_SERVICE
   __ota_service.begin_ota( this->m_client );
+  #endif
+  
   #ifdef ENABLE_GPIO_SERVICE
   __gpio_service.begin( this->m_client );
   #endif
+  
   #ifdef ENABLE_MQTT_SERVICE
   __mqtt_service.begin( this->m_client );
   #endif
@@ -85,8 +97,12 @@ void PDIStack::serve(){
  */
 void PDIStack::handleLogPrints(){
 
+  #ifdef ENABLE_WIFI_SERVICE
   __wifi_service.printWiFiConfigLogs();
+  #endif
+  #ifdef ENABLE_OTA_SERVICE
   __ota_service.printOtaConfigLogs();
+  #endif
   #ifdef ENABLE_GPIO_SERVICE
   __gpio_service.printGpioConfigLogs();
   #endif

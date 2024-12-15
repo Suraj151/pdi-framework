@@ -74,7 +74,7 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isAlertPost ){
 
   bool status = false;
 
-  std::string posturl = this->m_gpio_config_copy.gpio_host;
+  pdiutil::string posturl = this->m_gpio_config_copy.gpio_host;
 
   if( isAlertPost ){
     posturl += GPIO_ALERT_POST_HTTP_URL;
@@ -89,7 +89,7 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isAlertPost ){
     nullptr != this->m_http_client
   ){
 
-    std::string *_payload = new std::string();
+    pdiutil::string *_payload = new pdiutil::string();
 
     if( nullptr != _payload ){
 
@@ -125,9 +125,9 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isAlertPost ){
 /**
  * append gpio payload to string arg
  *
- * @param std::string& _payload
+ * @param pdiutil::string& _payload
  */
-void GpioServiceProvider::appendGpioJsonPayload( std::string &_payload, bool isAlertPost ){
+void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool isAlertPost ){
 
   _payload += "{";
 
@@ -148,10 +148,10 @@ void GpioServiceProvider::appendGpioJsonPayload( std::string &_payload, bool isA
 
     if( __gpio_alert_track.alert_gpio_pin < MAX_DIGITAL_GPIO_PINS ){
       _payload += "D";
-      _payload += std::to_string(__gpio_alert_track.alert_gpio_pin);
+      _payload += pdiutil::to_string(__gpio_alert_track.alert_gpio_pin);
     }else{
       _payload += "A";
-      _payload += std::to_string(__gpio_alert_track.alert_gpio_pin - MAX_DIGITAL_GPIO_PINS);
+      _payload += pdiutil::to_string(__gpio_alert_track.alert_gpio_pin - MAX_DIGITAL_GPIO_PINS);
     }
 
     _payload += "\",";
@@ -166,15 +166,15 @@ void GpioServiceProvider::appendGpioJsonPayload( std::string &_payload, bool isA
     if( !__i_dvc_ctrl.isExceptionalGpio(_pin) ){
 
       _payload += "\"D";
-      _payload += std::to_string(_pin);
+      _payload += pdiutil::to_string(_pin);
       _payload += "\":{\"";
       _payload += GPIO_PAYLOAD_MODE_KEY;
       _payload += "\":";
-      _payload += std::to_string(this->m_gpio_config_copy.gpio_mode[_pin]);
+      _payload += pdiutil::to_string(this->m_gpio_config_copy.gpio_mode[_pin]);
       _payload += ",\"";
       _payload += GPIO_PAYLOAD_VALUE_KEY;
       _payload += "\":";
-      _payload += std::to_string(this->m_gpio_config_copy.gpio_readings[_pin]);
+      _payload += pdiutil::to_string(this->m_gpio_config_copy.gpio_readings[_pin]);
       _payload += "},";
     }
   }
@@ -182,15 +182,15 @@ void GpioServiceProvider::appendGpioJsonPayload( std::string &_payload, bool isA
   for (uint8_t _pin = 0; _pin < MAX_ANALOG_GPIO_PINS; _pin++) {
 
     _payload += "\"A";
-    _payload += std::to_string(_pin);
+    _payload += pdiutil::to_string(_pin);
     _payload += "\":{\"";
     _payload += GPIO_PAYLOAD_MODE_KEY;
     _payload += "\":";
-    _payload += std::to_string(this->m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS+_pin]);
+    _payload += pdiutil::to_string(this->m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS+_pin]);
     _payload += ",\"";
     _payload += GPIO_PAYLOAD_VALUE_KEY;
     _payload += "\":";
-    _payload += std::to_string(this->m_gpio_config_copy.gpio_readings[MAX_DIGITAL_GPIO_PINS+_pin]);
+    _payload += pdiutil::to_string(this->m_gpio_config_copy.gpio_readings[MAX_DIGITAL_GPIO_PINS+_pin]);
     _payload += "}";
 
     if( ( MAX_ANALOG_GPIO_PINS - _pin ) > 1 ){
@@ -264,7 +264,7 @@ bool GpioServiceProvider::handleGpioEmailAlert(){
 
   LogI("Handling GPIO email alert\n");
 
-  std::string *_payload = new std::string();
+  pdiutil::string *_payload = new pdiutil::string();
 
   if( nullptr != _payload ){
 

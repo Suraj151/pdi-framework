@@ -97,7 +97,7 @@ typedef struct
 	tConnState connState;
 	QUEUE msgQueue;
 	uint16_t host_connect_tick;
-	std::vector<mqtt_subscribed_topics_t> subscribed_topics;
+	pdiutil::vector<mqtt_subscribed_topics_t> subscribed_topics;
 	bool mqtt_connected;
 } MQTT_Client;
 

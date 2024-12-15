@@ -49,7 +49,7 @@ public:
 
   virtual void init_ntp_time() = 0;
   virtual bool is_valid_ntptime() = 0;
-  virtual time_t get_ntp_time() = 0;
+  virtual long get_ntp_time() = 0;
 };
 
 // derived class must define this

@@ -62,7 +62,7 @@ class LoginController : public Controller {
 		 * build html page with header, middle and footer part.
 		 *
 		 * @param	char*	_page
-		 * @param	PGM_P	_pgm_page
+		 * @param	const char *	_pgm_page
 		 * @param	bool|false	_enable_flash
 		 * @param	char*|""	_message
 		 * @param	FLASH_MSG_TYPE|ALERT_SUCCESS	_alert_type
@@ -71,7 +71,7 @@ class LoginController : public Controller {
 		 */
 		void build_html(
       char* _page,
-      PGM_P _pgm_page,
+      const char * _pgm_page,
       bool _enable_flash=false,
       char* _message="",
       FLASH_MSG_TYPE _alert_type=ALERT_SUCCESS ,
@@ -102,12 +102,12 @@ class LoginController : public Controller {
       strcat_P( _page, WEB_SERVER_HEADER_HTML );
       strcat_P( _page, WEB_SERVER_LOGIN_CONFIG_PAGE_TOP );
 
-      concat_tr_input_html_tags( _page, PSTR("Username:"), PSTR("usrnm"), this->login_credentials.username, LOGIN_CONFIGS_BUF_SIZE-1 );
-      concat_tr_input_html_tags( _page, PSTR("Password:"), PSTR("pswd"), this->login_credentials.password, LOGIN_CONFIGS_BUF_SIZE-1, (char*)"password" );
+      concat_tr_input_html_tags( _page, RODT_ATTR("Username:"), RODT_ATTR("usrnm"), this->login_credentials.username, LOGIN_CONFIGS_BUF_SIZE-1 );
+      concat_tr_input_html_tags( _page, RODT_ATTR("Password:"), RODT_ATTR("pswd"), this->login_credentials.password, LOGIN_CONFIGS_BUF_SIZE-1, (char*)"password" );
 
       strcat_P( _page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM );
       if( _enable_flash )
-      concat_flash_message_div( _page, _is_error ? PSTR("Invalid length error(3-20)"): HTML_SUCCESS_FLASH, _is_error ? ALERT_DANGER:ALERT_SUCCESS );
+      concat_flash_message_div( _page, _is_error ? RODT_ATTR("Invalid length error(3-20)"): HTML_SUCCESS_FLASH, _is_error ? ALERT_DANGER:ALERT_SUCCESS );
       strcat_P( _page, WEB_SERVER_FOOTER_HTML );
     }
 
@@ -133,8 +133,8 @@ class LoginController : public Controller {
 
       if ( this->m_web_resource->m_server->hasArg("usrnm") && this->m_web_resource->m_server->hasArg("pswd") ) {
 
-        std::string _username = this->m_web_resource->m_server->arg("usrnm");
-        std::string _password = this->m_web_resource->m_server->arg("pswd");
+        pdiutil::string _username = this->m_web_resource->m_server->arg("usrnm");
+        pdiutil::string _password = this->m_web_resource->m_server->arg("pswd");
 
         LogI("\nSubmitted info :\n");
         LogFmtI("Username : %s\n", _username.c_str());

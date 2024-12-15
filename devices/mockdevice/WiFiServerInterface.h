@@ -36,18 +36,18 @@ public:
   void handleClient() override{}
   void close() override{}
 
-  void on(const std::string &uri, CallBackVoidArgFn handler) override{}
+  void on(const pdiutil::string &uri, CallBackVoidArgFn handler) override{}
   void onNotFound(CallBackVoidArgFn fn) override{}   // called when handler is not assigned
   void onFileUpload(CallBackVoidArgFn fn) override{} // handle file uploads
 
-  std::string arg(const std::string &name) override{return "";}                                    // get request argument value by name
-  bool hasArg(const std::string &name) const override{return 0;}                                  // check if argument exists
+  pdiutil::string arg(const pdiutil::string &name) override{return "";}                                    // get request argument value by name
+  bool hasArg(const pdiutil::string &name) const override{return 0;}                                  // check if argument exists
   void collectHeaders(const char *headerKeys[], const size_t headerKeysCount) override{} // set the request headers to collect
-  std::string header(const std::string &name) override{return "";}                                 // get request header value by name
-  bool hasHeader(const std::string &name) const override{return 0;}                               // check if header exists
+  pdiutil::string header(const pdiutil::string &name) override{return "";}                                 // get request header value by name
+  bool hasHeader(const pdiutil::string &name) const override{return 0;}                               // check if header exists
 
   void send(int code, const char *content_type = nullptr, const char *content = nullptr) override{}
-  void sendHeader(const std::string &name, const std::string &value, bool first = false) override{}
+  void sendHeader(const pdiutil::string &name, const pdiutil::string &value, bool first = false) override{}
 
 };
 

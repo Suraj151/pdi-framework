@@ -16,9 +16,11 @@ created Date    : 1st Jan 2024
 LoggerInterface __i_logger;
 DatabaseInterface __i_db;
 DeviceControlInterface __i_dvc_ctrl;
+#ifdef ENABLE_WIFI_SERVICE
 WiFiInterface __i_wifi;
 WiFiClientInterface __i_wifi_client;
 WiFiServerInterface __i_wifi_server;
+#endif
 NtpInterface __i_ntp;
 PingInterface __i_ping;
 

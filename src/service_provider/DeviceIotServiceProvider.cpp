@@ -56,18 +56,20 @@ void DeviceIotServiceProvider::init( iClientInterface *_iclient ){
     this->m_mqtt_keep_alive*MILLISECOND_DURATION_1000
   );
 
+#if defined(ENABLE_MQTT_SERVICE)
   // clear all mqtt old configs
   __mqtt_general_table.clear();
   __mqtt_pubsub_table.clear();
   __mqtt_lwt_table.clear();
+#endif
 }
 
 /**
  * handle registration otp request
  */
-void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_table *_device_iot_configs, std::string &_response ){
+void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_table *_device_iot_configs, pdiutil::string &_response ){
 
-  std::string otpurl;
+  pdiutil::string otpurl;
 
   if( nullptr != _device_iot_configs ){
 
@@ -75,7 +77,7 @@ void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_t
     otpurl += DEVICE_IOT_OTP_REQ_URL;
 
     size_t mac_index = otpurl.find("[mac]");
-    if( std::string::npos != mac_index )
+    if( pdiutil::string::npos != mac_index )
     {
       otpurl.replace( mac_index, 5, __i_dvc_ctrl.getDeviceMac().c_str() );
     }
@@ -126,11 +128,11 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
 
   __database_service.get_device_iot_config_table(&this->m_device_iot_configs);
 
-  std::string configurl = this->m_device_iot_configs.device_iot_host;
+  pdiutil::string configurl = this->m_device_iot_configs.device_iot_host;
   configurl += DEVICE_IOT_CONFIG_REQ_URL;
 
   size_t mac_index = configurl.find("[mac]");
-  if( std::string::npos != mac_index )
+  if( pdiutil::string::npos != mac_index )
   {
     configurl.replace( mac_index, 5, __i_dvc_ctrl.getDeviceMac().c_str() );
   }
@@ -173,7 +175,9 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
               this->m_mqtt_keep_alive*MILLISECOND_DURATION_1000, DEFAULT_TASK_PRIORITY,
               ( __i_dvc_ctrl.millis_now() + MQTT_INITIALIZE_DURATION )
             );
+#if defined(ENABLE_MQTT_SERVICE)
             __task_scheduler.setTimeout( [&]() { this->configureMQTT(); }, 1, __i_dvc_ctrl.millis_now() );
+#endif
             this->m_token_validity = true;
 
           }else{
@@ -201,14 +205,17 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
  */
 void DeviceIotServiceProvider::handleConnectivityCheck(){
 
+#if defined(ENABLE_MQTT_SERVICE)
   bool _is_mqtt_connected = __mqtt_service.m_mqtt_client.is_mqtt_connected();
   LogFmtI("Device iot mqtt connection check cycle : %d\n", (int)_is_mqtt_connected );
   if( !_is_mqtt_connected ) {
     this->m_token_validity = false;
     __mqtt_service.stop();
   }
+#endif
 }
 
+#if defined(ENABLE_MQTT_SERVICE)
 
 /**
  * configure mqtt
@@ -231,8 +238,8 @@ void DeviceIotServiceProvider::configureMQTT(){
 
   memcpy( _mqtt_general_configs.host, httpreq.host, strlen( httpreq.host ) );
   _mqtt_general_configs.port = DEVICE_IOT_MQTT_DATA_PORT;
-  strcpy_P( _mqtt_general_configs.client_id, PSTR("[mac]") );
-  strcpy_P( _mqtt_general_configs.username, PSTR("[mac]") );
+  strcpy( _mqtt_general_configs.client_id, RODT_ATTR("[mac]") );
+  strcpy( _mqtt_general_configs.username, RODT_ATTR("[mac]") );
   memcpy( _mqtt_general_configs.password, this->m_device_iot_configs.device_iot_token, DEVICE_IOT_CONFIG_TOKEN_MAX_SIZE );
   _mqtt_general_configs.keepalive = this->m_mqtt_keep_alive;
   _mqtt_general_configs.clean_session = 1;
@@ -242,7 +249,7 @@ void DeviceIotServiceProvider::configureMQTT(){
 
   strcpy( _mqtt_lwt_configs.will_topic, this->m_device_iot_configs.device_iot_topic );
   // strcpy_P( _mqtt_lwt_configs.will_topic, DEVICE_IOT_MQTT_WILL_TOPIC );
-  strcpy_P( _mqtt_lwt_configs.will_message, PSTR("{\"head\":{\"uid\":\"[mac]\",\"packet_type\":\"disconnect\"},\"payload\":{},\"tail\":{}}") );
+  strcpy( _mqtt_lwt_configs.will_message, RODT_ATTR("{\"head\":{\"uid\":\"[mac]\",\"packet_type\":\"disconnect\"},\"payload\":{},\"tail\":{}}") );
   _mqtt_lwt_configs.will_qos = 1;
   _mqtt_lwt_configs.will_retain = 0;
 
@@ -252,6 +259,8 @@ void DeviceIotServiceProvider::configureMQTT(){
 
   __task_scheduler.setTimeout( [&]() { __mqtt_service.handleMqttConfigChange(); }, 1, __i_dvc_ctrl.millis_now() );
 }
+
+#endif
 
 /**
  * handle mqtt config parameters from server
@@ -344,11 +353,13 @@ void DeviceIotServiceProvider::handleSensorData(){
   if( this->m_smaple_index >= this->m_smaple_per_publish-1 ){
 
     this->m_smaple_index = 0;
-    std::string _payload = "{\"head\":{\"uid\":\"[mac]\",\"packet_type\":\"data\",\"packet_version\":\"";
+    pdiutil::string _payload = "{\"head\":{\"uid\":\"[mac]\",\"packet_type\":\"data\",\"packet_version\":\"";
     _payload += DEVICE_IOT_PACKET_VERSION;
     _payload += "\"},\"payload\":";
     this->m_device_iot->dataHook(_payload);
     _payload += ",\"tail\":{}}";
+
+#if defined(ENABLE_MQTT_SERVICE)
     __task_scheduler.setTimeout( [&]() { __mqtt_service.handleMqttPublish(); }, 1, __i_dvc_ctrl.millis_now() );
 
     memset( __mqtt_service.m_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
@@ -356,8 +367,9 @@ void DeviceIotServiceProvider::handleSensorData(){
       // _payload.toCharArray( __mqtt_service.m_mqtt_payload, _payload.size()+1);
       strncpy(__mqtt_service.m_mqtt_payload, _payload.c_str(), _payload.size()); 
     }else{
-      strcat_P( __mqtt_service.m_mqtt_payload, PSTR("mqtt data is too big to fit in buffer !"));
+      strcat( __mqtt_service.m_mqtt_payload, RODT_ATTR("mqtt data is too big to fit in buffer !"));
     }
+#endif
   }else{
     this->m_smaple_index++;
   }

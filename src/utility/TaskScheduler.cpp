@@ -173,7 +173,7 @@ void TaskScheduler::handle_tasks()
 		{
 			if (this->m_tasks[i]._task_priority < this->m_tasks[j]._task_priority)
 			{
-				std::swap(_priority_indices[i], _priority_indices[j]);
+				pdistd::swap(_priority_indices[i], _priority_indices[j]);
 			}
 		}
 	}

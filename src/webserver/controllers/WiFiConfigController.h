@@ -78,25 +78,25 @@ public:
 
 #ifdef ALLOW_WIFI_CONFIG_MODIFICATION
 
-    concat_tr_input_html_tags(_page, PSTR("WiFi Name:"), PSTR("sta_ssid"), this->wifi_configs.sta_ssid, WIFI_CONFIGS_BUF_SIZE - 1);
-    concat_tr_input_html_tags(_page, PSTR("WiFi Password:"), PSTR("sta_pswd"), this->wifi_configs.sta_password, WIFI_CONFIGS_BUF_SIZE - 1);
+    concat_tr_input_html_tags(_page, RODT_ATTR("WiFi Name:"), RODT_ATTR("sta_ssid"), this->wifi_configs.sta_ssid, WIFI_CONFIGS_BUF_SIZE - 1);
+    concat_tr_input_html_tags(_page, RODT_ATTR("WiFi Password:"), RODT_ATTR("sta_pswd"), this->wifi_configs.sta_password, WIFI_CONFIGS_BUF_SIZE - 1);
 
     __int_ip_to_str(_ip_address, this->wifi_configs.sta_local_ip, 20);
-    concat_tr_input_html_tags(_page, PSTR("WiFi Local Ip:"), PSTR("sta_lip"), _ip_address);
+    concat_tr_input_html_tags(_page, RODT_ATTR("WiFi Local Ip:"), RODT_ATTR("sta_lip"), _ip_address);
     __int_ip_to_str(_ip_address, this->wifi_configs.sta_gateway, 20);
-    concat_tr_input_html_tags(_page, PSTR("WiFi Gateway:"), PSTR("sta_gip"), _ip_address);
+    concat_tr_input_html_tags(_page, RODT_ATTR("WiFi Gateway:"), RODT_ATTR("sta_gip"), _ip_address);
     __int_ip_to_str(_ip_address, this->wifi_configs.sta_subnet, 20);
-    concat_tr_input_html_tags(_page, PSTR("WiFi Subnet:"), PSTR("sta_sip"), _ip_address);
+    concat_tr_input_html_tags(_page, RODT_ATTR("WiFi Subnet:"), RODT_ATTR("sta_sip"), _ip_address);
 
-    concat_tr_input_html_tags(_page, PSTR("Access Name:"), PSTR("ap_ssid"), this->wifi_configs.ap_ssid, WIFI_CONFIGS_BUF_SIZE - 1);
-    concat_tr_input_html_tags(_page, PSTR("Access Password:"), PSTR("ap_pswd"), this->wifi_configs.ap_password, WIFI_CONFIGS_BUF_SIZE - 1);
+    concat_tr_input_html_tags(_page, RODT_ATTR("Access Name:"), RODT_ATTR("ap_ssid"), this->wifi_configs.ap_ssid, WIFI_CONFIGS_BUF_SIZE - 1);
+    concat_tr_input_html_tags(_page, RODT_ATTR("Access Password:"), RODT_ATTR("ap_pswd"), this->wifi_configs.ap_password, WIFI_CONFIGS_BUF_SIZE - 1);
 
     __int_ip_to_str(_ip_address, this->wifi_configs.ap_local_ip, 20);
-    concat_tr_input_html_tags(_page, PSTR("Access Local Ip:"), PSTR("ap_lip"), _ip_address);
+    concat_tr_input_html_tags(_page, RODT_ATTR("Access Local Ip:"), RODT_ATTR("ap_lip"), _ip_address);
     __int_ip_to_str(_ip_address, this->wifi_configs.ap_gateway, 20);
-    concat_tr_input_html_tags(_page, PSTR("Access Gateway:"), PSTR("ap_gip"), _ip_address);
+    concat_tr_input_html_tags(_page, RODT_ATTR("Access Gateway:"), RODT_ATTR("ap_gip"), _ip_address);
     __int_ip_to_str(_ip_address, this->wifi_configs.ap_subnet, 20);
-    concat_tr_input_html_tags(_page, PSTR("Access Subnet:"), PSTR("ap_sip"), _ip_address);
+    concat_tr_input_html_tags(_page, RODT_ATTR("Access Subnet:"), RODT_ATTR("ap_sip"), _ip_address);
 
     strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 
@@ -104,32 +104,32 @@ public:
 
 #ifdef ALLOW_WIFI_SSID_PASSKEY_CONFIG_MODIFICATION_ONLY
 
-    concat_tr_input_html_tags(_page, PSTR("WiFi Name:"), PSTR("sta_ssid"), this->wifi_configs.sta_ssid, WIFI_CONFIGS_BUF_SIZE - 1);
-    concat_tr_input_html_tags(_page, PSTR("WiFi Password:"), PSTR("sta_pswd"), this->wifi_configs.sta_password, WIFI_CONFIGS_BUF_SIZE - 1);
+    concat_tr_input_html_tags(_page, RODT_ATTR("WiFi Name:"), RODT_ATTR("sta_ssid"), this->wifi_configs.sta_ssid, WIFI_CONFIGS_BUF_SIZE - 1);
+    concat_tr_input_html_tags(_page, RODT_ATTR("WiFi Password:"), RODT_ATTR("sta_pswd"), this->wifi_configs.sta_password, WIFI_CONFIGS_BUF_SIZE - 1);
 
 #else
 
-    concat_tr_input_html_tags(_page, PSTR("WiFi Name:"), PSTR("sta_ssid"), this->wifi_configs.sta_ssid, WIFI_CONFIGS_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
-    concat_tr_input_html_tags(_page, PSTR("WiFi Password:"), PSTR("sta_pswd"), this->wifi_configs.sta_password, WIFI_CONFIGS_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
+    concat_tr_input_html_tags(_page, RODT_ATTR("WiFi Name:"), RODT_ATTR("sta_ssid"), this->wifi_configs.sta_ssid, WIFI_CONFIGS_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
+    concat_tr_input_html_tags(_page, RODT_ATTR("WiFi Password:"), RODT_ATTR("sta_pswd"), this->wifi_configs.sta_password, WIFI_CONFIGS_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
 
 #endif
 
     __int_ip_to_str(_ip_address, this->wifi_configs.sta_local_ip, 20);
-    concat_tr_input_html_tags(_page, PSTR("WiFi Local Ip:"), PSTR("sta_lip"), _ip_address, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true);
+    concat_tr_input_html_tags(_page, RODT_ATTR("WiFi Local Ip:"), RODT_ATTR("sta_lip"), _ip_address, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true);
     __int_ip_to_str(_ip_address, this->wifi_configs.sta_gateway, 20);
-    concat_tr_input_html_tags(_page, PSTR("WiFi Gateway:"), PSTR("sta_gip"), _ip_address, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true);
+    concat_tr_input_html_tags(_page, RODT_ATTR("WiFi Gateway:"), RODT_ATTR("sta_gip"), _ip_address, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true);
     __int_ip_to_str(_ip_address, this->wifi_configs.sta_subnet, 20);
-    concat_tr_input_html_tags(_page, PSTR("WiFi Subnet:"), PSTR("sta_sip"), _ip_address, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true);
+    concat_tr_input_html_tags(_page, RODT_ATTR("WiFi Subnet:"), RODT_ATTR("sta_sip"), _ip_address, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true);
 
-    concat_tr_input_html_tags(_page, PSTR("Access Name:"), PSTR("ap_ssid"), this->wifi_configs.ap_ssid, WIFI_CONFIGS_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
-    concat_tr_input_html_tags(_page, PSTR("Access Password:"), PSTR("ap_pswd"), this->wifi_configs.ap_password, WIFI_CONFIGS_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
+    concat_tr_input_html_tags(_page, RODT_ATTR("Access Name:"), RODT_ATTR("ap_ssid"), this->wifi_configs.ap_ssid, WIFI_CONFIGS_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
+    concat_tr_input_html_tags(_page, RODT_ATTR("Access Password:"), RODT_ATTR("ap_pswd"), this->wifi_configs.ap_password, WIFI_CONFIGS_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
 
     __int_ip_to_str(_ip_address, this->wifi_configs.ap_local_ip, 20);
-    concat_tr_input_html_tags(_page, PSTR("Access Local Ip:"), PSTR("ap_lip"), _ip_address, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true);
+    concat_tr_input_html_tags(_page, RODT_ATTR("Access Local Ip:"), RODT_ATTR("ap_lip"), _ip_address, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true);
     __int_ip_to_str(_ip_address, this->wifi_configs.ap_gateway, 20);
-    concat_tr_input_html_tags(_page, PSTR("Access Gateway:"), PSTR("ap_gip"), _ip_address, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true);
+    concat_tr_input_html_tags(_page, RODT_ATTR("Access Gateway:"), RODT_ATTR("ap_gip"), _ip_address, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true);
     __int_ip_to_str(_ip_address, this->wifi_configs.ap_subnet, 20);
-    concat_tr_input_html_tags(_page, PSTR("Access Subnet:"), PSTR("ap_sip"), _ip_address, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true);
+    concat_tr_input_html_tags(_page, RODT_ATTR("Access Subnet:"), RODT_ATTR("ap_sip"), _ip_address, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true);
 
 #ifdef ALLOW_WIFI_SSID_PASSKEY_CONFIG_MODIFICATION_ONLY
 
@@ -140,7 +140,7 @@ public:
 #endif
 
     if (_enable_flash)
-      concat_flash_message_div(_page, _is_error ? PSTR("Invalid length error(3-20)") : PSTR("Config saved Successfully..applying new configs."), _is_error ? ALERT_DANGER : ALERT_SUCCESS);
+      concat_flash_message_div(_page, _is_error ? RODT_ATTR("Invalid length error(3-20)") : RODT_ATTR("Config saved Successfully..applying new configs."), _is_error ? ALERT_DANGER : ALERT_SUCCESS);
     strcat_P(_page, WEB_SERVER_FOOTER_HTML);
   }
 
@@ -170,17 +170,17 @@ public:
     if (this->m_web_resource->m_server->hasArg("sta_ssid") && this->m_web_resource->m_server->hasArg("sta_pswd"))
     {
 
-      std::string _sta_ssid = this->m_web_resource->m_server->arg("sta_ssid");
-      std::string _sta_pswd = this->m_web_resource->m_server->arg("sta_pswd");
-      std::string _sta_lip = this->m_web_resource->m_server->arg("sta_lip");
-      std::string _sta_gip = this->m_web_resource->m_server->arg("sta_gip");
-      std::string _sta_sip = this->m_web_resource->m_server->arg("sta_sip");
+      pdiutil::string _sta_ssid = this->m_web_resource->m_server->arg("sta_ssid");
+      pdiutil::string _sta_pswd = this->m_web_resource->m_server->arg("sta_pswd");
+      pdiutil::string _sta_lip = this->m_web_resource->m_server->arg("sta_lip");
+      pdiutil::string _sta_gip = this->m_web_resource->m_server->arg("sta_gip");
+      pdiutil::string _sta_sip = this->m_web_resource->m_server->arg("sta_sip");
 
-      std::string _ap_ssid = this->m_web_resource->m_server->arg("ap_ssid");
-      std::string _ap_pswd = this->m_web_resource->m_server->arg("ap_pswd");
-      std::string _ap_lip = this->m_web_resource->m_server->arg("ap_lip");
-      std::string _ap_gip = this->m_web_resource->m_server->arg("ap_gip");
-      std::string _ap_sip = this->m_web_resource->m_server->arg("ap_sip");
+      pdiutil::string _ap_ssid = this->m_web_resource->m_server->arg("ap_ssid");
+      pdiutil::string _ap_pswd = this->m_web_resource->m_server->arg("ap_pswd");
+      pdiutil::string _ap_lip = this->m_web_resource->m_server->arg("ap_lip");
+      pdiutil::string _ap_gip = this->m_web_resource->m_server->arg("ap_gip");
+      pdiutil::string _ap_sip = this->m_web_resource->m_server->arg("ap_sip");
 
       LogI("\nSubmitted info :\n");
       LogFmtI("sta ssid : %s\n", _sta_ssid.c_str());

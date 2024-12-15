@@ -172,9 +172,9 @@
 
 // protected:
 //   /**
-//    * @var	std::vector<TimerTask> vector
+//    * @var	pdiutil::vector<TimerTask> vector
 //    */
-//   std::vector<TimerTask> m_tasks;
+//   pdiutil::vector<TimerTask> m_tasks;
 
 // private:
 //   /**

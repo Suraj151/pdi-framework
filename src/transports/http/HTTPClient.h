@@ -109,7 +109,7 @@ struct httt_req_t
 	char *uri;
 	bool isHttps;
 	http_version_t http_version;
-	std::vector<httt_header_t> headers;
+	pdiutil::vector<httt_header_t> headers;
 
 	// Constructor
 	httt_req_t();
@@ -149,7 +149,7 @@ struct httt_resp_t
 	int16_t status_code;
 	uint16_t resp_length;
 	uint16_t max_resp_length;
-	std::vector<httt_header_t> headers;
+	pdiutil::vector<httt_header_t> headers;
 	bool follow_redirects;
 	uint8_t redirect_limit;
 

@@ -54,9 +54,9 @@ public:
 	virtual void boot() = 0;
 
 	/**
-	 * @var	std::vector<struct_controllers>	m_controllers
+	 * @var	pdiutil::vector<struct_controllers>	m_controllers
 	 */
-	static std::vector<struct_controllers> m_controllers;
+	static pdiutil::vector<struct_controllers> m_controllers;
 
 	/**
 	 * @var	const char*	m_controller_name

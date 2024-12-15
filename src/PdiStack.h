@@ -18,12 +18,18 @@ created Date    : 1st June 2019
 #endif
 
 #include <service_provider/DatabaseServiceProvider.h>
-#include <service_provider/OtaServiceProvider.h>
-#include <service_provider/WiFiServiceProvider.h>
 #include <service_provider/FactoryResetServiceProvider.h>
 
 #ifdef ENABLE_GPIO_SERVICE
 #include <service_provider/GpioServiceProvider.h>
+#endif
+
+#ifdef ENABLE_WIFI_SERVICE
+#include <service_provider/WiFiServiceProvider.h>
+#endif
+
+#ifdef ENABLE_OTA_SERVICE
+#include <service_provider/OtaServiceProvider.h>
 #endif
 
 #ifdef ENABLE_MQTT_SERVICE
@@ -61,13 +67,14 @@ class PDIStack {
     static void handleLogPrints( void );
 
     /**
-		 * @var	iWiFiInterface*   m_wifi
-		 */
-    iWiFiInterface        *m_wifi;
-    /**
 		 * @var	iClientInterface*  m_client
 		 */
     iClientInterface  *m_client;
+
+    /**
+		 * @var	iServerInterface*  m_server
+		 */
+    iServerInterface  *m_server;
 };
 
 extern PDIStack PdiStack;

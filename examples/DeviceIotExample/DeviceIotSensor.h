@@ -35,7 +35,7 @@ class DeviceIotSensor : public iDeviceIotInterface {
 
     void init( void );
     void sampleHook( void );
-    void dataHook( std::string &_payload );
+    void dataHook( pdiutil::string &_payload );
     void resetSampleHook( void );
 
   protected:

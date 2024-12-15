@@ -54,7 +54,7 @@ void EmailServiceProvider::handleEmail()
       {
         LogI("Handling email\n");
 
-        std::string *_payload = new std::string();
+        pdiutil::string *_payload = new pdiutil::string();
 
         if (nullptr != _payload)
         {
@@ -131,10 +131,10 @@ void EmailServiceProvider::handleEmail()
 /**
  * send email and return the result of operation
  *
- * @param	  std::string*	mail_body
+ * @param	  pdiutil::string*	mail_body
  * @return  bool
  */
-bool EmailServiceProvider::sendMail(std::string &mail_body)
+bool EmailServiceProvider::sendMail(pdiutil::string &mail_body)
 {
 
   email_config_table _email_config;
@@ -243,10 +243,10 @@ bool EmailServiceProvider::sendMail(char *mail_body)
 /**
  * send email and return the result of operation
  *
- * @param	  PGM_P	mail_body
+ * @param	  const char *	mail_body
  * @return  bool
  */
-bool EmailServiceProvider::sendMail(PGM_P mail_body)
+bool EmailServiceProvider::sendMail(const char * mail_body)
 {
 
   email_config_table _email_config;

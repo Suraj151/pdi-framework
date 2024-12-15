@@ -13,8 +13,12 @@ created Date    : 1st June 2019
 
 #include <webserver/controllers/HomeController.h>
 #include <webserver/controllers/DashboardController.h>
+#ifdef ENABLE_OTA_SERVICE
 #include <webserver/controllers/OtaController.h>
+#endif
+#ifdef ENABLE_WIFI_SERVICE
 #include <webserver/controllers/WiFiConfigController.h>
+#endif
 #include <webserver/controllers/LoginController.h>
 #ifdef ENABLE_GPIO_SERVICE
 #include <webserver/controllers/GPIOController.h>
@@ -46,18 +50,14 @@ class WebServer {
      */
     ~WebServer();
 
-    void start_server( iWiFiInterface* _wifi );
-    void handle_clients( void );
+    bool start_server(iServerInterface *iServer);
+    void handle_clients(void);
 
   protected:
     /**
-		 * @var	iWiFiServerInterface  m_server
+		 * @var	iServerInterface  m_server
 		 */
-    iWiFiServerInterface  *m_server;
-    /**
-		 * @var	iWiFiInterface*|&WiFi m_wifi
-		 */
-    iWiFiInterface        *m_wifi;
+    iServerInterface      *m_server;
 
   private:
     /**
@@ -70,15 +70,19 @@ class WebServer {
 		 */
     DashboardController   m_dashboard_controller;
 
+    #ifdef ENABLE_OTA_SERVICE
     /**
 		 * @var	OtaController  m_ota_controller
 		 */
     OtaController         m_ota_controller;
+    #endif
 
+    #ifdef ENABLE_WIFI_SERVICE
     /**
 		 * @var	WiFiConfigController  m_wificonfig_controller
 		 */
     WiFiConfigController  m_wificonfig_controller;
+    #endif
 
     /**
 		 * @var	LoginController  m_login_controller

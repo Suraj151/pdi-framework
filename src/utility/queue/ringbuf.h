@@ -1,8 +1,7 @@
 #ifndef _RING_BUF_H_
 #define _RING_BUF_H_
 
-#include <stdlib.h>
-#include <stdint.h>
+#include <utility/DataTypeDef.h>
 
 typedef struct
 {

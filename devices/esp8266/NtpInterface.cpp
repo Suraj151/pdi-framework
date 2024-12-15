@@ -56,7 +56,7 @@ bool NtpInterface::is_valid_ntptime()
  *
  * @return  time_t
  */
-time_t NtpInterface::get_ntp_time()
+long NtpInterface::get_ntp_time()
 {
   return time(nullptr);
 }

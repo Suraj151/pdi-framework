@@ -34,7 +34,7 @@ class NtpInterface : public iNtpInterface {
 
     void init_ntp_time() override{}
     bool is_valid_ntptime() override{return 0;}
-    time_t get_ntp_time() override{return 0;}
+    long get_ntp_time() override{return 0;}
 };
 
 #endif

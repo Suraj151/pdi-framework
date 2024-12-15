@@ -71,9 +71,9 @@ public:
 
 protected:
 	/**
-	 * @var	std::vector<task_t> m_tasks
+	 * @var	pdiutil::vector<task_t> m_tasks
 	 */
-	std::vector<task_t> m_tasks;
+	pdiutil::vector<task_t> m_tasks;
 
 	/**
 	 * @var	iUtilityInterface* m_util

@@ -1,0 +1,67 @@
+/***************************** PDI STD File ***********************************
+This file is taken from external sources. this is taken from open source uClibc++ 
+library available on github. below is reference link. Thanking to author for
+providing this .
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+referred from   : https://github.com/mike-matera/ArduinoSTL
+added Date      : 1st Dec 2024
+added by        : Suraj I.
+******************************************************************************/
+
+#include <stdlib.h>
+#include "basic_definitions"
+
+#ifndef __HEADER_CSTDLIB
+#define __HEADER_CSTDLIB 1
+
+
+namespace pdistd{
+	using ::abort;
+	using ::abs;
+	using ::atexit;
+	using ::atol;
+	using ::atof;
+	using ::atoi;
+	using ::bsearch;
+	using ::calloc;
+	using ::div;
+	using ::exit;
+	using ::free;
+	using ::getenv;
+	using ::labs;
+	using ::ldiv;
+	using ::malloc;
+	using ::qsort;
+	using ::rand;
+	using ::realloc;
+	using ::srand;
+	using ::strtod;
+	using ::strtol;
+	using ::strtoul;
+	using ::system;
+#ifdef __UCLIBCXX_HAS_WCHAR__
+	using ::mblen;
+	using ::mbstowcs;
+	using ::mbtowc;
+	using ::wctomb;
+	using ::wcstombs;
+#endif
+
+/* Defined in Arduino
+	inline long abs(long i){
+		return labs(i);
+	}
+*/
+	// inline ldiv_t div(long i, long j){
+	// 	return ldiv(i, j);
+	// }
+
+}
+
+
+
+#endif
+

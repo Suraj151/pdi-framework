@@ -8,6 +8,10 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
+#include <config/Config.h>
+
+#if defined(ENABLE_OTA_SERVICE)
+
 #include "OtaServiceProvider.h"
 
 /**
@@ -82,7 +86,7 @@ http_ota_status OtaServiceProvider::handle()
   __database_service.get_global_config_table(&_global_configs);
   __database_service.get_ota_config_table(&_ota_configs);
 
-  std::string firmware_url = _ota_configs.ota_host;
+  pdiutil::string firmware_url = _ota_configs.ota_host;
 
   if (firmware_url.size() > 0)
   {
@@ -93,7 +97,7 @@ http_ota_status OtaServiceProvider::handle()
     firmware_url += OTA_VERSION_CHECK_URL;
 
     size_t mac_index = firmware_url.find("[mac]");
-    if (std::string::npos != mac_index)
+    if (pdiutil::string::npos != mac_index)
     {
       firmware_url.replace(mac_index, 5, __i_dvc_ctrl.getDeviceMac().c_str());
     }
@@ -152,15 +156,15 @@ http_ota_status OtaServiceProvider::handle()
           firmware_url += OTA_BINARY_DOWNLOAD_URL;
 
           size_t mac_index = firmware_url.find("[mac]");
-          if (std::string::npos != mac_index)
+          if (pdiutil::string::npos != mac_index)
           {
             firmware_url.replace(mac_index, 5, __i_dvc_ctrl.getDeviceMac().c_str());
           }
 
-          firmware_url += std::to_string(_firm_version);
+          firmware_url += pdiutil::to_string(_firm_version);
         }
 
-        upgrade_status_t upgrd_status = __i_dvc_ctrl.Upgrade(firmware_url.c_str(), std::to_string(_global_configs.firmware_version).c_str());
+        upgrade_status_t upgrd_status = __i_dvc_ctrl.Upgrade(firmware_url.c_str(), pdiutil::to_string(_global_configs.firmware_version).c_str());
 
         if (upgrd_status == UPGRADE_STATUS_FAILED)
         {
@@ -207,3 +211,5 @@ void OtaServiceProvider::printOtaConfigLogs()
 }
 
 OtaServiceProvider __ota_service;
+
+#endif

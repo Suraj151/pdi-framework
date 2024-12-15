@@ -87,25 +87,25 @@ public:
 		// char _freq[10];memset( _freq, 0, 10 );
 		// __appendUintToBuff( _freq, "%d", this->email_configs.mail_frequency, 8 );
 
-		concat_tr_input_html_tags(_page, PSTR("Domain:"), PSTR("ml_dmn"), this->email_configs.sending_domain, DEFAULT_SENDING_DOMAIN_MAX_SIZE - 1);
-		concat_tr_input_html_tags(_page, PSTR("Mail Server:"), PSTR("ml_srvr"), this->email_configs.mail_host, DEFAULT_MAIL_HOST_MAX_SIZE - 1);
+		concat_tr_input_html_tags(_page, RODT_ATTR("Domain:"), RODT_ATTR("ml_dmn"), this->email_configs.sending_domain, DEFAULT_SENDING_DOMAIN_MAX_SIZE - 1);
+		concat_tr_input_html_tags(_page, RODT_ATTR("Mail Server:"), RODT_ATTR("ml_srvr"), this->email_configs.mail_host, DEFAULT_MAIL_HOST_MAX_SIZE - 1);
 
-		concat_tr_input_html_tags(_page, PSTR("Mail Port:"), PSTR("ml_prt"), _port);
-		concat_tr_input_html_tags(_page, PSTR("Mail Username:"), PSTR("ml_usr"), this->email_configs.mail_username, DEFAULT_MAIL_USERNAME_MAX_SIZE - 1);
-		concat_tr_input_html_tags(_page, PSTR("Mail Password:"), PSTR("ml_psw"), this->email_configs.mail_password, DEFAULT_MAIL_PASSWORD_MAX_SIZE - 1, (char *)"password");
+		concat_tr_input_html_tags(_page, RODT_ATTR("Mail Port:"), RODT_ATTR("ml_prt"), _port);
+		concat_tr_input_html_tags(_page, RODT_ATTR("Mail Username:"), RODT_ATTR("ml_usr"), this->email_configs.mail_username, DEFAULT_MAIL_USERNAME_MAX_SIZE - 1);
+		concat_tr_input_html_tags(_page, RODT_ATTR("Mail Password:"), RODT_ATTR("ml_psw"), this->email_configs.mail_password, DEFAULT_MAIL_PASSWORD_MAX_SIZE - 1, (char *)"password");
 
-		concat_tr_input_html_tags(_page, PSTR("Mail From:"), PSTR("ml_frm"), this->email_configs.mail_from, DEFAULT_MAIL_FROM_MAX_SIZE - 1);
-		concat_tr_input_html_tags(_page, PSTR("Mail From Name:"), PSTR("ml_frnm"), this->email_configs.mail_from_name, DEFAULT_MAIL_FROM_NAME_MAX_SIZE - 1);
+		concat_tr_input_html_tags(_page, RODT_ATTR("Mail From:"), RODT_ATTR("ml_frm"), this->email_configs.mail_from, DEFAULT_MAIL_FROM_MAX_SIZE - 1);
+		concat_tr_input_html_tags(_page, RODT_ATTR("Mail From Name:"), RODT_ATTR("ml_frnm"), this->email_configs.mail_from_name, DEFAULT_MAIL_FROM_NAME_MAX_SIZE - 1);
 
-		concat_tr_input_html_tags(_page, PSTR("Mail To:"), PSTR("ml_to"), this->email_configs.mail_to, DEFAULT_MAIL_TO_MAX_SIZE - 1);
-		concat_tr_input_html_tags(_page, PSTR("Mail Subject:"), PSTR("ml_sub"), this->email_configs.mail_subject, DEFAULT_MAIL_SUBJECT_MAX_SIZE - 1);
-		concat_tr_input_html_tags(_page, PSTR("Send Test Mail ?"), PSTR("tstml"), "test", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, false);
-		// concat_tr_input_html_tags( _page, PSTR("Mail Frequency:"), PSTR("ml_freq"), _freq );
+		concat_tr_input_html_tags(_page, RODT_ATTR("Mail To:"), RODT_ATTR("ml_to"), this->email_configs.mail_to, DEFAULT_MAIL_TO_MAX_SIZE - 1);
+		concat_tr_input_html_tags(_page, RODT_ATTR("Mail Subject:"), RODT_ATTR("ml_sub"), this->email_configs.mail_subject, DEFAULT_MAIL_SUBJECT_MAX_SIZE - 1);
+		concat_tr_input_html_tags(_page, RODT_ATTR("Send Test Mail ?"), RODT_ATTR("tstml"), "test", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, false);
+		// concat_tr_input_html_tags( _page, RODT_ATTR("Mail Frequency:"), RODT_ATTR("ml_freq"), _freq );
 
 		strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 
 		if (_enable_flash)
-			concat_flash_message_div(_page, _is_error ? PSTR("Invalid length error") : _is_test_mail ? HTML_EMAIL_SUCCESS_FLASH
+			concat_flash_message_div(_page, _is_error ? RODT_ATTR("Invalid length error") : _is_test_mail ? HTML_EMAIL_SUCCESS_FLASH
 																									 : HTML_SUCCESS_FLASH,
 									 _is_error ? ALERT_DANGER : ALERT_SUCCESS);
 		strcat_P(_page, WEB_SERVER_FOOTER_HTML);
@@ -137,17 +137,17 @@ public:
 		if (this->m_web_resource->m_server->hasArg("ml_dmn") && this->m_web_resource->m_server->hasArg("ml_srvr"))
 		{
 
-			std::string _mail_domain = this->m_web_resource->m_server->arg("ml_dmn");
-			std::string _mail_server = this->m_web_resource->m_server->arg("ml_srvr");
-			std::string _mail_port = this->m_web_resource->m_server->arg("ml_prt");
-			std::string _mail_username = this->m_web_resource->m_server->arg("ml_usr");
-			std::string _mail_password = this->m_web_resource->m_server->arg("ml_psw");
-			std::string _mail_from = this->m_web_resource->m_server->arg("ml_frm");
-			std::string _mail_from_name = this->m_web_resource->m_server->arg("ml_frnm");
-			std::string _mail_to = this->m_web_resource->m_server->arg("ml_to");
-			std::string _mail_subject = this->m_web_resource->m_server->arg("ml_sub");
-			// std::string _mail_frequency = this->m_web_resource->m_server->arg("ml_freq");
-			std::string _test_mail = this->m_web_resource->m_server->arg("tstml");
+			pdiutil::string _mail_domain = this->m_web_resource->m_server->arg("ml_dmn");
+			pdiutil::string _mail_server = this->m_web_resource->m_server->arg("ml_srvr");
+			pdiutil::string _mail_port = this->m_web_resource->m_server->arg("ml_prt");
+			pdiutil::string _mail_username = this->m_web_resource->m_server->arg("ml_usr");
+			pdiutil::string _mail_password = this->m_web_resource->m_server->arg("ml_psw");
+			pdiutil::string _mail_from = this->m_web_resource->m_server->arg("ml_frm");
+			pdiutil::string _mail_from_name = this->m_web_resource->m_server->arg("ml_frnm");
+			pdiutil::string _mail_to = this->m_web_resource->m_server->arg("ml_to");
+			pdiutil::string _mail_subject = this->m_web_resource->m_server->arg("ml_sub");
+			// pdiutil::string _mail_frequency = this->m_web_resource->m_server->arg("ml_freq");
+			pdiutil::string _test_mail = this->m_web_resource->m_server->arg("tstml");
 
 			LogI("\nSubmitted info :\n");
 			LogFmtI("mail domain : %s\n",_mail_domain.c_str());
@@ -196,7 +196,7 @@ public:
 		if (_is_posted && !_is_error && _is_test_mail)
 		{
 			__email_service.sendMail(TEST_EMAIL_MESSAGE);
-			// __email_service.sendMail( PSTR("this is test mail") );
+			// __email_service.sendMail( RODT_ATTR("this is test mail") );
 		}
 	}
 };

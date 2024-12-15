@@ -154,7 +154,7 @@ public:
    bool waitForExpectedResponse(char *expectedResponse, uint16_t _timeOut = SMTP_DEFAULT_TIMEOUT);
    bool sendCommandAndExpect(char *command, char *expectedResponse, uint16_t _timeOut = SMTP_DEFAULT_TIMEOUT);
    int sendCommandAndGetCode(char *command, uint16_t _timeOut = SMTP_DEFAULT_TIMEOUT);
-   int sendCommandAndGetCode(PGM_P command, uint16_t _timeOut = SMTP_DEFAULT_TIMEOUT);
+   int sendCommandAndGetCode(const char * command, uint16_t _timeOut = SMTP_DEFAULT_TIMEOUT);
 
    bool sendHello(char *domain);
    bool sendAuthLogin(char *username, char *password);
@@ -162,9 +162,9 @@ public:
    bool sendTo(char *recipient);
    bool sendDataCommand(void);
    void sendDataHeader(char *sender, char *recipient, char *subject);
-   bool sendDataBody(std::string &body);
+   bool sendDataBody(pdiutil::string &body);
    bool sendDataBody(char *body);
-   bool sendDataBody(PGM_P body);
+   bool sendDataBody(const char * body);
    bool sendQuit(void);
    void end(void);
 

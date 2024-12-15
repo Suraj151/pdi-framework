@@ -48,6 +48,6 @@ typedef struct {
 } esp_now_peer_t;
 
 extern esp_now_peer_t esp_now_peers[ESP_NOW_MAX_PEER];
-extern std::vector<esp_now_device_t> esp_now_device_table;
+extern pdiutil::vector<esp_now_device_t> esp_now_device_table;
 
 #endif

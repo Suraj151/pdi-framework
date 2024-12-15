@@ -54,7 +54,7 @@ public:
 	 * build html page with header, middle and footer part.
 	 *
 	 * @param	char*	_page
-	 * @param	PGM_P	_pgm_page
+	 * @param	const char *	_pgm_page
 	 * @param	bool|false	_enable_flash
 	 * @param	char*|""	_message
 	 * @param	FLASH_MSG_TYPE|ALERT_SUCCESS	_alert_type
@@ -63,7 +63,7 @@ public:
 	 */
 	void build_html(
 		char *_page,
-		PGM_P _pgm_page,
+		const char * _pgm_page,
 		bool _enable_flash = false,
 		char *_message = "",
 		FLASH_MSG_TYPE _alert_type = ALERT_SUCCESS,

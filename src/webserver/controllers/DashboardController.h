@@ -41,10 +41,13 @@ class DashboardController : public Controller {
 
 			if( nullptr != this->m_route_handler ){
 				this->m_route_handler->register_route( WEB_SERVER_DASHBOARD_ROUTE, [&]() { this->handleDashboardRoute(); }, AUTH_MIDDLEWARE );
+				#ifdef ENABLE_WIFI_SERVICE
 	      		this->m_route_handler->register_route( WEB_SERVER_DASHBOARD_MONITOR_ROUTE, [&]() { this->handleDashboardMonitor(); } );
+				#endif
 			}
 		}
 
+#ifdef ENABLE_WIFI_SERVICE
 		/**
 		 * handle dashboard monitor calls. it provides live dashborad parameters.
 		 */
@@ -52,28 +55,28 @@ class DashboardController : public Controller {
 		{
 			LogI("Handling dashboard monitor route\n");
 
-			if (nullptr == this->m_web_resource || nullptr == this->m_web_resource->m_wifi || nullptr == this->m_route_handler)
+			if (nullptr == this->m_web_resource || nullptr == this->m_web_resource->m_server || nullptr == this->m_route_handler)
 			{
 				return;
 			}
 
-			std::vector<wifi_station_info_t> stations;
-			this->m_web_resource->m_wifi->getApsConnectedStations(stations);
+			pdiutil::vector<wifi_station_info_t> stations;
+			__i_wifi.getApsConnectedStations(stations);
 
-			std::string _response = "{\"nm\":\"";
-			_response += this->m_web_resource->m_wifi->SSID();
+			pdiutil::string _response = "{\"nm\":\"";
+			_response += __i_wifi.SSID();
 			_response += "\",\"ip\":\"";
-			_response += (std::string)this->m_web_resource->m_wifi->localIP();
+			_response += (pdiutil::string)__i_wifi.localIP();
 			_response += "\",\"rs\":\"";
-			_response += std::to_string(this->m_web_resource->m_wifi->RSSI());
+			_response += pdiutil::to_string(__i_wifi.RSSI());
 			_response += "\",\"mc\":\"";
-			_response += this->m_web_resource->m_wifi->macAddress();
+			_response += __i_wifi.macAddress();
 			_response += "\",\"st\":";
-			_response += std::to_string(this->m_web_resource->m_wifi->status());
+			_response += pdiutil::to_string((int32_t)__i_wifi.status());
 			_response += ",\"nt\":";
-			_response += std::to_string(__status_wifi.internet_available);
+			_response += pdiutil::to_string(__status_wifi.internet_available);
 			_response += ",\"nwt\":";
-			_response += std::to_string(__i_ntp.get_ntp_time());
+			_response += pdiutil::to_string(__i_ntp.get_ntp_time());
 			_response += ",\"dl\":\"";
 
 			for (uint32_t sta_indx=0; sta_indx < stations.size(); sta_indx++)
@@ -85,24 +88,25 @@ class DashboardController : public Controller {
 					"%02X:%02X:%02X:%02X:%02X:%02X",
 					stations[sta_indx].bssid[0], stations[sta_indx].bssid[1], stations[sta_indx].bssid[2], stations[sta_indx].bssid[3], stations[sta_indx].bssid[4], stations[sta_indx].bssid[5]);
 				_response += "<tr><td>";
-				_response += std::string(macStr);
+				_response += pdiutil::string(macStr);
 				_response += "</td><td>";
-				_response += std::to_string((uint8_t)stations[sta_indx].ip4);
+				_response += pdiutil::to_string((uint8_t)stations[sta_indx].ip4);
 				_response += ".";
-				_response += std::to_string((uint8_t)(stations[sta_indx].ip4 >> 8));
+				_response += pdiutil::to_string((uint8_t)(stations[sta_indx].ip4 >> 8));
 				_response += ".";
-				_response += std::to_string((uint8_t)(stations[sta_indx].ip4 >> 16));
+				_response += pdiutil::to_string((uint8_t)(stations[sta_indx].ip4 >> 16));
 				_response += ".";
-				_response += std::to_string((uint8_t)(stations[sta_indx].ip4 >> 24));
+				_response += pdiutil::to_string((uint8_t)(stations[sta_indx].ip4 >> 24));
 				_response += "</td></tr>";
 			}
 			_response += "\",\"r\":";
-			_response += std::to_string(!this->m_route_handler->has_active_session());
+			_response += pdiutil::to_string(!this->m_route_handler->has_active_session());
 			_response += "}";
 
 			this->m_web_resource->m_server->sendHeader("Cache-Control", "no-cache");
 			this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _response.c_str());
 		}
+#endif		
 
 		/**
 		 * handle dashboard page route. it build & send dashboard html to client.

@@ -8,12 +8,16 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
+#include <config/Config.h>
+
+#if defined(ENABLE_HTTP_SERVER)
+
 #include "Controller.h"
 
 /**
- * @var	std::vector<struct_controllers>	m_controllers
+ * @var	pdiutil::vector<struct_controllers>	m_controllers
  */
-std::vector<struct_controllers> Controller::m_controllers;
+pdiutil::vector<struct_controllers> Controller::m_controllers;
 
 /**
  * Controller constructor
@@ -53,3 +57,5 @@ void Controller::register_controller(Controller* that){
   struct_controllers _c(that);
   this->m_controllers.push_back(_c);
 }
+
+#endif

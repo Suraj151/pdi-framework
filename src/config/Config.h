@@ -12,9 +12,17 @@ created Date    : 1st June 2019
 
 #include "Common.h"
 #include "GlobalConfig.h"
+
+#ifdef ENABLE_WIFI_SERVICE
 #include "WifiConfig.h"
+#endif
+
 #include "ServerConfig.h"
+
+#ifdef ENABLE_OTA_SERVICE
 #include "OtaConfig.h"
+#endif
+
 #include "EventConfig.h"
 #include "NetworkConfig.h"
 

@@ -316,9 +316,9 @@ ipaddress_t WiFiInterface::localIP()
 /**
  * macAddress
  */
-std::string WiFiInterface::macAddress()
+pdiutil::string WiFiInterface::macAddress()
 {
-  std::string mac;
+  pdiutil::string mac;
   if (nullptr != this->m_wifi)
   {
     mac = this->m_wifi->macAddress().c_str();
@@ -382,9 +382,9 @@ wifi_status_t WiFiInterface::status()
 /**
  * SSID
  */
-std::string WiFiInterface::SSID() const
+pdiutil::string WiFiInterface::SSID() const
 {
-  std::string ssid;
+  pdiutil::string ssid;
   if (nullptr != this->m_wifi)
   {
     ssid = this->m_wifi->SSID().c_str();
@@ -486,7 +486,7 @@ int8_t WiFiInterface::scanNetworks(bool _async, bool _show_hidden, uint8_t _chan
 /**
  * scanNetworksAsync
  */
-void WiFiInterface::scanNetworksAsync(std::function<void(int)> _onComplete, bool _show_hidden)
+void WiFiInterface::scanNetworksAsync(pdiutil::function<void(int)> _onComplete, bool _show_hidden)
 {
   if (nullptr != this->m_wifi)
   {
@@ -497,9 +497,9 @@ void WiFiInterface::scanNetworksAsync(std::function<void(int)> _onComplete, bool
 /**
  * SSID
  */
-std::string WiFiInterface::SSID(uint8_t _networkItem)
+pdiutil::string WiFiInterface::SSID(uint8_t _networkItem)
 {
-  std::string ssid;
+  pdiutil::string ssid;
   if (nullptr != this->m_wifi)
   {
     ssid = this->m_wifi->SSID(_networkItem).c_str();
@@ -576,7 +576,7 @@ bool WiFiInterface::get_bssid_within_scanned_nw_ignoring_connected_stations(char
 
   for (int i = 0; i < n; ++i) {
 
-    std::string _ssid = this->SSID(i);
+    pdiutil::string _ssid = this->SSID(i);
     // _ssid.toCharArray( _ssid_buff, _ssid.length()+1 );
     strncpy(_ssid_buff, _ssid.c_str(), _ssid.size());
 
@@ -616,7 +616,7 @@ bool WiFiInterface::get_bssid_within_scanned_nw_ignoring_connected_stations(char
 /**
  * return the list of connected stations info to acess point
  */
-bool WiFiInterface::getApsConnectedStations(std::vector<wifi_station_info_t> &stations)
+bool WiFiInterface::getApsConnectedStations(pdiutil::vector<wifi_station_info_t> &stations)
 {
   struct station_info *stat_info = wifi_softap_get_station_info();
 

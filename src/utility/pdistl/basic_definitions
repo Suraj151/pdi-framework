@@ -1,0 +1,95 @@
+/***************************** PDI STD File ***********************************
+This file is taken from external sources. this is taken from open source uClibc++ 
+library available on github. below is reference link. Thanking to author for
+providing this .
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+referred from   : https://github.com/mike-matera/ArduinoSTL
+added Date      : 1st Dec 2024
+added by        : Suraj I.
+******************************************************************************/
+
+#ifndef __PDISTD_BASIC_DEFINITIONS
+#define __PDISTD_BASIC_DEFINITIONS 1
+
+#include "system_configuration.h"
+
+#pragma GCC visibility push(default)
+
+//The following is used to support GCC symbol visibility patch
+
+#ifdef GCC_HASCLASSVISIBILITY
+	#define _UCXXEXPORT __attribute__ ((visibility("default")))
+	#define _UCXXLOCAL __attribute__ ((visibility("hidden")))
+#else
+	#define _UCXXEXPORT
+	#define _UCXXLOCAL
+
+#endif
+
+#ifdef __GCC__
+#define __UCLIBCXX_NORETURN __attribute__ ((__noreturn__))
+#else
+#define __UCLIBCXX_NORETURN
+#endif
+
+#ifdef __GCC__
+# ifndef _UCXX_NOTHROW
+#  ifndef __cplusplus
+#   define _UCXX_NOTHROW __attribute__((__nothrow__))
+#  endif
+# endif
+#endif
+#ifdef __cplusplus
+# if __cplusplus >= 201103L
+#  define _UCXX_NOEXCEPT noexcept
+#  define _UCXX_USE_NOEXCEPT noexcept
+#  define _UCXX_NOEXCEPT_IF(...) noexcept(__VA_ARGS__)
+#  define _UCXX_THROW(_EXCEPTION)
+# else
+#  define _UCXX_NOEXCEPT
+#  define _UCXX_USE_NOEXCEPT throw()
+#  define _UCXX_THROW(_EXCEPTION) throw(_EXCEPTION)
+# endif
+# ifndef _UCXX_NOTHROW
+#  define _UCXX_NOTHROW _UCXX_USE_NOEXCEPT
+# endif
+#endif
+
+#if defined(__DEPRECATED) && (__cplusplus >= 201103L)
+# define _UCXX_DEPRECATED __attribute__ ((__deprecated__))
+# define _UCXX_DEPRECATED_SUGGEST(ALT) \
+  __attribute__ ((__deprecated__ ("use '" ALT "' instead")))
+#else
+# define _UCXX_DEPRECATED
+# define _UCXX_DEPRECATED_SUGGEST(ALT)
+#endif
+
+#ifdef __UCLIBCXX_HAS_TLS__
+	#define __UCLIBCXX_TLS __thread
+#else
+	#define __UCLIBCXX_TLS
+#endif
+
+#if __cplusplus >= 201103L
+  typedef decltype(nullptr)	nullptr_t;
+#endif
+
+
+//Testing purposes
+#define __STRING_MAX_UNITS 65535
+
+namespace pdistd{
+	typedef signed long int streamsize;
+}
+
+#pragma GCC visibility pop
+
+# ifdef __DODEBUG__
+	#define UCLIBCXX_DEBUG 1
+# else
+	#define UCLIBCXX_DEBUG 0
+# endif
+#endif

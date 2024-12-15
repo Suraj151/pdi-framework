@@ -80,7 +80,7 @@ class Database
 {
 
 public:
-	std::vector<struct_tables> m_database_tables;
+	pdiutil::vector<struct_tables> m_database_tables;
 
 	Database();
 	~Database();

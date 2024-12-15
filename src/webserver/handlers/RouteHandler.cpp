@@ -8,6 +8,10 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
+#include <config/Config.h>
+
+#if defined(ENABLE_HTTP_SERVER)
+
 #include "RouteHandler.h"
 
 /**
@@ -55,3 +59,5 @@ void RouteHandler::register_not_found_fn( CallBackVoidArgFn _fn ){
 }
 
 RouteHandler __web_route_handler;
+
+#endif

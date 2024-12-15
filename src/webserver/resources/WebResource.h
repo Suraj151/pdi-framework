@@ -55,18 +55,14 @@ public:
    */
   ~WebResourceProvider();
 
-  void collect_resource(iWiFiInterface *_wifi, iWiFiServerInterface *_server);
+  void collect_resource(iServerInterface *_server);
 
   // protected:
 
   /**
-   * @var	iWiFiInterface*  m_wifi
+   * @var	iServerInterface*	m_server
    */
-  iWiFiInterface *m_wifi;
-  /**
-   * @var	iWiFiServerInterface*	m_server
-   */
-  iWiFiServerInterface *m_server;
+  iServerInterface *m_server;
   /**
    * @var	DatabaseServiceProvider*  m_db_conn
    */

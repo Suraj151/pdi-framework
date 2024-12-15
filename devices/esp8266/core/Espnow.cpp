@@ -15,7 +15,7 @@ created Date    : 1st June 2019
 #include "Espnow.h"
 
 esp_now_peer_t esp_now_peers[ESP_NOW_MAX_PEER];
-std::vector<esp_now_device_t> esp_now_device_table;
+pdiutil::vector<esp_now_device_t> esp_now_device_table;
 
 /**
  * Espnow constructor.

@@ -41,7 +41,7 @@ public:
 
   void begin(iClientInterface *_client);
   void enable_update_gpio_table_from_copy(void);
-  void appendGpioJsonPayload(std::string &_payload, bool isAlertPost = false);
+  void appendGpioJsonPayload(pdiutil::string &_payload, bool isAlertPost = false);
   void applyGpioJsonPayload(char *_payload, uint16_t _payload_length);
 #ifdef ENABLE_EMAIL_SERVICE
   bool handleGpioEmailAlert(void);

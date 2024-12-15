@@ -76,7 +76,7 @@ void MqttServiceProvider::handleMqttPublish(){
 
       #ifdef ENABLE_MQTT_DEFAULT_PAYLOAD
 
-        std::string *_payload = new std::string();
+        pdiutil::string *_payload = new pdiutil::string();
 
         if( nullptr != _payload ){
 

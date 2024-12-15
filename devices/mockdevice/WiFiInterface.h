@@ -57,14 +57,14 @@ public:
 
   // STA network info
   ipaddress_t localIP() override{return 0;}
-  std::string macAddress() override{return "";}
+  pdiutil::string macAddress() override{return "";}
   ipaddress_t subnetMask() override{return 0;}
   ipaddress_t gatewayIP() override{return 0;}
   ipaddress_t dnsIP(uint8_t _dns_no = 0) override{return 0;}
 
   // STA WiFi info
   wifi_status_t status() override{return CONN_STATUS_MAX;}
-  std::string SSID() const override{return "";}
+  pdiutil::string SSID() const override{return "";}
   uint8_t *BSSID() override{return 0;}
   int32_t RSSI() override{return 0;}
 
@@ -76,12 +76,12 @@ public:
 
   // n/w scan api's
   int8_t scanNetworks(bool _async = false, bool _show_hidden = false, uint8_t _channel = 0, uint8_t *ssid = nullptr) override{return 0;}
-  void scanNetworksAsync(std::function<void(int)> _onComplete, bool _show_hidden = false) override{}
-  std::string SSID(uint8_t _networkItem) override{return "";}
+  void scanNetworksAsync(pdiutil::function<void(int)> _onComplete, bool _show_hidden = false) override{}
+  pdiutil::string SSID(uint8_t _networkItem) override{return "";}
   int32_t RSSI(uint8_t _networkItem) override{return 0;}
   uint8_t *BSSID(uint8_t _networkItem) override{return 0;}
   bool get_bssid_within_scanned_nw_ignoring_connected_stations(char *ssid, uint8_t *bssid, uint8_t *ignorebssid, int _scanCount) override{return 0;}
-  bool getApsConnectedStations(std::vector<wifi_station_info_t> &stations) override{return 0;};
+  bool getApsConnectedStations(pdiutil::vector<wifi_station_info_t> &stations) override{return 0;};
 
   void enableNetworkStatusIndication() override{}
   void enableNAPT() override{}

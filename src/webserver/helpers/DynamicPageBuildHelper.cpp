@@ -8,6 +8,10 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
+#include <config/Config.h>
+
+#if defined(ENABLE_HTTP_SERVER)
+
 #include "DynamicPageBuildHelper.h"
 
 
@@ -15,9 +19,9 @@ created Date    : 1st June 2019
  * append style attribute
  *
  * @param	char*	_page
- * @param	PGM_P _style
+ * @param	const char *_style
  */
-void concat_style_attribute( char* _page, PGM_P _style ){
+void concat_style_attribute( char *_page, const char *_style ){
 
   if( _style ){
     strcat_P( _page, HTML_STYLE_ATTR );
@@ -31,9 +35,9 @@ void concat_style_attribute( char* _page, PGM_P _style ){
  * append style attribute
  *
  * @param	char*	_page
- * @param	char* _style
+ * @param	char *_style
  */
-void concat_style_attribute( char* _page, char* _style ){
+void concat_style_attribute( char *_page, char *_style ){
 
   if( _style ){
     strcat_P( _page, HTML_STYLE_ATTR );
@@ -47,9 +51,9 @@ void concat_style_attribute( char* _page, char* _style ){
  * append class attribute
  *
  * @param	char*	_page
- * @param	PGM_P _class
+ * @param	const char *_class
  */
-void concat_class_attribute( char* _page, PGM_P _class ){
+void concat_class_attribute( char *_page, const char *_class ){
 
   if( _class ){
     strcat_P( _page, HTML_CLASS_ATTR );
@@ -63,9 +67,9 @@ void concat_class_attribute( char* _page, PGM_P _class ){
  * append class attribute
  *
  * @param	char*	_page
- * @param	char* _class
+ * @param	char *_class
  */
-void concat_class_attribute( char* _page, char* _class ){
+void concat_class_attribute( char *_page, char *_class ){
 
   if( _class ){
     strcat_P( _page, HTML_CLASS_ATTR );
@@ -79,9 +83,9 @@ void concat_class_attribute( char* _page, char* _class ){
  * append id attribute
  *
  * @param	char*	_page
- * @param	PGM_P _id
+ * @param	const char *_id
  */
-void concat_id_attribute( char* _page, PGM_P _id ){
+void concat_id_attribute( char *_page, const char *_id ){
 
   if( _id ){
     strcat_P( _page, HTML_ID_ATTR );
@@ -95,9 +99,9 @@ void concat_id_attribute( char* _page, PGM_P _id ){
  * append id attribute
  *
  * @param	char*	_page
- * @param	char* _id
+ * @param	char *_id
  */
-void concat_id_attribute( char* _page, char* _id ){
+void concat_id_attribute( char *_page, char *_id ){
 
   if( _id ){
     strcat_P( _page, HTML_ID_ATTR );
@@ -111,9 +115,9 @@ void concat_id_attribute( char* _page, char* _id ){
  * append colspan attribute
  *
  * @param	char*	_page
- * @param	PGM_P _colspan
+ * @param	const char *_colspan
  */
-void concat_colspan_attribute( char* _page, PGM_P _colspan ){
+void concat_colspan_attribute( char *_page, const char *_colspan ){
 
   if( _colspan ){
     strcat_P( _page, HTML_COLSPAN_ATTR );
@@ -129,12 +133,12 @@ void concat_colspan_attribute( char* _page, PGM_P _colspan ){
  * this function uses program memory arguments to optimise ram
  *
  * @param	char*	_page
- * @param	PGM_P _header
+ * @param	const char *_header
  * @param	uint8_t	_header_level|1
- * @param	PGM_P _class_attr|nullptr
- * @param	PGM_P _style_attr|nullptr
+ * @param	const char *_class_attr|nullptr
+ * @param	const char *_style_attr|nullptr
  */
-void concat_heading_html_tag( char* _page, PGM_P _heading, uint8_t _heading_level, PGM_P _class_attr, PGM_P _style_attr ){
+void concat_heading_html_tag( char *_page, const char *_heading, uint8_t _heading_level, const char *_class_attr, const char *_style_attr ){
 
   strcat_P( _page,
     _heading_level == 1 ? HTML_H1_OPEN_TAG :
@@ -160,7 +164,7 @@ void concat_heading_html_tag( char* _page, PGM_P _heading, uint8_t _heading_leve
  * this function uses program memory arguments to optimise ram
  *
  * @param	char*	_page
- * @param	PGM_P _name
+ * @param	const char *_name
  * @param	char*	_value
  * @param	int   _maxlength
  * @param	char*	_type
@@ -170,11 +174,11 @@ void concat_heading_html_tag( char* _page, PGM_P _heading, uint8_t _heading_leve
  * @param	int   _max
  */
 void concat_input_html_tag(
-  char* _page,
-  PGM_P _name,
-  char* _value,
+  char *_page,
+  const char *_name,
+  char *_value,
   int _maxlength,
-  char* _type,
+  char *_type,
   bool _checked,
   bool _disabled,
   int _min,
@@ -232,7 +236,7 @@ void concat_input_html_tag(
   strcat_P( _page, HTML_VALUE_ATTR );
   strcat( _page, "'" );
   strcat( _page, _value );
-  strcat_P( _page, PSTR("'/>") );
+  strcat_P( _page, RODT_ATTR("'/>") );
 }
 
 
@@ -241,7 +245,7 @@ void concat_input_html_tag(
  * given type, name, value etc. attributes
  *
  * @param	char*	_page
- * @param	char* _name
+ * @param	char *_name
  * @param	char*	_value
  * @param	int   _maxlength
  * @param	char*	_type
@@ -251,11 +255,11 @@ void concat_input_html_tag(
  * @param	int   _max
  */
 void concat_input_html_tag(
-  char* _page,
-  char* _name,
-  char* _value,
+  char *_page,
+  char *_name,
+  char *_value,
   int _maxlength,
-  char* _type,
+  char *_type,
   bool _checked,
   bool _disabled,
   int _min,
@@ -313,19 +317,19 @@ void concat_input_html_tag(
   strcat_P( _page, HTML_VALUE_ATTR );
   strcat( _page, "'" );
   strcat( _page, _value );
-  strcat_P( _page, PSTR("'/>") );
+  strcat_P( _page, RODT_ATTR("'/>") );
 }
 
 /**
  * build and append td input html tag to html page. It build html tr/input tag
  */
 void concat_td_input_html_tags(
-  char* _page,
-  PGM_P _label,
-  PGM_P _name,
-  char* _value,
+  char *_page,
+  const char *_label,
+  const char *_name,
+  char *_value,
   int _maxlength,
-  char* _type,
+  char *_type,
   bool _checked,
   bool _disabled,
   int _min,
@@ -342,12 +346,12 @@ void concat_td_input_html_tags(
 }
 
 void concat_tr_input_html_tags(
-  char* _page,
-  PGM_P _label,
-  PGM_P _name,
-  char* _value,
+  char *_page,
+  const char *_label,
+  const char *_name,
+  char *_value,
   int _maxlength,
-  char* _type,
+  char *_type,
   bool _checked,
   bool _disabled,
   int _min,
@@ -363,12 +367,12 @@ void concat_tr_input_html_tags(
  * build and append td input html tag to html page. It build html tr/input tag
  */
 void concat_td_input_html_tags(
-  char* _page,
-  char* _label,
-  char* _name,
-  char* _value,
+  char *_page,
+  char *_label,
+  char *_name,
+  char *_value,
   int _maxlength,
-  char* _type,
+  char *_type,
   bool _checked,
   bool _disabled,
   int _min,
@@ -385,12 +389,12 @@ void concat_td_input_html_tags(
 }
 
 void concat_tr_input_html_tags(
-  char* _page,
-  char* _label,
-  char* _name,
-  char* _value,
+  char *_page,
+  char *_label,
+  char *_name,
+  char *_value,
   int _maxlength,
-  char* _type,
+  char *_type,
   bool _checked,
   bool _disabled,
   int _min,
@@ -408,13 +412,13 @@ void concat_tr_input_html_tags(
  * given name, options etc. attributes
  *
  * @param	char*	_page
- * @param	char* _name
+ * @param	char *_name
  * @param	char**	_options
  * @param	int   _size
  * @param	int   _selected
  * @param	int   _exception
  */
-void concat_select_html_tag( char* _page, char* _name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
+void concat_select_html_tag( char *_page, char *_name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
 
   strcat_P( _page, HTML_SELECT_OPEN );
   if(_disabled)strcat_P( _page, HTML_DISABLED_ATTR );
@@ -450,13 +454,13 @@ void concat_select_html_tag( char* _page, char* _name, char** _options, int _siz
  * this function uses program memory arguments to optimise ram
  *
  * @param	char*	_page
- * @param	PGM_P _name
+ * @param	const char *_name
  * @param	char**	_options
  * @param	int   _size
  * @param	int   _selected
  * @param	int   _exception
  */
-void concat_select_html_tag( char* _page, PGM_P _name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
+void concat_select_html_tag( char *_page, const char *_name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
 
   strcat_P( _page, HTML_SELECT_OPEN );
   if(_disabled)strcat_P( _page, HTML_DISABLED_ATTR );
@@ -490,7 +494,7 @@ void concat_select_html_tag( char* _page, PGM_P _name, char** _options, int _siz
 /**
  * build and append td select html tag to html page. It build html td/select tag
  */
-void concat_td_select_html_tags( char* _page, char* _label, char* _name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
+void concat_td_select_html_tags( char *_page, char *_label, char *_name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
 
   strcat_P( _page, HTML_TD_OPEN_TAG );
   strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
@@ -502,7 +506,7 @@ void concat_td_select_html_tags( char* _page, char* _label, char* _name, char** 
   strcat_P( _page, HTML_TD_CLOSE_TAG );
 }
 
-void concat_tr_select_html_tags( char* _page, char* _label, char* _name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
+void concat_tr_select_html_tags( char *_page, char *_label, char *_name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
 
   strcat_P( _page, HTML_TR_OPEN_TAG );
   strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
@@ -513,7 +517,7 @@ void concat_tr_select_html_tags( char* _page, char* _label, char* _name, char** 
 /**
  * build and append td select html tag to html page. It build html td/select tag
  */
-void concat_td_select_html_tags( char* _page, PGM_P _label, PGM_P _name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
+void concat_td_select_html_tags( char *_page, const char *_label, const char *_name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
 
   strcat_P( _page, HTML_TD_OPEN_TAG );
   strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
@@ -525,7 +529,7 @@ void concat_td_select_html_tags( char* _page, PGM_P _label, PGM_P _name, char** 
   strcat_P( _page, HTML_TD_CLOSE_TAG );
 }
 
-void concat_tr_select_html_tags( char* _page, PGM_P _label, PGM_P _name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
+void concat_tr_select_html_tags( char *_page, const char *_label, const char *_name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
 
   strcat_P( _page, HTML_TR_OPEN_TAG );
   strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
@@ -539,13 +543,13 @@ void concat_tr_select_html_tags( char* _page, PGM_P _label, PGM_P _name, char** 
  * this function uses program memory arguments to optimise ram
  *
  * @param	char*	_page
- * @param	PGM_P _heading
+ * @param	const char *_heading
  * @param	uint8_t	_header_level|1
- * @param	PGM_P _colspan_attr|nullptr
- * @param	PGM_P _class_attr|nullptr
- * @param	PGM_P _style_attr|nullptr
+ * @param	const char *_colspan_attr|nullptr
+ * @param	const char *_class_attr|nullptr
+ * @param	const char *_style_attr|nullptr
  */
-void concat_tr_heading_html_tags( char* _page, PGM_P _heading, uint8_t	_header_level, PGM_P _colspan_attr, PGM_P _class_attr, PGM_P _style_attr ){
+void concat_tr_heading_html_tags( char *_page, const char *_heading, uint8_t	_header_level, const char *_colspan_attr, const char *_class_attr, const char *_style_attr ){
 
   strcat_P( _page, HTML_TR_OPEN_TAG );
   strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
@@ -564,18 +568,18 @@ void concat_tr_heading_html_tags( char* _page, PGM_P _heading, uint8_t	_header_l
  * this function uses program memory arguments to optimise ram
  *
  * @param	char*	_page
- * @param	PGM_P _message
+ * @param	const char *_message
  * @param	int   _status
  */
-void concat_flash_message_div( char* _page, PGM_P _message, int _status ){
+void concat_flash_message_div( char *_page, const char *_message, int _status ){
 
   strcat_P( _page, HTML_DIV_OPEN_TAG );
   strcat_P( _page, HTML_CLASS_ATTR );
-  strcat_P( _page, PSTR("'msg'") );
+  strcat_P( _page, RODT_ATTR("'msg'") );
   strcat_P( _page, HTML_STYLE_ATTR );
-  strcat_P( _page, PSTR("'background:") );
-  strcat_P( _page, _status==ALERT_DANGER ? PSTR("#ffb2c7"): _status==ALERT_SUCCESS ? PSTR("#a6eaa8") : PSTR("#f9dc87") );
-  strcat_P( _page, PSTR(";'>") );
+  strcat_P( _page, RODT_ATTR("'background:") );
+  strcat_P( _page, _status==ALERT_DANGER ? RODT_ATTR("#ffb2c7"): _status==ALERT_SUCCESS ? RODT_ATTR("#a6eaa8") : RODT_ATTR("#f9dc87") );
+  strcat_P( _page, RODT_ATTR(";'>") );
   strcat_P( _page, _message );
   strcat_P( _page, HTML_DIV_CLOSE_TAG );
 }
@@ -584,18 +588,18 @@ void concat_flash_message_div( char* _page, PGM_P _message, int _status ){
  * build and append div html tag to html page. It build html div tag with inner html
  *
  * @param	char*	_page
- * @param	char* _message
+ * @param	char *_message
  * @param	int   _status
  */
-void concat_flash_message_div( char* _page, char* _message, int _status ){
+void concat_flash_message_div( char *_page, char *_message, int _status ){
 
   strcat_P( _page, HTML_DIV_OPEN_TAG );
   strcat_P( _page, HTML_CLASS_ATTR );
-  strcat_P( _page, PSTR("'msg'") );
+  strcat_P( _page, RODT_ATTR("'msg'") );
   strcat_P( _page, HTML_STYLE_ATTR );
-  strcat_P( _page, PSTR("'background:") );
-  strcat_P( _page, _status==ALERT_DANGER ? PSTR("#ffb2c7"): _status==ALERT_SUCCESS ? PSTR("#a6eaa8") : PSTR("#f9dc87") );
-  strcat_P( _page, PSTR(";'>") );
+  strcat_P( _page, RODT_ATTR("'background:") );
+  strcat_P( _page, _status==ALERT_DANGER ? RODT_ATTR("#ffb2c7"): _status==ALERT_SUCCESS ? RODT_ATTR("#a6eaa8") : RODT_ATTR("#f9dc87") );
+  strcat_P( _page, RODT_ATTR(";'>") );
   strcat( _page, _message );
   strcat_P( _page, HTML_DIV_CLOSE_TAG );
 }
@@ -604,10 +608,10 @@ void concat_flash_message_div( char* _page, char* _message, int _status ){
  * build and append div html tag for graph axis title.
  *
  * @param	char*	_page
- * @param	char* _title
- * @param	char* _style
+ * @param	char *_title
+ * @param	char *_style
  */
-void concat_graph_axis_title_div( char* _page, char* _title, char* _style ){
+void concat_graph_axis_title_div( char *_page, char *_title, char *_style ){
 
   strcat_P( _page, HTML_DIV_OPEN_TAG );
   strcat_P( _page, HTML_STYLE_ATTR );
@@ -623,12 +627,12 @@ void concat_graph_axis_title_div( char* _page, char* _title, char* _style ){
  * this function uses program memory arguments to optimise ram
  *
  * @param	char*	_page
- * @param	PGM_P _path
+ * @param	const char *_path
  * @param	int   _width
  * @param	int   _height
  * @param	char*	_fill
  */
-void concat_svg_tag( char* _page, PGM_P _path, int _width, int _height, char* _fill ){
+void concat_svg_tag( char *_page, const char *_path, int _width, int _height, char *_fill ){
 
   char _widthbuff[7]; memset(_widthbuff, 0, 7);
   itoa( _width, _widthbuff, 10 );
@@ -657,11 +661,11 @@ void concat_svg_tag( char* _page, PGM_P _path, int _width, int _height, char* _f
  * this function uses program memory arguments to optimise ram
  *
  * @param	char*	_page
- * @param	PGM_P _menu_title
- * @param	PGM_P _svg_path
+ * @param	const char *_menu_title
+ * @param	const char *_svg_path
  * @param	char*	_menu_link
  */
-void concat_svg_menu_card( char* _page, PGM_P _menu_title, PGM_P _svg_path, char* _menu_link ){
+void concat_svg_menu_card( char *_page, const char *_menu_title, const char *_svg_path, char *_menu_link ){
 
   strcat_P( _page, HTML_DIV_OPEN_TAG );
   strcat( _page, ">" );
@@ -689,12 +693,12 @@ void concat_svg_menu_card( char* _page, PGM_P _menu_title, PGM_P _svg_path, char
  * @param	char*	_page
  * @param	char**	_headings
  * @param	int   _size
- * @param	PGM_P _row_class
- * @param	PGM_P _row_style
- * @param	PGM_P _head_class
- * @param	PGM_P _head_style
+ * @param	const char *_row_class
+ * @param	const char *_row_style
+ * @param	const char *_head_class
+ * @param	const char *_head_style
  */
-void concat_table_heading_row( char* _page, char** _headings, int _size, PGM_P _row_class, PGM_P _row_style, PGM_P _head_class, PGM_P _head_style ){
+void concat_table_heading_row( char *_page, char** _headings, int _size, const char *_row_class, const char *_row_style, const char *_head_class, const char *_head_style ){
 
   strcat_P( _page, HTML_TR_OPEN_TAG );
   concat_class_attribute( _page, _row_class );
@@ -719,12 +723,12 @@ void concat_table_heading_row( char* _page, char** _headings, int _size, PGM_P _
  * @param	char*	_page
  * @param	char**	_data_items
  * @param	int   _size
- * @param	PGM_P _row_class
- * @param	PGM_P _row_style
- * @param	PGM_P _data_class
- * @param	PGM_P _data_style
+ * @param	const char *_row_class
+ * @param	const char *_row_style
+ * @param	const char *_data_class
+ * @param	const char *_data_style
  */
-void concat_table_data_row( char* _page, char** _data_items, int _size, PGM_P _row_class, PGM_P _row_style, PGM_P _data_class, PGM_P _data_style ){
+void concat_table_data_row( char *_page, char** _data_items, int _size, const char *_row_class, const char *_row_style, const char *_data_class, const char *_data_style ){
 
   strcat_P( _page, HTML_TR_OPEN_TAG );
   concat_class_attribute( _page, _row_class );
@@ -742,3 +746,5 @@ void concat_table_data_row( char* _page, char** _data_items, int _size, PGM_P _r
 
   strcat_P( _page, HTML_TR_CLOSE_TAG );
 }
+
+#endif

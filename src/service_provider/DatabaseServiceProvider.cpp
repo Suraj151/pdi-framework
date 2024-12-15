@@ -21,15 +21,19 @@ GlobalTable __global_table;
  */
 LoginTable __login_table;
 
+#ifdef ENABLE_WIFI_SERVICE 
 /**
  * @var	WiFiTable	__wifi_table
  */
 WiFiTable __wifi_table;
+#endif
 
+#ifdef ENABLE_OTA_SERVICE 
 /**
  * @var	OtaTable	__ota_table
  */
 OtaTable __ota_table;
+#endif
 
 #ifdef ENABLE_GPIO_SERVICE
 /**
@@ -136,6 +140,7 @@ bool DatabaseServiceProvider::get_login_credential_table(login_credential_table 
   return __login_table.get(_table);
 }
 
+#ifdef ENABLE_WIFI_SERVICE 
 /**
  * get/fetch wifi config table from database.
  *
@@ -145,7 +150,9 @@ bool DatabaseServiceProvider::get_wifi_config_table(wifi_config_table *_table)
 {
   return __wifi_table.get(_table);
 }
+#endif
 
+#ifdef ENABLE_OTA_SERVICE  
 /**
  * get/fetch ota(over the air update) config table from database.
  *
@@ -155,6 +162,7 @@ bool DatabaseServiceProvider::get_ota_config_table(ota_config_table *_table)
 {
   return __ota_table.get(_table);
 }
+#endif
 
 #ifdef ENABLE_GPIO_SERVICE
 /**
@@ -244,6 +252,7 @@ void DatabaseServiceProvider::set_login_credential_table(login_credential_table 
   __login_table.set(_table);
 }
 
+#ifdef ENABLE_WIFI_SERVICE  
 /**
  * set wifi config table in database.
  *
@@ -253,7 +262,9 @@ void DatabaseServiceProvider::set_wifi_config_table(wifi_config_table *_table)
 {
   __wifi_table.set(_table);
 }
+#endif
 
+#ifdef ENABLE_OTA_SERVICE  
 /**
  * set ota(over the air update) config table in database.
  *
@@ -263,6 +274,7 @@ void DatabaseServiceProvider::set_ota_config_table(ota_config_table *_table)
 {
   __ota_table.set(_table);
 }
+#endif
 
 #ifdef ENABLE_GPIO_SERVICE
 /**

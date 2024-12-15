@@ -36,6 +36,16 @@ created Date    : 1st June 2019
 #define ENABLE_GPIO_SERVICE
 
 /**
+ * enable/disable wifi feature here
+ */
+#define ENABLE_WIFI_SERVICE
+
+/**
+ * enable/disable ota feature here
+ */
+#define ENABLE_OTA_SERVICE
+
+/**
  * enable/disable email service here
  */
 #define ENABLE_EMAIL_SERVICE
@@ -43,7 +53,7 @@ created Date    : 1st June 2019
 /**
  * enable/disable device iot feature here
  */
-#define ENABLE_DEVICE_IOT
+// #define ENABLE_DEVICE_IOT
 
 /**
  * enable/disable auto factory reset on invalid database config found
@@ -60,6 +70,7 @@ created Date    : 1st June 2019
  */
 #define IGNORE_FREE_RELAY_CONNECTIONS
 
+#ifdef ENABLE_WIFI_SERVICE
 /**
  * enable/disable http server feature here
  */
@@ -88,6 +99,8 @@ created Date    : 1st June 2019
  */
 #ifdef ENABLE_INTERNET_BASED_CONNECTIONS
 #define SWITCHING_DURATION_FOR_NO_INTERNET_CONNECTION INTERNET_CONNECTIVITY_CHECK_DURATION*6
+#endif
+
 #endif
 
 /**

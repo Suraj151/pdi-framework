@@ -72,7 +72,7 @@ public:
 		device_iot_config_table _device_iot_configs;
 		this->m_web_resource->m_db_conn->get_device_iot_config_table(&_device_iot_configs);
 
-		concat_tr_input_html_tags(_page, PSTR("Registry Host:"), PSTR("dhst"), _device_iot_configs.device_iot_host, DEVICE_IOT_HOST_BUF_SIZE - 1);
+		concat_tr_input_html_tags(_page, RODT_ATTR("Registry Host:"), RODT_ATTR("dhst"), _device_iot_configs.device_iot_host, DEVICE_IOT_HOST_BUF_SIZE - 1);
 		strcat_P(_page, WEB_SERVER_FOOTER_WITH_OTP_MONITOR_HTML);
 	}
 
@@ -91,7 +91,7 @@ public:
 
 		if (this->m_web_resource->m_server->hasArg("dhst"))
 		{
-			std::string _device_iot_host = this->m_web_resource->m_server->arg("dhst");
+			pdiutil::string _device_iot_host = this->m_web_resource->m_server->arg("dhst");
 
 			LogI("\nSubmitted info :\n");
 			LogFmtI("device reg. host : %s\n\n", _device_iot_host.c_str());
@@ -101,7 +101,7 @@ public:
 			strncpy(_device_iot_configs.device_iot_host, _device_iot_host.c_str(), _device_iot_host.size()); 
 			this->m_web_resource->m_db_conn->set_device_iot_config_table(&_device_iot_configs);
 
-			std::string _response = "";
+			pdiutil::string _response = "";
 			__device_iot_service.handleRegistrationOtpRequest(&_device_iot_configs, _response);
 
 			this->m_web_resource->m_server->sendHeader("Cache-Control", "no-cache");

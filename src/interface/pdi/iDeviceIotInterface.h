@@ -31,7 +31,7 @@ class iDeviceIotInterface {
 
     virtual void init( void ) = 0;
     virtual void sampleHook( void ) = 0;
-    virtual void dataHook( std::string &_payload ) = 0;
+    virtual void dataHook( pdiutil::string &_payload ) = 0;
     virtual void resetSampleHook( void ) = 0;
 };
 

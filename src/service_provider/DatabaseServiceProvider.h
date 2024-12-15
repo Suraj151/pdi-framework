@@ -15,8 +15,12 @@ created Date    : 1st Jan 2023
 
 #include <database/tables/GlobalTable.h>
 #include <database/tables/LoginTable.h>
+#ifdef ENABLE_WIFI_SERVICE
 #include <database/tables/WiFiTable.h>
+#endif
+#ifdef ENABLE_OTA_SERVICE
 #include <database/tables/OtaTable.h>
+#endif
 #ifdef ENABLE_GPIO_SERVICE
 #include <database/tables/GpioTable.h>
 #endif
@@ -53,8 +57,12 @@ public:
 
   bool get_global_config_table(global_config_table *_table);
   bool get_login_credential_table(login_credential_table *_table);
+#ifdef ENABLE_WIFI_SERVICE  
   bool get_wifi_config_table(wifi_config_table *_table);
+#endif
+#ifdef ENABLE_OTA_SERVICE  
   bool get_ota_config_table(ota_config_table *_table);
+#endif
 
 #ifdef ENABLE_GPIO_SERVICE
   bool get_gpio_config_table(gpio_config_table *_table);
@@ -76,8 +84,12 @@ public:
 
   void set_global_config_table(global_config_table *_table);
   void set_login_credential_table(login_credential_table *_table);
+#ifdef ENABLE_WIFI_SERVICE  
   void set_wifi_config_table(wifi_config_table *_table);
+#endif
+#ifdef ENABLE_OTA_SERVICE  
   void set_ota_config_table(ota_config_table *_table);
+#endif
 
 #ifdef ENABLE_GPIO_SERVICE
   void set_gpio_config_table(gpio_config_table *_table);

@@ -1,0 +1,77 @@
+/***************************** PDI STD File ***********************************
+This file is taken from external sources. this is taken from open source uClibc++ 
+library available on github. below is reference link. Thanking to author for
+providing this .
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+referred from   : https://github.com/mike-matera/ArduinoSTL
+added Date      : 1st Dec 2024
+added by        : Suraj I.
+******************************************************************************/
+
+#include "basic_definitions"
+#include "cstddef"
+#include "string"
+
+#ifndef __HEADER_PDISTD_LOCALE
+#define __HEADER_PDISTD_LOCALE 1
+
+#pragma GCC visibility push(default)
+
+namespace pdistd{
+	class _UCXXEXPORT locale {
+	public:
+	// types:
+		class facet;
+		class id;
+		typedef unsigned char category;
+
+		static const category
+		none     = 0,
+		collate  = 0x01, ctype    = 0x02,
+		monetary = 0x04, numeric  = 0x08,
+		time = 0x10, messages = 0x20,
+		all = collate | ctype | monetary | numeric | time  | messages;
+
+		// construct/copy/destroy:
+		locale() _UCXX_USE_NOEXCEPT{
+			return;
+		}
+		locale(const locale& other) _UCXX_USE_NOEXCEPT{
+			(void)other;
+			return;
+		}
+		locale(const char *) _UCXX_USE_NOEXCEPT{
+			return;
+		}
+		~locale() _UCXX_USE_NOEXCEPT{
+			return;
+		}
+
+		const locale& operator=(const locale&) _UCXX_USE_NOEXCEPT{
+			return *this;
+		}
+		pdistd::string name() const { return "C"; }
+	};
+
+	class _UCXXEXPORT locale::facet {
+		friend class locale;
+		explicit facet(size_t = 0){
+			return;
+		}
+		virtual ~facet(){
+			return;
+		}
+	};
+
+	class _UCXXEXPORT locale::id {
+		id(){ }
+	};
+
+}
+
+#pragma GCC visibility pop
+
+#endif

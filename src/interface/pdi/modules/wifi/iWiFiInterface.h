@@ -57,14 +57,14 @@ public:
 
   // STA network info
   virtual ipaddress_t localIP() = 0;
-  virtual std::string macAddress() = 0;
+  virtual pdiutil::string macAddress() = 0;
   virtual ipaddress_t subnetMask() = 0;
   virtual ipaddress_t gatewayIP() = 0;
   virtual ipaddress_t dnsIP(uint8_t _dns_no = 0) = 0;
 
   // STA WiFi info
   virtual wifi_status_t status() = 0;
-  virtual std::string SSID() const = 0;
+  virtual pdiutil::string SSID() const = 0;
   virtual uint8_t *BSSID() = 0;
   virtual int32_t RSSI() = 0;
 
@@ -76,12 +76,12 @@ public:
 
   // n/w scan api's
   virtual int8_t scanNetworks(bool _async = false, bool _show_hidden = false, uint8_t _channel = 0, uint8_t *ssid = nullptr) = 0;
-  virtual void scanNetworksAsync(std::function<void(int)> _onComplete, bool _show_hidden = false) = 0;
-  virtual std::string SSID(uint8_t _networkItem) = 0;
+  virtual void scanNetworksAsync(pdiutil::function<void(int)> _onComplete, bool _show_hidden = false) = 0;
+  virtual pdiutil::string SSID(uint8_t _networkItem) = 0;
   virtual int32_t RSSI(uint8_t _networkItem) = 0;
   virtual uint8_t *BSSID(uint8_t _networkItem) = 0;
   virtual bool get_bssid_within_scanned_nw_ignoring_connected_stations(char *ssid, uint8_t *bssid, uint8_t *ignorebssid, int _scanCount) = 0;
-  virtual bool getApsConnectedStations(std::vector<wifi_station_info_t> &stations) = 0;
+  virtual bool getApsConnectedStations(pdiutil::vector<wifi_station_info_t> &stations) = 0;
 
   
   virtual void enableNetworkStatusIndication() = 0;

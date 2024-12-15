@@ -492,7 +492,7 @@ int16_t Http_Client::Post(const char *url, const char *payload)
     {
         AddHeader(HTTP_HEADER_KEY_CONTENT_TYPE, RODT_ATTR("text/plain"));
     }
-    AddReqHeader(HTTP_HEADER_KEY_CONTENT_LENGTH, std::to_string(strlen(payload)).c_str());
+    AddReqHeader(HTTP_HEADER_KEY_CONTENT_LENGTH, pdiutil::to_string(strlen(payload)).c_str());
     
     return SendRequest("POST", url, payload, strlen(payload));
 }
@@ -681,7 +681,7 @@ bool Http_Client::SendHeaders(const char *type)
         if (m_request.port != 80 && m_request.port != 443)
         {
             m_client->write(colon);
-            m_client->write((const uint8_t *)std::to_string(m_request.port).c_str());
+            m_client->write((const uint8_t *)pdiutil::to_string(m_request.port).c_str());
         }
         m_client->write(crlf);
 

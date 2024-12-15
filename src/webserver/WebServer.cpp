@@ -17,8 +17,8 @@ created Date    : 1st June 2019
 /**
  * WebServer constructor.
  */
-WebServer::WebServer() : m_wifi(nullptr),
-                             m_server(&__i_wifi_server)
+WebServer::WebServer() : 
+  m_server(nullptr)
 {
 }
 
@@ -27,16 +27,22 @@ WebServer::WebServer() : m_wifi(nullptr),
  */
 WebServer::~WebServer()
 {
-  this->m_wifi = nullptr;
+  this->m_server = nullptr;
 }
 
 /**
- * start http server functionality. this requires wifi should work as access point
+ * start http server functionality. this requires server interface to be provided
  */
-void WebServer::start_server(iWiFiInterface *_wifi)
+bool WebServer::start_server(iServerInterface *iServer)
 {
-  this->m_wifi = _wifi;
-  __web_resource.collect_resource(this->m_wifi, this->m_server);
+  bool bStatus = false;
+
+  if( nullptr == iServer ){
+    return bStatus;
+  }
+
+  this->m_server = iServer;
+  __web_resource.collect_resource(this->m_server);
 
   for (int i = 0; i < Controller::m_controllers.size(); i++)
   {
@@ -54,10 +60,13 @@ void WebServer::start_server(iWiFiInterface *_wifi)
   // start the server
   this->m_server->begin();
   LogI("HTTP server started !\n");
+  bStatus = true;
+
+  return bStatus;
 }
 
 /**
- * handle server functionality.
+ * handle clients. Should be called in loop
  */
 void WebServer::handle_clients()
 {

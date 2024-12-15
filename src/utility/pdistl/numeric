@@ -1,0 +1,155 @@
+/***************************** PDI STD File ***********************************
+This file is taken from external sources. this is taken from open source uClibc++ 
+library available on github. below is reference link. Thanking to author for
+providing this .
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+referred from   : https://github.com/mike-matera/ArduinoSTL
+added Date      : 1st Dec 2024
+added by        : Suraj I.
+******************************************************************************/
+
+#include "basic_definitions"
+#include "exception"
+
+#ifndef __PDISTD_NUMERIC_HEADER
+#define __PDISTD_NUMERIC_HEADER 1
+
+#pragma GCC visibility push(default)
+
+namespace pdistd{
+	template <class InputIterator, class T> _UCXXEXPORT 
+		T accumulate(InputIterator first, InputIterator last, T init)
+	{
+		while(first != last){
+			init = init + *first;
+			++first;
+		}
+		return init;
+	}
+
+	template <class InputIterator, class T, class BinaryOperation> _UCXXEXPORT 
+		T accumulate(InputIterator first, InputIterator last, T init, BinaryOperation binary_op)
+	{
+		while(first != last){
+			init = binary_op(init, *first);
+			++first;
+		}
+		return init;
+	}
+
+
+	template <class InputIterator1, class InputIterator2, class T> _UCXXEXPORT 
+		T inner_product(InputIterator1 first1, InputIterator1 last1,
+			InputIterator2 first2, T init)
+	{
+		while(first1 != last1){
+			init = init + *first1 * *first2;
+			++first1;
+			++first2;
+		}
+		return init;
+	}
+
+	template <class InputIterator1, class InputIterator2, class T,
+		class BinaryOperation1, class BinaryOperation2> _UCXXEXPORT 
+		T inner_product(InputIterator1 first1, InputIterator1 last1,
+			InputIterator2 first2, T init,
+			BinaryOperation1 binary_op1,
+			BinaryOperation2 binary_op2)
+	{
+		while(first1 != last1){
+			init = binary_op1(init, binary_op2(*first1, *first2));
+			++first1;
+			++first2;
+		}
+		return init;
+	}
+
+	template <class InputIterator, class OutputIterator> _UCXXEXPORT 
+		OutputIterator partial_sum(InputIterator first, InputIterator last,
+		OutputIterator result)
+	{
+		OutputIterator temp(result);
+		*result = *first;
+		++first;
+		++result;
+
+		while(first != last){
+			*result = *first + *temp;
+			temp = result;
+			++first;
+			++result;
+		}
+		return result;
+	}
+
+
+	template <class InputIterator, class OutputIterator, class BinaryOperation> _UCXXEXPORT 
+		OutputIterator partial_sum(InputIterator first, InputIterator last,
+		OutputIterator result, BinaryOperation binary_op)
+	{
+		OutputIterator temp(result);
+		*result = *first;
+		++first;
+		++result;
+
+		while(first != last){
+			*result = binary_op(*first, *temp);
+			temp = result;
+			++first;
+			++result;
+		}
+		return result;
+	}
+
+
+	template <class InputIterator, class OutputIterator> _UCXXEXPORT 
+		OutputIterator
+		adjacent_difference(InputIterator first, InputIterator last,
+			OutputIterator result)
+	{
+		OutputIterator temp(first);
+		*result = *first;
+		++first;
+		++result;
+
+		while(first != last){
+			*result = *first - *temp;
+			temp = first;
+			++first;
+			++result;
+		}
+
+		return result;
+	}
+
+
+	template <class InputIterator, class OutputIterator, class BinaryOperation> _UCXXEXPORT 
+		OutputIterator
+		adjacent_difference(InputIterator first, InputIterator last,
+			OutputIterator result, BinaryOperation binary_op)
+	{
+		OutputIterator temp(first);
+		*result = *first;
+		++first;
+		++result;
+
+		while(first != last){
+			*result = binary_op(*first, *temp);
+			temp = first;
+			++first;
+			++result;
+		}
+
+		return result;
+	}
+
+}
+
+#pragma GCC visibility pop
+
+#endif
+

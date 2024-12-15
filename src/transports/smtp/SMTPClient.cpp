@@ -195,7 +195,7 @@ bool SMTPClient::sendCommandAndExpect( char *command, char *expectedResponse, ui
 	return status;
 }
 
-int SMTPClient::sendCommandAndGetCode( PGM_P command, uint16_t _timeOut ){
+int SMTPClient::sendCommandAndGetCode( const char * command, uint16_t _timeOut ){
 
   int respcode = SMTP_STATUS_MAX;
 
@@ -206,7 +206,7 @@ int SMTPClient::sendCommandAndGetCode( PGM_P command, uint16_t _timeOut ){
     if( isConnected( this->m_client ) ){
 
       this->flushClient();
-      if( strlen_P(command) > 0 ){
+      if( strlen(command) > 0 ){
         this->m_client->write((const uint8_t*)command);
         this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
       }
@@ -261,7 +261,7 @@ bool SMTPClient::sendHello( char *domain ){
   if( nullptr != cmd ){
 
     memset( cmd, 0, 100 );
-    strcpy_P( cmd, SMTP_COMMAND_EHLO );
+    strcpy( cmd, SMTP_COMMAND_EHLO );
     strcat( cmd, " " );
     strcat( cmd, domain );
     respcode = this->sendCommandAndGetCode( cmd );
@@ -302,11 +302,11 @@ bool SMTPClient::sendFrom( char *sender ){
   if( nullptr != cmd ){
 
     memset( cmd, 0, 128 );
-    strcpy_P( cmd, SMTP_COMMAND_FROM );
-    strcat_P( cmd, SMTP_COMMAND_SEPARATOR );
-    strcat_P( cmd, SMTP_COMMAND_OPENING_ANG_BRACKET );
+    strcpy( cmd, SMTP_COMMAND_FROM );
+    strcat( cmd, SMTP_COMMAND_SEPARATOR );
+    strcat( cmd, SMTP_COMMAND_OPENING_ANG_BRACKET );
     strcat( cmd, sender );
-    strcat_P( cmd, SMTP_COMMAND_CLOSING_ANG_BRACKET );
+    strcat( cmd, SMTP_COMMAND_CLOSING_ANG_BRACKET );
     respcode = this->sendCommandAndGetCode( cmd );
 
     delete[] cmd;
@@ -322,11 +322,11 @@ bool SMTPClient::sendTo( char *recipient ){
   if( nullptr != cmd ){
 
     memset( cmd, 0, 128 );
-    strcpy_P( cmd, SMTP_COMMAND_TO );
-    strcat_P( cmd, SMTP_COMMAND_SEPARATOR );
-    strcat_P( cmd, SMTP_COMMAND_OPENING_ANG_BRACKET );
+    strcpy( cmd, SMTP_COMMAND_TO );
+    strcat( cmd, SMTP_COMMAND_SEPARATOR );
+    strcat( cmd, SMTP_COMMAND_OPENING_ANG_BRACKET );
     strcat( cmd, recipient );
-    strcat_P( cmd, SMTP_COMMAND_CLOSING_ANG_BRACKET );
+    strcat( cmd, SMTP_COMMAND_CLOSING_ANG_BRACKET );
     respcode = this->sendCommandAndGetCode( cmd );
 
     delete[] cmd;
@@ -358,7 +358,7 @@ void SMTPClient::sendDataHeader( char *sender, char *recipient, char *subject ){
   }
 }
 
-bool SMTPClient::sendDataBody( std::string &body ){
+bool SMTPClient::sendDataBody( pdiutil::string &body ){
 
   int respcode = SMTP_STATUS_MAX;
 
@@ -386,7 +386,7 @@ bool SMTPClient::sendDataBody( char *body ){
   return respcode < SMTP_STATUS_SERVICE_UNAVAILABLE;
 }
 
-bool SMTPClient::sendDataBody( PGM_P body ){
+bool SMTPClient::sendDataBody( const char * body ){
 
   int respcode = SMTP_STATUS_MAX;
 

@@ -192,6 +192,24 @@ void Int32ToString(int32_t val, char *pString, uint8_t _maxlen, uint8_t _padmax)
 }
 
 /**
+ * This function convert int64 to string.
+ *
+ * @param   int64_t val
+ * @param   char* pString
+ * @param   uint8_t _maxlen
+ * @param   uint8_t _padmax
+ */
+void Int64ToString(int64_t val, char *pString, uint8_t _maxlen, uint8_t _padmax)
+{
+	if( nullptr != pString )
+	{
+		memset(pString, 0, _maxlen);
+		sprintf(pString, "%lld", val);
+		for(int l=strlen(pString); l<_padmax; l++) pString[l]=' '; 
+	}
+}
+
+/**
  * This function returns the number of digits in integer.
  *
  * @param   int32_t x

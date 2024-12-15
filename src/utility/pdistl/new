@@ -1,0 +1,64 @@
+/***************************** PDI STD File ***********************************
+This file is taken from external sources. this is taken from open source uClibc++ 
+library available on github. below is reference link. Thanking to author for
+providing this .
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+referred from   : https://github.com/mike-matera/ArduinoSTL
+added Date      : 1st Dec 2024
+added by        : Suraj I.
+******************************************************************************/
+
+#include "basic_definitions"
+#include "exception"
+#include "cstddef"
+
+#ifndef __PDISTD_NEW_OPERATOR
+#define __PDISTD_NEW_OPERATOR 1
+
+#pragma GCC visibility push(default)
+
+namespace pdistd{
+	class _UCXXEXPORT bad_alloc : public exception {};
+
+	struct _UCXXEXPORT nothrow_t {};
+	extern const nothrow_t nothrow;
+
+	typedef void (*new_handler)();
+	_UCXXEXPORT new_handler set_new_handler(new_handler new_p) _UCXX_USE_NOEXCEPT;
+}
+
+
+_UCXXEXPORT void* operator new(pdistd::size_t numBytes) _UCXX_THROW(pdistd::bad_alloc);
+_UCXXEXPORT void operator delete(void* ptr) _UCXX_USE_NOEXCEPT;
+#ifdef __cpp_sized_deallocation
+_UCXXEXPORT void operator delete(void* ptr, pdistd::size_t) _UCXX_USE_NOEXCEPT;
+#endif
+
+_UCXXEXPORT void* operator new[](pdistd::size_t numBytes) _UCXX_THROW(pdistd::bad_alloc);
+_UCXXEXPORT void operator delete[](void * ptr) _UCXX_USE_NOEXCEPT;
+#ifdef __cpp_sized_deallocation
+_UCXXEXPORT void operator delete[](void * ptr, pdistd::size_t) _UCXX_USE_NOEXCEPT;
+#endif
+
+#ifndef NO_NOTHROW
+_UCXXEXPORT void* operator new(pdistd::size_t numBytes, const pdistd::nothrow_t& ) _UCXX_USE_NOEXCEPT;
+_UCXXEXPORT void operator delete(void* ptr, const pdistd::nothrow_t& ) _UCXX_USE_NOEXCEPT;
+
+_UCXXEXPORT void* operator new[](pdistd::size_t numBytes, const pdistd::nothrow_t& ) _UCXX_USE_NOEXCEPT;
+_UCXXEXPORT void operator delete[](void* ptr, const pdistd::nothrow_t& ) _UCXX_USE_NOEXCEPT;
+#endif
+
+/* Placement operators */
+inline void* operator new(pdistd::size_t, void* ptr, void* empty) _UCXX_USE_NOEXCEPT { return ptr; }
+inline void operator delete(void* , void*, void* empty) _UCXX_USE_NOEXCEPT { }
+
+inline void* operator new[](pdistd::size_t, void* ptr, void* empty) _UCXX_USE_NOEXCEPT { return ptr; }
+inline void operator delete[](void* , void*, void* empty) _UCXX_USE_NOEXCEPT { }
+
+#pragma GCC visibility pop
+
+#endif
+

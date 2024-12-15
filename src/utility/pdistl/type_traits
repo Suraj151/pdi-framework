@@ -1,0 +1,269 @@
+/***************************** PDI STD File ***********************************
+This file is taken from external sources. this is taken from open source uClibc++ 
+library available on github. below is reference link. Thanking to author for
+providing this .
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+referred from   : https://github.com/mike-matera/ArduinoSTL
+added Date      : 1st Dec 2024
+added by        : Suraj I.
+******************************************************************************/
+
+#include "basic_definitions"
+#include <string.h>
+#include "exception"
+#include "memory"
+#include "char_traits"
+
+#ifndef __HEADER_TYPE_TRAITS
+#define __HEADER_TYPE_TRAITS 1
+
+#pragma GCC visibility push(default)
+
+namespace pdistd{
+
+	/**
+	 * @defgroup metaprogramming Metaprogramming
+	 * @ingroup utilities
+	 *
+	 * Template utilities for compile-time introspection and modification,
+	 * including type classification traits, type property inspection traits
+	 * and type transformation traits.
+	 *
+	 * @{
+	 */
+
+	/// integral_constant
+	template<typename _Tp, _Tp __v> class integral_constant{
+	public:
+		static constexpr _Tp                  value = __v;
+		typedef _Tp                           value_type;
+		typedef integral_constant<_Tp, __v>   type;
+		constexpr operator value_type() const noexcept { return value; }
+	#if __cplusplus > 201103L
+
+	#define __cpp_lib_integral_constant_callable 201304
+
+		constexpr value_type operator()() const noexcept { return value; }
+	#endif
+	};
+
+	template<typename _Tp, _Tp __v>
+		constexpr _Tp integral_constant<_Tp, __v>::value;
+
+	/// The type used as a compile-time boolean with true value.
+	typedef integral_constant<bool, true>     __true_type;
+
+	/// The type used as a compile-time boolean with false value.
+	typedef integral_constant<bool, false>    __false_type;
+
+	/// bool_constant for C++11
+	template<bool __v> using __bool_constant = integral_constant<bool, __v>;
+
+	// struct _UCXXEXPORT __true_type{};
+	// struct _UCXXEXPORT __false_type{};
+
+	// template <class I> class _UCXXEXPORT __is_integer{
+	// public:
+	// 	typedef __false_type value;
+	// };
+
+	template <typename _Tp> class _UCXXEXPORT __is_integer : public __false_type {};
+	template <> class _UCXXEXPORT __is_integer<bool> : public __true_type {};
+	template <> class _UCXXEXPORT __is_integer<int> : public __true_type {};
+	template <> class _UCXXEXPORT __is_integer<unsigned int> : public __true_type {};
+	template <> class _UCXXEXPORT __is_integer<char> : public __true_type {};
+	template <> class _UCXXEXPORT __is_integer<unsigned char> : public __true_type {};
+	template <> class _UCXXEXPORT __is_integer<long> : public __true_type {};
+	template <> class _UCXXEXPORT __is_integer<unsigned long> : public __true_type {};
+	template <> class _UCXXEXPORT __is_integer<long long> : public __true_type {};
+	template <> class _UCXXEXPORT __is_integer<unsigned long long> : public __true_type {};
+
+	// template <> class _UCXXEXPORT __is_integer <signed int>{
+	// public:
+	// 	typedef __true_type value;
+	// };
+
+	// template <> class _UCXXEXPORT __is_integer <short unsigned int>{
+	// public:
+	// 	typedef __true_type value;
+	// };
+
+	// template <> class _UCXXEXPORT __is_integer <short signed int>{
+	// public:
+	// 	typedef __true_type value;
+	// };
+
+	// template <> class _UCXXEXPORT __is_integer <char>{
+	// public:
+	// 	typedef __true_type value;
+	// };
+
+	// template <> class _UCXXEXPORT __is_integer <signed char>{
+	// public:
+	// 	typedef __true_type value;
+	// };
+
+	// template <> class _UCXXEXPORT __is_integer <unsigned char>{
+	// public:
+	// 	typedef __true_type value;
+	// };
+
+	// template <> class _UCXXEXPORT __is_integer <long unsigned int>{
+	// public:
+	// 	typedef __true_type value;
+	// };
+
+	// template <> class _UCXXEXPORT __is_integer <long signed int>{
+	// public:
+	// 	typedef __true_type value;
+	// };
+
+	// template <> class _UCXXEXPORT __is_integer <long>{
+	// public:
+	// 	typedef __true_type value;
+	// };
+
+	// template <> class _UCXXEXPORT __is_integer <unsigned long>{
+	// public:
+	// 	typedef __true_type value;
+	// };
+
+	// template <> class _UCXXEXPORT __is_integer <long long>{
+	// public:
+	// 	typedef __true_type value;
+	// };
+
+	// template <> class _UCXXEXPORT __is_integer <unsigned long long>{
+	// public:
+	// 	typedef __true_type value;
+	// };
+
+	// Primary template.
+	/// Define a member typedef @c type to one of two argument types.
+	template<bool _Cond, typename _Iftrue, typename _Iffalse>
+		struct conditional
+		{ typedef _Iftrue type; };
+
+	// Partial specialization for false.
+	template<typename _Iftrue, typename _Iffalse>
+		struct conditional<false, _Iftrue, _Iffalse>
+		{ typedef _Iffalse type; };
+
+
+	/// Define a member typedef @c type only if a boolean constant is true.
+	template<bool, typename _Tp = void>
+		struct enable_if
+		{ };
+
+	// Partial specialization for true.
+	template<typename _Tp>
+		struct enable_if<true, _Tp>
+		{ typedef _Tp type; };
+
+
+	template<typename...>
+		struct __or_;
+
+	template<>
+		struct __or_<>
+		: public __false_type
+		{ };
+
+	template<typename _B1>
+		struct __or_<_B1>
+		: public _B1
+		{ };
+
+	template<typename _B1, typename _B2>
+		struct __or_<_B1, _B2>
+		: public conditional<_B1::value, _B1, _B2>::type
+		{ };
+
+	template<typename _B1, typename _B2, typename _B3, typename... _Bn>
+		struct __or_<_B1, _B2, _B3, _Bn...>
+		: public conditional<_B1::value, _B1, __or_<_B2, _B3, _Bn...>>::type
+		{ };
+
+	template<typename...>
+		struct __and_;
+
+	template<>
+		struct __and_<>
+		: public __true_type
+		{ };
+
+	template<typename _B1>
+		struct __and_<_B1>
+		: public _B1
+		{ };
+
+	template<typename _B1, typename _B2>
+		struct __and_<_B1, _B2>
+		: public conditional<_B1::value, _B2, _B1>::type
+		{ };
+
+	template<typename _B1, typename _B2, typename _B3, typename... _Bn>
+		struct __and_<_B1, _B2, _B3, _Bn...>
+		: public conditional<_B1::value, __and_<_B2, _B3, _Bn...>, _B1>::type
+		{ };
+
+	template<typename _Pp>
+		struct __not_
+		: public __bool_constant<!bool(_Pp::value)>
+		{ };
+
+	/// remove_reference
+	template<typename _Tp>
+		struct remove_reference
+		{ typedef _Tp   type; };
+
+	template<typename _Tp>
+		struct remove_reference<_Tp&>
+		{ typedef _Tp   type; };
+
+	template<typename _Tp>
+		struct remove_reference<_Tp&&>
+		{ typedef _Tp   type; };
+
+	/// is_lvalue_reference
+	template<typename>
+		struct is_lvalue_reference
+		: public __false_type { };
+
+	template<typename _Tp>
+		struct is_lvalue_reference<_Tp&>
+		: public __true_type { };
+
+	/// is_rvalue_reference
+	template<typename>
+		struct is_rvalue_reference
+		: public __false_type { };
+
+	template<typename _Tp>
+		struct is_rvalue_reference<_Tp&&>
+		: public __true_type { };
+
+	/// is_trivial
+	template<typename _Tp>
+		struct is_trivial
+		: public integral_constant<bool, __is_trivial(_Tp)>
+		{ };
+
+	// is_trivially_copyable
+	template<typename _Tp>
+		struct is_trivially_copyable
+		: public integral_constant<bool, __is_trivially_copyable(_Tp)>
+		{ };
+
+
+	template <typename _Tp> class _UCXXEXPORT __is_signed : public integral_constant<bool, _Tp(-1) < _Tp(0)> {};
+	template <typename _Tp> class _UCXXEXPORT __is_unsigned : public integral_constant<bool, !(_Tp(-1) < _Tp(0))> {};
+}
+
+#pragma GCC visibility pop
+
+#endif
+

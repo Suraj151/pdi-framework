@@ -61,7 +61,7 @@ public:
   // misc methods
   void eraseConfig() override{}
   uint32_t getDeviceId() override{return 0;}
-  std::string getDeviceMac() override{return "XX:XX:XX:XX:XX:XX";}
+  pdiutil::string getDeviceMac() override{return "XX:XX:XX:XX:XX:XX";}
   bool isDeviceFactoryRequested() override{return 0;}
 
   // util methods
