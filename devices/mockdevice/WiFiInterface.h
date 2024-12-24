@@ -39,8 +39,8 @@ public:
   void init() override{}
   void setOutputPower(float _dBm) override{}
   void persistent(bool _persistent) override{}
-  bool setMode(wifi_mode_t _mode) override{return 0;}
-  wifi_mode_t getMode() override{return 0;}
+  bool setMode(pdi_wifi_mode_t _mode) override{return 0;}
+  pdi_wifi_mode_t getMode() override{return 0;}
   bool setSleepMode(sleep_mode_t type, uint8_t listenInterval = 0) override{return 0;}
   sleep_mode_t getSleepMode() override{return 0;}
   bool enableSTA(bool _enable) override{return 0;}
@@ -84,7 +84,7 @@ public:
   bool getApsConnectedStations(pdiutil::vector<wifi_station_info_t> &stations) override{return 0;};
 
   void enableNetworkStatusIndication() override{}
-  void enableNAPT() override{}
+  void enableNAPT(bool enable = true) override{}
   // static void wifi_event_handler_cb( System_Event_t * _event ){}
 
   // misc api's

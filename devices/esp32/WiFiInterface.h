@@ -11,7 +11,7 @@ created Date    : 1st June 2019
 #ifndef _WIFI_INTERFACE_H_
 #define _WIFI_INTERFACE_H_
 
-#include "esp8266.h"
+#include "esp32.h"
 #include <interface/pdi/modules/wifi/iWiFiInterface.h>
 
 // declare device specific
@@ -83,16 +83,16 @@ public:
 
   void enableNetworkStatusIndication() override;
   void enableNAPT(bool enable = true) override;
-  static void wifi_event_handler_cb( System_Event_t * _event );
+  static void wifi_event_handler_cb( arduino_event_t * _event );
 
   // misc api's
   static void preinitWiFiOff();
 
 private:
   /**
-   * @var	ESP8266WiFiClass*|&WiFi m_wifi
+   * @var	WiFiClass*|&WiFi m_wifi
    */
-  ESP8266WiFiClass *m_wifi;
+  WiFiClass *m_wifi;
 
   /**
    * @var	int16_t for network indication

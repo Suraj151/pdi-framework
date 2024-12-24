@@ -25,9 +25,11 @@ created Date    : 1st June 2019
 // #define ENABLE_TIMER_TASK_SCHEDULER
 
 /**
- * enable/disable mocking for test
+ * enable/disable devices. enable one from below list to get it compiled
  */
 // #define MOCK_DEVICE_TEST
+// #define DEVICE_ESP8266
+#define DEVICE_ESP32
 
 /**
  * enable/disable gpio and mqtt feature here
@@ -70,7 +72,11 @@ created Date    : 1st June 2019
  */
 #define IGNORE_FREE_RELAY_CONNECTIONS
 
+/**
+ * enable/disable wifi service here
+ */
 #ifdef ENABLE_WIFI_SERVICE
+
 /**
  * enable/disable http server feature here
  */

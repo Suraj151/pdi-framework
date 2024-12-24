@@ -60,7 +60,7 @@ typedef enum {
 typedef uint8_t gpio_id_t;
 typedef int64_t gpio_val_t;
 
-typedef uint8_t wifi_mode_t;
+typedef uint8_t pdi_wifi_mode_t;
 typedef uint8_t sleep_mode_t;
 typedef conn_status_t wifi_status_t;
 typedef uint8_t follow_redirects_t;
@@ -113,6 +113,14 @@ struct ipaddress_t
 {
     uint8_t ip4[4];
     ip_addr_type type;
+
+    ipaddress_t() : type(IP_ADDR_TYPE_V4)
+    {
+        ip4[0] = 0;
+        ip4[1] = 0;
+        ip4[2] = 0;
+        ip4[3] = 0;
+    }
 
     ipaddress_t(uint32_t _ip4) : type(IP_ADDR_TYPE_V4)
     {

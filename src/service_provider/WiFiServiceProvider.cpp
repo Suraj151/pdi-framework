@@ -378,9 +378,11 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
     #ifdef IGNORE_FREE_RELAY_CONNECTIONS
     this->m_wifi->reconnect();
     #else
-    uint8_t number_client= wifi_softap_get_station_num();
 
-    if( number_client > 0 ){
+    pdiutil::vector<wifi_station_info_t> stations;
+    this->m_wifi->getApsConnectedStations(stations);
+
+    if( stations.size() > 0 ){
       this->m_wifi->scanNetworksAsync( [&](int _scanCount) {
         this->scan_aps_and_configure_wifi_station_async(_scanCount);
       }, false);

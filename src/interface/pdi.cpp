@@ -10,8 +10,10 @@ created Date    : 1st Jan 2024
 
 #include "pdi.h"
 
-#ifdef MOCK_DEVICE_TEST
-#include "../../devices/mockdevice/mockdevice_pdi.cpp"
-#else
+#if defined(DEVICE_ESP32)
+#include "../../devices/esp32/esp32_pdi.cpp"
+#elif defined(DEVICE_ESP8266)
 #include "../../devices/esp8266/esp8266_pdi.cpp"
+#else
+#include "../../devices/mockdevice/mockdevice_pdi.cpp"
 #endif

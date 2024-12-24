@@ -39,10 +39,10 @@ public:
   virtual void init() = 0;
   virtual void setOutputPower(float _dBm) = 0;
   virtual void persistent(bool _persistent) = 0;
-  virtual bool setMode(wifi_mode_t _mode) = 0;
+  virtual bool setMode(pdi_wifi_mode_t _mode) = 0;
   virtual bool setSleepMode(sleep_mode_t type, uint8_t listenInterval = 0) = 0;
   virtual sleep_mode_t getSleepMode() = 0;
-  virtual wifi_mode_t getMode() = 0;
+  virtual pdi_wifi_mode_t getMode() = 0;
   virtual bool enableSTA(bool _enable) = 0;
   virtual bool enableAP(bool _enable) = 0;
   virtual uint8_t channel() = 0;
@@ -85,7 +85,7 @@ public:
 
   
   virtual void enableNetworkStatusIndication() = 0;
-  virtual void enableNAPT() = 0;
+  virtual void enableNAPT(bool enable = true) = 0;
 };
 
 // derived class must define this

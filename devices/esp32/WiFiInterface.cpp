@@ -12,24 +12,16 @@ created Date    : 1st June 2019
 #include "LoggerInterface.h"
 #include "DeviceControlInterface.h"
 
-#if defined( ENABLE_NAPT_FEATURE )
-#include "lwip/lwip_napt.h"
-#include "lwip/app/dhcpserver.h"
-#elif defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
-#include <lwip/napt.h>
-#include <lwip/dns.h>
-#include <LwipDhcpServer-NonOS.h>
-#endif
-
 extern "C" void preinit() {
-#ifdef ENABLE_NAPT_FEATURE_LWIP_V2
-  WiFiInterface::preinitWiFiOff();
-#endif
   __i_dvc_ctrl.eraseConfig();
 	uint8_t sta_mac[6];
-  wifi_get_macaddr(STATION_IF, sta_mac);
+  esp_wifi_get_mac(WIFI_IF_STA, sta_mac);
+  // esp_efuse_mac_get_default(sta_mac);
+  // wifi_get_macaddr(STATION_IF, sta_mac);
   sta_mac[0] +=2;
-	wifi_set_macaddr(SOFTAP_IF, sta_mac);
+  esp_wifi_set_mac(WIFI_IF_AP, sta_mac);
+  // esp_iface_mac_addr_set(sta_mac, ESP_MAC_WIFI_SOFTAP);
+	// wifi_set_macaddr(SOFTAP_IF, sta_mac);
 }
 
 /**
@@ -49,9 +41,6 @@ wifi_status_t toWifiStatus(wl_status_t stat)
   case WL_CONNECT_FAILED:
     _wifi_status = CONN_STATUS_CONNECTION_FAILED;
     break;
-  case WL_WRONG_PASSWORD:
-    _wifi_status = CONN_STATUS_CONFIG_ERROR;
-    break;
   case WL_DISCONNECTED:
     _wifi_status = CONN_STATUS_DISCONNECTED;
     break;
@@ -68,7 +57,8 @@ wifi_status_t toWifiStatus(wl_status_t stat)
  */
 WiFiInterface::WiFiInterface() : m_wifi(&WiFi), m_wifi_led(0)
 {
-  wifi_set_event_handler_cb( (wifi_event_handler_cb_t)&WiFiInterface::wifi_event_handler_cb );
+  this->m_wifi->onEvent((WiFiEventSysCb)&WiFiInterface::wifi_event_handler_cb);
+  // wifi_set_event_handler_cb( (wifi_event_handler_cb_t)&WiFiInterface::wifi_event_handler_cb );
 }
 
 /**
@@ -85,8 +75,8 @@ WiFiInterface::~WiFiInterface()
 void WiFiInterface::init()
 {
   // this->m_wifi->mode(WIFI_AP_STA);
-  setSleepMode(WIFI_NONE_SLEEP);  // WIFI_NONE_SLEEP = 0, WIFI_LIGHT_SLEEP = 1, WIFI_MODEM_SLEEP = 2
-  setOutputPower(21.0);  // dBm max: +20.5dBm  min: 0dBm
+  setSleepMode(WIFI_PS_NONE); 
+  setOutputPower(WIFI_POWER_19_5dBm);  
   persistent(false);
 }
 
@@ -97,7 +87,7 @@ void WiFiInterface::setOutputPower(float _dBm)
 {
   if (nullptr != this->m_wifi)
   {
-    this->m_wifi->setOutputPower(_dBm);
+    this->m_wifi->setTxPower((wifi_power_t)WIFI_POWER_21dBm);
   }
 }
 
@@ -148,7 +138,7 @@ bool WiFiInterface::setSleepMode(sleep_mode_t type, uint8_t listenInterval)
   bool status = false;
   if (nullptr != this->m_wifi)
   {
-    status = this->m_wifi->setSleepMode(static_cast<WiFiSleepType_t>(type), listenInterval);
+    status = this->m_wifi->setSleep(static_cast<wifi_ps_type_t>(type));
   }
   return status;
 }
@@ -162,7 +152,7 @@ sleep_mode_t WiFiInterface::getSleepMode()
   sleep_mode_t mode = 0;
   if (nullptr != this->m_wifi)
   {
-    mode = this->m_wifi->getSleepMode();
+    mode = this->m_wifi->getSleep();
   }
   return mode;
 }
@@ -215,7 +205,7 @@ int WiFiInterface::hostByName(const char *aHostname, ipaddress_t &aResult, uint3
   if (nullptr != this->m_wifi)
   {
     IPAddress ip = (uint32_t)aResult;
-    status = this->m_wifi->hostByName(aHostname, ip, timeout_ms);
+    status = this->m_wifi->hostByName(aHostname, ip);
     aResult = (uint32_t)ip;
   }
   return status;
@@ -305,7 +295,7 @@ bool WiFiInterface::setAutoReconnect(bool _autoReconnect)
  */
 ipaddress_t WiFiInterface::localIP()
 {
-  IPAddress ip(0);
+  IPAddress ip((uint32_t)0);
   if (nullptr != this->m_wifi)
   {
     ip = this->m_wifi->localIP();
@@ -331,7 +321,7 @@ pdiutil::string WiFiInterface::macAddress()
  */
 ipaddress_t WiFiInterface::subnetMask()
 {
-  IPAddress ip(0);
+  IPAddress ip((uint32_t)0);
   if (nullptr != this->m_wifi)
   {
     ip = this->m_wifi->subnetMask();
@@ -344,7 +334,7 @@ ipaddress_t WiFiInterface::subnetMask()
  */
 ipaddress_t WiFiInterface::gatewayIP()
 {
-  IPAddress ip(0);
+  IPAddress ip((uint32_t)0);
   if (nullptr != this->m_wifi)
   {
     ip = this->m_wifi->gatewayIP();
@@ -357,7 +347,7 @@ ipaddress_t WiFiInterface::gatewayIP()
  */
 ipaddress_t WiFiInterface::dnsIP(uint8_t _dns_no)
 {
-  IPAddress ip(0);
+  IPAddress ip((uint32_t)0);
   if (nullptr != this->m_wifi)
   {
     ip = this->m_wifi->dnsIP(_dns_no);
@@ -439,7 +429,11 @@ bool WiFiInterface::softAPConfig(ipaddress_t _local_ip, ipaddress_t _gateway, ip
   bool status = false;
   if (nullptr != this->m_wifi)
   {
-    status = this->m_wifi->softAPConfig((uint32_t)_local_ip, (uint32_t)_gateway, (uint32_t)_subnet);
+    // start lease from gateway onwards
+    ipaddress_t lease_start(_gateway[0], _gateway[1], _gateway[2], _gateway[3]+1);
+    // Set the DNS server for clients of the AP to the one we also use for the STA interface
+    ipaddress_t dns((uint32_t)this->m_wifi->dnsIP());
+    status = this->m_wifi->softAPConfig((uint32_t)_local_ip, (uint32_t)_gateway, (uint32_t)_subnet, (uint32_t)lease_start, (uint32_t)dns);
   }
   return status;
 }
@@ -462,7 +456,7 @@ bool WiFiInterface::softAPdisconnect(bool _wifioff)
  */
 ipaddress_t WiFiInterface::softAPIP()
 {
-  IPAddress ip(0);
+  IPAddress ip((uint32_t)0);
   if (nullptr != this->m_wifi)
   {
     ip = this->m_wifi->softAPIP();
@@ -478,7 +472,7 @@ int8_t WiFiInterface::scanNetworks(bool _async, bool _show_hidden, uint8_t _chan
   int8_t num = 0;
   if (nullptr != this->m_wifi)
   {
-    num = this->m_wifi->scanNetworks(_async, _show_hidden, _channel, ssid);
+    num = this->m_wifi->scanNetworks(_async, _show_hidden, false, 300, _channel, (const char*)ssid);
   }
   return num;
 }
@@ -490,7 +484,38 @@ void WiFiInterface::scanNetworksAsync(pdiutil::function<void(int)> _onComplete, 
 {
   if (nullptr != this->m_wifi)
   {
-    this->m_wifi->scanNetworksAsync(_onComplete, _show_hidden);
+    static int asyncScanTaskId = -1;
+
+    // check whether scan task is already running and return
+    if( asyncScanTaskId == -1 ){
+      return;
+    }else{  // start scanning for network with async true. 
+      this->scanNetworks(true);
+    }
+
+    // scan every 500ms for scanning done
+    asyncScanTaskId = __task_scheduler.updateInterval( asyncScanTaskId, [&]() {
+
+      int16_t WiFiScanStatus = this->m_wifi->scanComplete();
+
+      if (WiFiScanStatus < 0) {  // it is busy scanning or got an error
+
+        if (WiFiScanStatus == WIFI_SCAN_FAILED) {
+
+          LogE("WiFi Scan has failed. Starting again.\n");
+          this->scanNetworks(true);
+        }
+        // other option is status WIFI_SCAN_RUNNING - just wait.
+      } else {
+
+        // callback on Found Zero or more Wireless Networks
+        _onComplete(WiFiScanStatus);
+
+        // clear scan task interval once scan complete
+        __task_scheduler.clearInterval(asyncScanTaskId);
+        asyncScanTaskId = -1;
+      }
+    }, 200);
   }
 }
 
@@ -565,10 +590,11 @@ bool WiFiInterface::get_bssid_within_scanned_nw_ignoring_connected_stations(char
   //     }
   //   }
   // }
-  struct station_info * stat_info = wifi_softap_get_station_info();
-  struct station_info * stat_info_copy = stat_info;
+  wifi_sta_list_t wifi_sta_list;
+  memset(&wifi_sta_list, 0, sizeof(wifi_sta_list_t));
+  esp_wifi_ap_get_sta_list(&wifi_sta_list);
+  
   char* _ssid_buff = new char[WIFI_CONFIGS_BUF_SIZE];
-
   if( nullptr == _ssid_buff ){
     return false;
   }
@@ -583,20 +609,20 @@ bool WiFiInterface::get_bssid_within_scanned_nw_ignoring_connected_stations(char
     if( __are_arrays_equal( ssid, _ssid_buff, _ssid.size() ) ){
 
       bool _found = false;
-      stat_info = stat_info_copy;
-      while ( nullptr != stat_info ) {
 
-        memcpy(bssid, stat_info->bssid, 6);
+      for (int i = 0; i < wifi_sta_list.num; i++) {
+
+		    wifi_sta_info_t sta_info = wifi_sta_list.sta[i];
+
+        memcpy(bssid, sta_info.mac, 6);
         bssid[0] +=2;
 
-        if( __are_arrays_equal( (char*)bssid, (char*)this->BSSID(i), 6 ) ){
+        if( __are_arrays_equal( (char*)bssid, (char*)this->m_wifi->BSSID(i), 6 ) ){
 
           _found = true;
           break;
         }
-
-        stat_info = STAILQ_NEXT(stat_info, next);
-      }
+		  }
 
       if( !_found ){
 
@@ -618,13 +644,17 @@ bool WiFiInterface::get_bssid_within_scanned_nw_ignoring_connected_stations(char
  */
 bool WiFiInterface::getApsConnectedStations(pdiutil::vector<wifi_station_info_t> &stations)
 {
-  struct station_info *stat_info = wifi_softap_get_station_info();
+  wifi_sta_list_t wifi_sta_list;
+  memset(&wifi_sta_list, 0, sizeof(wifi_sta_list_t));
+  esp_wifi_ap_get_sta_list(&wifi_sta_list);
 
-  while (nullptr != stat_info)
-  {
-    wifi_station_info_t _station(stat_info->bssid, stat_info->ip.addr);
+
+  for (int i = 0; i < wifi_sta_list.num; i++) {
+
+    wifi_sta_info_t sta_info = wifi_sta_list.sta[i];
+    wifi_station_info_t _station(sta_info.mac, 0);
+
     stations.push_back(_station);
-    stat_info = STAILQ_NEXT(stat_info, next);
   }
 
   return true;
@@ -645,7 +675,7 @@ void WiFiInterface::enableNetworkStatusIndication()
       LogI("Handling LED Status Indications\n");
       LogFmtI("RSSI : %d\n", this->m_wifi->RSSI());
 
-      if( !this->m_wifi->localIP().isSet() || !this->m_wifi->isConnected() || ( this->m_wifi->RSSI() < (int)WIFI_RSSI_THRESHOLD ) ){
+      if( !this->m_wifi->localIP() != INADDR_NONE || !this->m_wifi->isConnected() || ( this->m_wifi->RSSI() < (int)WIFI_RSSI_THRESHOLD ) ){
 
         LogW("WiFi not connected.\n");
         __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, this->m_wifi_led, LOW );
@@ -664,54 +694,30 @@ void WiFiInterface::enableNetworkStatusIndication()
  */
 void WiFiInterface::enableNAPT(bool enable)
 {
-#if defined( ENABLE_NAPT_FEATURE )
-  // Initialize the NAT feature
-  ip_napt_init(IP_NAPT_MAX, IP_PORTMAP_MAX);
-  // Enable NAT on the AP interface
-  ip_napt_enable_no(1, 1);
-  // Set the DNS server for clients of the AP to the one we also use for the STA interface
-  IPAddress _ip((uint32_t)__i_wifi.dnsIP());
-  dhcps_set_DNS(_ip);
-  LogFmtS("NAPT(lwip %d) initialization done\n", (int)LWIP_VERSION_MAJOR);
-#elif defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
-  // Initialize the NAPT feature
-  err_t ret = ip_napt_init(IP_NAPT_MAX, IP_PORTMAP_MAX);
-  if (ret == ERR_OK) {
-    // Enable NAT on the AP interface
-    ret = ip_napt_enable_no(SOFTAP_IF, 1);
-    if (ret == ERR_OK) {
-      LogFmtS("NAPT(lwip %d) initialization done\n", (int)LWIP_VERSION_MAJOR);
-      // Set the DNS server for clients of the AP to the one we also use for the STA interface
-      IPAddress _ip((uint32_t)__i_wifi.dnsIP(0));
-      getNonOSDhcpServer().setDns(_ip);
-      //dhcpSoftAP.dhcps_set_dns(1, __i_wifi.dnsIP(1));
-    }
-  }
-  if (ret != ERR_OK) {
-    LogE("NAPT initialization failed\n");
-  }
-#endif
+  bool bStatus = this->m_wifi->AP.enableNAPT(enable);
+  LogFmtS("NAPT enable status : %d\n", (int)bStatus);
 }
 
 /**
  * static wifi event handler
  *
  */
-void WiFiInterface::wifi_event_handler_cb(System_Event_t *_event)
+void WiFiInterface::wifi_event_handler_cb(arduino_event_t *_event)
 {
   if( nullptr != _event ){
 
-    LogFmtI("\nwifi event : %d\n", (int)_event->event);
+    LogFmtI("\nesp event : %d\n", (int)_event->event_id);
     event_name_t e = EVENT_NAME_MAX;
 
-    if ( EVENT_STAMODE_CONNECTED == _event->event ) {
-      __task_scheduler.setTimeout( [&]() { __i_wifi.enableNAPT(); }, NAPT_INIT_DURATION_AFTER_WIFI_CONNECT, __i_dvc_ctrl.millis_now() );
+    if ( ARDUINO_EVENT_WIFI_STA_CONNECTED == _event->event_id ) {
+      __task_scheduler.setTimeout( [&]() { __i_wifi.enableNAPT(true); }, NAPT_INIT_DURATION_AFTER_WIFI_CONNECT, __i_dvc_ctrl.millis_now() );
       e = EVENT_WIFI_STA_CONNECTED;
-    }else if( EVENT_STAMODE_DISCONNECTED == _event->event ){
+    }else if( ARDUINO_EVENT_WIFI_STA_DISCONNECTED == _event->event_id ){
+      __task_scheduler.setTimeout( [&]() { __i_wifi.enableNAPT(false); }, MILLISECOND_DURATION_1000, __i_dvc_ctrl.millis_now() );
       e = EVENT_WIFI_STA_DISCONNECTED;
-    }else if( EVENT_SOFTAPMODE_STACONNECTED == _event->event ){
+    }else if( ARDUINO_EVENT_WIFI_AP_STACONNECTED == _event->event_id ){
       e = EVENT_WIFI_AP_STACONNECTED;
-    }else if( EVENT_SOFTAPMODE_STADISCONNECTED == _event->event ){
+    }else if( ARDUINO_EVENT_WIFI_AP_STADISCONNECTED == _event->event_id ){
       e = EVENT_WIFI_AP_STADISCONNECTED;
     }
 
@@ -726,7 +732,7 @@ void WiFiInterface::wifi_event_handler_cb(System_Event_t *_event)
  */
 void WiFiInterface::preinitWiFiOff()
 {
-  ESP8266WiFiClass::preinitWiFiOff();
+  // WiFiClass::preinitWiFiOff();
 }
 
 WiFiInterface __i_wifi;

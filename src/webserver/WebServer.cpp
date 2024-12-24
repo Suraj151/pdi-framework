@@ -15,17 +15,17 @@ created Date    : 1st June 2019
 #include "WebServer.h"
 
 /**
- * WebServer constructor.
+ * HttpServer constructor.
  */
-WebServer::WebServer() : 
+HttpServer::HttpServer() : 
   m_server(nullptr)
 {
 }
 
 /**
- * WebServer destructor.
+ * HttpServer destructor.
  */
-WebServer::~WebServer()
+HttpServer::~HttpServer()
 {
   this->m_server = nullptr;
 }
@@ -33,7 +33,7 @@ WebServer::~WebServer()
 /**
  * start http server functionality. this requires server interface to be provided
  */
-bool WebServer::start_server(iServerInterface *iServer)
+bool HttpServer::start_server(iServerInterface *iServer)
 {
   bool bStatus = false;
 
@@ -68,11 +68,11 @@ bool WebServer::start_server(iServerInterface *iServer)
 /**
  * handle clients. Should be called in loop
  */
-void WebServer::handle_clients()
+void HttpServer::handle_clients()
 {
   this->m_server->handleClient();
 }
 
-WebServer __web_server;
+HttpServer __web_server;
 
 #endif

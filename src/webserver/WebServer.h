@@ -35,20 +35,20 @@ created Date    : 1st June 2019
 
 
 /**
- * WebServer class
+ * HttpServer class
  */
-class WebServer {
+class HttpServer {
 
   public:
 
     /**
-     * WebServer constructor.
+     * HttpServer constructor.
      */
-    WebServer();
+    HttpServer();
     /**
-     * WebServer destructor.
+     * HttpServer destructor.
      */
-    ~WebServer();
+    ~HttpServer();
 
     bool start_server(iServerInterface *iServer);
     void handle_clients(void);
@@ -117,6 +117,6 @@ class WebServer {
 
 };
 
-extern WebServer __web_server;
+extern HttpServer __web_server;
 
 #endif

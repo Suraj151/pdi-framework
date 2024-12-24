@@ -13,10 +13,12 @@ created Date    : 1st Jan 2024
 
 #include <config/Config.h>
 
-#ifdef MOCK_DEVICE_TEST
-#include "../../devices/mockdevice/mockdevice_pdi.h"
-#else
+#if defined(DEVICE_ESP32)
+#include "../../devices/esp32/esp32_pdi.h"
+#elif defined(DEVICE_ESP8266)
 #include "../../devices/esp8266/esp8266_pdi.h"
+#else
+#include "../../devices/mockdevice/mockdevice_pdi.h"
 #endif
 
 #include <interface/pdi/iDeviceIotInterface.h>
