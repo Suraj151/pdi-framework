@@ -8,6 +8,10 @@ Author          : Suraj I.
 created Date    : 1st Jan 2024
 ******************************************************************************/
 
+#include <config/Config.h>
+
+#if defined(ENABLE_NETWORK_SERVICE)
+
 #include "HTTPClient.h"
 
 /**
@@ -850,3 +854,5 @@ int16_t Http_Client::handleResponse()
 
     return m_response.status_code;
 }
+
+#endif

@@ -12,10 +12,12 @@ created Date    : 1st June 2019
 #define _GPIO_SERVICE_PROVIDER_H_
 
 #include <service_provider/ServiceProvider.h>
-#include <service_provider/EmailServiceProvider.h>
 #include <service_provider/DatabaseServiceProvider.h>
 
+#ifdef ENABLE_NETWORK_SERVICE
 #include <transports/http/HTTPClient.h>
+#include <service_provider/EmailServiceProvider.h>
+#endif
 
 #define GPIO_PAYLOAD_DATA_KEY "data"
 #define GPIO_PAYLOAD_MODE_KEY "mode"
@@ -52,7 +54,9 @@ public:
 #endif
   void handleGpioOperations(void);
   void handleGpioModes(int _gpio_config_type = GPIO_MODE_CONFIG);
+#ifdef ENABLE_NETWORK_SERVICE
   bool handleGpioHttpRequest(bool isAlertPost = false);
+#endif
   void printGpioConfigLogs(void);
 
   /**
@@ -70,10 +74,12 @@ public:
 
 protected:
 
+#ifdef ENABLE_NETWORK_SERVICE
   /**
    * @var	Http_Client  *m_http_client
    */
   Http_Client *m_http_client;
+#endif
 
   iGpioBlinkerInterface *m_digital_blinker[MAX_DIGITAL_GPIO_PINS];
 };

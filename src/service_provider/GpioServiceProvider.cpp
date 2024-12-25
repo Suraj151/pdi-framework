@@ -24,8 +24,10 @@ __gpio_alert_track_t __gpio_alert_track = {
  */
 GpioServiceProvider::GpioServiceProvider():
   m_gpio_http_request_cb_id(0),
-  m_update_gpio_table_from_copy(true),
-  m_http_client(Http_Client::GetStaticInstance())
+  m_update_gpio_table_from_copy(true)
+  #ifdef ENABLE_NETWORK_SERVICE
+  ,m_http_client(Http_Client::GetStaticInstance())
+  #endif
 {
   for (size_t i = 0; i < MAX_DIGITAL_GPIO_PINS; i++) {
     this->m_digital_blinker[i] = nullptr;
@@ -37,7 +39,9 @@ GpioServiceProvider::GpioServiceProvider():
  */
 GpioServiceProvider::~GpioServiceProvider(){
 
+#ifdef ENABLE_NETWORK_SERVICE
   this->m_http_client = nullptr;
+#endif
 
   for (size_t i = 0; i < MAX_DIGITAL_GPIO_PINS; i++) {
     if( nullptr != this->m_digital_blinker[i] ){
@@ -71,6 +75,7 @@ void GpioServiceProvider::begin(){
   __task_scheduler.setInterval( [&]() { this->enable_update_gpio_table_from_copy(); }, GPIO_TABLE_UPDATE_DURATION, __i_dvc_ctrl.millis_now() );
 }
 
+#ifdef ENABLE_NETWORK_SERVICE
 /**
  * post gpio data to server specified in gpio configs
  */
@@ -125,6 +130,7 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isAlertPost ){
 
   return status;
 }
+#endif
 
 /**
  * append gpio payload to string arg
@@ -321,13 +327,17 @@ void GpioServiceProvider::handleGpioOperations(){
         break;
       }
       case DIGITAL_BLINK:{
-        if( nullptr != this->m_digital_blinker[_pin] ){
+        if(_pin < MAX_DIGITAL_GPIO_PINS){
+          if( nullptr != this->m_digital_blinker[_pin] ){
 
-          this->m_digital_blinker[_pin]->updateConfig( _pin, this->m_gpio_config_copy.gpio_readings[_pin] );
-          this->m_digital_blinker[_pin]->start();
+            this->m_digital_blinker[_pin]->updateConfig( _pin, this->m_gpio_config_copy.gpio_readings[_pin] );
+            this->m_digital_blinker[_pin]->start();
+          }else{
+
+            this->m_digital_blinker[_pin] = __i_dvc_ctrl.createGpioBlinkerInstance( _pin, this->m_gpio_config_copy.gpio_readings[_pin] );
+          }
         }else{
-
-          this->m_digital_blinker[_pin] = __i_dvc_ctrl.createGpioBlinkerInstance( _pin, this->m_gpio_config_copy.gpio_readings[_pin] );
+          LogFmtW("\nOut Of Range GPIO blink Config : %d", _pin);
         }
         break;
       }
@@ -380,10 +390,12 @@ void GpioServiceProvider::handleGpioOperations(){
             break;
           }
           #endif
+          #ifdef ENABLE_NETWORK_SERVICE
           case HTTP_SERVER:{
             __gpio_alert_track.is_last_alert_succeed = this->handleGpioHttpRequest(true);
             break;
           }
+          #endif
           case NO_ALERT:
           default: break;
         }
@@ -421,6 +433,7 @@ void GpioServiceProvider::handleGpioModes( int _gpio_config_type ){
 
   this->m_gpio_config_copy = _gpio_configs;
 
+#ifdef ENABLE_NETWORK_SERVICE
   if( strlen( this->m_gpio_config_copy.gpio_host ) > 5 && this->m_gpio_config_copy.gpio_port > 0 &&
     this->m_gpio_config_copy.gpio_post_frequency > 0
   ){
@@ -433,6 +446,7 @@ void GpioServiceProvider::handleGpioModes( int _gpio_config_type ){
     __task_scheduler.clearInterval( this->m_gpio_http_request_cb_id );
     this->m_gpio_http_request_cb_id = 0;
   }
+#endif
 
 }
 

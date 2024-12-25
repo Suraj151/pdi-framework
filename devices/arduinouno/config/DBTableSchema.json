@@ -1,0 +1,66 @@
+{
+    "id": "DBTableSchema",
+    "definitions": [
+        {
+            "name": "$$defItemName$$",
+            "description": "$$defItemDesc$$",
+            "type": "class",
+            "onlyHeader": true,
+            "$defItems": [
+                {
+                    "defItemName": "GlobalTable",
+                    "defItemDesc": "Global table handles global config load/store operations",
+                    "defItemArg": "global_config_table",
+                    "defItemAddressKey": "GLOBAL_CONFIG_TABLE_ADDRESS",
+                    "defItemAddressValue": "CONFIG_START",
+                    "defItemExtVar": "__global_table"
+                },
+                {
+                    "defItemName": "GpioTable",
+                    "defItemDesc": "GPIO table handles GPIO configs load/store operations",
+                    "defItemArg": "gpio_config_table",
+                    "defItemAddressKey": "GPIO_CONFIG_TABLE_ADDRESS",
+                    "defItemAddressValue": "500",
+                    "defItemExtVar": "__gpio_table"
+                },
+                {
+                    "defItemName": "LoginTable",
+                    "defItemDesc": "Login table handles credential configs load/store operations",
+                    "defItemArg": "login_credential_table",
+                    "defItemAddressKey": "LOGIN_CREDENTIAL_TABLE_ADDRESS",
+                    "defItemAddressValue": "200",
+                    "defItemExtVar": "__login_table"
+                }
+            ],
+            "includes": [
+                "<database/core/DatabaseTable.h>"
+            ],
+            "macrodefines":[
+                {
+                    "macroDefine": "$$defItemAddressKey$$ $$defItemAddressValue$$"
+                }
+            ],
+            "parent": {
+                "name": "DatabaseTable",
+                "type": "template",
+                "access": "public",
+                "template": {
+                    "isDeclaration": false,
+                    "args": [
+                        "$$defItemAddressKey$$",
+                        "$$defItemArg$$"
+                    ]
+                }
+            },
+            "members": [
+            ],
+            "postclassdeclaration":[
+                {
+                    "name": "$$defItemExtVar$$",
+                    "preprop": "extern ",
+                    "type": "$$defItemName$$"
+                }
+            ]
+        }
+    ]
+}

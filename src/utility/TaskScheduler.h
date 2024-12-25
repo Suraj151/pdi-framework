@@ -22,11 +22,11 @@ struct task_t
 {
 	int _task_id;
 	int _max_attempts;
-	uint32_t _duration;
-	unsigned long _last_millis;
+	uint64_t _duration;
+	uint64_t _last_millis;
 	CallBackVoidArgFn _task;
 	int _task_priority; // from 0 onwards. default is 0
-	uint32_t _task_exec_millis;
+	uint64_t _task_exec_millis;
 };
 
 /**
@@ -48,17 +48,17 @@ public:
 	 * TaskScheduler constructor
 	 *
 	 * @param	CallBackVoidArgFn	_task_fn
-	 * @param	uint32_t	_duration
-	 * @param	unsigned long|0	_last_millis
+	 * @param	uint64_t	_duration
+	 * @param	uint64_t|0	_last_millis
 	 */
-	TaskScheduler(CallBackVoidArgFn _task_fn, uint32_t _duration, int _task_priority = DEFAULT_TASK_PRIORITY, unsigned long _last_millis = 0);
+	TaskScheduler(CallBackVoidArgFn _task_fn, uint64_t _duration, int _task_priority = DEFAULT_TASK_PRIORITY, uint64_t _last_millis = 0);
 
-	int setTimeout(CallBackVoidArgFn _task_fn, uint32_t _duration, unsigned long _now_millis, int _task_priority = DEFAULT_TASK_PRIORITY);
-	int setInterval(CallBackVoidArgFn _task_fn, uint32_t _duration, unsigned long _now_millis, int _task_priority = DEFAULT_TASK_PRIORITY);
-	int updateInterval(int _task_id, CallBackVoidArgFn _task_fn, uint32_t _duration, int _task_priority = DEFAULT_TASK_PRIORITY, unsigned long _last_millis = 0, int _max_attempts = -1);
+	int setTimeout(CallBackVoidArgFn _task_fn, uint64_t _duration, uint64_t _now_millis, int _task_priority = DEFAULT_TASK_PRIORITY);
+	int setInterval(CallBackVoidArgFn _task_fn, uint64_t _duration, uint64_t _now_millis, int _task_priority = DEFAULT_TASK_PRIORITY);
+	int updateInterval(int _task_id, CallBackVoidArgFn _task_fn, uint64_t _duration, int _task_priority = DEFAULT_TASK_PRIORITY, uint64_t _last_millis = 0, int _max_attempts = -1);
 	bool clearTimeout(int _id);
 	bool clearInterval(int _id);
-	int register_task(CallBackVoidArgFn _task_fn, uint32_t _duration, int _task_priority = DEFAULT_TASK_PRIORITY, unsigned long _last_millis = 0, int _max_attempts = -1);
+	int register_task(CallBackVoidArgFn _task_fn, uint64_t _duration, int _task_priority = DEFAULT_TASK_PRIORITY, uint64_t _last_millis = 0, int _max_attempts = -1);
 	void handle_tasks();
 	void remove_expired_tasks(void);
 	int is_registered_task(int _id);

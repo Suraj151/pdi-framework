@@ -204,7 +204,7 @@ void Int64ToString(int64_t val, char *pString, uint8_t _maxlen, uint8_t _padmax)
 	if( nullptr != pString )
 	{
 		memset(pString, 0, _maxlen);
-		sprintf(pString, "%lld", val);
+		sprintf(pString, "%ld", val);
 		for(int l=strlen(pString); l<_padmax; l++) pString[l]=' '; 
 	}
 }

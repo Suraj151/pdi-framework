@@ -34,10 +34,10 @@ TaskScheduler::~TaskScheduler()
  * TaskScheduler constructor
  *
  * @param	CallBackVoidArgFn	_task_fn
- * @param	uint32_t	_duration
- * @param	unsigned long|0	_last_millis
+ * @param	uint64_t	_duration
+ * @param	uint64_t|0	_last_millis
  */
-TaskScheduler::TaskScheduler(CallBackVoidArgFn _task_fn, uint32_t _duration, int _task_priority, unsigned long _last_millis)
+TaskScheduler::TaskScheduler(CallBackVoidArgFn _task_fn, uint64_t _duration, int _task_priority, uint64_t _last_millis)
 {
 	this->register_task(_task_fn, _duration, _task_priority, _last_millis);
 }
@@ -47,10 +47,10 @@ TaskScheduler::TaskScheduler(CallBackVoidArgFn _task_fn, uint32_t _duration, int
  * it will return callback task id for reference.
  *
  * @param		CallBackVoidArgFn	_task_fn
- * @param		uint32_t	_duration
+ * @param		uint64_t	_duration
  * @return	int
  */
-int TaskScheduler::setTimeout(CallBackVoidArgFn _task_fn, uint32_t _duration, unsigned long _now_millis, int _task_priority)
+int TaskScheduler::setTimeout(CallBackVoidArgFn _task_fn, uint64_t _duration, uint64_t _now_millis, int _task_priority)
 {
 	return this->register_task(_task_fn, _duration, _task_priority, _now_millis, 1);
 }
@@ -60,10 +60,10 @@ int TaskScheduler::setTimeout(CallBackVoidArgFn _task_fn, uint32_t _duration, un
  * it will return callback task id for reference.
  *
  * @param		CallBackVoidArgFn	_task_fn
- * @param		uint32_t	_duration
+ * @param		uint64_t	_duration
  * @return	int
  */
-int TaskScheduler::setInterval(CallBackVoidArgFn _task_fn, uint32_t _duration, unsigned long _now_millis, int _task_priority)
+int TaskScheduler::setInterval(CallBackVoidArgFn _task_fn, uint64_t _duration, uint64_t _now_millis, int _task_priority)
 {
 	return this->register_task(_task_fn, _duration, _task_priority, _now_millis);
 }
@@ -74,12 +74,12 @@ int TaskScheduler::setInterval(CallBackVoidArgFn _task_fn, uint32_t _duration, u
  *
  * @param		int	_task_id
  * @param		CallBackVoidArgFn	_task_fn
- * @param		uint32_t	_duration
- * @param		unsigned long|0	_last_millis
+ * @param		uint64_t	_duration
+ * @param		uint64_t|0	_last_millis
  * @param		int|-1	_max_attempts
  * @return	int
  */
-int TaskScheduler::updateInterval(int _task_id, CallBackVoidArgFn _task_fn, uint32_t _duration, int _task_priority, unsigned long _last_millis, int _max_attempts)
+int TaskScheduler::updateInterval(int _task_id, CallBackVoidArgFn _task_fn, uint64_t _duration, int _task_priority, uint64_t _last_millis, int _max_attempts)
 {
 	int _registered_index = this->is_registered_task(_task_id);
 	if (_registered_index > -1)
@@ -126,12 +126,12 @@ bool TaskScheduler::clearInterval(int _id)
  * it will return callback task id for reference.
  *
  * @param		CallBackVoidArgFn	_task_fn
- * @param		uint32_t	_duration
- * @param		unsigned long|0	_last_millis
+ * @param		uint64_t	_duration
+ * @param		uint64_t|0	_last_millis
  * @param		int|-1	_max_attempts
  * @return	int
  */
-int TaskScheduler::register_task(CallBackVoidArgFn _task_fn, uint32_t _duration, int _task_priority, unsigned long _last_millis, int _max_attempts)
+int TaskScheduler::register_task(CallBackVoidArgFn _task_fn, uint64_t _duration, int _task_priority, uint64_t _last_millis, int _max_attempts)
 {
 	if (this->m_tasks.size() < this->m_max_tasks)
 	{
@@ -180,7 +180,7 @@ void TaskScheduler::handle_tasks()
 
 	for (uint16_t i = 0; i < _task_count; i++)
 	{
-		unsigned long _last_start_ms = m_util->millis_now();
+		uint64_t _last_start_ms = m_util->millis_now();
 
 		if (_last_start_ms < this->m_tasks[_priority_indices[i]]._last_millis)
 		{
@@ -196,7 +196,7 @@ void TaskScheduler::handle_tasks()
 			this->m_tasks[_priority_indices[i]]._last_millis = _last_start_ms;
 			this->m_tasks[_priority_indices[i]]._max_attempts = this->m_tasks[_priority_indices[i]]._max_attempts > 0 ? this->m_tasks[_priority_indices[i]]._max_attempts - 1 : this->m_tasks[_priority_indices[i]]._max_attempts;
 
-			unsigned long _task_end_ms = m_util->millis_now();
+			uint64_t _task_end_ms = m_util->millis_now();
 			this->m_tasks[_priority_indices[i]]._task_exec_millis = _task_end_ms > _last_start_ms ? (_task_end_ms - _last_start_ms) : 0;
 		}
 
@@ -337,13 +337,13 @@ void TaskScheduler::printTaskSchedulerLogs()
 			Int32ToString(this->m_tasks[i]._task_priority, content, 20, 10);
 			m_util->log(INFO_LOG, content);
 
-			Int32ToString(this->m_tasks[i]._duration, content, 20, 10);
+			Int64ToString(this->m_tasks[i]._duration, content, 20, 10);
 			m_util->log(INFO_LOG, content);
 
-			Int32ToString(this->m_tasks[i]._last_millis, content, 20, 10);
+			Int64ToString(this->m_tasks[i]._last_millis, content, 20, 10);
 			m_util->log(INFO_LOG, content);
 
-			Int32ToString(this->m_tasks[i]._task_exec_millis, content, 20, 10);
+			Int64ToString(this->m_tasks[i]._task_exec_millis, content, 20, 10);
 			m_util->log(INFO_LOG, content);
 
 			Int32ToString(this->m_tasks[i]._max_attempts, content, 20, 14);

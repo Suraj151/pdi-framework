@@ -8,6 +8,10 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
+#include <config/Config.h>
+
+#if defined(ENABLE_NETWORK_SERVICE)
+
 #include "ClientHelper.h"
 
 /*  client support functions */
@@ -131,3 +135,5 @@ uint16_t readPacket(iClientInterface *client, uint8_t *buffer, uint16_t maxlen, 
 
   return len;
 }
+
+#endif

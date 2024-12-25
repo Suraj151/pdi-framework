@@ -17,6 +17,8 @@ created Date    : 1st Jan 2024
 #include "../../devices/esp32/esp32_pdi.h"
 #elif defined(DEVICE_ESP8266)
 #include "../../devices/esp8266/esp8266_pdi.h"
+#elif defined(DEVICE_ARDUINOUNO)
+#include "../../devices/arduinouno/arduinouno_pdi.h"
 #else
 #include "../../devices/mockdevice/mockdevice_pdi.h"
 #endif

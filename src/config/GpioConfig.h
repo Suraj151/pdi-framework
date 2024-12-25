@@ -12,8 +12,13 @@ created Date    : 1st June 2019
 
 #include "Common.h"
 
+#if !defined(MAX_DIGITAL_GPIO_PINS)
 #define MAX_DIGITAL_GPIO_PINS         9
+#endif
+#if !defined(MAX_ANALOG_GPIO_PINS)
 #define MAX_ANALOG_GPIO_PINS          1
+#endif
+
 #define GPIO_HOST_BUF_SIZE            60
 #define ANALOG_GPIO_RESOLUTION        1024
 #define GPIO_GRAPH_ADJ_POINT_DISTANCE 10

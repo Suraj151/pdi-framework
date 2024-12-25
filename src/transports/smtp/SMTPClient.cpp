@@ -8,6 +8,10 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
+#include <config/Config.h>
+
+#if defined(ENABLE_NETWORK_SERVICE)
+
 #include "SMTPClient.h"
 
 /**
@@ -419,3 +423,5 @@ void SMTPClient::end(){
     delete[] this->m_responseBuffer;
   }
 }
+
+#endif
