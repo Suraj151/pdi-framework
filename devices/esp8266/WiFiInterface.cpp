@@ -567,12 +567,12 @@ bool WiFiInterface::get_bssid_within_scanned_nw_ignoring_connected_stations(char
   // }
   struct station_info * stat_info = wifi_softap_get_station_info();
   struct station_info * stat_info_copy = stat_info;
-  char* _ssid_buff = new char[WIFI_CONFIGS_BUF_SIZE];
+  char* _ssid_buff = new char[30];
 
   if( nullptr == _ssid_buff ){
     return false;
   }
-  memset( _ssid_buff, 0, WIFI_CONFIGS_BUF_SIZE );
+  memset( _ssid_buff, 0, 30 );
 
   for (int i = 0; i < n; ++i) {
 

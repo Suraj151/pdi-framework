@@ -50,6 +50,7 @@ GpioServiceProvider::~GpioServiceProvider(){
 /**
  * start gpio services if enabled
  */
+#ifdef ENABLE_NETWORK_SERVICE
 void GpioServiceProvider::begin( iClientInterface* _client ){
 
   if( nullptr == _client ){
@@ -59,6 +60,9 @@ void GpioServiceProvider::begin( iClientInterface* _client ){
   if( nullptr != this->m_http_client ){
     this->m_http_client->SetClient(_client);
   }
+#else
+void GpioServiceProvider::begin(){
+#endif
 
   this->handleGpioModes();
   __database_service.get_gpio_config_table(&this->m_gpio_config_copy);

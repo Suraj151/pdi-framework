@@ -39,7 +39,11 @@ public:
    */
   ~GpioServiceProvider();
 
+#ifdef ENABLE_NETWORK_SERVICE
   void begin(iClientInterface *_client);
+#else
+  void begin();
+#endif
   void enable_update_gpio_table_from_copy(void);
   void appendGpioJsonPayload(pdiutil::string &_payload, bool isAlertPost = false);
   void applyGpioJsonPayload(char *_payload, uint16_t _payload_length);

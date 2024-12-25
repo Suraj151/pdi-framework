@@ -13,13 +13,11 @@ created Date    : 1st June 2019
 /**
  * PDIStack constructor.
  */
-PDIStack::PDIStack():
-#ifdef ENABLE_WIFI_SERVICE
+PDIStack::PDIStack()
+#ifdef ENABLE_NETWORK_SERVICE
+  :
   m_client(&__i_wifi_client),
   m_server(&__i_wifi_server)
-#else
-  m_client(nullptr),
-  m_server(nullptr)
 #endif
 {
   __utl_event.begin(&__i_dvc_ctrl);
@@ -31,8 +29,10 @@ PDIStack::PDIStack():
  * PDIStack destructor.
  */
 PDIStack::~PDIStack(){
+#ifdef ENABLE_NETWORK_SERVICE
   this->m_client = nullptr;
   this->m_server = nullptr;
+#endif
 }
 
 /**
@@ -60,7 +60,12 @@ void PDIStack::initialize(){
   #endif
   
   #ifdef ENABLE_GPIO_SERVICE
-  __gpio_service.begin( this->m_client );
+  __gpio_service.begin( 
+    #ifdef ENABLE_NETWORK_SERVICE
+    this->m_client 
+    #else 
+    #endif
+    );
   #endif
   
   #ifdef ENABLE_MQTT_SERVICE
@@ -116,8 +121,10 @@ void PDIStack::handleLogPrints(){
   __device_iot_service.printDeviceIotConfigLogs();
   #endif
   __task_scheduler.printTaskSchedulerLogs();
+  #ifdef ENABLE_NETWORK_SERVICE
   LogFmtI("\nNTP Validity : %d\n", __i_ntp.is_valid_ntptime());
   LogFmtI("NTP Time : %d\n", (int)__i_ntp.get_ntp_time());
+  #endif
 }
 
 PDIStack PdiStack;

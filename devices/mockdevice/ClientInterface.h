@@ -1,4 +1,4 @@
-/************************** WiFi Client Interface ******************************
+/****************************** Client Interface ******************************
 This file is part of the pdi stack.
 
 This is free software. you can redistribute it and/or modify it but without any
@@ -8,27 +8,27 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
-#ifndef _MOCKDEVICE_WIFI_CLIENT_INTERFACE_H_
-#define _MOCKDEVICE_WIFI_CLIENT_INTERFACE_H_
+#ifndef _MOCKDEVICE_CLIENT_INTERFACE_H_
+#define _MOCKDEVICE_CLIENT_INTERFACE_H_
 
 #include "mockdevice.h"
 #include <interface/pdi/modules/wifi/iWiFiClientInterface.h>
 
 /**
- * WiFiClientInterface class
+ * ClientInterface class
  */
-class WiFiClientInterface : public iWiFiClientInterface
+class ClientInterface : public iWiFiClientInterface
 {
 
 public:
   /**
-   * WiFiClientInterface constructor.
+   * ClientInterface constructor.
    */
-  WiFiClientInterface(){}
+  ClientInterface(){}
   /**
-   * WiFiClientInterface destructor.
+   * ClientInterface destructor.
    */
-  ~WiFiClientInterface(){}
+  ~ClientInterface(){}
 
   // connect/disconnect api
   int16_t connect(const uint8_t *host, uint16_t port) override{return 0;}
@@ -50,13 +50,6 @@ public:
   void flush() override{}
   iClientInterface* getNewInstance() override{return nullptr;}
 
-  // WiFiClient *getWiFiClient() { return &this->m_wifi_client; }
-
-private:
-  /**
-   * @var	WiFiClient  m_wifi_client
-   */
-  // WiFiClient m_wifi_client;
 };
 
 #endif

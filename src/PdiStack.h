@@ -66,6 +66,7 @@ class PDIStack {
   protected:
     static void handleLogPrints( void );
 
+#ifdef ENABLE_NETWORK_SERVICE
     /**
 		 * @var	iClientInterface*  m_client
 		 */
@@ -75,6 +76,7 @@ class PDIStack {
 		 * @var	iServerInterface*  m_server
 		 */
     iServerInterface  *m_server;
+#endif
 };
 
 extern PDIStack PdiStack;
