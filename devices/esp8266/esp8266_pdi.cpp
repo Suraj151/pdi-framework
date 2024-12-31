@@ -18,12 +18,19 @@ created Date    : 1st Jan 2024
 #include "LoggerInterface.cpp"
 #include "DatabaseInterface.cpp"
 #include "DeviceControlInterface.cpp"
+#ifdef ENABLE_WIFI_SERVICE
 #include "WiFiInterface.cpp"
 #include "WiFiClientInterface.cpp"
 #include "WiFiServerInterface.cpp"
+#endif
+#ifdef ENABLE_NETWORK_SERVICE
 #include "NtpInterface.cpp"
 #include "PingInterface.cpp"
+#endif
 #include "ExceptionsNotifier.cpp"
 #include "core/Espnow.cpp"
 #include "core/EW_EEPROM.cpp"
+#ifdef ENABLE_SERIAL_SERVICE
+#include "SerialInterface.cpp"
+#endif
 

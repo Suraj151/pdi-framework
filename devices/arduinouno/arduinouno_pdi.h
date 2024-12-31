@@ -13,6 +13,9 @@ created Date    : 1st Jan 2024
 
 #include "LoggerInterface.h"
 #include "DatabaseInterface.h"
+#ifdef ENABLE_SERIAL_SERVICE
+#include "SerialInterface.h"
+#endif
 #include "DeviceControlInterface.h"
 #include "core/PDIEEPROM.h"
 

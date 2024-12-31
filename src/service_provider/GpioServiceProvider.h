@@ -14,9 +14,12 @@ created Date    : 1st June 2019
 #include <service_provider/ServiceProvider.h>
 #include <service_provider/DatabaseServiceProvider.h>
 
-#ifdef ENABLE_NETWORK_SERVICE
-#include <transports/http/HTTPClient.h>
+#ifdef ENABLE_EMAIL_SERVICE
 #include <service_provider/EmailServiceProvider.h>
+#endif
+
+#ifdef ENABLE_HTTP_CLIENT
+#include <transports/http/HTTPClient.h>
 #endif
 
 #define GPIO_PAYLOAD_DATA_KEY "data"
@@ -41,7 +44,7 @@ public:
    */
   ~GpioServiceProvider();
 
-#ifdef ENABLE_NETWORK_SERVICE
+#ifdef ENABLE_HTTP_CLIENT
   void begin(iClientInterface *_client);
 #else
   void begin();
@@ -54,7 +57,7 @@ public:
 #endif
   void handleGpioOperations(void);
   void handleGpioModes(int _gpio_config_type = GPIO_MODE_CONFIG);
-#ifdef ENABLE_NETWORK_SERVICE
+#ifdef ENABLE_HTTP_CLIENT
   bool handleGpioHttpRequest(bool isAlertPost = false);
 #endif
   void printGpioConfigLogs(void);
@@ -74,7 +77,7 @@ public:
 
 protected:
 
-#ifdef ENABLE_NETWORK_SERVICE
+#ifdef ENABLE_HTTP_CLIENT
   /**
    * @var	Http_Client  *m_http_client
    */

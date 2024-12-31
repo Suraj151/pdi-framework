@@ -10,7 +10,7 @@ created Date    : 1st June 2019
 
 #include <config/Config.h>
 
-#if defined(ENABLE_NETWORK_SERVICE)
+#if defined(ENABLE_EMAIL_SERVICE)
 
 #include "SMTPClient.h"
 

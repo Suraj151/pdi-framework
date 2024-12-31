@@ -191,7 +191,9 @@ void DeviceControlInterface::initDeviceSpecificFeatures()
   #ifdef ENABLE_ESP_NOW
   __espnow.begin( &__i_wifi );
   #endif
+  #ifdef ENABLE_NETWORK_SERVICE
   __i_ping.init_ping( &__i_wifi );
+  #endif
 
   #ifdef ENABLE_EXCEPTION_NOTIFIER
   beginCrashHandler();
@@ -295,6 +297,7 @@ void DeviceControlInterface::log(logger_type_t log_type, const char *content)
  */
 void DeviceControlInterface::yield()
 {
+    // yield();
     delay(0);
 }
 
@@ -306,6 +309,7 @@ upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *v
     String binary_path = path;
     upgrade_status_t status = UPGRADE_STATUS_MAX;
 
+#ifdef ENABLE_WIFI_SERVICE
     ESPhttpUpdate.rebootOnUpdate(false);
     ESPhttpUpdate.followRedirects(true);
     ESPhttpUpdate.setAuthorization("ota", __i_dvc_ctrl.getDeviceMac().c_str());
@@ -328,6 +332,7 @@ upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *v
         LogW("DEVICE_UPGRADE_UNKNOWN_RETURN\n");
         status = UPGRADE_STATUS_MAX;
     }
+#endif
 
     return status;
 }

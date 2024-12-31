@@ -44,6 +44,10 @@ created Date    : 1st June 2019
 #include <service_provider/DeviceIotServiceProvider.h>
 #endif
 
+#ifdef ENABLE_SERIAL_SERVICE
+#include <service_provider/SerialServiceProvider.h>
+#endif
+
 /**
  * PDIStack class
  */
@@ -66,7 +70,7 @@ class PDIStack {
   protected:
     static void handleLogPrints( void );
 
-#ifdef ENABLE_NETWORK_SERVICE
+#ifdef ENABLE_WIFI_SERVICE
     /**
 		 * @var	iClientInterface*  m_client
 		 */

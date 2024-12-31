@@ -14,11 +14,18 @@ created Date    : 1st Jan 2024
 #include "LoggerInterface.h"
 #include "DatabaseInterface.h"
 #include "DeviceControlInterface.h"
+#ifdef ENABLE_WIFI_SERVICE
 #include "WiFiInterface.h"
 #include "WiFiClientInterface.h"
 #include "WiFiServerInterface.h"
+#endif
+#ifdef ENABLE_NETWORK_SERVICE
 #include "NtpInterface.h"
 #include "PingInterface.h"
+#endif
 #include "core/Espnow.h"
+#ifdef ENABLE_SERIAL_SERVICE
+#include "SerialInterface.h"
+#endif
 
 #endif  // _ESP8266_PORTABLE_DEVICE_INTERFACE_H_

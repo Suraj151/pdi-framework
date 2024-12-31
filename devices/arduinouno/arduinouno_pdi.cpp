@@ -18,4 +18,7 @@ created Date    : 1st Jan 2024
 #include "LoggerInterface.cpp"
 #include "DatabaseInterface.cpp"
 #include "DeviceControlInterface.cpp"
+#ifdef ENABLE_SERIAL_SERVICE
+#include "SerialInterface.cpp"
+#endif
 

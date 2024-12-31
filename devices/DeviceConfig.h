@@ -19,8 +19,8 @@ created Date    : 1st June 2019
  * enable/disable devices. enable one from below list to get it compiled
  */
 // #define MOCK_DEVICE_TEST
-// #define DEVICE_ESP8266
-#define DEVICE_ESP32
+#define DEVICE_ESP8266
+// #define DEVICE_ESP32
 // #define DEVICE_ARDUINOUNO
 
 /**
@@ -28,6 +28,10 @@ created Date    : 1st June 2019
  */
 #define ENABLE_GPIO_SERVICE
 
+/**
+ * enable/disable serial service
+ */
+#define ENABLE_SERIAL_SERVICE
 
 /**
  * define number of gpios based on device enabled
@@ -83,6 +87,11 @@ created Date    : 1st June 2019
  * enable/disable http server feature here
  */
 #define ENABLE_HTTP_SERVER
+
+/**
+ * enable/disable http client
+ */
+#define ENABLE_HTTP_CLIENT
 
 /**
  * enable/disable network subnetting ( dynamically set ap subnet,gateway etc. )

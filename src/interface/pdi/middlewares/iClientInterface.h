@@ -30,7 +30,8 @@ public:
   virtual ~iClientInterface() {}
 
   // connect/disconnect api
-  virtual int16_t connect(const uint8_t *host, uint16_t port) = 0;
+  virtual int16_t connect(const uint8_t *host, uint16_t port) { return -1; };
+  virtual int16_t connect(uint16_t port, uint64_t speed) { return -1; };
   virtual int16_t disconnect() = 0;
 
   // data sending api

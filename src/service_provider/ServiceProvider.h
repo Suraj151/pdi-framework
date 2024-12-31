@@ -32,7 +32,7 @@ class ServiceProvider{
     /**
 		 * ServiceProvider destructor
 		 */
-    ~ServiceProvider(){
+    virtual ~ServiceProvider(){
     }
 
     /**

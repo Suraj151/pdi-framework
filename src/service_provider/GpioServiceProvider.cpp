@@ -25,7 +25,7 @@ __gpio_alert_track_t __gpio_alert_track = {
 GpioServiceProvider::GpioServiceProvider():
   m_gpio_http_request_cb_id(0),
   m_update_gpio_table_from_copy(true)
-  #ifdef ENABLE_NETWORK_SERVICE
+  #ifdef ENABLE_HTTP_CLIENT
   ,m_http_client(Http_Client::GetStaticInstance())
   #endif
 {
@@ -39,7 +39,7 @@ GpioServiceProvider::GpioServiceProvider():
  */
 GpioServiceProvider::~GpioServiceProvider(){
 
-#ifdef ENABLE_NETWORK_SERVICE
+#ifdef ENABLE_HTTP_CLIENT
   this->m_http_client = nullptr;
 #endif
 
@@ -54,7 +54,7 @@ GpioServiceProvider::~GpioServiceProvider(){
 /**
  * start gpio services if enabled
  */
-#ifdef ENABLE_NETWORK_SERVICE
+#ifdef ENABLE_HTTP_CLIENT
 void GpioServiceProvider::begin( iClientInterface* _client ){
 
   if( nullptr == _client ){
@@ -75,7 +75,7 @@ void GpioServiceProvider::begin(){
   __task_scheduler.setInterval( [&]() { this->enable_update_gpio_table_from_copy(); }, GPIO_TABLE_UPDATE_DURATION, __i_dvc_ctrl.millis_now() );
 }
 
-#ifdef ENABLE_NETWORK_SERVICE
+#ifdef ENABLE_HTTP_CLIENT
 /**
  * post gpio data to server specified in gpio configs
  */
@@ -390,7 +390,7 @@ void GpioServiceProvider::handleGpioOperations(){
             break;
           }
           #endif
-          #ifdef ENABLE_NETWORK_SERVICE
+          #ifdef ENABLE_HTTP_CLIENT
           case HTTP_SERVER:{
             __gpio_alert_track.is_last_alert_succeed = this->handleGpioHttpRequest(true);
             break;
@@ -428,12 +428,14 @@ void GpioServiceProvider::handleGpioModes( int _gpio_config_type ){
 
   for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
 
-    __i_dvc_ctrl.gpioMode((GPIO_MODE)_gpio_configs.gpio_mode[_pin], _pin);
+    if( !__i_dvc_ctrl.isExceptionalGpio(_pin) ){
+      __i_dvc_ctrl.gpioMode((GPIO_MODE)_gpio_configs.gpio_mode[_pin], _pin);
+    }
   }
 
   this->m_gpio_config_copy = _gpio_configs;
 
-#ifdef ENABLE_NETWORK_SERVICE
+#ifdef ENABLE_HTTP_CLIENT
   if( strlen( this->m_gpio_config_copy.gpio_host ) > 5 && this->m_gpio_config_copy.gpio_port > 0 &&
     this->m_gpio_config_copy.gpio_post_frequency > 0
   ){

@@ -16,10 +16,10 @@ created Date    : 1st Jan 2024
 #include "DeviceControlInterface.h"
 #include "ClientInterface.h"
 #include "ServerInterface.h"
-#ifdef ENABLE_NETWORK_SERVICE
 #ifdef ENABLE_WIFI_SERVICE
 #include "WiFiInterface.h"
 #endif
+#ifdef ENABLE_NETWORK_SERVICE
 #include "NtpInterface.h"
 #include "PingInterface.h"
 #endif

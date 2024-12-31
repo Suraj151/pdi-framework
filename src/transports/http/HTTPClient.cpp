@@ -10,7 +10,7 @@ created Date    : 1st Jan 2024
 
 #include <config/Config.h>
 
-#if defined(ENABLE_NETWORK_SERVICE)
+#if defined(ENABLE_HTTP_CLIENT)
 
 #include "HTTPClient.h"
 

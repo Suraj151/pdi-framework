@@ -14,7 +14,7 @@ created Date    : 1st June 2019
  * PDIStack constructor.
  */
 PDIStack::PDIStack()
-#ifdef ENABLE_NETWORK_SERVICE
+#ifdef ENABLE_WIFI_SERVICE
   :
   m_client(&__i_wifi_client),
   m_server(&__i_wifi_server)
@@ -29,7 +29,7 @@ PDIStack::PDIStack()
  * PDIStack destructor.
  */
 PDIStack::~PDIStack(){
-#ifdef ENABLE_NETWORK_SERVICE
+#ifdef ENABLE_WIFI_SERVICE
   this->m_client = nullptr;
   this->m_server = nullptr;
 #endif
@@ -47,6 +47,10 @@ void PDIStack::initialize(){
   
   __i_dvc_ctrl.initDeviceSpecificFeatures();
 
+  #ifdef ENABLE_SERIAL_SERVICE
+  __serial_service.initService();
+  #endif
+
   #ifdef ENABLE_WIFI_SERVICE
   __wifi_service.begin( &__i_wifi );
   #endif
@@ -61,7 +65,7 @@ void PDIStack::initialize(){
   
   #ifdef ENABLE_GPIO_SERVICE
   __gpio_service.begin( 
-    #ifdef ENABLE_NETWORK_SERVICE
+    #ifdef ENABLE_HTTP_CLIENT
     this->m_client 
     #else 
     #endif
