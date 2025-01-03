@@ -87,6 +87,10 @@ void PDIStack::initialize(){
   #ifdef ENABLE_DEVICE_IOT
   __device_iot_service.init( this->m_client );
   #endif
+
+  #ifdef ENABLE_AUTH_SERVICE
+  __auth_service.initService();
+  #endif
 }
 
 /**

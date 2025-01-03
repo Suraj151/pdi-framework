@@ -13,6 +13,7 @@ created Date    : 1st June 2019
 #if defined(ENABLE_SERIAL_SERVICE)
 
 #include "SerialServiceProvider.h"
+#include "CommandLineServiceProvider.h"
 
 /**
  * SerialServiceProvider constructor
@@ -72,16 +73,26 @@ void SerialServiceProvider::processSerial(serial_event_t *se)
       while (se->serial->available())
       {
         char c = se->serial->read();
+        // break command on line ending
         if (c == '\n') {
-
-          LogFmtI("serial uart recv (%d) : %s\n", recvdata.size(), recvdata.c_str());
-          recvdata = "";
+          
+          break;
         }else{
           
           recvdata += c;
         }
-        __i_dvc_ctrl.yield();
+        __i_dvc_ctrl.wait(1);
       }
+
+      LogFmtI("serial uart recv (%d) : %s\n", recvdata.size(), recvdata.c_str());
+
+      // process and execute command
+      cmd_status_t status = __cmd_service.executeCommand(&recvdata);
+      CommandLineServiceProvider::CMDStatusToSerial(status);
+
+      // make sure to flush serial if no more data available
+      __i_dvc_ctrl.wait(1);
+      if(!se->serial->available()) se->serial->flush();
     }
   }
 }

@@ -51,6 +51,17 @@ created Date    : 1st June 2019
 #define ENABLE_NETWORK_SERVICE
 #endif
 
+/**
+ * enable/disable auth service here
+ */
+#define ENABLE_AUTH_SERVICE
+
+/**
+ * enable/disable cmd service here
+ */
+#define ENABLE_CMD_SERVICE
+
+
 #ifdef ENABLE_NETWORK_SERVICE
 
 /**

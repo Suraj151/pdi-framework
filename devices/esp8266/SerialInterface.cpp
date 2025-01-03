@@ -155,6 +155,5 @@ void serialEvent() {
   if (Serial.available()) {
     serial_event_t e(SERIAL_TYPE_UART, &__serial_uart);
     __utl_event.execute_event(EVENT_SERIAL_AVAILABLE, &e);
-    __serial_uart.flush();
   }
 }

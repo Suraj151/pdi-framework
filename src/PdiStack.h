@@ -48,6 +48,14 @@ created Date    : 1st June 2019
 #include <service_provider/SerialServiceProvider.h>
 #endif
 
+#ifdef ENABLE_AUTH_SERVICE
+#include <service_provider/AuthServiceProvider.h>
+#endif
+
+#ifdef ENABLE_CMD_SERVICE
+#include <service_provider/CommandLineServiceProvider.h>
+#endif
+
 /**
  * PDIStack class
  */

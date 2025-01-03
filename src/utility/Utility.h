@@ -25,6 +25,9 @@ created Date    : 1st June 2019
 #include "StringOperations.h"
 #include "queue/queue.h"
 #include "Base64.h"
+#ifdef ENABLE_CMD_SERVICE
+#include "CommandBase.h"
+#endif
 
 /**
  * This template clone program memory object to data memory.
