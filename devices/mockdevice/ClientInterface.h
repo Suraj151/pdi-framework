@@ -15,20 +15,20 @@ created Date    : 1st June 2019
 #include <interface/pdi/modules/wifi/iWiFiClientInterface.h>
 
 /**
- * ClientInterface class
+ * WiFiClientInterface class
  */
-class ClientInterface : public iWiFiClientInterface
+class WiFiClientInterface : public iWiFiClientInterface
 {
 
 public:
   /**
-   * ClientInterface constructor.
+   * WiFiClientInterface constructor.
    */
-  ClientInterface(){}
+  WiFiClientInterface(){}
   /**
-   * ClientInterface destructor.
+   * WiFiClientInterface destructor.
    */
-  ~ClientInterface(){}
+  ~WiFiClientInterface(){}
 
   // connect/disconnect api
   int16_t connect(const uint8_t *host, uint16_t port) override{return 0;}

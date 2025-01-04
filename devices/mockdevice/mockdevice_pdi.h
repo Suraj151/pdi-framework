@@ -23,5 +23,8 @@ created Date    : 1st Jan 2024
 #include "NtpInterface.h"
 #include "PingInterface.h"
 #endif
+#ifdef ENABLE_SERIAL_SERVICE
+#include "SerialInterface.h"
+#endif
 
 #endif  // _MOCKDEVICE_PORTABLE_DEVICE_INTERFACE_H_

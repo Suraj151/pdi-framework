@@ -16,20 +16,20 @@ created Date    : 1st June 2019
 
 
 /**
- * ServerInterface class
+ * WiFiServerInterface class
  */
-class ServerInterface : public iWiFiServerInterface
+class WiFiServerInterface : public iWiFiServerInterface
 {
 
 public:
   /**
-   * ServerInterface constructor.
+   * WiFiServerInterface constructor.
    */
-  ServerInterface(){}
+  WiFiServerInterface(){}
   /**
-   * ServerInterface destructor.
+   * WiFiServerInterface destructor.
    */
-  ~ServerInterface(){}
+  ~WiFiServerInterface(){}
 
   void begin() override{}
   void begin(uint16_t port) override{}
