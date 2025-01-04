@@ -29,9 +29,20 @@ To install manually for esp8266 clone or download source, copy folder to esp8266
 
 Restart the arduino ide and navigate to File->Examples->pdi-framework->PdiStack example compile and upload.
 
-**Note** that, for esp8266 installed version of arduino-esp8266 should be > 3.1.x. or greater is recommended. you can check your installed esp8266 version in tools->boards->board manager (type "esp" in top search bar).
+**Note :** before compile make sure that you have selected correct board in arduino ide and in `devices/DeviceConfig.h` file as below
+```
+/**
+ * enable/disable devices. enable/uncomment one from below list to get it compiled
+ */
+// #define MOCK_DEVICE_TEST
+#define DEVICE_ESP8266
+// #define DEVICE_ESP32
+// #define DEVICE_ARDUINOUNO
+```
 
-* after initializing device completely, check in pc/mobile wifi list if **pdiStack** name appear.
+for example we selected esp8266 device to compile and flash as above.
+
+* after flash and initializing device completely, check in pc/mobile wifi list if **pdiStack** name appear.
 * select it and enter default password **pdiStack@123**.
 * finally after succesful connectinon to device open browser, type **192.168.0.1** in address bar and press enter
 * you will directed to login screen, enter default username and password **( username: pdiStack, password: pdiStack@123 )**
@@ -46,6 +57,7 @@ you can play with all settings. you can modify configs by making changes in file
 
 **Note** that by default session will active for 300 seconds once login, you can change its timeout in server config file.
 
+**Note** not all devices having wifi/network feature to run web server on device as mentioned in above esp8266 example. e.g. arduino uno device wont have the web server enabled due to lack of network feature.
 
 # Services
 
@@ -91,6 +103,14 @@ GPIO alerts are provided to get notified on specific condition met. from local w
 * **Database:**
 Database service can be used to get/set any config in device NVM memory.
 
+* **Auth Service:**
+Auth service can be used to check whether user is logged in or not which required for few auth dependent services.
+
+* **Serial Service:**
+Serial service is mostly related to the serial communication of device. Serial service handles the serial events received on devices.
+
+* **CommandLine Service:**
+CommandLine service provides few basic commands to use. this will be covered in another section
 
 # Local Web Server
 
@@ -162,6 +182,9 @@ As name clears the purpose of this utility. It just used to convert the data typ
 
 * **Event :**
 This is to handle specific event tasks that should be executed on event arrival. just register the event listener as task to perticular event and fire it when event happens.
+
+* **CommandBase :**
+This is to handle user commands. It will help to parse command options and provide it to command line service to execute the command.
 
 # Device Iot (beta)
 
