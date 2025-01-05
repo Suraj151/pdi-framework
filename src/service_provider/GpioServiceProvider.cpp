@@ -15,9 +15,11 @@ created Date    : 1st June 2019
 #include "GpioServiceProvider.h"
 
 
+#ifndef ENABLE_GPIO_BASIC_ONLY
 __gpio_alert_track_t __gpio_alert_track = {
   false, 0, -1
 };
+#endif
 
 /**
  * GpioServiceProvider constructor.
@@ -150,6 +152,7 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
     _payload += "\",";
   }
 
+#ifndef ENABLE_GPIO_BASIC_ONLY
   if( isAlertPost ){
 
     _payload += "\"";
@@ -166,6 +169,7 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
 
     _payload += "\",";
   }
+#endif
 
   _payload += "\"";
   _payload += GPIO_PAYLOAD_DATA_KEY;
@@ -353,6 +357,7 @@ void GpioServiceProvider::handleGpioOperations(){
       }
     }
 
+#ifndef ENABLE_GPIO_BASIC_ONLY
     if( !__i_dvc_ctrl.isExceptionalGpio(_pin) && this->m_gpio_config_copy.gpio_alert_channel[_pin] != NO_ALERT ){
 
       bool _is_alert_condition = false;
@@ -401,6 +406,7 @@ void GpioServiceProvider::handleGpioOperations(){
         }
       }
     }
+#endif
 
   }
 
@@ -468,6 +474,7 @@ void GpioServiceProvider::printGpioConfigLogs(){
     LogFmtI("%d\t", this->m_gpio_config_copy.gpio_readings[_pin]);
   }
 
+#ifndef ENABLE_GPIO_BASIC_ONLY
   LogI("\nGPIO Configs (alert comparator) :\n");
   for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
     LogFmtI("%d\t", this->m_gpio_config_copy.gpio_alert_comparator[_pin]);
@@ -486,6 +493,7 @@ void GpioServiceProvider::printGpioConfigLogs(){
   LogI("\nGPIO Configs (server) :\n");
   LogFmtI("%s\t%d\t%d\n\n", this->m_gpio_config_copy.gpio_host, this->m_gpio_config_copy.gpio_port, 
   this->m_gpio_config_copy.gpio_post_frequency);
+#endif
 }
 
 

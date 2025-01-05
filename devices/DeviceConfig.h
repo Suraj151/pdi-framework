@@ -27,6 +27,7 @@ created Date    : 1st June 2019
  * enable/disable gpio service here
  */
 #define ENABLE_GPIO_SERVICE
+// #define ENABLE_GPIO_BASIC_ONLY
 
 /**
  * enable/disable serial service
@@ -130,6 +131,16 @@ created Date    : 1st June 2019
 #endif
 
 #endif
+
+/**
+ * enable/disable auto factory reset on invalid database config found
+ */
+#define AUTO_FACTORY_RESET_ON_INVALID_CONFIGS
+
+/**
+ * enable/disable config clear/reset on factory reset event
+ */
+#define CONFIG_CLEAR_TO_DEFAULT_ON_FACTORY_RESET
 
 /**
  * enable/disable logs here

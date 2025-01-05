@@ -39,6 +39,7 @@ created Date    : 1st June 2019
 #define GPIO_OPERATION_DURATION MILLISECOND_DURATION_1000
 #define GPIO_TABLE_UPDATE_DURATION 300000
 
+#ifndef ENABLE_GPIO_BASIC_ONLY
 /**
  * global gpio alert status
  */
@@ -49,6 +50,8 @@ typedef struct {
 } __gpio_alert_track_t;
 
 extern __gpio_alert_track_t __gpio_alert_track;
+
+#endif
 
 struct last_gpio_monitor_point{
   int x;
@@ -103,22 +106,26 @@ struct gpio_configs {
   void clear(){
     memset(gpio_mode, OFF, MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS);
     memset(gpio_readings, 0, MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS);
+#ifndef ENABLE_GPIO_BASIC_ONLY
     memset(gpio_alert_comparator, EQUAL, MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS);
     memset(gpio_alert_channel, NO_ALERT, MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS);
     memset(gpio_alert_values, 0, MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS);
     memset(gpio_host, 0, GPIO_HOST_BUF_SIZE);
     gpio_port = 80;
     gpio_post_frequency = GPIO_DATA_POST_FREQ;
+#endif
   }
 
   uint8_t gpio_mode[MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS];
   uint16_t gpio_readings[MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS];
+#ifndef ENABLE_GPIO_BASIC_ONLY
   uint8_t gpio_alert_comparator[MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS];
   uint8_t gpio_alert_channel[MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS];
   uint16_t gpio_alert_values[MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS];
   char gpio_host[GPIO_HOST_BUF_SIZE];
   int gpio_port;
   int gpio_post_frequency;
+#endif
 };
 
 // const gpio_configs PROGMEM _gpio_config_defaults = {

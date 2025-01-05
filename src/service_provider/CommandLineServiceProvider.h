@@ -12,7 +12,9 @@ created Date    : 1st June 2019
 #define _COMMANDLINE_SERVICE_H_
 
 #include <service_provider/ServiceProvider.h>
+#ifdef ENABLE_GPIO_SERVICE
 #include "GpioServiceProvider.h"
+#endif
 #include "AuthServiceProvider.h"
 
 /**
@@ -135,6 +137,7 @@ struct LogoutCommand : public CommandBase {
 	}
 };
 
+#ifdef ENABLE_GPIO_SERVICE
 /**
  * gpio command
  * 
@@ -216,6 +219,6 @@ struct GpioCommand : public CommandBase {
 		return status;
 	}
 };
-
+#endif
 
 #endif

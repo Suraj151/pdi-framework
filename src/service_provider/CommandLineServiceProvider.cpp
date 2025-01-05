@@ -20,12 +20,15 @@ created Date    : 1st June 2019
 CommandLineServiceProvider::CommandLineServiceProvider()
 {
   // Add commands in list
+  #ifdef ENABLE_GPIO_SERVICE
   GpioCommand *gpiocmd = new GpioCommand();
-  LoginCommand *logincmd = new LoginCommand();
-  LogoutCommand *logoutcmd = new LogoutCommand();
-
   m_cmdlist.push_back(gpiocmd);
+  #endif
+  
+  LoginCommand *logincmd = new LoginCommand();
   m_cmdlist.push_back(logincmd);
+
+  LogoutCommand *logoutcmd = new LogoutCommand();
   m_cmdlist.push_back(logoutcmd);
 }
 

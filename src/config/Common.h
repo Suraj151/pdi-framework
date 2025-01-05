@@ -39,14 +39,5 @@ created Date    : 1st June 2019
 #define MAX_SCHEDULABLE_TASKS	25
 #define MAX_FACTORY_RESET_CALLBACKS	MAX_SCHEDULABLE_TASKS
 
-/**
- * enable/disable auto factory reset on invalid database config found
- */
-#define AUTO_FACTORY_RESET_ON_INVALID_CONFIGS
-
-/**
- * enable/disable config clear/reset on factory reset event
- */
-#define CONFIG_CLEAR_TO_DEFAULT_ON_FACTORY_RESET
 
 #endif
