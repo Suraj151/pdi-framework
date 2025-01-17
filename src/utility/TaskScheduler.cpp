@@ -19,7 +19,7 @@ created Date    : 1st June 2019
  * TaskScheduler constructor
  */
 TaskScheduler::TaskScheduler() : m_util(nullptr),
-								 m_max_tasks(25)
+								 m_max_tasks(MAX_SCHEDULABLE_TASKS)
 {
 }
 

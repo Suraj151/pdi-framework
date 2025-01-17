@@ -27,7 +27,9 @@ created Date    : 1st June 2019
  * enable/disable gpio service here
  */
 #define ENABLE_GPIO_SERVICE
-// #define ENABLE_GPIO_BASIC_ONLY
+#if defined(DEVICE_ARDUINOUNO)
+#define ENABLE_GPIO_BASIC_ONLY
+#endif
 
 /**
  * enable/disable serial service
@@ -43,6 +45,15 @@ created Date    : 1st June 2019
 #else
 #define MAX_DIGITAL_GPIO_PINS         9
 #define MAX_ANALOG_GPIO_PINS          1
+#endif
+
+/**
+ * define max number of tables in database
+ */
+#if defined(DEVICE_ARDUINOUNO)
+#define MAX_DB_TABLES 5
+#else
+#define MAX_DB_TABLES 15
 #endif
 
 /**

@@ -16,7 +16,11 @@ created Date    : 1st June 2019
 /**
  * define database tables max limit
  */
+#ifdef MAX_DB_TABLES
+#define MAX_TABLES MAX_DB_TABLES
+#else
 #define MAX_TABLES 20
+#endif
 
 class DatabaseTableAbstractLayer
 {

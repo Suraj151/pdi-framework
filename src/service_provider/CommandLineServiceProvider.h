@@ -15,7 +15,9 @@ created Date    : 1st June 2019
 #ifdef ENABLE_GPIO_SERVICE
 #include "GpioServiceProvider.h"
 #endif
+#ifdef ENABLE_AUTH_SERVICE
 #include "AuthServiceProvider.h"
+#endif
 
 /**
  * CommandLineServiceProvider class
@@ -49,8 +51,10 @@ extern CommandLineServiceProvider __cmd_service;
 
 
 /* command lists */
+#ifdef ENABLE_AUTH_SERVICE
 #define CMD_NAME_LOGIN 				"login"
 #define CMD_NAME_LOGOUT				"logout"
+#endif
 #define CMD_NAME_GPIO 				"gpio"
 
 /* command options */
@@ -59,6 +63,8 @@ extern CommandLineServiceProvider __cmd_service;
 #define CMD_OPTION_NAME_VALUE		"v"
 #define CMD_OPTION_NAME_USERNAME	"u"
 #define CMD_OPTION_NAME_PASSWORD	CMD_OPTION_NAME_PIN
+
+#ifdef ENABLE_AUTH_SERVICE
 
 /**
  * login command
@@ -137,6 +143,8 @@ struct LogoutCommand : public CommandBase {
 	}
 };
 
+#endif
+
 #ifdef ENABLE_GPIO_SERVICE
 /**
  * gpio command
@@ -161,10 +169,12 @@ struct GpioCommand : public CommandBase {
 	/* execute command with provided options */
 	cmd_status_t execute(){
 
+#ifdef ENABLE_AUTH_SERVICE
 		// return in case authentication needed and not authorized yet
 		if( needauth() && !__auth_service.getAuthorized()){
 			return CMD_STATUS_NEED_AUTH;
 		}
+#endif
 
 		cmd_status_t status = CMD_STATUS_OK;
 		LogFmtI("executing command : %s with", cmd);

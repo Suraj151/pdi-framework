@@ -25,11 +25,13 @@ CommandLineServiceProvider::CommandLineServiceProvider()
   m_cmdlist.push_back(gpiocmd);
   #endif
   
+  #ifdef ENABLE_AUTH_SERVICE
   LoginCommand *logincmd = new LoginCommand();
   m_cmdlist.push_back(logincmd);
 
   LogoutCommand *logoutcmd = new LogoutCommand();
   m_cmdlist.push_back(logoutcmd);
+  #endif
 }
 
 /**

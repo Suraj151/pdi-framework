@@ -9,6 +9,10 @@ warranty.
 Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
+#include <config/Config.h>
+
+#if defined(ENABLE_MQTT_SERVICE)
+
 #include "Mqtt_msg.h"
 
 #define MQTT_MAX_FIXED_HEADER_SIZE 3
@@ -573,3 +577,5 @@ mqtt_message_t* mqtt_msg_disconnect(mqtt_connection_t* connection){
   init_message(connection);
   return fini_message(connection, MQTT_MSG_TYPE_DISCONNECT, 0, 0, 0);
 }
+
+#endif
