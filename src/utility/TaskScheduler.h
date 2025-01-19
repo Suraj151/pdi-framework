@@ -13,22 +13,6 @@ created Date    : 1st June 2019
 
 #include "iUtilityInterface.h"
 
-#define DEFAULT_TASK_PRIORITY 0
-
-/**
- * task struct type for scheduler
- */
-struct task_t
-{
-	int _task_id;
-	int _max_attempts;
-	uint64_t _duration;
-	uint64_t _last_millis;
-	CallBackVoidArgFn _task;
-	int _task_priority; // from 0 onwards. default is 0
-	uint64_t _task_exec_millis;
-};
-
 /**
  * TaskScheduler class
  */
