@@ -25,6 +25,20 @@ Goto Tools->Manage Libraries... then in library manager window type pdi-framewor
 
 To install manually for esp8266 clone or download source, copy folder to esp8266 libraries path ( in windows 10 generally path is like ==> C:\Users\suraj\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\2.6.2\libraries...).
 
+# AutoGen Script
+
+Before start compiling for the specific device make sure that device specific auto gen source files has been generated. Currently database table source files are auto generated.
+
+Open terminal and navigate to `scripts` directory in this library and then run below device specific script.
+
+`` python3 CreateDBSourceFromJson.py -s ../devices/{DEVICENAME}/config/DBTableSchema.json
+``
+
+replace DEVICENAME in above command with specific device folder name for which build has to be done. for example if we want to build for arduino uno then command will be
+
+`` python3 CreateDBSourceFromJson.py -s ../devices/arduinouno/config/DBTableSchema.json
+``
+
 # Usage
 
 Restart the arduino ide and navigate to File->Examples->pdi-framework->PdiStack example compile and upload.
