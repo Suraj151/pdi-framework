@@ -21,6 +21,9 @@ created Date    : 1st June 2019
 
 #define GPIO_HOST_BUF_SIZE            60
 #define ANALOG_GPIO_RESOLUTION        1024
+
+#ifndef ENABLE_GPIO_BASIC_ONLY
+
 #define GPIO_GRAPH_ADJ_POINT_DISTANCE 10
 #define GPIO_MAX_GRAPH_WIDTH          300
 #define GPIO_MAX_GRAPH_HEIGHT         150
@@ -34,13 +37,6 @@ created Date    : 1st June 2019
 #define GPIO_ALERT_DURATION_FOR_FAILED  300000
 
 /**
- * @define gpio parameters
- */
-#define GPIO_OPERATION_DURATION MILLISECOND_DURATION_1000
-#define GPIO_TABLE_UPDATE_DURATION 300000
-
-#ifndef ENABLE_GPIO_BASIC_ONLY
-/**
  * global gpio alert status
  */
 typedef struct {
@@ -51,12 +47,20 @@ typedef struct {
 
 extern __gpio_alert_track_t __gpio_alert_track;
 
-#endif
-
 struct last_gpio_monitor_point{
   int x;
   int y;
 };
+
+#endif
+
+
+/**
+ * @define gpio parameters
+ */
+#define GPIO_OPERATION_DURATION MILLISECOND_DURATION_1000
+#define GPIO_TABLE_UPDATE_DURATION 300000
+
 
 enum GPIO_CONFIG_TYPE {
   GPIO_MODE_CONFIG,

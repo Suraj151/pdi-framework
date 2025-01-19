@@ -287,6 +287,44 @@ void DeviceControlInterface::log(logger_type_t log_type, const char *content)
 }
 
 /**
+ * log helper for print task
+ */
+void DeviceControlInterface::printtasks(pdiutil::vector<task_t> &tasks)
+{
+    LogI("\nTasks : \n");
+    LogI("id        "); // max column size=10
+    LogI("priority  "); // max column size=10
+    LogI("interval  "); // max column size=10
+    LogI("last_ms   "); // max column size=10
+    LogI("exc_ms    "); // max column size=10
+    LogI("max_attempts\n"); // max column size=14
+
+    char content[20];
+
+    for (int i = 0; i < tasks.size(); i++)
+    {
+        Int32ToString(tasks[i]._task_id, content, 20, 10);
+        log(INFO_LOG, content);
+
+        Int32ToString(tasks[i]._task_priority, content, 20, 10);
+        log(INFO_LOG, content);
+
+        Int64ToString(tasks[i]._duration, content, 20, 10);
+        log(INFO_LOG, content);
+
+        Int64ToString(tasks[i]._last_millis, content, 20, 10);
+        log(INFO_LOG, content);
+
+        Int64ToString(tasks[i]._task_exec_millis, content, 20, 10);
+        log(INFO_LOG, content);
+
+        Int32ToString(tasks[i]._max_attempts, content, 20, 14);
+        log(INFO_LOG, content);
+        log(INFO_LOG, "\n");
+    }
+}
+
+/**
  * yield
  */
 void DeviceControlInterface::yield()

@@ -11,6 +11,7 @@ created Date    : 1st June 2019
 #ifndef _DATA_TYPE_DEFS_H_
 #define _DATA_TYPE_DEFS_H_
 
+#include "../../devices/DeviceConfig.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdarg.h>
@@ -191,5 +192,22 @@ typedef enum
     UPGRADE_STATUS_IGNORE, // no update available
     UPGRADE_STATUS_MAX
 } upgrade_status_t;
+
+
+/**
+ * task struct type for scheduler
+ */
+#define DEFAULT_TASK_PRIORITY 0
+
+struct task_t
+{
+	int _task_id;
+	int _max_attempts;
+	uint64_t _duration;
+	uint64_t _last_millis;
+	CallBackVoidArgFn _task;
+	int _task_priority; // from 0 onwards. default is 0
+	uint64_t _task_exec_millis;
+};
 
 #endif

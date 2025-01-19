@@ -15,7 +15,9 @@ created Date    : 1st June 2019
 #define DEFAULT_LOGIN_USERNAME     USER
 #define DEFAULT_LOGIN_PASSWORD     PASSPHRASE
 
+#ifdef ENABLE_HTTP_SERVER
 #define SERVER_SESSION_NAME     "pdi_session"
+#endif
 #define SERVER_COOKIE_MAX_AGE   300
 
 #define LOGIN_CONFIGS_BUF_SIZE 25
@@ -31,18 +33,24 @@ struct login_credential {
   void clear(){
     memset(username, 0, LOGIN_CONFIGS_BUF_SIZE);
     memset(password, 0, LOGIN_CONFIGS_BUF_SIZE);
+    #ifdef ENABLE_HTTP_SERVER
     memset(session_name, 0, LOGIN_CONFIGS_BUF_SIZE);
+    #endif
 
     memcpy(username, DEFAULT_LOGIN_USERNAME, sizeof(DEFAULT_LOGIN_USERNAME));
     memcpy(password, DEFAULT_LOGIN_PASSWORD, sizeof(DEFAULT_LOGIN_PASSWORD));
+    #ifdef ENABLE_HTTP_SERVER
     memcpy(session_name, SERVER_SESSION_NAME, sizeof(SERVER_SESSION_NAME));
+    #endif
 
     cookie_max_age = SERVER_COOKIE_MAX_AGE;
   }
 
   char username[LOGIN_CONFIGS_BUF_SIZE];
   char password[LOGIN_CONFIGS_BUF_SIZE];
+  #ifdef ENABLE_HTTP_SERVER
   char session_name[LOGIN_CONFIGS_BUF_SIZE];
+  #endif
   uint16_t cookie_max_age;
 };
 

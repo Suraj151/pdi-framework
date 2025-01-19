@@ -11,7 +11,6 @@ created Date    : 1st June 2019
 #define _COMMON_CONFIG_H_
 
 #include <utility/DataTypeDef.h>
-#include "../../devices/DeviceConfig.h"
 
 /**
  * @define common time durations

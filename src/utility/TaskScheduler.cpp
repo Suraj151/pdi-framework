@@ -319,37 +319,7 @@ void TaskScheduler::printTaskSchedulerLogs()
 {
 	if (nullptr != m_util)
 	{
-		m_util->log(INFO_LOG, "\nTasks : \n");
-		m_util->log(INFO_LOG, "id        "); // max column size=10
-		m_util->log(INFO_LOG, "priority  "); // max column size=10
-		m_util->log(INFO_LOG, "interval  "); // max column size=10
-		m_util->log(INFO_LOG, "last_ms   "); // max column size=10
-		m_util->log(INFO_LOG, "exc_ms    "); // max column size=10
-		m_util->log(INFO_LOG, "max_attempts\n"); // max column size=14
-
-		char content[20];
-
-		for (int i = 0; i < this->m_tasks.size(); i++)
-		{
-			Int32ToString(this->m_tasks[i]._task_id, content, 20, 10);
-			m_util->log(INFO_LOG, content);
-
-			Int32ToString(this->m_tasks[i]._task_priority, content, 20, 10);
-			m_util->log(INFO_LOG, content);
-
-			Int64ToString(this->m_tasks[i]._duration, content, 20, 10);
-			m_util->log(INFO_LOG, content);
-
-			Int64ToString(this->m_tasks[i]._last_millis, content, 20, 10);
-			m_util->log(INFO_LOG, content);
-
-			Int64ToString(this->m_tasks[i]._task_exec_millis, content, 20, 10);
-			m_util->log(INFO_LOG, content);
-
-			Int32ToString(this->m_tasks[i]._max_attempts, content, 20, 14);
-			m_util->log(INFO_LOG, content);
-			m_util->log(INFO_LOG, "\n");
-		}
+		m_util->printtasks(this->m_tasks);
 	}
 }
 
