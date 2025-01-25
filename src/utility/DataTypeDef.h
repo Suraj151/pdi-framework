@@ -208,6 +208,39 @@ struct task_t
 	CallBackVoidArgFn _task;
 	int _task_priority; // from 0 onwards. default is 0
 	uint64_t _task_exec_millis;
+
+    /* Constructor */
+    task_t(){
+        clear();
+    }
+
+    /* Destructor */
+    ~task_t(){
+        clear();
+    }
+
+    /* Clear */
+    void clear(){
+        _task_id = -1;
+        _max_attempts = 0;
+        _duration = 0;
+        _last_millis = 0;
+        _task = nullptr;
+        _task_priority = 0;
+        _task_exec_millis = 0;
+    }
+
+    /* Copy Constructor */
+    task_t(const task_t &t){
+        _task_id = t._task_id;
+        _max_attempts = t._max_attempts;
+        _duration = t._duration;
+        _last_millis = t._last_millis;
+        _task = t._task;
+        _task_priority = t._task_priority;
+        _task_exec_millis = t._task_exec_millis;
+    }
+
 };
 
 #endif

@@ -187,7 +187,8 @@ void TaskScheduler::handle_tasks()
 			this->m_tasks[_priority_indices[i]]._last_millis = _last_start_ms;
 		}
 
-		if ((_last_start_ms - this->m_tasks[_priority_indices[i]]._last_millis) > this->m_tasks[_priority_indices[i]]._duration)
+		if (this->m_tasks[_priority_indices[i]]._max_attempts != 0 &&
+			(_last_start_ms - this->m_tasks[_priority_indices[i]]._last_millis) > this->m_tasks[_priority_indices[i]]._duration)
 		{
 			if (nullptr != this->m_tasks[_priority_indices[i]]._task)
 			{

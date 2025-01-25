@@ -78,6 +78,17 @@ namespace pdistd
             delete functorHolderPtr;
         }
 
+        function& operator= (nullptr_t)
+        {
+            if( nullptr != functorHolderPtr ){
+
+                delete functorHolderPtr;
+                functorHolderPtr = nullptr;
+            }
+
+            return *this;
+        }
+
         function& operator= (function const& other)
         {
             delete functorHolderPtr;
