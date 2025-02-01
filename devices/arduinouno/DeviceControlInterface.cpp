@@ -10,6 +10,8 @@ created Date    : 1st Jan 2024
 
 #include "DeviceControlInterface.h"
 #include "LoggerInterface.h"
+#include <avr/wdt.h>
+
 
 /**
  * DeviceControlInterface constructor.
@@ -200,6 +202,9 @@ void DeviceControlInterface::initDeviceSpecificFeatures()
  */
 void DeviceControlInterface::resetDevice()
 {
+    wdt_disable();
+    wdt_enable(WDTO_15MS);
+    while(1) {}
 }
 
 /**
@@ -207,6 +212,7 @@ void DeviceControlInterface::resetDevice()
  */
 void DeviceControlInterface::restartDevice()
 {
+    resetDevice();
 }
 
 /**
@@ -214,6 +220,7 @@ void DeviceControlInterface::restartDevice()
  */
 void DeviceControlInterface::feedWdt()
 {
+    wdt_reset();
 }
 
 /**

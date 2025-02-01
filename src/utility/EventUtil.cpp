@@ -68,7 +68,7 @@ void EventUtil::execute_event(event_name_t _event, void *_arg)
   {
     char content[25];
     memset(content, 0, 25);
-    sprintf(content, "\nExecuting event : %d\n", (int)_event);
+    sprintf(content, "\ne:%d\n", (int)_event);
     m_util->log(INFO_LOG, content);
   }
 

@@ -14,7 +14,9 @@ created Date    : 1st Jan 2023
 #include <service_provider/ServiceProvider.h>
 
 #include <database/tables/GlobalTable.h>
+#if defined(ENABLE_HTTP_SERVER) || defined(ENABLE_AUTH_SERVICE)
 #include <database/tables/LoginTable.h>
+#endif
 #ifdef ENABLE_WIFI_SERVICE
 #include <database/tables/WiFiTable.h>
 #endif
@@ -56,7 +58,9 @@ public:
   void clear_default_tables();
 
   bool get_global_config_table(global_config_table *_table);
+#if defined(ENABLE_HTTP_SERVER) || defined(ENABLE_AUTH_SERVICE)
   bool get_login_credential_table(login_credential_table *_table);
+#endif
 #ifdef ENABLE_WIFI_SERVICE  
   bool get_wifi_config_table(wifi_config_table *_table);
 #endif
@@ -83,7 +87,9 @@ public:
 #endif
 
   void set_global_config_table(global_config_table *_table);
+#if defined(ENABLE_HTTP_SERVER) || defined(ENABLE_AUTH_SERVICE)
   void set_login_credential_table(login_credential_table *_table);
+#endif
 #ifdef ENABLE_WIFI_SERVICE  
   void set_wifi_config_table(wifi_config_table *_table);
 #endif

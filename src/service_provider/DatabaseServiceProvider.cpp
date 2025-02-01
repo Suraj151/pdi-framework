@@ -16,10 +16,12 @@ created Date    : 1st June 2019
  */
 GlobalTable __global_table;
 
+#if defined(ENABLE_HTTP_SERVER) || defined(ENABLE_AUTH_SERVICE)
 /**
  * @var	LoginTable	__login_table
  */
 LoginTable __login_table;
+#endif
 
 #ifdef ENABLE_WIFI_SERVICE 
 /**
@@ -130,6 +132,7 @@ bool DatabaseServiceProvider::get_global_config_table(global_config_table *_tabl
   return __global_table.get(_table);
 }
 
+#if defined(ENABLE_HTTP_SERVER) || defined(ENABLE_AUTH_SERVICE)
 /**
  * get/fetch login credential table from database.
  *
@@ -139,6 +142,7 @@ bool DatabaseServiceProvider::get_login_credential_table(login_credential_table 
 {
   return __login_table.get(_table);
 }
+#endif
 
 #ifdef ENABLE_WIFI_SERVICE 
 /**
@@ -242,6 +246,7 @@ void DatabaseServiceProvider::set_global_config_table(global_config_table *_tabl
   __global_table.set(_table);
 }
 
+#if defined(ENABLE_HTTP_SERVER) || defined(ENABLE_AUTH_SERVICE)
 /**
  * set login credential config table in database.
  *
@@ -251,6 +256,7 @@ void DatabaseServiceProvider::set_login_credential_table(login_credential_table 
 {
   __login_table.set(_table);
 }
+#endif
 
 #ifdef ENABLE_WIFI_SERVICE  
 /**

@@ -22,8 +22,10 @@ created Date    : 1st June 2019
 /**
  * @define default username/ssid and password
  */
+#if defined(ENABLE_HTTP_SERVER) || defined(ENABLE_AUTH_SERVICE) || defined(ENABLE_WIFI_SERVICE)
 #define USER            "pdiStack"
 #define PASSPHRASE      "pdiStack@123"
+#endif
 
 /**
  * @define general http parameters

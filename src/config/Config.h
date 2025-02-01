@@ -17,7 +17,9 @@ created Date    : 1st June 2019
 #include "WifiConfig.h"
 #endif
 
+#if defined(ENABLE_HTTP_SERVER) || defined(ENABLE_AUTH_SERVICE)
 #include "ServerConfig.h"
+#endif
 
 #ifdef ENABLE_OTA_SERVICE
 #include "OtaConfig.h"
