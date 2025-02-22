@@ -60,12 +60,13 @@ public:
   uint32_t getDeviceId() override;
   pdiutil::string getDeviceMac() override;
   bool isDeviceFactoryRequested() override;
+  iTerminalInterface* getTerminal(terminal_types_t terminal=TERMINAL_TYPE_SERIAL) override;
 
   // util methods
   void wait(uint64_t timeoutms) override;
   uint32_t millis_now() override;
   void log(logger_type_t log_type, const char *content) override;
-  void printtasks(pdiutil::vector<task_t> &tasks) override;
+  void printtasks(pdiutil::vector<task_t> &tasks, iTerminalInterface *terminal) override;
   void yield() override;
 
   // upgrade api

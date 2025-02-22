@@ -37,6 +37,7 @@ public:
 	void setAuthorized(bool auth);
 	bool getAuthorized();
 
+  	void printConfigToTerminal(iTerminalInterface *terminal) override;
 private:
 
 	/**

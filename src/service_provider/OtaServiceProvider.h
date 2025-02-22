@@ -46,7 +46,7 @@ class OtaServiceProvider : public ServiceProvider{
     void begin_ota(iClientInterface *_client);
     void handleOta();
     http_ota_status handle();
-    void printOtaConfigLogs();
+    void printConfigToTerminal(iTerminalInterface *terminal) override;
 
     /**
      * @var	Http_Client*|nullptr	m_http_client

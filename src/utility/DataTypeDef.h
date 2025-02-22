@@ -243,4 +243,13 @@ struct task_t
 
 };
 
+/**
+* available terminal types
+*/
+typedef enum terminal_types{
+
+  TERMINAL_TYPE_SERIAL = 0,
+  TERMINAL_TYPE_MAX
+} terminal_types_t;
+
 #endif

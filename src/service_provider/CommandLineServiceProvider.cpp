@@ -32,6 +32,9 @@ CommandLineServiceProvider::CommandLineServiceProvider()
   LogoutCommand *logoutcmd = new LogoutCommand();
   m_cmdlist.push_back(logoutcmd);
   #endif
+
+  ShowCommand *showcmd = new ShowCommand();
+  m_cmdlist.push_back(showcmd);
 }
 
 /**

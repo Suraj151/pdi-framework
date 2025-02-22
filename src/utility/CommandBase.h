@@ -12,6 +12,8 @@ created Date    : 1st June 2019
 #define _COMMAND_BASE_H_
 
 #include "StringOperations.h"
+#include "iIOInterface.h"
+
 
 /* command results */
 typedef enum {
@@ -61,10 +63,16 @@ typedef struct CommandBase {
 	char cmd[CMD_SIZE_MAX];
 	CommandOption options[CMD_OPTION_MAX];
 	uint8_t optionindx;
+	iTerminalInterface *m_terminal;
 
 	/* Constructor */
 	CommandBase(){
 		// Clear();
+	}
+
+	/* Set terminal type */
+	void SetTerminal(iTerminalInterface *terminal){
+		m_terminal = terminal;
 	}
 
 	/* Set command */
@@ -194,6 +202,11 @@ typedef struct CommandBase {
 
 		/* execute command if format is ok */
 		if( CMD_STATUS_OK == status ){
+			if( nullptr != m_terminal ){
+				m_terminal->write_ro(RODT_ATTR("Exec command : "));
+				m_terminal->write(cmd);
+				m_terminal->write(RODT_ATTR("\n"));
+			}
 			status = execute();
 		}
 
@@ -213,6 +226,7 @@ typedef struct CommandBase {
 			options[i].Clear();
 		}
 		optionindx = 0;
+		m_terminal = nullptr;
 	}
 
 	/* derived command can implement auth necesity */

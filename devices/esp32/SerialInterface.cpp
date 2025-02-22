@@ -27,7 +27,7 @@ iSerialInterface* iSerialInterface::instances[SERIAL_TYPE_MAX] = {
 /**
  * UARTSerial constructor.
  */
-UARTSerial::UARTSerial()
+UARTSerial::UARTSerial() : m_connected(false)
 {
 }
 
@@ -44,6 +44,7 @@ UARTSerial::~UARTSerial()
 int16_t UARTSerial::connect(uint16_t port, uint64_t speed)
 {
   Serial.begin(speed);
+  m_connected = true;
   return 1;
 }
 
@@ -53,6 +54,7 @@ int16_t UARTSerial::connect(uint16_t port, uint64_t speed)
 int16_t UARTSerial::disconnect()
 {
   Serial.end();
+  m_connected = false;
   return 0;
 }
 
@@ -78,6 +80,14 @@ uint32_t UARTSerial::write(const uint8_t *c_str)
 uint32_t UARTSerial::write(const uint8_t *c_str, uint32_t size)
 {
   return Serial.write(c_str, size);
+}
+
+/**
+ * write
+ */
+uint32_t UARTSerial::write_ro(const char *c_str)
+{
+  return Serial.print(c_str);
 }
 
 /**
@@ -114,8 +124,7 @@ int32_t UARTSerial::available()
  */
 int8_t UARTSerial::connected()
 {
-  // for now using available with uart
-  return Serial.available();
+  return m_connected;
 }
 
 /**

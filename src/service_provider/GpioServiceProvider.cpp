@@ -459,43 +459,53 @@ void GpioServiceProvider::handleGpioModes( int _gpio_config_type ){
 }
 
 /**
- * print gpio configs
+ * print gpio configs to terminal
  */
-void GpioServiceProvider::printGpioConfigLogs(){
+void GpioServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
+{
+  if( nullptr != terminal ){
 
+    terminal->write_ro(RODT_ATTR("\nGPIO Configs (mode) :\n"));
+    for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
+      terminal->write((int32_t)this->m_gpio_config_copy.gpio_mode[_pin]);
+      terminal->write(RODT_ATTR("\t"));
+    }
 
-  LogI("\nGPIO Configs (mode) :\n");
-  for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
-    LogFmtI("%d\t", this->m_gpio_config_copy.gpio_mode[_pin]);
-  }
-
-  LogI("\nGPIO Configs (readings) :\n");
-  for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
-    LogFmtI("%d\t", this->m_gpio_config_copy.gpio_readings[_pin]);
-  }
+    terminal->write_ro(RODT_ATTR("\nGPIO Configs (readings) :\n"));
+    for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
+      terminal->write((int32_t)this->m_gpio_config_copy.gpio_readings[_pin]);
+      terminal->write(RODT_ATTR("\t"));
+    }
 
 #ifndef ENABLE_GPIO_BASIC_ONLY
-  LogI("\nGPIO Configs (alert comparator) :\n");
-  for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
-    LogFmtI("%d\t", this->m_gpio_config_copy.gpio_alert_comparator[_pin]);
-  }
+    terminal->write_ro(RODT_ATTR("\nGPIO Configs (alert comparator) :\n"));
+    for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
+      terminal->write((int32_t)this->m_gpio_config_copy.gpio_alert_comparator[_pin]);
+      terminal->write(RODT_ATTR("\t"));
+    }
 
-  LogI("\nGPIO Configs (alert channels) :\n");
-  for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
-    LogFmtI("%d\t", this->m_gpio_config_copy.gpio_alert_channel[_pin]);
-  }
+    terminal->write_ro(RODT_ATTR("\nGPIO Configs (alert channels) :\n"));
+    for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
+      terminal->write((int32_t)this->m_gpio_config_copy.gpio_alert_channel[_pin]);
+      terminal->write(RODT_ATTR("\t"));
+    }
 
-  LogI("\nGPIO Configs (alert values) :\n");
-  for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
-    LogFmtI("%d\t", this->m_gpio_config_copy.gpio_alert_values[_pin]);
-  }
+    terminal->write_ro(RODT_ATTR("\nGPIO Configs (alert values) :\n"));
+    for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
+      terminal->write((int32_t)this->m_gpio_config_copy.gpio_alert_values[_pin]);
+      terminal->write(RODT_ATTR("\t"));
+    }
 
-  LogI("\nGPIO Configs (server) :\n");
-  LogFmtI("%s\t%d\t%d\n\n", this->m_gpio_config_copy.gpio_host, this->m_gpio_config_copy.gpio_port, 
-  this->m_gpio_config_copy.gpio_post_frequency);
+    terminal->write_ro(RODT_ATTR("\nGPIO Configs (server) :\n"));
+    terminal->write(this->m_gpio_config_copy.gpio_host);
+    terminal->write(RODT_ATTR("\t"));
+    terminal->write((int32_t)this->m_gpio_config_copy.gpio_port);
+    terminal->write(RODT_ATTR("\t"));
+    terminal->write((int32_t)this->m_gpio_config_copy.gpio_post_frequency);
+    terminal->write(RODT_ATTR("\n\n"));
 #endif
+  }
 }
-
 
 GpioServiceProvider __gpio_service;
 

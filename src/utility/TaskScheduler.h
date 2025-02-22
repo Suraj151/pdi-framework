@@ -51,7 +51,7 @@ public:
 	void setMaxTasksLimit(uint8_t maxtasks);
 	// This needs to be set prior to start the scheduler handle
 	void setUtilityInterface(iUtilityInterface * util);
-	void printTaskSchedulerLogs(void);
+	void printTasksToTerminal(iTerminalInterface *terminal);
 
 protected:
 	/**

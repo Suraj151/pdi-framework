@@ -14,6 +14,7 @@ created Date    : 1st Jan 2024
 #include "WiFiClientInterface.h"
 #include "core/Espnow.h"
 #include "PingInterface.h"
+#include "SerialInterface.h"
 
 /**
  * DeviceControlInterface constructor.
@@ -188,16 +189,22 @@ void DeviceControlInterface::releaseGpioBlinkerInstance(iGpioBlinkerInterface *i
  */
 void DeviceControlInterface::initDeviceSpecificFeatures()
 {
-  #ifdef ENABLE_ESP_NOW
-  __espnow.begin( &__i_wifi );
-  #endif
-  #ifdef ENABLE_NETWORK_SERVICE
-  __i_ping.init_ping( &__i_wifi );
-  #endif
+    #ifdef ENABLE_ESP_NOW
+    __espnow.begin( &__i_wifi );
+    #endif
 
-  #ifdef ENABLE_EXCEPTION_NOTIFIER
-  beginCrashHandler();
-  #endif
+    #ifdef ENABLE_NETWORK_SERVICE
+    __i_ping.init_ping( &__i_wifi );
+    #endif
+
+    #ifdef ENABLE_EXCEPTION_NOTIFIER
+    beginCrashHandler();
+    #endif
+
+    // Open default serial terminal
+    if( nullptr != getTerminal(TERMINAL_TYPE_SERIAL) ){
+        getTerminal(TERMINAL_TYPE_SERIAL)->open();
+    }
 }
 
 /**
@@ -269,6 +276,17 @@ bool DeviceControlInterface::isDeviceFactoryRequested()
 }
 
 /**
+ * get terminal interface to interact
+ */
+iTerminalInterface * DeviceControlInterface::getTerminal(terminal_types_t terminal)
+{
+    if( TERMINAL_TYPE_MAX > terminal ){
+      return &__serial_uart;
+    } 
+    return nullptr; 
+}
+
+/**
  * keep hold on current execution
  */
 void DeviceControlInterface::wait(uint64_t timeoutms)
@@ -295,38 +313,41 @@ void DeviceControlInterface::log(logger_type_t log_type, const char *content)
 /**
  * log helper for print task
  */
-void DeviceControlInterface::printtasks(pdiutil::vector<task_t> &tasks)
+void DeviceControlInterface::printtasks(pdiutil::vector<task_t> &tasks, iTerminalInterface *terminal)
 {
-    LogI("\nTasks : \n");
-    LogI("id        "); // max column size=10
-    LogI("priority  "); // max column size=10
-    LogI("interval  "); // max column size=10
-    LogI("last_ms   "); // max column size=10
-    LogI("exc_ms    "); // max column size=10
-    LogI("max_attempts\n"); // max column size=14
+    if( nullptr != terminal ){
 
-    char content[20];
+        terminal->write_ro(RODT_ATTR("\nTasks : \n"));
+        terminal->write_ro(RODT_ATTR("id        ")); // max column size=10
+        terminal->write_ro(RODT_ATTR("priority  ")); // max column size=10
+        terminal->write_ro(RODT_ATTR("interval  ")); // max column size=10
+        terminal->write_ro(RODT_ATTR("last_ms   ")); // max column size=10
+        terminal->write_ro(RODT_ATTR("exc_ms    ")); // max column size=10
+        terminal->write_ro(RODT_ATTR("max_attempts\n")); // max column size=14
 
-    for (int i = 0; i < tasks.size(); i++)
-    {
-        Int32ToString(tasks[i]._task_id, content, 20, 10);
-        log(INFO_LOG, content);
+        char content[20];
 
-        Int32ToString(tasks[i]._task_priority, content, 20, 10);
-        log(INFO_LOG, content);
+        for (int i = 0; i < tasks.size(); i++)
+        {
+            Int32ToString(tasks[i]._task_id, content, 20, 10);
+            terminal->write(content);
 
-        Int64ToString(tasks[i]._duration, content, 20, 10);
-        log(INFO_LOG, content);
+            Int32ToString(tasks[i]._task_priority, content, 20, 10);
+            terminal->write(content);
 
-        Int64ToString(tasks[i]._last_millis, content, 20, 10);
-        log(INFO_LOG, content);
+            Int64ToString(tasks[i]._duration, content, 20, 10);
+            terminal->write(content);
 
-        Int64ToString(tasks[i]._task_exec_millis, content, 20, 10);
-        log(INFO_LOG, content);
+            Int64ToString(tasks[i]._last_millis, content, 20, 10);
+            terminal->write(content);
 
-        Int32ToString(tasks[i]._max_attempts, content, 20, 14);
-        log(INFO_LOG, content);
-        log(INFO_LOG, "\n");
+            Int64ToString(tasks[i]._task_exec_millis, content, 20, 10);
+            terminal->write(content);
+
+            Int32ToString(tasks[i]._max_attempts, content, 20, 14);
+            terminal->write(content);
+            terminal->write("\n");
+        }
     }
 }
 

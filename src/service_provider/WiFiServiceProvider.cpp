@@ -170,7 +170,7 @@ bool WiFiServiceProvider::configure_wifi_station( wifi_config_table* _wifi_crede
     return false;
   }
 
-  LogFmtI("\nConnecing To %s", _wifi_credentials->sta_ssid);
+  LogFmtI("\nWiFi Connecing To %s", _wifi_credentials->sta_ssid);
 
   if (nullptr != mac)
   {
@@ -211,7 +211,7 @@ bool WiFiServiceProvider::configure_wifi_station( wifi_config_table* _wifi_crede
 
   wifi_status_t stat = this->m_wifi->status();
   if( CONN_STATUS_CONNECTED == stat ){
-    LogFmtI("Connected to %s\n", _wifi_credentials->sta_ssid);
+    LogFmtI("WiFi Connected to %s\n", _wifi_credentials->sta_ssid);
     LogFmtI("IP address: %s\n", ((pdiutil::string)this->m_wifi->localIP()).c_str());
     // this->m_wifi->setAutoConnect(true);
     // this->m_wifi->setAutoReconnect(true);
@@ -237,7 +237,7 @@ void WiFiServiceProvider::reconfigure_wifi_access_point( void ){
     return;
   }
 
-  LogI("Handeling reconfigure AP.\n");
+  LogI("Handeling reconfigure WiFi AP.\n");
 
   wifi_config_table _wifi_credentials;
   __database_service.get_wifi_config_table( &_wifi_credentials );
@@ -313,7 +313,7 @@ bool WiFiServiceProvider::configure_wifi_access_point( wifi_config_table* _wifi_
     return false;
   }
 
-  LogFmtI("Configuring access point %s..\n", _wifi_credentials->ap_ssid);
+  LogFmtI("Configuring WiFi access point %s..\n", _wifi_credentials->ap_ssid);
 
   ipaddress_t local_IP(
     _wifi_credentials->ap_local_ip[0],_wifi_credentials->ap_local_ip[1],_wifi_credentials->ap_local_ip[2],_wifi_credentials->ap_local_ip[3]
@@ -333,7 +333,7 @@ bool WiFiServiceProvider::configure_wifi_access_point( wifi_config_table* _wifi_
     LogFmtI("AP IP address: %s\n", ((pdiutil::string)this->m_wifi->softAPIP()).c_str());
     return true;
   }else{
-    LogE("Configuring access point failed!\n");
+    LogE("Configuring WiFi access point failed!\n");
     return false;
   }
 }
@@ -401,25 +401,32 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
 }
 
 /**
- * print wifi configs
+ * print wifi configs to terminal
  */
-void WiFiServiceProvider::printWiFiConfigLogs(){
+void WiFiServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
+{
+  if( nullptr != terminal ){
 
-  wifi_config_table _table;
-  __database_service.get_wifi_config_table(&_table);
-  char _ip_address[20];
+    wifi_config_table _table;
+    __database_service.get_wifi_config_table(&_table);
+    char _ip[20];
 
-  LogI("\nWiFi Configs :\n");
-  LogFmtI("%s\t%s\t", _table.sta_ssid, _table.sta_password);
-  __int_ip_to_str( _ip_address, _table.sta_local_ip, 20 ); LogFmtI("%s\t", _ip_address);
-  __int_ip_to_str( _ip_address, _table.sta_gateway, 20 ); LogFmtI("%s\t", _ip_address);
-  __int_ip_to_str( _ip_address, _table.sta_subnet, 20 ); LogFmtI("%s\t\n", _ip_address);
+    terminal->write_ro(RODT_ATTR("\nWiFi Configs :\n"));
+    terminal->write(_table.sta_ssid); terminal->write(RODT_ATTR("\t"));
+    terminal->write(_table.sta_password); terminal->write(RODT_ATTR("\t"));
 
-  LogI("\nAccess Configs :\n");
-  LogFmtI("%s\t%s\t", _table.ap_ssid, _table.ap_password);
-  __int_ip_to_str( _ip_address, _table.ap_local_ip, 20 ); LogFmtI("%s\t", _ip_address);
-  __int_ip_to_str( _ip_address, _table.ap_gateway, 20 ); LogFmtI("%s\t", _ip_address);
-  __int_ip_to_str( _ip_address, _table.ap_subnet, 20 ); LogFmtI("%s\t\n\n", _ip_address);
+    __int_ip_to_str( _ip, _table.sta_local_ip, 20 ); terminal->write(_ip); terminal->write(RODT_ATTR("\t"));
+    __int_ip_to_str( _ip, _table.sta_gateway, 20 ); terminal->write(_ip); terminal->write(RODT_ATTR("\t"));
+    __int_ip_to_str( _ip, _table.sta_subnet, 20 ); terminal->write(_ip); terminal->write(RODT_ATTR("\t\n"));
+
+    terminal->write_ro(RODT_ATTR("\nAccess Configs :\n"));
+    terminal->write(_table.ap_ssid); terminal->write(RODT_ATTR("\t"));
+    terminal->write(_table.ap_password); terminal->write(RODT_ATTR("\t"));
+
+    __int_ip_to_str( _ip, _table.ap_local_ip, 20 ); terminal->write(_ip); terminal->write(RODT_ATTR("\t"));
+    __int_ip_to_str( _ip, _table.ap_gateway, 20 ); terminal->write(_ip); terminal->write(RODT_ATTR("\t"));
+    __int_ip_to_str( _ip, _table.ap_subnet, 20 ); terminal->write(_ip); terminal->write(RODT_ATTR("\t\n"));
+  }
 }
 
 WiFiServiceProvider __wifi_service;

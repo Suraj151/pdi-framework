@@ -12,11 +12,33 @@ created Date    : 1st June 2019
 #define _COMMANDLINE_SERVICE_H_
 
 #include <service_provider/ServiceProvider.h>
-#ifdef ENABLE_GPIO_SERVICE
-#include "GpioServiceProvider.h"
-#endif
+
 #ifdef ENABLE_AUTH_SERVICE
-#include "AuthServiceProvider.h"
+#include <service_provider/AuthServiceProvider.h>
+#endif
+
+#ifdef ENABLE_GPIO_SERVICE
+#include <service_provider/GpioServiceProvider.h>
+#endif
+
+#ifdef ENABLE_WIFI_SERVICE
+#include <service_provider/WiFiServiceProvider.h>
+#endif
+
+#ifdef ENABLE_OTA_SERVICE
+#include <service_provider/OtaServiceProvider.h>
+#endif
+
+#ifdef ENABLE_MQTT_SERVICE
+#include <service_provider/MqttServiceProvider.h>
+#endif
+
+#ifdef ENABLE_EMAIL_SERVICE
+#include <service_provider/EmailServiceProvider.h>
+#endif
+
+#ifdef ENABLE_DEVICE_IOT
+#include <service_provider/DeviceIotServiceProvider.h>
 #endif
 
 /**
@@ -56,6 +78,7 @@ extern CommandLineServiceProvider __cmd_service;
 #define CMD_NAME_LOGOUT				"logout"
 #endif
 #define CMD_NAME_GPIO 				"gpio"
+#define CMD_NAME_SHOW 				"show"
 
 /* command options */
 #define CMD_OPTION_NAME_PIN			"p"
@@ -85,7 +108,6 @@ struct LoginCommand : public CommandBase {
 	cmd_status_t execute(){
 
 		cmd_status_t status = CMD_STATUS_OK;
-		LogFmtI("executing command : %s with", cmd);
 
 		char _username[LOGIN_CONFIGS_BUF_SIZE]; 
 		char _password[LOGIN_CONFIGS_BUF_SIZE]; 
@@ -100,11 +122,11 @@ struct LoginCommand : public CommandBase {
 				if(__are_str_equals(options[i].option, CMD_OPTION_NAME_USERNAME, CMD_OPTION_SIZE_MAX)){
 
 					memcpy(_username, options[i].optionval, options[i].optionvalsize);
-					LogFmtI(" | option %d : %s, %s", i, options[i].option, _username);
+					// LogFmtI(" | option %d : %s, %s", i, options[i].option, _username);
 				}else if(__are_str_equals(options[i].option, CMD_OPTION_NAME_PASSWORD, CMD_OPTION_SIZE_MAX)){
 
 					memcpy(_password, options[i].optionval, options[i].optionvalsize);
-					LogFmtI(" | option %d : %s, %s", i, options[i].option, _password);
+					// LogFmtI(" | option %d : %s, %s", i, options[i].option, _password);
 				}
 			}
 		}
@@ -137,7 +159,7 @@ struct LogoutCommand : public CommandBase {
 	cmd_status_t execute(){
 
 		cmd_status_t status = CMD_STATUS_OK;
-		LogFmtI("executing command : %s\n", cmd);
+		// LogFmtI("executing command : %s\n", cmd);
 		__auth_service.setAuthorized(false);
 		return status;
 	}
@@ -163,8 +185,10 @@ struct GpioCommand : public CommandBase {
 		AddOption(CMD_OPTION_NAME_VALUE);
 	}
 
+#ifdef ENABLE_AUTH_SERVICE
 	/* override the necesity of required permission */
 	bool needauth() override { return true; }
+#endif
 
 	/* execute command with provided options */
 	cmd_status_t execute(){
@@ -177,7 +201,6 @@ struct GpioCommand : public CommandBase {
 #endif
 
 		cmd_status_t status = CMD_STATUS_OK;
-		LogFmtI("executing command : %s with", cmd);
 
 		int16_t _pin = -1; 
 		int16_t _mode = -1; 
@@ -202,7 +225,7 @@ struct GpioCommand : public CommandBase {
 					_value = _strval;
 				}
 
-				LogFmtI(" | option %d : %s, %d", i, options[i].option, _strval);
+				// LogFmtI(" | option %d : %s, %d", i, options[i].option, _strval);
 			}
 		}
 
@@ -225,10 +248,105 @@ struct GpioCommand : public CommandBase {
 			status = CMD_STATUS_ARGS_MISSING;
 		}
 
-		LogI("\n");
+		// LogI("\n");
 		return status;
 	}
 };
 #endif
+
+/**
+ * show command
+ * 
+ */
+struct ShowCommand : public CommandBase {
+
+	/* Show options */
+	enum ShowCmdOption{
+		SHOWCMD_OPTION_WIFICONFIG = 0,
+		SHOWCMD_OPTION_OTACONFIG,
+		SHOWCMD_OPTION_GPIOCONFIG,
+		SHOWCMD_OPTION_MQTTCONFIG,
+		SHOWCMD_OPTION_EMAILCONFIG,
+		SHOWCMD_OPTION_DVCIOTCONFIG,
+		SHOWCMD_OPTION_AUTHCONFIG,
+		SHOWCMD_OPTION_TASKS,
+	};
+
+	/* Constructor */
+	ShowCommand(){
+		Clear();
+		SetCommand(CMD_NAME_SHOW);
+		AddOption(CMD_OPTION_NAME_VALUE);
+	}
+
+#ifdef ENABLE_AUTH_SERVICE
+	/* override the necesity of required permission */
+	bool needauth() override { return true; }
+#endif
+
+	/* execute command with provided options */
+	cmd_status_t execute(){
+
+#ifdef ENABLE_AUTH_SERVICE
+		// return in case authentication needed and not authorized yet
+		if( needauth() && !__auth_service.getAuthorized()){
+			return CMD_STATUS_NEED_AUTH;
+		}
+#endif
+
+		cmd_status_t status = CMD_STATUS_OK;
+
+		for (uint8_t i = 0; i < CMD_OPTION_MAX; i++){
+
+			if(options[i].optionval != nullptr){
+
+				if(__are_str_equals(options[i].option, CMD_OPTION_NAME_VALUE, CMD_OPTION_SIZE_MAX)){
+
+					int32_t _showval = StringToUint16(options[i].optionval, options[i].optionvalsize);
+					// LogFmtI(" | option %d : %s, %d", i, options[i].option, _showval);
+
+					if(SHOWCMD_OPTION_WIFICONFIG == _showval){
+					#ifdef ENABLE_WIFI_SERVICE
+						__wifi_service.printConfigToTerminal(m_terminal);
+					#endif
+					}else if(SHOWCMD_OPTION_OTACONFIG == _showval){
+					#ifdef ENABLE_OTA_SERVICE
+						__ota_service.printConfigToTerminal(m_terminal);
+					#endif
+					}else if(SHOWCMD_OPTION_GPIOCONFIG == _showval){
+					#ifdef ENABLE_GPIO_SERVICE
+						__gpio_service.printConfigToTerminal(m_terminal);
+					#endif
+					}else if(SHOWCMD_OPTION_MQTTCONFIG == _showval){
+					#ifdef ENABLE_MQTT_SERVICE
+						__mqtt_service.printConfigToTerminal(m_terminal);
+					#endif
+					}else if(SHOWCMD_OPTION_EMAILCONFIG == _showval){
+					#ifdef ENABLE_EMAIL_SERVICE
+						__email_service.printConfigToTerminal(m_terminal);
+					#endif
+					}else if(SHOWCMD_OPTION_DVCIOTCONFIG == _showval){
+					#ifdef ENABLE_DEVICE_IOT
+						__device_iot_service.printConfigToTerminal(m_terminal);
+					#endif
+					}else if(SHOWCMD_OPTION_AUTHCONFIG == _showval){
+					#ifdef ENABLE_AUTH_SERVICE
+						__auth_service.printConfigToTerminal(m_terminal);
+					#endif
+					}else if(SHOWCMD_OPTION_TASKS == _showval){
+						__task_scheduler.printTasksToTerminal(m_terminal);
+					}else{
+
+					}
+
+					break;
+				}
+			}
+		}
+
+		return status;
+	}
+};
+
 
 #endif

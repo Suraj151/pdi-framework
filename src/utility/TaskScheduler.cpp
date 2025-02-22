@@ -316,11 +316,11 @@ void TaskScheduler::setUtilityInterface(iUtilityInterface *util)
  * this function prints task logs.
  *
  */
-void TaskScheduler::printTaskSchedulerLogs()
+void TaskScheduler::printTasksToTerminal(iTerminalInterface *terminal)
 {
 	if (nullptr != m_util)
 	{
-		m_util->printtasks(this->m_tasks);
+		m_util->printtasks(this->m_tasks, terminal);
 	}
 }
 

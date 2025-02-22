@@ -60,7 +60,8 @@ public:
 #ifdef ENABLE_HTTP_CLIENT
   bool handleGpioHttpRequest(bool isAlertPost = false);
 #endif
-  void printGpioConfigLogs(void);
+  void printConfigToTerminal(iTerminalInterface *terminal) override;
+
 
   /**
    * @var gpio_config_table m_gpio_config_copy

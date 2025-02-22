@@ -12,6 +12,7 @@ created Date    : 1st Jan 2024
 #define _I_DEVICE_UTILITY_INTERFACE_H_
 
 #include "DataTypeDef.h"
+#include "iIOInterface.h"
 
 /**
  * iUtilityInterface class
@@ -30,7 +31,7 @@ public:
   virtual void wait(uint64_t timeoutms) = 0;
   virtual uint32_t millis_now() = 0;
   virtual void log(logger_type_t log_type, const char *content) = 0;
-  virtual void printtasks(pdiutil::vector<task_t> &tasks) = 0;
+  virtual void printtasks(pdiutil::vector<task_t> &tasks, iTerminalInterface *terminal) = 0;
   virtual void yield() = 0;
 };
 

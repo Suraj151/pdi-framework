@@ -297,21 +297,29 @@ bool EmailServiceProvider::sendMail(const char * mail_body)
 }
 
 /**
- * print email configs
+ * print Email configs to terminal
  */
-void EmailServiceProvider::printEmailConfigLogs()
+void EmailServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
 {
+  if( nullptr != terminal ){
 
-  email_config_table _email_config;
-  __database_service.get_email_config_table(&_email_config);
+    email_config_table _email_config;
+    __database_service.get_email_config_table(&_email_config);
 
-  LogI("\nEmail Configs :\n");
+    terminal->write_ro(RODT_ATTR("\nEmail Configs :\n"));
 
-  LogFmtI("%s\t%s\t%d\t%s\t%s\n", _email_config.sending_domain, _email_config.mail_host,
-          _email_config.mail_port, _email_config.mail_username, _email_config.mail_password);
+    terminal->write(_email_config.sending_domain); terminal->write(RODT_ATTR("\t"));
+    terminal->write(_email_config.mail_host); terminal->write(RODT_ATTR("\t"));
+    terminal->write(_email_config.mail_port); terminal->write(RODT_ATTR("\t"));
+    terminal->write(_email_config.mail_username); terminal->write(RODT_ATTR("\t"));
+    terminal->write(_email_config.mail_password); terminal->write(RODT_ATTR("\n"));
 
-  LogFmtI("%s\t%s\t%s\t%s\t%d\n", _email_config.mail_from, _email_config.mail_from_name,
-          _email_config.mail_to, _email_config.mail_subject, _email_config.mail_frequency);
+    terminal->write(_email_config.mail_from); terminal->write(RODT_ATTR("\t"));
+    terminal->write(_email_config.mail_from_name); terminal->write(RODT_ATTR("\t"));
+    terminal->write(_email_config.mail_to); terminal->write(RODT_ATTR("\t"));
+    terminal->write(_email_config.mail_subject); terminal->write(RODT_ATTR("\t"));
+    terminal->write(_email_config.mail_frequency); terminal->write(RODT_ATTR("\n"));
+  }
 }
 
 EmailServiceProvider __email_service;

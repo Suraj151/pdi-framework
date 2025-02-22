@@ -80,4 +80,9 @@ public:
   }
 };
 
+/**
+ * iSerialTerminalInterface class
+ */
+using iSerialTerminalInterface = iSerialInterface;
+
 #endif

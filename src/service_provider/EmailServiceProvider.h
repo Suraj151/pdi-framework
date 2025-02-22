@@ -39,7 +39,7 @@ public:
   bool sendMail(const char * mail_body);
   // template <typename T> bool sendMail( T mail_body );
   void handleEmail(void);
-  void printEmailConfigLogs(void);
+  void printConfigToTerminal(iTerminalInterface *terminal) override;
 
   /**
    * @var	int|0 m_mail_handler_cb_id

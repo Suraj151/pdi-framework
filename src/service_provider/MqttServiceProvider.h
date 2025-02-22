@@ -48,7 +48,7 @@ public:
   void setMqttPublishDataCallback(MqttPublishDataCallback _cb);
   void setMqttSubscribeDataCallback(MqttSubscribeDataCallback _cb);
   void stop(void);
-  void printMqttConfigLogs(void);
+  void printConfigToTerminal(iTerminalInterface *terminal) override;
 
   /**
    * @var	int|0 m_mqtt_timer_cb_id

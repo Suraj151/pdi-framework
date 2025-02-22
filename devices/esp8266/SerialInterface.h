@@ -38,6 +38,7 @@ public:
   uint32_t write(uint8_t c) override;
   uint32_t write(const uint8_t *c_str) override;
   uint32_t write(const uint8_t *c_str, uint32_t size) override;
+  uint32_t write_ro(const char *c_str) override;
 
   // received data read api
   uint8_t read() override;
@@ -49,6 +50,10 @@ public:
   void setTimeout(uint32_t timeout) override;
   void flush() override;
   iClientInterface* getNewInstance() override;
+
+private:
+  bool m_connected;
+
 };
 
 extern UARTSerial __serial_uart;

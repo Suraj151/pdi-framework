@@ -200,14 +200,21 @@ http_ota_status OtaServiceProvider::handle()
 }
 
 /**
- * print ota configs
+ * print Ota configs to terminal
  */
-void OtaServiceProvider::printOtaConfigLogs()
+void OtaServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
 {
-  ota_config_table _ota_configs;
-  __database_service.get_ota_config_table(&_ota_configs);
+  if( nullptr != terminal ){
 
-  LogFmtI("\nOTA Configs :\n%s\t%d\n", _ota_configs.ota_host, _ota_configs.ota_port);
+    ota_config_table _ota_configs;
+    __database_service.get_ota_config_table(&_ota_configs);
+
+    terminal->write_ro(RODT_ATTR("\nOTA Configs :\n"));
+    terminal->write(_ota_configs.ota_host);
+    terminal->write(RODT_ATTR("\t"));
+    terminal->write(_ota_configs.ota_port);
+    terminal->write(RODT_ATTR("\n"));
+  }
 }
 
 OtaServiceProvider __ota_service;

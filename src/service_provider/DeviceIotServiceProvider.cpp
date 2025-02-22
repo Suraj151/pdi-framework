@@ -375,15 +375,20 @@ void DeviceIotServiceProvider::handleSensorData(){
   }
 }
 
+
 /**
- * print device register configs
+ * print Device reg configs to terminal
  */
-void DeviceIotServiceProvider::printDeviceIotConfigLogs(){
+void DeviceIotServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
+{
+  if( nullptr != terminal ){
 
-  device_iot_config_table _device_iot_configs;
-  __database_service.get_device_iot_config_table(&_device_iot_configs);
+    device_iot_config_table _device_iot_configs;
+    __database_service.get_device_iot_config_table(&_device_iot_configs);
 
-  LogFmtI("\nDevice IOT Configs : %s\n\n", _device_iot_configs.device_iot_host);
+    terminal->write_ro(RODT_ATTR("\nDevice IOT Configs :\n"));
+    terminal->write(_device_iot_configs.device_iot_host); terminal->write(RODT_ATTR("\n\n"));
+  }
 }
 
 DeviceIotServiceProvider __device_iot_service;

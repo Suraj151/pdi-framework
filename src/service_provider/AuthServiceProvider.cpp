@@ -78,6 +78,19 @@ bool AuthServiceProvider::getAuthorized()
   return m_isAuthorized;
 }
 
+/**
+ * print login configs to terminal
+ */
+void AuthServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
+{
+  if( nullptr != terminal && m_initStatus ){
+
+    terminal->write_ro(RODT_ATTR("\nLogin Configs :\n"));
+    terminal->write(m_login_credentials.username); terminal->write(RODT_ATTR("\t"));
+    terminal->write(m_login_credentials.password); terminal->write(RODT_ATTR("\n\n"));
+  }
+}
+
 
 AuthServiceProvider __auth_service;
 

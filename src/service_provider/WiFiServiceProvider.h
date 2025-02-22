@@ -49,7 +49,8 @@ public:
   void handleInternetConnectivity(void);
   void handleWiFiConnectivity(void);
 
-  void printWiFiConfigLogs(void);
+  void printConfigToTerminal(iTerminalInterface *terminal) override;
+
 
   /**
    * @var	uint8_t  m_wifi_connection_timeout

@@ -41,6 +41,12 @@ class ServiceProvider{
     virtual bool initService(){
       return true;
     }
+
+    /**
+     * print service config to terminal
+     */
+    virtual void printConfigToTerminal(iTerminalInterface *terminal){
+    }
 };
 
 #endif
