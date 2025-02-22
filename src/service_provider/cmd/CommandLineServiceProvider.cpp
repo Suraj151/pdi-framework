@@ -14,10 +14,13 @@ created Date    : 1st June 2019
 
 #include "CommandLineServiceProvider.h"
 
+
+iTerminalInterface *CommandLineServiceProvider::m_cmdterminal = nullptr;
+
 /**
  * CommandLineServiceProvider constructor
  */
-CommandLineServiceProvider::CommandLineServiceProvider()
+CommandLineServiceProvider::CommandLineServiceProvider() : ServiceProvider(SERVICE_CMD)
 {
   // Add commands in list
   #ifdef ENABLE_GPIO_SERVICE
@@ -33,8 +36,8 @@ CommandLineServiceProvider::CommandLineServiceProvider()
   m_cmdlist.push_back(logoutcmd);
   #endif
 
-  ShowCommand *showcmd = new ShowCommand();
-  m_cmdlist.push_back(showcmd);
+  ServiceCommand *svccmd = new ServiceCommand();
+  m_cmdlist.push_back(svccmd);
 }
 
 /**
@@ -42,6 +45,37 @@ CommandLineServiceProvider::CommandLineServiceProvider()
  */
 CommandLineServiceProvider::~CommandLineServiceProvider()
 {
+}
+
+/**
+ * Initialize cmd service 
+ *
+ */
+bool CommandLineServiceProvider::initService()
+{
+
+  m_cmdterminal = __i_dvc_ctrl.getTerminal();
+
+  if( nullptr != m_cmdterminal ){
+
+    for (int16_t i = 0; i < m_cmdlist.size(); i++){
+
+      if( nullptr != m_cmdlist[i] ){
+
+        // Set default terminal at start
+        m_cmdlist[i]->SetTerminal(m_cmdterminal);
+      }
+    }
+
+		m_cmdterminal->write_ro(RODT_ATTR("\n\nInitializing PDI Stack CMD\nRelease : "));
+    m_cmdterminal->write(RELEASE);
+		m_cmdterminal->write_ro(RODT_ATTR("\n\n"));
+    startInteraction();
+
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -58,58 +92,30 @@ cmd_status_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd)
 
     if(nullptr != m_cmdlist[i] && m_cmdlist[i]->isValidCommand((char*)cmd->data())){
 
-      res = m_cmdlist[i]->parseCmdOptions((char*)cmd->data());
+      res = m_cmdlist[i]->executeCommand((char*)cmd->data());
 
-      if( CMD_STATUS_OK == res ){
+      // if( CMD_STATUS_OK == res ){
         break;
-      }
+      // }
     }
   }
+
+  // start new interaction
+  startInteraction();
 
   return res;
 }
 
 /**
- * Command status to console string 
+ * Make command terminal ready for interaction 
  *
  * @param cmd_status_t status
  */
-void CommandLineServiceProvider::CMDStatusToSerial(cmd_status_t status)
+void CommandLineServiceProvider::startInteraction()
 {
-  switch (status)
-  {
-  case CMD_STATUS_ARGS_ERROR:
-    LogE("\nArg Error\n");
-    break;
-  case CMD_STATUS_ARGS_MISSING:
-    LogE("\nArg Missing\n");
-    break;
-  case CMD_STATUS_NOT_FOUND:
-    LogE("\nCMD Not Found\n");
-    break;
-  case CMD_STATUS_INVALID:
-    LogE("\nCMD invalid\n");
-    break;
-  case CMD_STATUS_INVALID_OPTION:
-    LogE("\nOption invalid\n");
-    break;
-  case CMD_STATUS_EMPTY:
-    LogE("\nCMD empty\n");
-    break;
-  case CMD_STATUS_NEED_AUTH:
-    LogE("\nRequired login\n");
-    break;
-  case CMD_STATUS_WRONG_CREDENTIAL:
-    LogE("\nWrong Credential\n");
-    break;
-  case CMD_STATUS_MAX:
-    LogE("\nUnknown\n");
-    break;
-  case CMD_STATUS_OK:
-    LogS("\nSuccess\n");
-    break;
-  default:
-    break;
+  if( nullptr != m_cmdterminal ){
+
+		m_cmdterminal->write_ro(RODT_ATTR("\npdistack : "));
   }
 }
 

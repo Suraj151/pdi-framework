@@ -17,43 +17,43 @@ created Date    : 1st June 2019
 #include <webserver/WebServer.h>
 #endif
 
-#include <service_provider/DatabaseServiceProvider.h>
-#include <service_provider/FactoryResetServiceProvider.h>
+#include <service_provider/database/DatabaseServiceProvider.h>
+#include <service_provider/device/FactoryResetServiceProvider.h>
 
 #ifdef ENABLE_GPIO_SERVICE
-#include <service_provider/GpioServiceProvider.h>
+#include <service_provider/device/GpioServiceProvider.h>
 #endif
 
 #ifdef ENABLE_WIFI_SERVICE
-#include <service_provider/WiFiServiceProvider.h>
+#include <service_provider/network/WiFiServiceProvider.h>
 #endif
 
 #ifdef ENABLE_OTA_SERVICE
-#include <service_provider/OtaServiceProvider.h>
+#include <service_provider/device/OtaServiceProvider.h>
 #endif
 
 #ifdef ENABLE_MQTT_SERVICE
-#include <service_provider/MqttServiceProvider.h>
+#include <service_provider/transport/MqttServiceProvider.h>
 #endif
 
 #ifdef ENABLE_EMAIL_SERVICE
-#include <service_provider/EmailServiceProvider.h>
+#include <service_provider/email/EmailServiceProvider.h>
 #endif
 
 #ifdef ENABLE_DEVICE_IOT
-#include <service_provider/DeviceIotServiceProvider.h>
+#include <service_provider/iot/DeviceIotServiceProvider.h>
 #endif
 
 #ifdef ENABLE_SERIAL_SERVICE
-#include <service_provider/SerialServiceProvider.h>
+#include <service_provider/transport/SerialServiceProvider.h>
 #endif
 
 #ifdef ENABLE_AUTH_SERVICE
-#include <service_provider/AuthServiceProvider.h>
+#include <service_provider/auth/AuthServiceProvider.h>
 #endif
 
 #ifdef ENABLE_CMD_SERVICE
-#include <service_provider/CommandLineServiceProvider.h>
+#include <service_provider/cmd/CommandLineServiceProvider.h>
 #endif
 
 /**

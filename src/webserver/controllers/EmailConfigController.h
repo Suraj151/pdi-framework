@@ -12,7 +12,7 @@ created Date    : 1st June 2019
 #define _WEB_SERVER_EMAIL_CONFIG_CONTROLLER_
 
 #include "Controller.h"
-#include <service_provider/EmailServiceProvider.h>
+#include <service_provider/email/EmailServiceProvider.h>
 #include <webserver/pages/EmailConfigPage.h>
 #include <webserver/pages/WiFiConfigPage.h>
 

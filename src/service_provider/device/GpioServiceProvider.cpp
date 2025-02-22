@@ -26,10 +26,11 @@ __gpio_alert_track_t __gpio_alert_track = {
  */
 GpioServiceProvider::GpioServiceProvider():
   m_gpio_http_request_cb_id(0),
-  m_update_gpio_table_from_copy(true)
+  m_update_gpio_table_from_copy(true),
   #ifdef ENABLE_HTTP_CLIENT
-  ,m_http_client(Http_Client::GetStaticInstance())
+  m_http_client(Http_Client::GetStaticInstance()),
   #endif
+  ServiceProvider(SERVICE_GPIO)
 {
   for (size_t i = 0; i < MAX_DIGITAL_GPIO_PINS; i++) {
     this->m_digital_blinker[i] = nullptr;

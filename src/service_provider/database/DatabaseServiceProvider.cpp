@@ -9,7 +9,7 @@ created Date    : 1st June 2019
 ******************************************************************************/
 
 #include "DatabaseServiceProvider.h"
-#include "FactoryResetServiceProvider.h"
+#include <service_provider/device/FactoryResetServiceProvider.h>
 
 /**
  * @var	GlobalTable	__global_table
@@ -76,7 +76,7 @@ DeviceIotTable __device_iot_table;
 /**
  * Constructor
  */
-DatabaseServiceProvider::DatabaseServiceProvider()
+DatabaseServiceProvider::DatabaseServiceProvider() : ServiceProvider(SERVICE_DATABASE)
 {
 }
 

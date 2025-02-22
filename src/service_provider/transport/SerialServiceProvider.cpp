@@ -14,13 +14,13 @@ created Date    : 1st June 2019
 
 #include "SerialServiceProvider.h"
 #ifdef ENABLE_CMD_SERVICE
-#include "CommandLineServiceProvider.h"
+#include <service_provider/cmd/CommandLineServiceProvider.h>
 #endif
 
 /**
  * SerialServiceProvider constructor
  */
-SerialServiceProvider::SerialServiceProvider()
+SerialServiceProvider::SerialServiceProvider() : ServiceProvider(SERVICE_SERIAL)
 {
 }
 
@@ -88,10 +88,9 @@ void SerialServiceProvider::processSerial(serial_event_t *se)
 
       LogFmtI("serial uart recv (%d) : %s\n", recvdata.size(), recvdata.c_str());
 
-      // process and execute command
+      // process and execute if command has provided
       #ifdef ENABLE_CMD_SERVICE
       cmd_status_t status = __cmd_service.executeCommand(&recvdata);
-      CommandLineServiceProvider::CMDStatusToSerial(status);
       #endif
 
       // make sure to flush serial if no more data available

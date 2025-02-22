@@ -12,10 +12,10 @@ created Date    : 1st June 2019
 #define _MQTT_SERVICE_PROVIDER_H_
 
 #include <service_provider/ServiceProvider.h>
-#include <service_provider/DatabaseServiceProvider.h>
+#include <service_provider/database/DatabaseServiceProvider.h>
 
 #ifdef ENABLE_GPIO_SERVICE
-#include <service_provider/GpioServiceProvider.h>
+#include <service_provider/device/GpioServiceProvider.h>
 #endif
 #include <transports/mqtt/MqttClient.h>
 

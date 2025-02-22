@@ -156,7 +156,7 @@ created Date    : 1st June 2019
 /**
  * enable/disable logs here
  */
-#define ENABLE_LOG_ALL
+// #define ENABLE_LOG_ALL
 // #define ENABLE_LOG_INFO
 // #define ENABLE_LOG_WARNING
 // #define ENABLE_LOG_ERROR

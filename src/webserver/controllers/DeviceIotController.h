@@ -14,7 +14,7 @@ created Date    : 1st June 2019
 #include "Controller.h"
 #include <webserver/pages/WiFiConfigPage.h>
 #include <webserver/pages/DeviceIotPage.h>
-#include <service_provider/DeviceIotServiceProvider.h>
+#include <service_provider/iot/DeviceIotServiceProvider.h>
 
 /**
  * DeviceIotController class

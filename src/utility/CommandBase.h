@@ -106,6 +106,24 @@ typedef struct CommandBase {
 		return false;
 	}
 
+	/* retrieve available option from parsed command line data */
+	CommandOption* RetrieveOption(const char* _optn){
+
+		if( nullptr != _optn ){
+
+			for (uint8_t i = 0; i < CMD_OPTION_MAX; i++)
+			{
+				if (options[i].optionval != nullptr && options[i].optionvalsize > 0 &&
+					__are_str_equals(options[i].option, _optn, CMD_OPTION_SIZE_MAX)
+				){
+
+					return &options[i];
+				}
+			}
+		}
+		return nullptr;
+	}
+
 	/* check whether passed argument is matching with current/this command */
 	bool isValidCommand(char* _cmd){
 		// return ((nullptr != _cmd) && __are_str_equals(cmd, _cmd, CMD_SIZE_MAX));
@@ -125,7 +143,7 @@ typedef struct CommandBase {
 	}
 
 	/* parse passed command and argument is matching with available options */
-	cmd_status_t parseCmdOptions(char* _args){
+	cmd_status_t executeCommand(char* _args){
 
 		cmd_status_t status = CMD_STATUS_EMPTY;
 
@@ -203,11 +221,12 @@ typedef struct CommandBase {
 		/* execute command if format is ok */
 		if( CMD_STATUS_OK == status ){
 			if( nullptr != m_terminal ){
-				m_terminal->write_ro(RODT_ATTR("Exec command : "));
+				// m_terminal->write_ro(RODT_ATTR("Executing cmd : "));
 				m_terminal->write(cmd);
 				m_terminal->write(RODT_ATTR("\n"));
 			}
 			status = execute();
+			StatusToTerminal(status);
 		}
 
 		// once executed clear the option value and their value
@@ -227,6 +246,53 @@ typedef struct CommandBase {
 		}
 		optionindx = 0;
 		m_terminal = nullptr;
+	}
+
+	/* put final result on terminal */
+	void StatusToTerminal(cmd_status_t status){
+
+		if( nullptr != m_terminal ){
+
+			m_terminal->write_ro(RODT_ATTR("\n\ncmd status : "));
+
+			switch (status)
+			{
+			case CMD_STATUS_ARGS_ERROR:
+				m_terminal->write_ro(RODT_ATTR("Arg Error"));
+				break;
+			case CMD_STATUS_ARGS_MISSING:
+				m_terminal->write_ro(RODT_ATTR("Arg Missing"));
+				break;
+			case CMD_STATUS_NOT_FOUND:
+				m_terminal->write_ro(RODT_ATTR("CMD Not Found"));
+				break;
+			case CMD_STATUS_INVALID:
+				m_terminal->write_ro(RODT_ATTR("CMD invalid"));
+				break;
+			case CMD_STATUS_INVALID_OPTION:
+				m_terminal->write_ro(RODT_ATTR("Option invalid"));
+				break;
+			case CMD_STATUS_EMPTY:
+				m_terminal->write_ro(RODT_ATTR("CMD empty"));
+				break;
+			case CMD_STATUS_NEED_AUTH:
+				m_terminal->write_ro(RODT_ATTR("Required login"));
+				break;
+			case CMD_STATUS_WRONG_CREDENTIAL:
+				m_terminal->write_ro(RODT_ATTR("Wrong Credential"));
+				break;
+			case CMD_STATUS_MAX:
+				m_terminal->write_ro(RODT_ATTR("Unknown"));
+				break;
+			case CMD_STATUS_OK:
+				m_terminal->write_ro(RODT_ATTR("Success"));
+				break;
+			default:
+				break;
+			}
+
+			m_terminal->write_ro(RODT_ATTR("\n\n"));
+		}
 	}
 
 	/* derived command can implement auth necesity */

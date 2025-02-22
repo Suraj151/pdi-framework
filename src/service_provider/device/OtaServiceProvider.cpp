@@ -17,7 +17,7 @@ created Date    : 1st June 2019
 /**
  * OtaServiceProvider constructor.
  */
-OtaServiceProvider::OtaServiceProvider() : m_http_client(Http_Client::GetStaticInstance())
+OtaServiceProvider::OtaServiceProvider() : m_http_client(Http_Client::GetStaticInstance()), ServiceProvider(SERVICE_OTA)
 {
 }
 

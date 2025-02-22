@@ -12,7 +12,7 @@ created Date    : 1st June 2019
 #define _WIFI_SERVICE_PROVIDER_H_
 
 #include <service_provider/ServiceProvider.h>
-#include <service_provider/DatabaseServiceProvider.h>
+#include <service_provider/database/DatabaseServiceProvider.h>
 
 /**
  * WiFiServiceProvider class

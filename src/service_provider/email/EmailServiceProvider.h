@@ -13,7 +13,7 @@ created Date    : 1st June 2019
 
 #include <service_provider/ServiceProvider.h>
 #ifdef ENABLE_GPIO_SERVICE
-#include <service_provider/GpioServiceProvider.h>
+#include <service_provider/device/GpioServiceProvider.h>
 #endif
 #include <transports/smtp/SMTPClient.h>
 

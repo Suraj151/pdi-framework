@@ -12,10 +12,10 @@ created Date    : 1st June 2019
 #define _GPIO_SERVICE_PROVIDER_H_
 
 #include <service_provider/ServiceProvider.h>
-#include <service_provider/DatabaseServiceProvider.h>
+#include <service_provider/database/DatabaseServiceProvider.h>
 
 #ifdef ENABLE_EMAIL_SERVICE
-#include <service_provider/EmailServiceProvider.h>
+#include <service_provider/email/EmailServiceProvider.h>
 #endif
 
 #ifdef ENABLE_HTTP_CLIENT

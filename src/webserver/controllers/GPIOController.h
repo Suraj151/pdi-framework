@@ -13,7 +13,7 @@ created Date    : 1st June 2019
 
 #include "Controller.h"
 #include <webserver/pages/GpioConfigPage.h>
-#include <service_provider/GpioServiceProvider.h>
+#include <service_provider/device/GpioServiceProvider.h>
 
 /**
  * GpioController class

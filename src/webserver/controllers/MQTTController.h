@@ -13,7 +13,7 @@ created Date    : 1st June 2019
 
 #include "Controller.h"
 #include <webserver/pages/MqttConfigPage.h>
-#include <service_provider/MqttServiceProvider.h>
+#include <service_provider/transport/MqttServiceProvider.h>
 
 /**
  * MqttController class

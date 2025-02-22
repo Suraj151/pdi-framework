@@ -12,7 +12,7 @@ created Date    : 1st June 2019
 #define _AUTH_SERVICE_H_
 
 #include <service_provider/ServiceProvider.h>
-#include "DatabaseServiceProvider.h"
+#include <service_provider/database/DatabaseServiceProvider.h>
 
 /**
  * AuthServiceProvider class

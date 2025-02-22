@@ -24,7 +24,8 @@ MqttServiceProvider::MqttServiceProvider():
   m_mqtt_payload(nullptr),
   m_mqtt_publish_data_cb(nullptr),
   m_mqtt_subscribe_data_cb(nullptr),
-  m_client(nullptr)
+  m_client(nullptr),
+  ServiceProvider(SERVICE_MQTT)
 {
 }
 
