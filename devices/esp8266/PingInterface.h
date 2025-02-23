@@ -16,6 +16,8 @@ created Date    : 1st June 2019
 
 // This function is called when a ping is received or the request times out:
 static void ICACHE_FLASH_ATTR ping_recv_cb(void* arg, void* pdata);
+// This function is called when a ping is sent
+static void ICACHE_FLASH_ATTR ping_sent_cb(void* arg, void* pdata);
 
 /**
  * PingInterface class

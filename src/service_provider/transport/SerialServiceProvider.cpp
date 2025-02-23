@@ -90,7 +90,7 @@ void SerialServiceProvider::processSerial(serial_event_t *se)
 
       // process and execute if command has provided
       #ifdef ENABLE_CMD_SERVICE
-      cmd_status_t status = __cmd_service.executeCommand(&recvdata);
+      cmd_result_t result = __cmd_service.executeCommand(&recvdata);
       #endif
 
       // make sure to flush serial if no more data available

@@ -39,7 +39,7 @@ public:
      * init service
      */
     bool initService() override;
-	cmd_status_t executeCommand(pdiutil::string *cmd = nullptr);
+	cmd_result_t executeCommand(pdiutil::string *cmd = nullptr);
 	static void startInteraction();
 
 	/**

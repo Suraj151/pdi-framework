@@ -30,6 +30,21 @@ static void ICACHE_FLASH_ATTR ping_recv_cb (void* arg, void *pdata){
   }
 }
 
+// This function is called when a ping is sent
+static void ICACHE_FLASH_ATTR ping_sent_cb (void* arg, void *pdata){
+
+  // struct ping_msg *pingmsg = (struct ping_msg *)pdata;
+
+  // if( nullptr != pingmsg ){
+
+  //   uint32_t delay = pingmsg->ping_start;
+  //   delay /= PING_COARSE;
+
+  //   LogFmtI("ping %d, timeout %d, payload %d bytes, %d ms\n",
+  //       pingmsg->max_count, pingmsg->timeout_count, PING_DATA_SIZE*(pingmsg->max_count - pingmsg->timeout_count), delay);
+  // }
+}
+
 /**
  * PingInterface constructor.
  */
@@ -55,7 +70,7 @@ void PingInterface::init_ping( iWiFiInterface* _wifi ){
   // m_opt.sent_function = NULL;
   // m_opt.recv_function = NULL;
   // m_opt.reverse = NULL;
-  ping_regist_sent(&this->m_opt, NULL);
+  ping_regist_sent(&this->m_opt, ping_sent_cb);
   // ping_regist_recv(&this->m_opt, reinterpret_cast<ping_recv_function>(&PingInterface::ping_recv));
   ping_regist_recv(&this->m_opt, ping_recv_cb);
 }

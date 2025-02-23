@@ -37,16 +37,16 @@ struct GpioCommand : public CommandBase {
 #endif
 
 	/* execute command with provided options */
-	cmd_status_t execute(){
+	cmd_result_t execute(){
 
 #ifdef ENABLE_AUTH_SERVICE
 		// return in case authentication needed and not authorized yet
 		if( needauth() && !__auth_service.getAuthorized()){
-			return CMD_STATUS_NEED_AUTH;
+			return CMD_RESULT_NEED_AUTH;
 		}
 #endif
 
-		cmd_status_t status = CMD_STATUS_OK;
+		cmd_result_t result = CMD_RESULT_OK;
 
 		int16_t _pin = -1; 
 		int16_t _mode = -1; 
@@ -84,11 +84,11 @@ struct GpioCommand : public CommandBase {
 			__gpio_service.handleGpioModes(GPIO_WRITE_CONFIG);
 		}else{
 
-			status = CMD_STATUS_ARGS_MISSING;
+			result = CMD_RESULT_ARGS_MISSING;
 		}
 
 		// LogI("\n");
-		return status;
+		return result;
 	}
 };
 #endif

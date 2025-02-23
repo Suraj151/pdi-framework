@@ -31,9 +31,9 @@ struct LoginCommand : public CommandBase {
 	}
 
 	/* execute command with provided options */
-	cmd_status_t execute(){
+	cmd_result_t execute(){
 
-		cmd_status_t status = CMD_STATUS_OK;
+		cmd_result_t result = CMD_RESULT_OK;
 
 		if( !__auth_service.getAuthorized() ){
 
@@ -43,25 +43,53 @@ struct LoginCommand : public CommandBase {
 			memset(_username, 0, LOGIN_CONFIGS_BUF_SIZE);
 			memset(_password, 0, LOGIN_CONFIGS_BUF_SIZE);
 
-			CommandOption *cmdoptn = RetrieveOption(CMD_OPTION_NAME_U);		
-			if( nullptr != cmdoptn ){
-				memcpy(_username, cmdoptn->optionval, cmdoptn->optionvalsize);
+			CommandOption *usernamecmdoptn = RetrieveOption(CMD_OPTION_NAME_U);	
+			CommandOption *passwordcmdoptn = RetrieveOption(CMD_OPTION_NAME_P);	
+
+			bool isUsernameProvided = ( nullptr != usernamecmdoptn && nullptr != usernamecmdoptn->optionval && usernamecmdoptn->optionvalsize );
+			bool isPasswordProvided = ( nullptr != passwordcmdoptn && nullptr != passwordcmdoptn->optionval && passwordcmdoptn->optionvalsize );
+
+			if( isUsernameProvided ){
+				memcpy(_username, usernamecmdoptn->optionval, usernamecmdoptn->optionvalsize);
+				if( !isPasswordProvided ){
+					holdOptionValue(CMD_OPTION_NAME_U);
+				}
+			}else{
+				setWaitingForOption(CMD_OPTION_NAME_U);
+				if( nullptr != m_terminal ){
+					m_terminal->write_ro(RODT_ATTR("\n"));
+      				m_terminal->write(CMD_NAME_LOGIN);
+					m_terminal->write_ro(RODT_ATTR(": "));
+				}
+				return CMD_RESULT_INCOMPLETE;
 			}
 
-			cmdoptn = RetrieveOption(CMD_OPTION_NAME_P);
-			if( nullptr != cmdoptn ){
-				memcpy(_password, cmdoptn->optionval, cmdoptn->optionvalsize);
+			if( isPasswordProvided ){
+				memcpy(_password, passwordcmdoptn->optionval, passwordcmdoptn->optionvalsize);
+			}else{
+				setWaitingForOption(CMD_OPTION_NAME_P);
+				if( nullptr != m_terminal ){
+					m_terminal->write_ro(RODT_ATTR("\nPass : "));
+				}
+				return CMD_RESULT_INCOMPLETE;
 			}
 
 			if( strlen(_username) && strlen(_password) && __auth_service.isAuthorized(_username, _password) ){
 				__auth_service.setAuthorized(true);
 			}else{
 
-				status = CMD_STATUS_WRONG_CREDENTIAL;
+				result = CMD_RESULT_WRONG_CREDENTIAL;
+				ResultToTerminal(result);
+				setWaitingForOption(CMD_OPTION_NAME_U);
+				if( nullptr != m_terminal ){
+					m_terminal->write_ro(RODT_ATTR("\n"));
+      				m_terminal->write(CMD_NAME_LOGIN);
+					m_terminal->write_ro(RODT_ATTR(": "));
+				}
 			}
 		}
 
-		return status;
+		return result;
 	}
 };
 
@@ -78,11 +106,11 @@ struct LogoutCommand : public CommandBase {
 	}
 
 	/* execute command with provided options */
-	cmd_status_t execute(){
+	cmd_result_t execute(){
 
-		cmd_status_t status = CMD_STATUS_OK;
+		cmd_result_t result = CMD_RESULT_OK;
 		__auth_service.setAuthorized(false);
-		return status;
+		return result;
 	}
 };
 

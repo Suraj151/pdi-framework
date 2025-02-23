@@ -36,6 +36,7 @@ public:
 
 	void setAuthorized(bool auth);
 	bool getAuthorized();
+	const char* getUsername();
 
   	void printConfigToTerminal(iTerminalInterface *terminal) override;
 private:

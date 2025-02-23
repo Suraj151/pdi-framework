@@ -71,11 +71,21 @@ void AuthServiceProvider::setAuthorized(bool auth)
 /**
  * get authorised status
  *
- * @return bool auth
+ * @return bool
  */
 bool AuthServiceProvider::getAuthorized()
 {
   return m_isAuthorized;
+}
+
+/**
+ * get username
+ *
+ * @return const char*
+ */
+const char *AuthServiceProvider::getUsername()
+{
+    return m_login_credentials.username;
 }
 
 /**

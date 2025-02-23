@@ -17,15 +17,23 @@ created Date    : 1st June 2019
 
 /* command results */
 typedef enum {
-    CMD_STATUS_OK = 0,
-    CMD_STATUS_ARGS_ERROR,
-    CMD_STATUS_ARGS_MISSING,
-    CMD_STATUS_NOT_FOUND,
-    CMD_STATUS_INVALID,
-    CMD_STATUS_INVALID_OPTION,
-    CMD_STATUS_EMPTY,
-    CMD_STATUS_NEED_AUTH,
-    CMD_STATUS_WRONG_CREDENTIAL,
+    CMD_RESULT_OK = 0,
+    CMD_RESULT_ARGS_ERROR,
+    CMD_RESULT_ARGS_MISSING,
+    CMD_RESULT_NOT_FOUND,
+    CMD_RESULT_INVALID,
+    CMD_RESULT_INVALID_OPTION,
+    CMD_RESULT_NEED_AUTH,
+    CMD_RESULT_INCOMPLETE, // may need more input from user
+    CMD_RESULT_WRONG_CREDENTIAL,
+    CMD_RESULT_MAX
+} cmd_result_t;
+
+/* command status */
+typedef enum {
+    CMD_STATUS_IDLE = 0,
+    CMD_STATUS_ACTIVE,
+    CMD_STATUS_INACTIVE,
     CMD_STATUS_MAX
 } cmd_status_t;
 
@@ -45,25 +53,36 @@ typedef struct CommandBase {
 		char option[CMD_OPTION_SIZE_MAX];
 		char *optionval;
 		int16_t optionvalsize;
+		bool holdingoptn;
 
 		/* Constructor */
-		CommandOption(){
-			Clear();
+		CommandOption() : optionval(nullptr), optionvalsize(0), holdingoptn(false){
+			Clear(true);
 		}
 
 		/* Clear */
-		void Clear(){
-			memset(option, 0, CMD_OPTION_SIZE_MAX);
+		void Clear(bool deep=false){
+			if(holdingoptn && nullptr != optionval && optionvalsize){
+				delete[] optionval;
+			}
 			optionval = nullptr;
 			optionvalsize = 0;
+			holdingoptn = false;
+			if(deep){
+				memset(option, 0, CMD_OPTION_SIZE_MAX);
+			}
 		}
 	};
 	
 	/* members */
-	char cmd[CMD_SIZE_MAX];
-	CommandOption options[CMD_OPTION_MAX];
-	uint8_t optionindx;
+	char m_cmd[CMD_SIZE_MAX];
+	CommandOption m_options[CMD_OPTION_MAX];
+	uint8_t m_optionindx;
+	int8_t m_waitingoptionindx;
 	iTerminalInterface *m_terminal;
+	cmd_status_t m_status;
+	cmd_result_t m_result;
+
 
 	/* Constructor */
 	CommandBase(){
@@ -83,7 +102,7 @@ typedef struct CommandBase {
 			int16_t cmdsize = strlen(_cmd);
 
 			if( cmdsize < CMD_SIZE_MAX ){
-				memcpy(cmd, _cmd, cmdsize);
+				memcpy(m_cmd, _cmd, cmdsize);
 				return true;
 			}
 		}
@@ -97,9 +116,9 @@ typedef struct CommandBase {
 
 			int16_t optnsize = strlen(_optn);
 
-			if( optionindx < CMD_OPTION_MAX && optnsize < CMD_OPTION_SIZE_MAX ){
-				memcpy(options[optionindx].option, _optn, optnsize);
-				optionindx++;
+			if( m_optionindx < CMD_OPTION_MAX && optnsize < CMD_OPTION_SIZE_MAX ){
+				memcpy(m_options[m_optionindx].option, _optn, optnsize);
+				m_optionindx++;
 				return true;
 			}
 		}
@@ -113,11 +132,11 @@ typedef struct CommandBase {
 
 			for (uint8_t i = 0; i < CMD_OPTION_MAX; i++)
 			{
-				if (options[i].optionval != nullptr && options[i].optionvalsize > 0 &&
-					__are_str_equals(options[i].option, _optn, CMD_OPTION_SIZE_MAX)
+				if (m_options[i].optionval != nullptr && m_options[i].optionvalsize > 0 &&
+					__are_str_equals(m_options[i].option, _optn, CMD_OPTION_SIZE_MAX)
 				){
 
-					return &options[i];
+					return &m_options[i];
 				}
 			}
 		}
@@ -127,171 +146,236 @@ typedef struct CommandBase {
 	/* check whether passed argument is matching with current/this command */
 	bool isValidCommand(char* _cmd){
 		// return ((nullptr != _cmd) && __are_str_equals(cmd, _cmd, CMD_SIZE_MAX));
-		return ((nullptr != _cmd) && __are_arrays_equal(cmd, _cmd, strlen(cmd)));
+		return ((nullptr != _cmd) && __are_arrays_equal(m_cmd, _cmd, strlen(m_cmd)));
 	}
 
 	/* check whether passed argument is matching with available options and return its index */
-	int8_t isValidOption(char* _optn){
+	int8_t getOptionIndex(const char* _optn){
 
 		for (uint8_t i = 0; nullptr != _optn && i < CMD_OPTION_MAX; i++){
 
-			if(__are_str_equals(options[i].option, _optn, CMD_OPTION_SIZE_MAX)){
+			if(__are_str_equals(m_options[i].option, _optn, CMD_OPTION_SIZE_MAX)){
 				return i;
 			}
 		}
 		return -1;
 	}
 
-	/* parse passed command and argument is matching with available options */
-	cmd_status_t executeCommand(char* _args){
+	/* check whether passed argument is valid option */
+	bool isValidOption(const char* _optn){
+		return (getOptionIndex(_optn) != -1);
+	}
 
-		cmd_status_t status = CMD_STATUS_EMPTY;
+	/* return if command is waiting for option */
+	bool isWaitingForOption(){
+		return (m_waitingoptionindx != -1);
+	}
+
+	/* Set flag which indicates that command need more input from user */
+	void setWaitingForOption(const char* _optn){
+		m_waitingoptionindx = getOptionIndex(_optn);
+	}
+
+	/* hold the option value if provided */
+	bool holdOptionValue(const char* _optn){
+
+		bool bStatus = false;
+		int8_t optindx = getOptionIndex(_optn);
+
+		if( optindx != -1 && optindx < m_optionindx ){
+
+			if( !m_options[optindx].holdingoptn &&
+				nullptr != m_options[optindx].optionval && 
+				m_options[optindx].optionvalsize ){
+
+				char *val = new char[m_options[optindx].optionvalsize+2]();
+				memset(val, 0, m_options[optindx].optionvalsize+2);
+				memcpy(val, m_options[optindx].optionval, m_options[optindx].optionvalsize);
+				m_options[optindx].optionval = val;
+				m_options[optindx].holdingoptn = true;
+			}
+
+			bStatus = m_options[optindx].holdingoptn;
+		}
+
+		return bStatus;
+	}
+
+	/* parse passed command and argument is matching with available options */
+	cmd_result_t executeCommand(char* _args, int16_t _len, bool _waiting_option = false){
+
+		m_result = CMD_RESULT_MAX;
 
 		if(_args != nullptr){
 
-			int16_t cmd_max_len = strlen(_args);
-			int16_t cmd_start_indx = __strstr(_args, cmd);
-			int16_t cmd_end_indx = __strstr(_args+cmd_start_indx, " ");
-			cmd_end_indx = cmd_end_indx < 0 ? cmd_max_len : (cmd_start_indx+cmd_end_indx);
+			if( !_waiting_option ){
 
-			if( cmd_start_indx >= 0 && cmd_start_indx < cmd_end_indx && cmd_end_indx <= cmd_max_len ){
+				int16_t cmd_max_len = _len;
+				int16_t cmd_start_indx = __strstr(_args, m_cmd);
+				int16_t cmd_end_indx = __strstr(_args+cmd_start_indx, " ");
+				cmd_end_indx = cmd_end_indx < 0 ? cmd_max_len : (cmd_start_indx+cmd_end_indx);
 
-				char argcmd[CMD_SIZE_MAX];
-				memset(argcmd, 0, CMD_SIZE_MAX);
-				memcpy(argcmd, _args+cmd_start_indx, abs(cmd_end_indx-cmd_start_indx));
+				if( cmd_start_indx >= 0 && cmd_start_indx < cmd_end_indx && cmd_end_indx <= cmd_max_len ){
 
-				if( isValidCommand(argcmd) ){
+					char argcmd[CMD_SIZE_MAX];
+					memset(argcmd, 0, CMD_SIZE_MAX);
+					memcpy(argcmd, _args+cmd_start_indx, abs(cmd_end_indx-cmd_start_indx));
 
-					char argoptn[CMD_OPTION_SIZE_MAX];
-					
-					// get the option start and end indices
-					int16_t optn_start_indx = cmd_end_indx;
-					int16_t optn_end_indx = __strstr(_args+optn_start_indx, CMD_OPTION_ASSIGN_OPERATOR);
-					optn_end_indx += optn_end_indx != -1 ? optn_start_indx : 0;
+					if( isValidCommand(argcmd) ){
 
-					if( optn_end_indx != -1 && optionindx > 0 ){
+						char argoptn[CMD_OPTION_SIZE_MAX];
+						
+						// get the option start and end indices
+						int16_t optn_start_indx = cmd_end_indx;
+						int16_t optn_end_indx = __strstr(_args+optn_start_indx, CMD_OPTION_ASSIGN_OPERATOR);
+						optn_end_indx += optn_end_indx != -1 ? optn_start_indx : 0;
 
-						if( optn_end_indx < cmd_max_len && optn_start_indx < optn_end_indx ){
+						if( optn_end_indx != -1 && m_optionindx > 0 ){
 
-							do
-							{
-								memset(argoptn, 0, CMD_OPTION_SIZE_MAX);
-								memcpy(argoptn, _args+optn_start_indx, optn_end_indx-optn_start_indx);
+							if( optn_end_indx < cmd_max_len && optn_start_indx < optn_end_indx ){
 
-								// get the option value start and end indices
-								int16_t optn_val_start_index = optn_end_indx+strlen(CMD_OPTION_ASSIGN_OPERATOR);
-								int16_t optn_val_end_index = __strstr(_args+optn_val_start_index, CMD_OPTION_SEPERATOR);
-								optn_val_end_index += optn_val_end_index != -1 ? optn_val_start_index : cmd_max_len+1;
-								char *argoptntrimmed = __strtrim(argoptn);
+								do
+								{
+									memset(argoptn, 0, CMD_OPTION_SIZE_MAX);
+									memcpy(argoptn, _args+optn_start_indx, optn_end_indx-optn_start_indx);
 
-								int8_t validoptnindex = isValidOption(argoptntrimmed);
-								if( validoptnindex != -1 ){
+									// get the option value start and end indices
+									int16_t optn_val_start_index = optn_end_indx+strlen(CMD_OPTION_ASSIGN_OPERATOR);
+									int16_t optn_val_end_index = __strstr(_args+optn_val_start_index, CMD_OPTION_SEPERATOR);
+									optn_val_end_index += optn_val_end_index != -1 ? optn_val_start_index : cmd_max_len+1;
+									char *argoptntrimmed = __strtrim(argoptn);
 
-									options[validoptnindex].optionval = __strtrim(_args+optn_val_start_index);
-									options[validoptnindex].optionvalsize = optn_val_end_index - optn_val_start_index;
-									status = CMD_STATUS_OK;
-								}else{
-									status = CMD_STATUS_INVALID_OPTION;
-									break;
-								}
-								
-								// next option start index will start with last option value end index
-								optn_start_indx = optn_val_end_index+strlen(CMD_OPTION_SEPERATOR);
-								// optn_start_indx += optn_start_indx != -1 ? (optn_val_end_index+strlen(CMD_OPTION_SEPERATOR)) : 0;
+									int8_t validoptnindex = getOptionIndex(argoptntrimmed);
+									if( validoptnindex != -1 ){
 
-								optn_end_indx = __strstr(_args+optn_start_indx, CMD_OPTION_ASSIGN_OPERATOR);
-								optn_end_indx += optn_end_indx != -1 ? optn_start_indx : 0;
-							} while ( optn_start_indx > 0 && optn_end_indx > 0 && optn_end_indx < cmd_max_len && optn_start_indx < optn_end_indx);
+										m_options[validoptnindex].optionval = __strtrim(_args+optn_val_start_index);
+										m_options[validoptnindex].optionvalsize = optn_val_end_index - optn_val_start_index;
+										m_result = CMD_RESULT_OK;
+									}else{
+										m_result = CMD_RESULT_INVALID_OPTION;
+										break;
+									}
+									
+									// next option start index will start with last option value end index
+									optn_start_indx = optn_val_end_index+strlen(CMD_OPTION_SEPERATOR);
+									// optn_start_indx += optn_start_indx != -1 ? (optn_val_end_index+strlen(CMD_OPTION_SEPERATOR)) : 0;
 
+									optn_end_indx = __strstr(_args+optn_start_indx, CMD_OPTION_ASSIGN_OPERATOR);
+									optn_end_indx += optn_end_indx != -1 ? optn_start_indx : 0;
+								} while ( optn_start_indx > 0 && optn_end_indx > 0 && optn_end_indx < cmd_max_len && optn_start_indx < optn_end_indx);
+
+							}else{
+								m_result = CMD_RESULT_ARGS_ERROR;
+							}
 						}else{
-							status = CMD_STATUS_ARGS_ERROR;
+							// if command dont have any options by default
+							m_result = CMD_RESULT_OK;
 						}
 					}else{
-						// if command dont have any options by default
-						status = CMD_STATUS_OK;
+						m_result = CMD_RESULT_INVALID;
 					}
 				}else{
-					status = CMD_STATUS_INVALID;
+					m_result = CMD_RESULT_NOT_FOUND;
 				}
 			}else{
-				status = CMD_STATUS_NOT_FOUND;
+
+				if( m_waitingoptionindx != -1 && m_waitingoptionindx < m_optionindx ){
+
+					m_options[m_waitingoptionindx].optionval = _args;
+					m_options[m_waitingoptionindx].optionvalsize = _len;
+					m_waitingoptionindx = -1;
+					m_result = CMD_RESULT_OK;
+				}else{
+
+				}
 			}
 		}
 
 		/* execute command if format is ok */
-		if( CMD_STATUS_OK == status ){
-			if( nullptr != m_terminal ){
-				// m_terminal->write_ro(RODT_ATTR("Executing cmd : "));
-				m_terminal->write(cmd);
-				m_terminal->write(RODT_ATTR("\n"));
-			}
-			status = execute();
-			StatusToTerminal(status);
+		if( CMD_RESULT_OK == m_result ){
+			
+			// if( nullptr != m_terminal ){
+			// 	m_terminal->write_ro(RODT_ATTR("Executing cmd : "));
+			// 	m_terminal->write(m_cmd);
+			// 	m_terminal->write(RODT_ATTR("\n"));
+			// }
+			
+			m_status = CMD_STATUS_ACTIVE;
+			m_result = execute();
 		}
 
-		// once executed clear the option value and their value
-		for (uint8_t i = 0; i < CMD_OPTION_MAX; i++){
-			options[i].optionval = nullptr;
-			options[i].optionvalsize = 0;
+		if( CMD_RESULT_INCOMPLETE != m_result ){
+			
+			m_status = CMD_STATUS_INACTIVE;
+			ResultToTerminal(m_result);
+
+			// once executed clear the options
+			ClearOptions();
 		}
 
-		return status;
+		return m_result;
 	}
 
 	/* Clear */
 	void Clear(){
-		memset(cmd, 0, CMD_SIZE_MAX);
-		for (uint8_t i = 0; i < CMD_OPTION_MAX; i++){
-			options[i].Clear();
-		}
-		optionindx = 0;
+		memset(m_cmd, 0, CMD_SIZE_MAX);
+		ClearOptions(true);
+		m_optionindx = 0;
 		m_terminal = nullptr;
+		m_status = CMD_STATUS_MAX;
+		m_result = CMD_RESULT_MAX;
+	}
+
+	/* Clear options */
+	void ClearOptions(bool deep=false){
+		for (uint8_t i = 0; i < CMD_OPTION_MAX; i++){
+			m_options[i].Clear(deep);
+		}
+		if(deep)
+			m_waitingoptionindx = -1;
 	}
 
 	/* put final result on terminal */
-	void StatusToTerminal(cmd_status_t status){
+	void ResultToTerminal(cmd_result_t res){
 
-		if( nullptr != m_terminal ){
+		if( nullptr != m_terminal && CMD_RESULT_INCOMPLETE != res && !isWaitingForOption() ){
 
-			m_terminal->write_ro(RODT_ATTR("\n\ncmd status : "));
+			m_terminal->write_ro(RODT_ATTR("\n"));
 
-			switch (status)
+			switch (res)
 			{
-			case CMD_STATUS_ARGS_ERROR:
+			case CMD_RESULT_ARGS_ERROR:
 				m_terminal->write_ro(RODT_ATTR("Arg Error"));
 				break;
-			case CMD_STATUS_ARGS_MISSING:
+			case CMD_RESULT_ARGS_MISSING:
 				m_terminal->write_ro(RODT_ATTR("Arg Missing"));
 				break;
-			case CMD_STATUS_NOT_FOUND:
+			case CMD_RESULT_NOT_FOUND:
 				m_terminal->write_ro(RODT_ATTR("CMD Not Found"));
 				break;
-			case CMD_STATUS_INVALID:
+			case CMD_RESULT_INVALID:
 				m_terminal->write_ro(RODT_ATTR("CMD invalid"));
 				break;
-			case CMD_STATUS_INVALID_OPTION:
+			case CMD_RESULT_INVALID_OPTION:
 				m_terminal->write_ro(RODT_ATTR("Option invalid"));
 				break;
-			case CMD_STATUS_EMPTY:
-				m_terminal->write_ro(RODT_ATTR("CMD empty"));
-				break;
-			case CMD_STATUS_NEED_AUTH:
+			case CMD_RESULT_NEED_AUTH:
 				m_terminal->write_ro(RODT_ATTR("Required login"));
 				break;
-			case CMD_STATUS_WRONG_CREDENTIAL:
+			case CMD_RESULT_WRONG_CREDENTIAL:
 				m_terminal->write_ro(RODT_ATTR("Wrong Credential"));
 				break;
-			case CMD_STATUS_MAX:
+			case CMD_RESULT_MAX:
 				m_terminal->write_ro(RODT_ATTR("Unknown"));
 				break;
-			case CMD_STATUS_OK:
+			case CMD_RESULT_OK:
 				m_terminal->write_ro(RODT_ATTR("Success"));
 				break;
 			default:
 				break;
 			}
 
-			m_terminal->write_ro(RODT_ATTR("\n\n"));
+			m_terminal->write_ro(RODT_ATTR("\n"));
 		}
 	}
 
@@ -299,7 +383,7 @@ typedef struct CommandBase {
 	virtual bool needauth() { return false; }
 
 	/* derived command should implement execute */
-	virtual cmd_status_t execute() = 0;
+	virtual cmd_result_t execute() = 0;
 
 } cmd_t;
 

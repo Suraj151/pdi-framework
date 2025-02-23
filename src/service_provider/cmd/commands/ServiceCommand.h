@@ -41,16 +41,16 @@ struct ServiceCommand : public CommandBase {
 #endif
 
 	/* execute command with provided options */
-	cmd_status_t execute(){
+	cmd_result_t execute(){
 
 #ifdef ENABLE_AUTH_SERVICE
 		// return in case authentication needed and not authorized yet
 		if( needauth() && !__auth_service.getAuthorized()){
-			return CMD_STATUS_NEED_AUTH;
+			return CMD_RESULT_NEED_AUTH;
 		}
 #endif
 
-		cmd_status_t status = CMD_STATUS_OK;
+		cmd_result_t result = CMD_RESULT_OK;
 		ServiceProvider *srvc = nullptr;
 		ServiceCommandQuery srvcq = SERVICE_COMMAND_QUERY_MAX;
 		CommandOption *cmdoptn = RetrieveOption(CMD_OPTION_NAME_S);
@@ -74,7 +74,7 @@ struct ServiceCommand : public CommandBase {
 			}
 		}
 
-		return status;
+		return result;
 	}
 };
 

@@ -22,18 +22,19 @@ iTerminalInterface *CommandLineServiceProvider::m_cmdterminal = nullptr;
  */
 CommandLineServiceProvider::CommandLineServiceProvider() : ServiceProvider(SERVICE_CMD)
 {
-  // Add commands in list
-  #ifdef ENABLE_GPIO_SERVICE
-  GpioCommand *gpiocmd = new GpioCommand();
-  m_cmdlist.push_back(gpiocmd);
-  #endif
-  
+  // Add commands in list  
   #ifdef ENABLE_AUTH_SERVICE
   LoginCommand *logincmd = new LoginCommand();
+  logincmd->setWaitingForOption(CMD_OPTION_NAME_U);
   m_cmdlist.push_back(logincmd);
 
   LogoutCommand *logoutcmd = new LogoutCommand();
   m_cmdlist.push_back(logoutcmd);
+  #endif
+
+  #ifdef ENABLE_GPIO_SERVICE
+  GpioCommand *gpiocmd = new GpioCommand();
+  m_cmdlist.push_back(gpiocmd);
   #endif
 
   ServiceCommand *svccmd = new ServiceCommand();
@@ -82,26 +83,40 @@ bool CommandLineServiceProvider::initService()
  * execute command provided or in list available
  *
  * @param pdiutil::string* cmd
- * @return cmd_status_t command result status
+ * @return cmd_result_t command result status
  */
-cmd_status_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd)
+cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd)
 {
-  cmd_status_t res = CMD_STATUS_NOT_FOUND;
+  cmd_result_t res = CMD_RESULT_NOT_FOUND;
+  bool is_executing_lastcommand = false;
 
+  // first check whether any last command is incomplete and waiting for user input
   for (int16_t i = 0; i < m_cmdlist.size(); i++){
+
+    if(nullptr != m_cmdlist[i] && m_cmdlist[i]->isWaitingForOption()){
+
+      is_executing_lastcommand = true;
+      res = m_cmdlist[i]->executeCommand((char*)cmd->data(), cmd->size(), true);
+      break;
+    }
+  }
+
+  for (int16_t i = 0; !is_executing_lastcommand && i < m_cmdlist.size(); i++){
 
     if(nullptr != m_cmdlist[i] && m_cmdlist[i]->isValidCommand((char*)cmd->data())){
 
-      res = m_cmdlist[i]->executeCommand((char*)cmd->data());
+      res = m_cmdlist[i]->executeCommand((char*)cmd->data(), cmd->size());
 
-      // if( CMD_STATUS_OK == res ){
+      // if( CMD_RESULT_OK == res ){
         break;
       // }
     }
   }
 
-  // start new interaction
-  startInteraction();
+  if( !is_executing_lastcommand || CMD_RESULT_OK == res ){
+    // start new interaction
+    startInteraction();
+  }
 
   return res;
 }
@@ -109,13 +124,27 @@ cmd_status_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd)
 /**
  * Make command terminal ready for interaction 
  *
- * @param cmd_status_t status
  */
 void CommandLineServiceProvider::startInteraction()
 {
   if( nullptr != m_cmdterminal ){
 
-		m_cmdterminal->write_ro(RODT_ATTR("\npdistack : "));
+	  m_cmdterminal->write_ro(RODT_ATTR("\n"));
+
+    #ifdef ENABLE_AUTH_SERVICE
+    if( __auth_service.getAuthorized() ){
+      m_cmdterminal->write(__auth_service.getUsername());
+		  m_cmdterminal->write_ro(RODT_ATTR("@"));
+      m_cmdterminal->write(__i_dvc_ctrl.getDeviceId());
+		  m_cmdterminal->write_ro(RODT_ATTR(": "));
+    }else{
+      m_cmdterminal->write(CMD_NAME_LOGIN);
+		  m_cmdterminal->write_ro(RODT_ATTR(": "));
+    }
+    #else
+      m_cmdterminal->write(__i_dvc_ctrl.getDeviceId());
+		  m_cmdterminal->write_ro(RODT_ATTR(": "));
+    #endif
   }
 }
 
