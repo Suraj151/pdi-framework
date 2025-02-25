@@ -25,7 +25,6 @@ CommandLineServiceProvider::CommandLineServiceProvider() : ServiceProvider(SERVI
   // Add commands in list  
   #ifdef ENABLE_AUTH_SERVICE
   LoginCommand *logincmd = new LoginCommand();
-  logincmd->setWaitingForOption(CMD_OPTION_NAME_U);
   m_cmdlist.push_back(logincmd);
 
   LogoutCommand *logoutcmd = new LogoutCommand();
@@ -68,15 +67,55 @@ bool CommandLineServiceProvider::initService()
       }
     }
 
-		m_cmdterminal->write_ro(RODT_ATTR("\n\nInitializing PDI Stack CMD\nRelease : "));
-    m_cmdterminal->write(RELEASE);
-		m_cmdterminal->write_ro(RODT_ATTR("\n\n"));
+		m_cmdterminal->write_ro(RODT_ATTR("\n\nStarted PDI Stack CMD\r\nRelease : "));
+    m_cmdterminal->writeln(RELEASE);
+
     startInteraction();
 
     return true;
   }
 
   return false;
+}
+
+/**
+ * execute command provided or in list available
+ *
+ * @param iTerminalInterface* terminal
+ * @return None
+ */
+void CommandLineServiceProvider::processTerminalInput(iTerminalInterface *terminal)
+{
+    if( nullptr == terminal ) return;
+
+    bool isEnteredLF = false;
+
+    while (terminal->available())
+    {
+      char c = terminal->read();
+      terminal->write(c);  
+
+      // break command on line ending
+      if (c == '\n' || c == '\r') {
+        
+        isEnteredLF = true;
+        break;
+      }else{
+
+        m_termrecvdata += c;
+      }
+      __i_dvc_ctrl.wait(1);
+    }
+
+    // 
+    if( !isEnteredLF ){
+      return;
+    }
+
+    cmd_result_t result = executeCommand(&m_termrecvdata);
+
+    // flush stored string
+    m_termrecvdata = "";
 }
 
 /**
@@ -90,26 +129,29 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd)
   cmd_result_t res = CMD_RESULT_NOT_FOUND;
   bool is_executing_lastcommand = false;
 
-  // first check whether any last command is incomplete and waiting for user input
-  for (int16_t i = 0; i < m_cmdlist.size(); i++){
+  if( nullptr != cmd && cmd->size() ){
 
-    if(nullptr != m_cmdlist[i] && m_cmdlist[i]->isWaitingForOption()){
+    // first check whether any last command is incomplete and waiting for user input
+    for (int16_t i = 0; i < m_cmdlist.size(); i++){
 
-      is_executing_lastcommand = true;
-      res = m_cmdlist[i]->executeCommand((char*)cmd->data(), cmd->size(), true);
-      break;
-    }
-  }
+      if(nullptr != m_cmdlist[i] && m_cmdlist[i]->isWaitingForOption()){
 
-  for (int16_t i = 0; !is_executing_lastcommand && i < m_cmdlist.size(); i++){
-
-    if(nullptr != m_cmdlist[i] && m_cmdlist[i]->isValidCommand((char*)cmd->data())){
-
-      res = m_cmdlist[i]->executeCommand((char*)cmd->data(), cmd->size());
-
-      // if( CMD_RESULT_OK == res ){
+        is_executing_lastcommand = true;
+        res = m_cmdlist[i]->executeCommand((char*)cmd->data(), cmd->size(), true);
         break;
-      // }
+      }
+    }
+
+    for (int16_t i = 0; !is_executing_lastcommand && i < m_cmdlist.size(); i++){
+
+      if(nullptr != m_cmdlist[i] && m_cmdlist[i]->isValidCommand((char*)cmd->data())){
+
+        res = m_cmdlist[i]->executeCommand((char*)cmd->data(), cmd->size());
+
+        // if( CMD_RESULT_OK == res ){
+          break;
+        // }
+      }
     }
   }
 
@@ -129,7 +171,7 @@ void CommandLineServiceProvider::startInteraction()
 {
   if( nullptr != m_cmdterminal ){
 
-	  m_cmdterminal->write_ro(RODT_ATTR("\n"));
+    m_cmdterminal->putln();
 
     #ifdef ENABLE_AUTH_SERVICE
     if( __auth_service.getAuthorized() ){
@@ -140,12 +182,34 @@ void CommandLineServiceProvider::startInteraction()
     }else{
       m_cmdterminal->write(CMD_NAME_LOGIN);
 		  m_cmdterminal->write_ro(RODT_ATTR(": "));
+
+      cmd_t *logincmd = __cmd_service.getCommandByName(CMD_NAME_LOGIN);
+      if( nullptr != logincmd ){
+        logincmd->setWaitingForOption(CMD_OPTION_NAME_U);
+      }
     }
     #else
       m_cmdterminal->write(__i_dvc_ctrl.getDeviceId());
 		  m_cmdterminal->write_ro(RODT_ATTR(": "));
     #endif
   }
+}
+
+/**
+ * Return command by provided name tag 
+ *
+ */
+cmd_t *CommandLineServiceProvider::getCommandByName(char *_cmd)
+{
+  for (int16_t i = 0; i < m_cmdlist.size(); i++){
+
+    if(nullptr != m_cmdlist[i] && m_cmdlist[i]->isValidCommand(_cmd)){
+
+      return m_cmdlist[i];
+    }
+  }
+
+  return nullptr;
 }
 
 CommandLineServiceProvider __cmd_service;

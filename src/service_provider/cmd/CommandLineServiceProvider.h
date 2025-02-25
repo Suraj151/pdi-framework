@@ -39,8 +39,11 @@ public:
      * init service
      */
     bool initService() override;
+
+	void processTerminalInput(iTerminalInterface *terminal);
 	cmd_result_t executeCommand(pdiutil::string *cmd = nullptr);
 	static void startInteraction();
+	cmd_t* getCommandByName(char* _cmd);
 
 	/**
 	 * @var	iTerminalInterface*	m_cmdterminal
@@ -53,6 +56,11 @@ private:
 	 * @var	pdiutil::vector<cmd_t>	m_cmdlist
 	 */
     pdiutil::vector<cmd_t*> m_cmdlist;
+
+	/**
+	 * @var	pdiutil::string	m_termrecvdata
+	 */
+    pdiutil::string m_termrecvdata;
 };
 
 extern CommandLineServiceProvider __cmd_service;

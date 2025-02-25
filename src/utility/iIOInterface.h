@@ -45,6 +45,11 @@ public:
   virtual uint32_t write(const char *c_str) { return write((const uint8_t*)c_str); }
   virtual uint32_t write(const char *c_str, uint32_t size) { return write((const uint8_t*)c_str, size); }
 
+  virtual uint32_t putln() { return write("\r\n"); }
+  virtual uint32_t writeln(char c) { return (write(c) + putln()); }
+  virtual uint32_t writeln(const char *c_str="") { return (write(c_str) + putln()); }
+  virtual uint32_t writeln(const char *c_str, uint32_t size) { return (write(c_str, size) + putln()); }
+
   virtual uint32_t write(int32_t val){
     char tembuff[25];
  		memset(tembuff, 0, 25);
@@ -59,10 +64,10 @@ public:
     return write(tembuff);
   }
 
-  virtual uint32_t write(uint32_t val, bool hex=false, bool capital=false){
+  virtual uint32_t write(uint32_t val, bool hex=false, bool cap=false){
     char tembuff[25];
  		memset(tembuff, 0, 25);
-		sprintf(tembuff, hex ? ( capital ? "%X" : "%x") : "%u", val);
+		sprintf(tembuff, hex ? ( cap ? "%X" : "%x") : "%u", val);
     return write(tembuff);
   }
 
@@ -73,7 +78,13 @@ public:
     return write(tembuff);
   }
 
+  virtual uint32_t writeln(int32_t val) { return (write(val) + putln()); }
+  virtual uint32_t writeln(int64_t val) { return (write(val) + putln()); }
+  virtual uint32_t writeln(double val) { return (write(val) + putln()); }
+  virtual uint32_t writeln(uint32_t val, bool hex=false, bool cap=false){ return (write(val,hex,cap) + putln()); }
+
   virtual uint32_t write_ro(const char *c_str) { return -1; }
+  virtual uint32_t writeln_ro(const char *c_str) { return (write_ro(c_str) + putln()); }
 
   // received data read api
   virtual uint8_t read() = 0;

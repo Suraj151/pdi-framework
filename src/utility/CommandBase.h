@@ -340,7 +340,7 @@ typedef struct CommandBase {
 
 		if( nullptr != m_terminal && CMD_RESULT_INCOMPLETE != res && !isWaitingForOption() ){
 
-			m_terminal->write_ro(RODT_ATTR("\n"));
+			m_terminal->writeln();
 
 			switch (res)
 			{
@@ -375,7 +375,7 @@ typedef struct CommandBase {
 				break;
 			}
 
-			m_terminal->write_ro(RODT_ATTR("\n"));
+			m_terminal->writeln();
 		}
 	}
 

@@ -95,9 +95,10 @@ void AuthServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
 {
   if( nullptr != terminal && m_initStatus ){
 
-    terminal->write_ro(RODT_ATTR("\nLogin Configs :\n"));
+    terminal->writeln();
+    terminal->writeln_ro(RODT_ATTR("Login Configs :"));
     terminal->write(m_login_credentials.username); terminal->write(RODT_ATTR("\t"));
-    terminal->write(m_login_credentials.password); terminal->write(RODT_ATTR("\n\n"));
+    terminal->writeln(m_login_credentials.password);
   }
 }
 

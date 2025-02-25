@@ -209,11 +209,11 @@ void OtaServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
     ota_config_table _ota_configs;
     __database_service.get_ota_config_table(&_ota_configs);
 
-    terminal->write_ro(RODT_ATTR("\nOTA Configs :\n"));
+    terminal->writeln();
+    terminal->writeln_ro(RODT_ATTR("OTA Configs :"));
     terminal->write(_ota_configs.ota_host);
     terminal->write(RODT_ATTR("\t"));
-    terminal->write(_ota_configs.ota_port);
-    terminal->write(RODT_ATTR("\n"));
+    terminal->writeln(_ota_configs.ota_port);
   }
 }
 

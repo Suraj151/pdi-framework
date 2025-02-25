@@ -69,34 +69,15 @@ void SerialServiceProvider::processSerial(serial_event_t *se)
 
     if( SERIAL_TYPE_UART == se->type && nullptr != se->serial ){
 
-      int32_t available = se->serial->available();
-      pdiutil::string recvdata = "";
-
-      while (se->serial->available())
-      {
-        char c = se->serial->read();
-        // break command on line ending
-        if (c == '\n') {
-          
-          break;
-        }else{
-          
-          recvdata += c;
-        }
-        __i_dvc_ctrl.wait(1);
-      }
-
-      LogFmtI("serial uart recv (%d) : %s\n", recvdata.size(), recvdata.c_str());
-
       // process and execute if command has provided
       #ifdef ENABLE_CMD_SERVICE
-      cmd_result_t result = __cmd_service.executeCommand(&recvdata);
+      __cmd_service.processTerminalInput(se->serial);
       #endif
-
-      // make sure to flush serial if no more data available
-      __i_dvc_ctrl.wait(1);
-      if(!se->serial->available()) se->serial->flush();
     }
+
+    // make sure to flush serial if no more data available
+    __i_dvc_ctrl.wait(1);
+    if(!se->serial->available()) se->serial->flush();
   }
 }
 

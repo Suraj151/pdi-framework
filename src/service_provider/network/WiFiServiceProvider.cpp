@@ -412,7 +412,8 @@ void WiFiServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
     __database_service.get_wifi_config_table(&_table);
     char _ip[20];
 
-    terminal->write_ro(RODT_ATTR("\nWiFi Configs :\n"));
+    terminal->writeln();
+    terminal->writeln_ro(RODT_ATTR("WiFi Configs :"));
     terminal->write(_table.sta_ssid); terminal->write(RODT_ATTR("\t"));
     terminal->write(_table.sta_password); terminal->write(RODT_ATTR("\t"));
 
@@ -420,13 +421,14 @@ void WiFiServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
     __int_ip_to_str( _ip, _table.sta_gateway, 20 ); terminal->write(_ip); terminal->write(RODT_ATTR("\t"));
     __int_ip_to_str( _ip, _table.sta_subnet, 20 ); terminal->write(_ip); terminal->write(RODT_ATTR("\t\n"));
 
-    terminal->write_ro(RODT_ATTR("\nAccess Configs :\n"));
+    terminal->writeln();
+    terminal->writeln_ro(RODT_ATTR("Access Configs :"));
     terminal->write(_table.ap_ssid); terminal->write(RODT_ATTR("\t"));
     terminal->write(_table.ap_password); terminal->write(RODT_ATTR("\t"));
 
     __int_ip_to_str( _ip, _table.ap_local_ip, 20 ); terminal->write(_ip); terminal->write(RODT_ATTR("\t"));
     __int_ip_to_str( _ip, _table.ap_gateway, 20 ); terminal->write(_ip); terminal->write(RODT_ATTR("\t"));
-    __int_ip_to_str( _ip, _table.ap_subnet, 20 ); terminal->write(_ip); terminal->write(RODT_ATTR("\t\n"));
+    __int_ip_to_str( _ip, _table.ap_subnet, 20 ); terminal->writeln(_ip);
   }
 }
 

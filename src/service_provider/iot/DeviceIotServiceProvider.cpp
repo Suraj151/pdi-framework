@@ -387,8 +387,9 @@ void DeviceIotServiceProvider::printConfigToTerminal(iTerminalInterface *termina
     device_iot_config_table _device_iot_configs;
     __database_service.get_device_iot_config_table(&_device_iot_configs);
 
-    terminal->write_ro(RODT_ATTR("\nDevice IOT Configs :\n"));
-    terminal->write(_device_iot_configs.device_iot_host); terminal->write(RODT_ATTR("\n\n"));
+    terminal->writeln();
+    terminal->writeln_ro(RODT_ATTR("Device IOT Configs :"));
+    terminal->writeln(_device_iot_configs.device_iot_host);
   }
 }
 
