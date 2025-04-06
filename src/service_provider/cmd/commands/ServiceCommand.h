@@ -16,6 +16,11 @@ created Date    : 1st June 2019
 /**
  * service command
  * 
+ * e.g. if we want to print config of GPIO service then we can execute command as below
+ * srvc s={SERVICE_GPIO enum number}, q=1
+ * 
+ * SERVICE_GPIO enum number can vary according to the device since services are enabled/
+ * disabled based on device capability.
  */
 struct ServiceCommand : public CommandBase {
 
