@@ -1,11 +1,16 @@
 /***************************** Session Handler ********************************
-This file is part of the pdi stack.
+This file is part of the PDI stack.
 
-This is free software. you can redistribute it and/or modify it but without any
+This is free software. You can redistribute it and/or modify it but without any
 warranty.
 
+The `SessionHandler.h` file defines the `EwSessionHandler` class, which provides
+methods to manage user sessions for the web server. It includes functionality
+to create, validate, and invalidate session cookies, ensuring secure and efficient
+session handling.
+
 Author          : Suraj I.
-created Date    : 1st June 2019
+Created Date    : 1st June 2019
 ******************************************************************************/
 
 #ifndef _WEB_SERVER_SESSION_HANDLER_
@@ -14,33 +19,42 @@ created Date    : 1st June 2019
 #include <webserver/resources/WebResource.h>
 
 /**
- * @define	max buf size for client cookies.
+ * @define EW_COOKIE_BUFF_MAX_SIZE
+ * @brief Defines the maximum buffer size for client cookies.
  */
 #define EW_COOKIE_BUFF_MAX_SIZE 60
 
 /**
- * EwSessionHandler class
+ * @class EwSessionHandler
+ * @brief Handles session management for the web server.
+ *
+ * The `EwSessionHandler` class provides methods to manage user sessions,
+ * including creating session cookies, validating active sessions, and
+ * invalidating sessions.
  */
 class EwSessionHandler
 {
 
 public:
   /**
-   * EwSessionHandler constructor
+   * @brief Constructor for the `EwSessionHandler` class.
+   *
+   * Initializes the session handler.
    */
-  EwSessionHandler(void)
-  {
-  }
+  EwSessionHandler(void) {}
 
   /**
-   * EwSessionHandler destructor
+   * @brief Destructor for the `EwSessionHandler` class.
+   *
+   * Cleans up resources used by the session handler.
    */
-  ~EwSessionHandler()
-  {
-  }
+  ~EwSessionHandler() {}
 
   /**
-   * send inactive session to client. this will remove any login cache from client side.
+   * @brief Sends inactive session headers to the client.
+   *
+   * This method invalidates the session on the client side by sending
+   * headers that remove any login cache.
    */
   void send_inactive_session_headers(void)
   {
@@ -55,17 +69,19 @@ public:
   }
 
   /**
-   * build session cookies for login user with defined max age.
+   * @brief Builds a session cookie for the logged-in user.
    *
-   * @param	char*	_str
-   * @param	bool  _stat
-   * @param	int   _max_size
-   * @param	bool|false	_enable_max_age
-   * @param	uint32_t|SERVER_COOKIE_MAX_AGE  _max_age
+   * Generates a session cookie with the specified attributes, including
+   * an optional maximum age.
+   *
+   * @param _str The buffer to store the session cookie.
+   * @param _stat The session status (true for active, false for inactive).
+   * @param _max_size The maximum size of the session cookie buffer.
+   * @param _enable_max_age Whether to include the Max-Age attribute.
+   * @param _max_age The maximum age of the session cookie (default: SERVER_COOKIE_MAX_AGE).
    */
   void build_session_cookie(char *_str, bool _stat, int _max_size, bool _enable_max_age = false, uint32_t _max_age = SERVER_COOKIE_MAX_AGE)
   {
-
     if (nullptr == __web_resource.m_db_conn)
     {
       return;
@@ -84,9 +100,12 @@ public:
   }
 
   /**
-   * check whether client has active valid session
+   * @brief Checks whether the client has an active session.
    *
-   * @return  bool
+   * Validates the presence of an active session cookie in the client's
+   * request headers.
+   *
+   * @return `true` if an active session is found, `false` otherwise.
    */
   bool has_active_session(void)
   {
@@ -99,7 +118,6 @@ public:
 
     if (__web_resource.m_server->hasHeader("Cookie"))
     {
-
       pdiutil::string cookie = __web_resource.m_server->header("Cookie");
       char _session_cookie[EW_COOKIE_BUFF_MAX_SIZE];
       this->build_session_cookie(_session_cookie, true, EW_COOKIE_BUFF_MAX_SIZE);
@@ -118,9 +136,12 @@ public:
   }
 
   /**
-   * check whether client has inactive session
+   * @brief Checks whether the client has an inactive session.
    *
-   * @return  bool
+   * Validates the presence of an inactive session cookie in the client's
+   * request headers.
+   *
+   * @return `true` if an inactive session is found, `false` otherwise.
    */
   bool has_inactive_session(void)
   {
@@ -128,7 +149,7 @@ public:
 
     if (nullptr == __web_resource.m_server)
     {
-      false;
+      return false;
     }
 
     if (__web_resource.m_server->hasHeader("Cookie"))

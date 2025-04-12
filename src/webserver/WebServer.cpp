@@ -1,11 +1,17 @@
 /******************************** web server **********************************
-This file is part of the pdi stack.
+This file is part of the PDI stack.
 
-This is free software. you can redistribute it and/or modify it but without any
+This is free software. You can redistribute it and/or modify it but without any
 warranty.
 
+The `WebServer.cpp` file implements the `HttpServer` class, which provides the
+core functionality for managing an HTTP web server. It integrates various
+controllers to handle specific routes and services, such as Home, Dashboard,
+OTA updates, WiFi configuration, GPIO, MQTT, Email, and IoT device management.
+The server can be started, and it handles incoming client requests.
+
 Author          : Suraj I.
-created Date    : 1st June 2019
+Created Date    : 1st June 2019
 ******************************************************************************/
 
 #include <config/Config.h>
@@ -15,7 +21,9 @@ created Date    : 1st June 2019
 #include "WebServer.h"
 
 /**
- * HttpServer constructor.
+ * @brief Constructor for the `HttpServer` class.
+ *
+ * Initializes the HTTP server with default values.
  */
 HttpServer::HttpServer() : 
   m_server(nullptr)
@@ -23,7 +31,9 @@ HttpServer::HttpServer() :
 }
 
 /**
- * HttpServer destructor.
+ * @brief Destructor for the `HttpServer` class.
+ *
+ * Cleans up resources used by the HTTP server.
  */
 HttpServer::~HttpServer()
 {
@@ -31,48 +41,63 @@ HttpServer::~HttpServer()
 }
 
 /**
- * start http server functionality. this requires server interface to be provided
+ * @brief Starts the HTTP server.
+ *
+ * This method initializes the server interface and prepares it to handle
+ * incoming client requests. It also boots all registered controllers and
+ * configures the server to track specific HTTP headers.
+ *
+ * @param iServer Pointer to the server interface implementation.
+ * @return True if the server started successfully, false otherwise.
  */
 bool HttpServer::start_server(iServerInterface *iServer)
 {
   bool bStatus = false;
 
-  if( nullptr == iServer ){
+  if (nullptr == iServer) {
     return bStatus;
   }
 
   this->m_server = iServer;
+
+  // Collect resources for the server
   __web_resource.collect_resource(this->m_server);
 
-  for (int i = 0; i < Controller::m_controllers.size(); i++)
-  {
-    LogFmtI("booting : %s controller\n", Controller::m_controllers[i].controller->m_controller_name);
+  // Boot all registered controllers
+  for (int i = 0; i < Controller::m_controllers.size(); i++) {
+    LogFmtI("Booting: %s controller\n", Controller::m_controllers[i].controller->m_controller_name);
     Controller::m_controllers[i].controller->boot();
   }
 
-  // here the list of headers to be recorded
-  // const char * headerkeys[] = {"User-Agent", "Cookie"} ;
+  // Define headers to be tracked by the server
   const char *headerkeys[] = {"Cookie"};
   size_t headerkeyssize = sizeof(headerkeys) / sizeof(char *);
-  // ask server to track these headers
   this->m_server->collectHeaders(headerkeys, headerkeyssize);
 
-  // start the server
+  // Start the server
   this->m_server->begin();
-  LogI("HTTP server started !\n");
+  LogI("HTTP server started!\n");
   bStatus = true;
 
   return bStatus;
 }
 
 /**
- * handle clients. Should be called in loop
+ * @brief Handles incoming client requests.
+ *
+ * This method processes client requests and routes them to the appropriate
+ * controller for handling. It should be called in the main loop.
  */
 void HttpServer::handle_clients()
 {
   this->m_server->handleClient();
 }
 
+/**
+ * @brief Global instance of the `HttpServer` class.
+ *
+ * This instance is used to manage the web server throughout the PDI stack.
+ */
 HttpServer __web_server;
 
 #endif

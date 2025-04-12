@@ -1,11 +1,16 @@
-/**************************** login html page *********************************
-This file is part of the pdi stack.
+/**************************** Login HTML Page *********************************
+This file is part of the PDI stack.
 
-This is free software. you can redistribute it and/or modify it but without any
+This is free software. You can redistribute it and/or modify it but without any
 warranty.
 
+The `LoginPage.h` file defines the HTML content for the login page of the web
+server. This page allows users to log in by providing their username and
+password. The HTML content is stored in program memory (PROGMEM) to optimize
+memory usage on embedded systems.
+
 Author          : Suraj I.
-created Date    : 1st June 2019
+Created Date    : 1st June 2019
 ******************************************************************************/
 
 #ifndef _WEB_SERVER_LOGIN_PAGE_H_
@@ -13,6 +18,13 @@ created Date    : 1st June 2019
 
 #include <Arduino.h>
 
+/**
+ * @brief HTML content for the login page.
+ *
+ * This static HTML content is used to render the login page of the web server.
+ * It includes a form with fields for entering a username and password, and a
+ * button to submit the login credentials.
+ */
 static const char WEB_SERVER_LOGIN_PAGE[] PROGMEM = "\
 <h2>Login to Continue !</h2>\
 <form action='/login' method='POST'>\

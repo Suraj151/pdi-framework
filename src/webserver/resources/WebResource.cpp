@@ -1,11 +1,16 @@
 /****************************** Web Resource **********************************
-This file is part of the pdi stack.
+This file is part of the PDI stack.
 
-This is free software. you can redistribute it and/or modify it but without any
+This is free software. You can redistribute it and/or modify it but without any
 warranty.
 
+The `WebResource.cpp` file implements the `WebResourceProvider` class, which is
+responsible for managing and providing resources required by the web server. It
+integrates with the server interface and database service provider to handle
+dynamic content generation and resource collection.
+
 Author          : Suraj I.
-created Date    : 1st June 2019
+Created Date    : 1st June 2019
 ******************************************************************************/
 
 #include <config/Config.h>
@@ -15,7 +20,10 @@ created Date    : 1st June 2019
 #include "WebResource.h"
 
 /**
- * WebResourceProvider constructor
+ * @brief Constructor for the `WebResourceProvider` class.
+ *
+ * Initializes the resource provider with default values, setting the server
+ * and database connection pointers to `nullptr`.
  */
 WebResourceProvider::WebResourceProvider() : 
   m_server(nullptr),
@@ -24,7 +32,10 @@ WebResourceProvider::WebResourceProvider() :
 }
 
 /**
- * WebResourceProvider destructor
+ * @brief Destructor for the `WebResourceProvider` class.
+ *
+ * Cleans up resources used by the resource provider by resetting the server
+ * and database connection pointers to `nullptr`.
  */
 WebResourceProvider::~WebResourceProvider()
 {
@@ -33,9 +44,13 @@ WebResourceProvider::~WebResourceProvider()
 }
 
 /**
- * collect resources for web services
+ * @brief Collects resources for the web server.
  *
- * @param iServerInterface* _server
+ * This method integrates with the server interface to register and manage
+ * resources required by the web server. It also initializes the database
+ * connection using the global `__database_service` instance.
+ *
+ * @param _server Pointer to the server interface implementation.
  */
 void WebResourceProvider::collect_resource(iServerInterface *_server)
 {
@@ -43,6 +58,11 @@ void WebResourceProvider::collect_resource(iServerInterface *_server)
   this->m_db_conn = &__database_service;
 }
 
+/**
+ * @brief Global instance of the `WebResourceProvider` class.
+ *
+ * This instance is used to manage resources throughout the PDI stack.
+ */
 WebResourceProvider __web_resource;
 
 #endif

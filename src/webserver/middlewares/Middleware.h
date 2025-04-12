@@ -1,11 +1,16 @@
 /******************************** Middleware **********************************
-This file is part of the pdi stack.
+This file is part of the PDI stack.
 
-This is free software. you can redistribute it and/or modify it but without any
+This is free software. You can redistribute it and/or modify it but without any
 warranty.
 
+The `Middleware` class provides a mechanism to process HTTP requests before
+they reach their intended handlers. It allows for authentication checks,
+API-level validations, and request redirection based on specific conditions.
+The middleware integrates with the session handler to manage user sessions.
+
 Author          : Suraj I.
-created Date    : 1st June 2019
+Created Date    : 1st June 2019
 ******************************************************************************/
 
 #ifndef _MIDDLEWARE_PROVIDER_
@@ -16,6 +21,11 @@ created Date    : 1st June 2019
 
 /**
  * @enum middlewares
+ * @brief Defines the levels of middleware processing.
+ *
+ * - `AUTH_MIDDLEWARE`: Middleware for authentication checks.
+ * - `API_MIDDLEWARE`: Middleware for API-level validations.
+ * - `NO_MIDDLEWARE`: No middleware processing.
  */
 enum middlwares {
   AUTH_MIDDLEWARE,
@@ -24,42 +34,52 @@ enum middlwares {
 };
 
 /**
- * Middleware class
- * @parent  EwSessionHandler|protected
+ * @class Middleware
+ * @brief Handles middleware processing for HTTP requests.
+ *
+ * The `Middleware` class processes incoming HTTP requests to enforce
+ * authentication, validate API requests, or redirect unauthorized users.
+ * It extends the `EwSessionHandler` class to manage user sessions.
  */
-class Middleware  : public EwSessionHandler{
+class Middleware : public EwSessionHandler {
 
   public:
 
     /**
-		 * Middleware constructor
-		 */
-    Middleware( void ){
-    }
-
-    /**
-		 * Middleware destructor
-		 */
-    ~Middleware(){
-    }
-
-    /**
-		 * each request go through this middelware to check requests by parameters.
-     * this method allow to redirect or unautherise any request based on conditions.
+     * @brief Constructor for the `Middleware` class.
      *
-     * @param   middlwares _middleware_level
-     * @param   const char* _redirect_uri
-     * @return  bool
-		 */
-    bool handle_middleware( middlwares _middleware_level, const char* _redirect_uri ){
+     * Initializes the middleware with default settings.
+     */
+    Middleware(void) {
+    }
+
+    /**
+     * @brief Destructor for the `Middleware` class.
+     *
+     * Cleans up resources used by the middleware.
+     */
+    ~Middleware() {
+    }
+
+    /**
+     * @brief Processes an HTTP request through the middleware.
+     *
+     * This method checks the request against the specified middleware level
+     * and performs actions such as authentication checks or redirection.
+     *
+     * @param _middleware_level The middleware level to apply (e.g., `AUTH_MIDDLEWARE`).
+     * @param _redirect_uri The URI to redirect to if the request is unauthorized.
+     * @return `true` if the request passes the middleware checks, `false` otherwise.
+     */
+    bool handle_middleware(middlwares _middleware_level, const char* _redirect_uri) {
 
       LogI("checking through middleware\n");
 
-      if ( _middleware_level == AUTH_MIDDLEWARE ) {
+      if (_middleware_level == AUTH_MIDDLEWARE) {
 
-        if ( !this->has_active_session() ) {
+        if (!this->has_active_session()) {
 
-          if( nullptr != __web_resource.m_server ){
+          if (nullptr != __web_resource.m_server) {
 
             __web_resource.m_server->sendHeader("Location", _redirect_uri);
             __web_resource.m_server->sendHeader("Cache-Control", "no-cache");
@@ -68,11 +88,11 @@ class Middleware  : public EwSessionHandler{
           return false;
         }
         return true;
-      }else if ( _middleware_level == API_MIDDLEWARE ) {
+      } else if (_middleware_level == API_MIDDLEWARE) {
 
         return true;
 
-      }else{
+      } else {
 
         return true;
       }

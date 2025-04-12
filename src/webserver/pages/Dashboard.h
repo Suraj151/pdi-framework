@@ -1,11 +1,16 @@
-/************************** Dashboard html page *******************************
-This file is part of the pdi stack.
+/************************** Dashboard HTML Page *******************************
+This file is part of the PDI stack.
 
-This is free software. you can redistribute it and/or modify it but without any
+This is free software. You can redistribute it and/or modify it but without any
 warranty.
 
+The `Dashboard.h` file defines the HTML content for the dashboard page of the
+web server. The dashboard provides information about the device's network
+status, connected devices, and other relevant details. The HTML content is
+stored in program memory (PROGMEM) to optimize memory usage on embedded systems.
+
 Author          : Suraj I.
-created Date    : 1st June 2019
+Created Date    : 1st June 2019
 ******************************************************************************/
 
 #ifndef _WEB_SERVER_DASHBOARD_PAGE_H_
@@ -13,6 +18,14 @@ created Date    : 1st June 2019
 
 #include <Arduino.h>
 
+/**
+ * @brief HTML content for the dashboard page.
+ *
+ * This static HTML content is used to render the dashboard page on the web
+ * server. It includes a table displaying network information such as SSID, IP
+ * address, RSSI, status, MAC address, internet connectivity, and network time.
+ * Additionally, it provides a section for listing connected devices.
+ */
 static const char WEB_SERVER_DASHBOARD_PAGE[] PROGMEM = "\
 <h2>Dashboard</h2>\
 \
@@ -62,4 +75,5 @@ min-width:100px;\
 \
 <table id='cndl'>\
 </table>";
+
 #endif
