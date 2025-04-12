@@ -11,7 +11,10 @@ created Date    : 1st June 2019
 #include <utility/EventUtil.h>
 
 /**
- * PDIStack constructor.
+ * @brief Constructor for the PDIStack class.
+ *
+ * Initializes the PDIStack object and sets up utility interfaces and task scheduler limits.
+ * If WiFi service is enabled, it initializes the client and server interfaces.
  */
 PDIStack::PDIStack()
 #ifdef ENABLE_WIFI_SERVICE
@@ -26,7 +29,9 @@ PDIStack::PDIStack()
 }
 
 /**
- * PDIStack destructor.
+ * @brief Destructor for the PDIStack class.
+ *
+ * Cleans up resources by setting client and server pointers to nullptr if WiFi service is enabled.
  */
 PDIStack::~PDIStack(){
 #ifdef ENABLE_WIFI_SERVICE
@@ -36,7 +41,10 @@ PDIStack::~PDIStack(){
 }
 
 /**
- * initialize all required features/services/actions.
+ * @brief Initializes all required features, services, and actions.
+ *
+ * This method initializes various services such as database, WiFi, HTTP server, OTA, GPIO, MQTT,
+ * email, device IoT, authentication, and command-line services based on the enabled preprocessor directives.
  */
 void PDIStack::initialize(){
 
@@ -96,7 +104,10 @@ void PDIStack::initialize(){
 }
 
 /**
- * serve each internal action, client request, auto operations
+ * @brief Handles internal actions, client requests, and auto operations.
+ *
+ * This method serves the PDI stack by handling HTTP server clients, executing scheduled tasks,
+ * and yielding control to the device controller.
  */
 void PDIStack::serve(){
 
@@ -108,7 +119,9 @@ void PDIStack::serve(){
 }
 
 /**
- * prints log as per defined duration
+ * @brief Prints logs at defined intervals.
+ *
+ * If the network service is enabled, this method logs the validity of the NTP time and the current NTP time.
  */
 void PDIStack::handleLogPrints(){
 
@@ -118,4 +131,9 @@ void PDIStack::handleLogPrints(){
   #endif
 }
 
+/**
+ * @brief Global instance of the PDIStack class.
+ *
+ * This instance is used to manage and serve the PDI stack throughout the application.
+ */
 PDIStack PdiStack;

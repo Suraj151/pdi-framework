@@ -1,17 +1,19 @@
-/****************************** Event service *********************************
-This file is part of the pdi stack.
+/****************************** Event Service *********************************
+This file is part of the PDI stack.
 
-This is free software. you can redistribute it and/or modify it but without any
+This is free software. You can redistribute it and/or modify it but without any
 warranty.
 
 Author          : Suraj I.
-created Date    : 1st June 2019
+Created Date    : 1st June 2019
 ******************************************************************************/
 
 #include "EventUtil.h"
 
 /**
- * EventUtil constructor.
+ * @brief Constructor for the EventUtil class.
+ *
+ * Initializes the EventUtil object and sets default values for internal state.
  */
 EventUtil::EventUtil() : m_last_event(0),
                          m_last_event_millis(0),
@@ -20,15 +22,20 @@ EventUtil::EventUtil() : m_last_event(0),
 }
 
 /**
- * EventUtil destructor
+ * @brief Destructor for the EventUtil class.
+ *
+ * Cleans up resources used by the EventUtil object.
  */
 EventUtil::~EventUtil()
 {
 }
 
 /**
- * begin event service. set wifi event handler
+ * @brief Initializes the EventUtil object with a utility interface.
  *
+ * This method sets the utility interface to be used for event handling.
+ *
+ * @param _iutil Pointer to an iUtilityInterface implementation.
  */
 void EventUtil::begin(iUtilityInterface *_iutil)
 {
@@ -36,12 +43,14 @@ void EventUtil::begin(iUtilityInterface *_iutil)
 }
 
 /**
- * add event listener. added listener will be executed on given event.
- * it return true on successfull addition of listener
+ * @brief Adds an event listener for a specific event.
  *
- * @param		event_name_t	_event
- * @param		CallBackVoidPointerArgFn	_handler
- * @return  bool
+ * Registers a callback function to be executed when the specified event is triggered.
+ * Returns true if the listener is successfully added, false otherwise.
+ *
+ * @param _event The name of the event to listen for.
+ * @param _handler The callback function to execute when the event is triggered.
+ * @return True if the listener was added successfully, false otherwise.
  */
 bool EventUtil::add_event_listener(event_name_t _event, CallBackVoidPointerArgFn _handler)
 {
@@ -57,14 +66,17 @@ bool EventUtil::add_event_listener(event_name_t _event, CallBackVoidPointerArgFn
 }
 
 /**
- * here we will execute perticular event listeners with their accepted argument
+ * @brief Executes all listeners for a specific event.
  *
- * @param		event_name_t	_event
- * @param		void*|nullptr	_arg
+ * Triggers the callback functions associated with the specified event and passes
+ * an optional argument to the handlers.
+ *
+ * @param _event The name of the event to execute.
+ * @param _arg Optional argument to pass to the event handlers.
  */
 void EventUtil::execute_event(event_name_t _event, void *_arg)
 {
-  if( nullptr != m_util )
+  if (nullptr != m_util)
   {
     char content[25];
     memset(content, 0, 25);
@@ -81,4 +93,9 @@ void EventUtil::execute_event(event_name_t _event, void *_arg)
   }
 }
 
+/**
+ * @brief Global instance of the EventUtil class.
+ *
+ * This instance is used throughout the PDI stack for managing and executing events.
+ */
 EventUtil __utl_event;

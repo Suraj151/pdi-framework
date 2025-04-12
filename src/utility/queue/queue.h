@@ -1,4 +1,4 @@
-/* str_queue.h --
+/* queue.h --
  *
  * Copyright (c) 2014-2015, Tuan PM <tuanpm at live dot com>
  * All rights reserved.
@@ -33,14 +33,66 @@
 
 #include "proto.h"
 
+/**
+ * @struct QUEUE
+ * @brief Represents a queue structure.
+ *
+ * The `QUEUE` structure provides a simple abstraction for managing a queue
+ * using a ring buffer. It supports operations for adding and retrieving data
+ * in a FIFO (First In, First Out) manner.
+ */
 typedef struct
 {
-	uint8_t *buf;
-	RINGBUF rb;
+    uint8_t *buf; ///< Pointer to the memory buffer used for the queue.
+    RINGBUF rb;   ///< Ring buffer structure for managing the queue.
 } QUEUE;
 
+/**
+ * @brief Initializes a queue.
+ *
+ * This function initializes a queue by associating it with a memory buffer
+ * and setting up the ring buffer.
+ *
+ * @param queue Pointer to the `QUEUE` structure to initialize.
+ * @param bufferSize The size of the memory buffer to allocate for the queue.
+ */
 void QUEUE_Init(QUEUE *queue, int bufferSize);
+
+/**
+ * @brief Adds data to the queue.
+ *
+ * This function writes data to the queue. If the queue is full, the function
+ * will return an error.
+ *
+ * @param queue Pointer to the `QUEUE` structure.
+ * @param buffer Pointer to the data to add to the queue.
+ * @param len The length of the data to add.
+ * @return The number of bytes written to the queue, or -1 if the queue is full.
+ */
 int32_t QUEUE_Puts(QUEUE *queue, uint8_t *buffer, uint16_t len);
+
+/**
+ * @brief Retrieves data from the queue.
+ *
+ * This function reads data from the queue. If the queue is empty, the function
+ * will return an error.
+ *
+ * @param queue Pointer to the `QUEUE` structure.
+ * @param buffer Pointer to the buffer to store the retrieved data.
+ * @param len Pointer to store the length of the retrieved data.
+ * @param maxLen The maximum length of data to retrieve.
+ * @return The number of bytes read from the queue, or -1 if the queue is empty.
+ */
 int32_t QUEUE_Gets(QUEUE *queue, uint8_t *buffer, uint16_t *len, uint16_t maxLen);
+
+/**
+ * @brief Checks if the queue is empty.
+ *
+ * This function checks whether the queue is empty.
+ *
+ * @param queue Pointer to the `QUEUE` structure.
+ * @return True if the queue is empty, false otherwise.
+ */
 bool QUEUE_IsEmpty(QUEUE *queue);
+
 #endif /* USER_QUEUE_H_ */

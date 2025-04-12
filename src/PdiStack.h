@@ -57,40 +57,82 @@ created Date    : 1st June 2019
 #endif
 
 /**
- * PDIStack class
+ * @class PDIStack
+ * @brief The main class for managing the PDI stack.
+ *
+ * The PDIStack class serves as the central orchestrator for initializing and managing
+ * various services and features of the PDI stack. It provides methods for initialization
+ * and serving client requests, and it conditionally includes services based on preprocessor
+ * directives.
  */
 class PDIStack {
 
   public:
 
     /**
-     * PDIStack constructor.
+     * @brief Constructor for the PDIStack class.
+     *
+     * Initializes the PDIStack object and sets up utility interfaces and task scheduler limits.
+     * If WiFi service is enabled, it initializes the client and server interfaces.
      */
     PDIStack();
+
     /**
-     * PDIStack destructor.
+     * @brief Destructor for the PDIStack class.
+     *
+     * Cleans up resources by setting client and server pointers to nullptr if WiFi service is enabled.
      */
     ~PDIStack();
 
+    /**
+     * @brief Initializes all required features, services, and actions.
+     *
+     * This method initializes various services such as database, WiFi, HTTP server, OTA, GPIO, MQTT,
+     * email, device IoT, authentication, and command-line services based on the enabled preprocessor directives.
+     */
     void initialize( void );
+
+    /**
+     * @brief Handles internal actions, client requests, and auto operations.
+     *
+     * This method serves the PDI stack by handling HTTP server clients, executing scheduled tasks,
+     * and yielding control to the device controller.
+     */
     void serve( void );
 
   protected:
+
+    /**
+     * @brief Prints logs at defined intervals.
+     *
+     * If the network service is enabled, this method logs the validity of the NTP time and the current NTP time.
+     */
     static void handleLogPrints( void );
 
 #ifdef ENABLE_WIFI_SERVICE
     /**
-		 * @var	iClientInterface*  m_client
-		 */
+     * @var iClientInterface* m_client
+     * @brief Pointer to the client interface for WiFi service.
+     *
+     * This pointer is used to manage client-side operations for the WiFi service.
+     */
     iClientInterface  *m_client;
 
     /**
-		 * @var	iServerInterface*  m_server
-		 */
+     * @var iServerInterface* m_server
+     * @brief Pointer to the server interface for WiFi service.
+     *
+     * This pointer is used to manage server-side operations for the WiFi service.
+     */
     iServerInterface  *m_server;
 #endif
 };
 
+/**
+ * @brief Global instance of the PDIStack class.
+ *
+ * This instance is used to manage and serve the PDI stack throughout the application.
+ */
 extern PDIStack PdiStack;
 
 #endif

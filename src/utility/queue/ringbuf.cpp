@@ -1,16 +1,16 @@
 /**
- * \file
- *		Ring Buffer library
+ * @file
+ * @brief Ring Buffer library
  */
 
 #include "ringbuf.h"
 
 /**
- * \brief init a RINGBUF object
- * \param r pointer to a RINGBUF object
- * \param buf pointer to a byte array
- * \param size size of buf
- * \return 0 if successfull, otherwise failed
+ * @brief init a RINGBUF object
+ * @param r pointer to a RINGBUF object
+ * @param buf pointer to a byte array
+ * @param size size of buf
+ * @return 0 if successfull, otherwise failed
  */
 int RINGBUF_Init(RINGBUF *r, unsigned char *buf, unsigned int size)
 {
@@ -24,10 +24,10 @@ int RINGBUF_Init(RINGBUF *r, unsigned char *buf, unsigned int size)
 	return 0;
 }
 /**
- * \brief put a character into ring buffer
- * \param r pointer to a ringbuf object
- * \param c character to be put
- * \return 0 if successfull, otherwise failed
+ * @brief put a character into ring buffer
+ * @param r pointer to a ringbuf object
+ * @param c character to be put
+ * @return 0 if successfull, otherwise failed
  */
 int RINGBUF_Put(RINGBUF *r, unsigned char c)
 {
@@ -44,10 +44,10 @@ int RINGBUF_Put(RINGBUF *r, unsigned char c)
 	return 0;
 }
 /**
- * \brief get a character from ring buffer
- * \param r pointer to a ringbuf object
- * \param c read character
- * \return 0 if successfull, otherwise failed
+ * @brief get a character from ring buffer
+ * @param r pointer to a ringbuf object
+ * @param c read character
+ * @return 0 if successfull, otherwise failed
  */
 int RINGBUF_Get(RINGBUF *r, unsigned char *c)
 {

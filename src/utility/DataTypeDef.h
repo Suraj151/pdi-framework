@@ -1,11 +1,15 @@
-/******************************** type defs ***********************************
-This file is part of the pdi stack.
+/******************************** Type Definitions ****************************
+This file is part of the PDI stack.
 
-This is free software. you can redistribute it and/or modify it but without any
+This is free software. You can redistribute it and/or modify it but without any
 warranty.
 
+The DataTypeDef file provides type definitions, utility structures, and enums
+used throughout the PDI stack. It includes definitions for connection statuses,
+logging types, IP address handling, task management, and callback functions.
+
 Author          : Suraj I.
-created Date    : 1st June 2019
+Created Date    : 1st June 2019
 ******************************************************************************/
 
 #ifndef _DATA_TYPE_DEFS_H_
@@ -22,31 +26,29 @@ created Date    : 1st June 2019
 #include <utility/pdistl/cstring>
 #include <utility/pdistl/cmath>
 
+// Namespace for utility types and functions
+namespace pdiutil {
 
-// using namespace for defining stl under pdiutil
-namespace pdiutil{
-
-    // class string;
+    // String type alias
     using string = pdistd::string;
 
-    // class vector;
+    // Vector type alias
     template <class T, class A = pdistd::allocator<T>> 
-    using vector = pdistd::vector<T,A>;
+    using vector = pdistd::vector<T, A>;
 
-    // conversion to respective string type
+    // Conversion to string
     using pdistd::to_string;
 
-    // class function
+    // Function type alias
     template<typename _Res, typename... _ArgTypes>
     using function = pdistd::function<_Res, _ArgTypes...>;
+
 } // namespace pdiutil
 
-
-// option to define the attribute for read only data
-// redefine this in derived interface
+// Attribute for read-only data (can be redefined in derived interfaces)
 #define RODT_ATTR(x) x
 
-/* connection enums */
+/* Connection status enums */
 typedef enum {
     CONN_STATUS_IDLE = 0,
     CONN_STATUS_CONNECTED,
@@ -58,28 +60,26 @@ typedef enum {
     CONN_STATUS_MAX
 } conn_status_t;
 
+// GPIO and WiFi-related typedefs
 typedef uint8_t gpio_id_t;
 typedef int64_t gpio_val_t;
-
 typedef uint8_t pdi_wifi_mode_t;
 typedef uint8_t sleep_mode_t;
 typedef conn_status_t wifi_status_t;
 typedef uint8_t follow_redirects_t;
-
 typedef uint16_t http_method_t;
 
 /**
- * Define required callback type
+ * Callback function typedefs
  */
 typedef pdiutil::function<void(int)> CallBackIntArgFn;
 typedef pdiutil::function<void(void)> CallBackVoidArgFn;
 typedef pdiutil::function<void(void *)> CallBackVoidPointerArgFn;
 
 /**
- * Define log types
+ * Logging types
  */
-typedef enum
-{
+typedef enum {
     INFO_LOG,
     ERROR_LOG,
     WARNING_LOG,
@@ -87,15 +87,15 @@ typedef enum
 } logger_type_t;
 
 /**
- * Define ip stuff
+ * IP address types
  */
-typedef enum
-{
+typedef enum {
     IP_ADDR_TYPE_V4 = 4,  /** IPv4 */
     IP_ADDR_TYPE_V6 = 6,  /** IPv6 */
     IP_ADDR_TYPE_ANY = 46 /** IPv4+IPv6 ("dual-stack") */
 } ip_addr_type;
 
+// IPv4 address constants and macros
 /** 255.255.255.255 */
 #define IP4_ADDRESS_NONE        ((uint32_t)0xffffffffUL)
 /** 127.0.0.1 */
@@ -107,120 +107,109 @@ typedef enum
 /** get byte from 32bit ipaddr */
 #define IP4_ADDRESS_BYTE(ipaddr, idx) (((const uint8_t *)(&ipaddr))[idx])
 
-/** check the byte order */
+/** Check the byte order */
 #define IS_BIG_ENDIAN() ({ uint32_t n = 0x11223344; uint8_t *p = (uint8_t *)&n; (*p == 0x11); })
 
-struct ipaddress_t
-{
-    uint8_t ip4[4];
-    ip_addr_type type;
+/**
+ * @struct ipaddress_t
+ * @brief Represents an IP address.
+ *
+ * Provides constructors and operators for handling IPv4 addresses.
+ */
+struct ipaddress_t {
+    uint8_t ip4[4]; ///< IPv4 address bytes
+    ip_addr_type type; ///< IP address type (IPv4/IPv6)
 
-    ipaddress_t() : type(IP_ADDR_TYPE_V4)
-    {
+    ipaddress_t() : type(IP_ADDR_TYPE_V4) {
         ip4[0] = 0;
         ip4[1] = 0;
         ip4[2] = 0;
         ip4[3] = 0;
     }
 
-    ipaddress_t(uint32_t _ip4) : type(IP_ADDR_TYPE_V4)
-    {
+    ipaddress_t(uint32_t _ip4) : type(IP_ADDR_TYPE_V4) {
         ip4[0] = IP4_ADDRESS_BYTE(_ip4, 0);
         ip4[1] = IP4_ADDRESS_BYTE(_ip4, 1);
         ip4[2] = IP4_ADDRESS_BYTE(_ip4, 2);
         ip4[3] = IP4_ADDRESS_BYTE(_ip4, 3);
     }
 
-    ipaddress_t(uint8_t first_octet, uint8_t second_octet, uint8_t third_octet, uint8_t fourth_octet) : type(IP_ADDR_TYPE_V4)
-    {
+    ipaddress_t(uint8_t first_octet, uint8_t second_octet, uint8_t third_octet, uint8_t fourth_octet) : type(IP_ADDR_TYPE_V4) {
         ip4[0] = first_octet;
         ip4[1] = second_octet;
         ip4[2] = third_octet;
         ip4[3] = fourth_octet;
     }
 
-    operator pdiutil::string()
-    {
+    operator pdiutil::string() {
         return (pdiutil::to_string(ip4[0]) + "." + pdiutil::to_string(ip4[1]) + "." + pdiutil::to_string(ip4[2]) + "." + pdiutil::to_string(ip4[3]));
     }
 
-    operator uint32_t()
-    {
-        if( IS_BIG_ENDIAN() )
-        {
+    operator uint32_t() {
+        if (IS_BIG_ENDIAN()) {
             return (((uint32_t)ip4[0] << 24) | ((uint32_t)ip4[1] << 16) | ((uint32_t)ip4[2] << 8) | ((uint32_t)ip4[3]));
-        }
-        else
-        {
+        } else {
             return (((uint32_t)ip4[3] << 24) | ((uint32_t)ip4[2] << 16) | ((uint32_t)ip4[1] << 8) | ((uint32_t)ip4[0]));
         }
     }
 
-    uint8_t operator[](uint8_t index)
-    {
+    uint8_t operator[](uint8_t index) {
         return index < 4 ? ip4[index] : 0;
     }
 
-    bool isSet()
-    {
-        return (((uint32_t) * this) != IP4_ADDRESS_NONE) && (((uint32_t) * this) != IP4_ADDRESS_ANY);
+    bool isSet() {
+        return (((uint32_t)*this) != IP4_ADDRESS_NONE) && (((uint32_t)*this) != IP4_ADDRESS_ANY);
     }
 };
 
 /**
- * Define wifi station info struct
- * bssid - mac address of access point/connected station
+ * @struct wifi_station_info_t
+ * @brief Represents WiFi station information.
+ *
+ * Contains the BSSID (MAC address) and IPv4 address of a connected station.
  */
-struct wifi_station_info_t
-{
-    uint8_t bssid[6];
-    uint32_t ip4;
+struct wifi_station_info_t {
+    uint8_t bssid[6]; ///< MAC address of the access point or connected station
+    uint32_t ip4; ///< IPv4 address
 
-    wifi_station_info_t( uint8_t *_bssid, uint32_t _ip4 )
-    {
+    wifi_station_info_t(uint8_t *_bssid, uint32_t _ip4) {
         memcpy(bssid, _bssid, 6);
         ip4 = _ip4;
     }
 };
 
-
-/* upgrade defs */
-typedef enum
-{
+/**
+ * Upgrade status enums
+ */
+typedef enum {
     UPGRADE_STATUS_FAILED = -1,
     UPGRADE_STATUS_SUCCESS,
-    UPGRADE_STATUS_IGNORE, // no update available
+    UPGRADE_STATUS_IGNORE, // No update available
     UPGRADE_STATUS_MAX
 } upgrade_status_t;
 
-
 /**
- * task struct type for scheduler
+ * @struct task_t
+ * @brief Represents a task for the scheduler.
+ *
+ * Contains task details such as ID, duration, priority, and callback function.
  */
+
 #define DEFAULT_TASK_PRIORITY 0
 
-struct task_t
-{
-	int _task_id;
-	int _max_attempts;
-	uint64_t _duration;
-	uint64_t _last_millis;
-	CallBackVoidArgFn _task;
-	int _task_priority; // from 0 onwards. default is 0
-	uint64_t _task_exec_millis;
+struct task_t {
+    int _task_id; ///< Task ID
+    int _max_attempts; ///< Maximum number of attempts
+    uint64_t _duration; ///< Task duration in milliseconds
+    uint64_t _last_millis; ///< Last execution timestamp
+    CallBackVoidArgFn _task; ///< Task callback function
+    int _task_priority; ///< Task priority (default is 0)
+    uint64_t _task_exec_millis; ///< Task execution timestamp
 
-    /* Constructor */
-    task_t(){
-        clear();
-    }
+    task_t() { clear(); }
+    ~task_t() { clear(); }
 
-    /* Destructor */
-    ~task_t(){
-        clear();
-    }
-
-    /* Clear */
-    void clear(){
+    void clear() {
         _task_id = -1;
         _max_attempts = 0;
         _duration = 0;
@@ -230,8 +219,7 @@ struct task_t
         _task_exec_millis = 0;
     }
 
-    /* Copy Constructor */
-    task_t(const task_t &t){
+    task_t(const task_t &t) {
         _task_id = t._task_id;
         _max_attempts = t._max_attempts;
         _duration = t._duration;
@@ -240,16 +228,14 @@ struct task_t
         _task_priority = t._task_priority;
         _task_exec_millis = t._task_exec_millis;
     }
-
 };
 
 /**
-* available terminal types
-*/
-typedef enum terminal_types{
-
-  TERMINAL_TYPE_SERIAL = 0,
-  TERMINAL_TYPE_MAX
+ * Terminal types
+ */
+typedef enum terminal_types {
+    TERMINAL_TYPE_SERIAL = 0,
+    TERMINAL_TYPE_MAX
 } terminal_types_t;
 
 #endif

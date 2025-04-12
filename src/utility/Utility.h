@@ -1,11 +1,15 @@
 /******************************* Utility **************************************
-This file is part of the pdi stack.
+This file is part of the PDI stack.
 
-This is free software. you can redistribute it and/or modify it but without any
+This is free software. You can redistribute it and/or modify it but without any
 warranty.
 
+The Utility module provides a collection of utility functions, interfaces, and
+includes essential components for the PDI stack. It integrates task scheduling,
+event handling, data type conversions, string operations, and more.
+
 Author          : Suraj I.
-created Date    : 1st June 2019
+Created Date    : 1st June 2019
 ******************************************************************************/
 
 #ifndef __STACK_UTILITY_H__
@@ -31,7 +35,7 @@ created Date    : 1st June 2019
 #endif
 
 /**
- * This template clone program memory object to data memory.
+ * @brief This template clone program memory object to data memory.
  *
  * @param	cost T* sce
  * @param	T&	dest
@@ -42,7 +46,7 @@ created Date    : 1st June 2019
 // }
 
 /**
- * This template returns static copy of program memory object.
+ * @brief This template returns static copy of program memory object.
  *
  * @param		cost T* sce
  * @return	T
@@ -55,14 +59,21 @@ created Date    : 1st June 2019
 // }
 
 /**
- * Template to clear type of object/struct.
+ * @brief Template to clear the contents of an object or struct.
  *
- * @param	cost Struct* _object
+ * This template function clears the memory of a given object or struct by
+ * setting all its bytes to zero.
+ *
+ * @tparam Struct The type of the object or struct to clear.
+ * @param _object Pointer to the object or struct to clear.
  */
-template <typename Struct> void _ClearObject (const Struct * _object) {
-  for (unsigned int i = 0; i < sizeof((*_object)); i++){
-    *((char*) & (*_object) + i) = 0;
-  }
+template <typename Struct>
+void _ClearObject(const Struct *_object)
+{
+    for (unsigned int i = 0; i < sizeof((*_object)); i++)
+    {
+        *((char *)&(*_object) + i) = 0;
+    }
 }
 
 
