@@ -49,6 +49,7 @@ created Date    : 1st June 2019
 #endif
 #define CMD_NAME_GPIO 				"gpio"
 #define CMD_NAME_SERVICE 			"srvc"
+#define CMD_NAME_FS 				"fs"
 
 /* command options */
 #define CMD_OPTION_NAME_P			"p"

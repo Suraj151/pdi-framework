@@ -7,11 +7,17 @@ warranty.
 Author          : Suraj I.
 created Date    : 6th Apr 2025
 ******************************************************************************/
-#ifndef _LITTLEFS_WRAPPER_H
-#define _LITTLEFS_WRAPPER_H
+#ifndef _EXT_LITTLEFS_WRAPPER_H
+#define _EXT_LITTLEFS_WRAPPER_H
 
-#include "interface/pdi/modules/storage/iStorageInterface.h"
-#include "littlefs/lfs.h" // Include the LittleFS library
+#include "interface/pdi/modules/storage/iFileSystemInterface.h"
+
+// Include the LittleFS library
+#define LFS_NAME_MAX FILE_NAME_MAX_SIZE
+#define LFS_NO_DEBUG
+#define LFS_NO_WARN
+#define LFS_NO_ERROR
+#include "littlefs/lfs.h"
 
 /**
  * @class LittleFSWrapper
@@ -37,47 +43,29 @@ created Date    : 6th Apr 2025
  *
  * @note The storage backend must implement the iStorageInterface.
  */
-class LittleFSWrapper {
+class LittleFSWrapper : public iFileSystemInterface {
 public:
     /**
      * @brief Constructor to initialize the LittleFSWrapper.
      * @param storage Reference to an iStorageInterface implementation.
+     * @param defaultConfig Flag to use default configuration.
      *
      * This constructor initializes the LittleFS configuration, mounts the file
      * system, and formats it if mounting fails.
      */
-    explicit LittleFSWrapper(iStorageInterface& storage)
-        : m_istorage(storage) {
-        // Initialize LittleFS configuration
-        m_lfscfg.read = &LittleFSWrapper::readCallback;
-        m_lfscfg.prog = &LittleFSWrapper::progCallback;
-        m_lfscfg.erase = &LittleFSWrapper::eraseCallback;
-        m_lfscfg.sync = &LittleFSWrapper::syncCallback;
-
-        m_lfscfg.read_size = 16; // Minimum read size (adjust as needed)
-        m_lfscfg.prog_size = 16; // Minimum program size (adjust as needed)
-        m_lfscfg.block_size = 4096; // Block size (adjust as needed)
-        m_lfscfg.block_count = m_istorage.size() / m_lfscfg.block_size;
-        m_lfscfg.cache_size = 16; // Cache size (adjust as needed)
-        m_lfscfg.lookahead_size = 16; // Lookahead buffer size (adjust as needed)
-        m_lfscfg.block_cycles = 500; // Number of erase cycles before wear leveling
-
-        // Mount the file system
-        if (lfs_mount(&m_lfs, &m_lfscfg) != LFS_ERR_OK) {
-            // Format and mount if mounting fails
-            lfs_format(&m_lfs, &m_lfscfg);
-            if (lfs_mount(&m_lfs, &m_lfscfg) != LFS_ERR_OK) {
-                // throw std::runtime_error("Failed to mount LittleFS");
-            }
-        }
-    }
+    LittleFSWrapper(iStorageInterface& storage, bool defaultConfig = true);
 
     /**
      * @brief Destructor to unmount the LittleFS file system.
      */
-    ~LittleFSWrapper() {
-        lfs_unmount(&m_lfs);
-    }
+    virtual ~LittleFSWrapper();
+
+    /**
+     * @brief Initialize and mount the file system.
+     * @param lfscnfg Pointer to the LittleFS configuration.
+     * @return 0 on success, or a negative error code on failure.
+     */
+    int initLFSConfig(lfs_config* lfscnfg = nullptr);
 
     /**
      * @brief Creates a file and writes content to it.
@@ -85,7 +73,7 @@ public:
      * @param content The content to write to the file.
      * @return The number of bytes written, or -1 on failure.
      */
-    int createFile(const char* path, const char* content);
+    int createFile(const char* path, const char* content) override;
 
     /**
      * @brief Reads content from a file.
@@ -94,10 +82,69 @@ public:
      * @param size The maximum number of bytes to read.
      * @return The number of bytes read, or -1 on failure.
      */
-    int readFile(const char* path, char *buffer, uint64_t size);
+    int readFile(const char* path, char *buffer, uint64_t size) override; ;
+
+    /**
+     * @brief Creates a directory.
+     * @param path The path of the directory to create.
+     * @return 0 on success, or a negative error code on failure.
+     */
+    int createDirectory(const char* path) override;
+
+    /**
+     * @brief Deletes a directory.
+     * @param path The path of the directory to delete.
+     * @return 0 on success, or a negative error code on failure.
+     */
+    int deleteDirectory(const char* path) override;
+
+    /**
+     * @brief Renames a file or directory.
+     * @param oldPath The current path of the file or directory.
+     * @param newPath The new path of the file or directory.
+     * @return 0 on success, or a negative error code on failure.
+     */
+    int rename(const char* oldPath, const char* newPath) override;
+
+    /**
+     * @brief Copies a file to a new path.
+     * @param sourcePath The path of the source file.
+     * @param destPath The path of the destination file.
+     * @return 0 on success, or a negative error code on failure.
+     */
+    int copyFile(const char* sourcePath, const char* destPath) override;
+
+    /**
+     * @brief Deletes a file.
+     * @param path The path of the file to delete.
+     * @return 0 on success, or a negative error code on failure.
+     */
+    int deleteFile(const char* path) override;
+
+    /**
+     * @brief Moves a file to a new path.
+     * @param oldPath The current path of the file.
+     * @param newPath The new path of the file.
+     * @return 0 on success, or a negative error code on failure.
+     */
+    int moveFile(const char* oldPath, const char* newPath) override;
+
+    /**
+     * @brief Gets the size of a file.
+     * @param path The path of the file.
+     * @return The size of the file in bytes, or -1 on failure.
+     */
+    int64_t getFileSize(const char* path) override;
+
+    /**
+     * @brief Get the list of files in a provided path.
+     * @param path The path of the directory to list.
+     * @param items A vector to store the file information.
+     * @return 0 on success, or negative on failure.
+     */
+    int getDirFileList(const char* path, pdiutil::vector<file_info_t>& items) override;
 
 private:
-    iStorageInterface& m_istorage;
     lfs_t m_lfs;
     lfs_config m_lfscfg;
 
@@ -111,15 +158,7 @@ private:
      * @return 0 on success, or a negative error code on failure.
      */
     static int readCallback(const struct lfs_config* c, lfs_block_t block,
-                            lfs_off_t offset, void* buffer, lfs_size_t size) {
-        auto* wrapper = static_cast<LittleFSWrapper*>(c->context);
-        try {
-            wrapper->m_istorage.read(block * c->block_size + offset, buffer, size);
-            return 0;
-        } catch (...) {
-            return LFS_ERR_IO;
-        }
-    }
+                            lfs_off_t offset, void* buffer, lfs_size_t size);
 
     /**
      * @brief Callback for writing data to storage.
@@ -131,15 +170,7 @@ private:
      * @return 0 on success, or a negative error code on failure.
      */
     static int progCallback(const struct lfs_config* c, lfs_block_t block,
-                            lfs_off_t offset, const void* buffer, lfs_size_t size) {
-        auto* wrapper = static_cast<LittleFSWrapper*>(c->context);
-        try {
-            wrapper->m_istorage.write(block * c->block_size + offset, buffer, size);
-            return 0;
-        } catch (...) {
-            return LFS_ERR_IO;
-        }
-    }
+                            lfs_off_t offset, const void* buffer, lfs_size_t size);
 
     /**
      * @brief Callback for erasing a block of storage.
@@ -147,25 +178,14 @@ private:
      * @param block The block number to erase.
      * @return 0 on success, or a negative error code on failure.
      */
-    static int eraseCallback(const struct lfs_config* c, lfs_block_t block) {
-        auto* wrapper = static_cast<LittleFSWrapper*>(c->context);
-        try {
-            wrapper->m_istorage.erase(block * c->block_size, c->block_size);
-            return 0;
-        } catch (...) {
-            return LFS_ERR_IO;
-        }
-    }
+    static int eraseCallback(const struct lfs_config* c, lfs_block_t block);
 
     /**
      * @brief Callback for syncing storage (no-op for most backends).
      * @param c The LittleFS configuration.
      * @return 0 on success.
      */
-    static int syncCallback(const struct lfs_config* c) {
-        // Sync is a no-op for most m_istorage backends
-        return 0;
-    }
+    static int syncCallback(const struct lfs_config* c);
 };
 
-#endif // _LITTLEFS_WRAPPER_H
+#endif // _EXT_LITTLEFS_WRAPPER_H

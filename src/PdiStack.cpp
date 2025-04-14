@@ -101,6 +101,10 @@ void PDIStack::initialize(){
   #ifdef ENABLE_CMD_SERVICE
   __cmd_service.initService();
   #endif
+
+  #ifdef ENABLE_STORAGE_SERVICE
+  __i_fs.init();
+  #endif
 }
 
 /**

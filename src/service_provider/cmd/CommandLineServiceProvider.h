@@ -17,6 +17,7 @@ created Date    : 1st June 2019
 #include "commands/AuthCommand.h"
 #include "commands/GpioCommand.h"
 #include "commands/ServiceCommand.h"
+#include "commands/FSCommand.h"
 
 /**
  * CommandLineServiceProvider class

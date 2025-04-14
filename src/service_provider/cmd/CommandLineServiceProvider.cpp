@@ -38,6 +38,11 @@ CommandLineServiceProvider::CommandLineServiceProvider() : ServiceProvider(SERVI
 
   ServiceCommand *svccmd = new ServiceCommand();
   m_cmdlist.push_back(svccmd);
+
+  #ifdef ENABLE_STORAGE_SERVICE
+  FileSystemCommand *fscmd = new FileSystemCommand();
+  m_cmdlist.push_back(fscmd);
+  #endif
 }
 
 /**

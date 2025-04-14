@@ -130,6 +130,28 @@ public:
   virtual uint32_t write(const char *c_str, uint32_t size) { return write((const uint8_t *)c_str, size); }
 
   /**
+   * @brief Writes a specified number of characters.
+   * @param c_str Pointer to the character string.
+   * @param maxsize The maximum number of characters to write.
+   * @param pad The character to use for padding (default is space).
+   * @return Number of bytes written.
+   */
+  virtual uint32_t write_pad(const char *c_str, uint32_t maxsize, char pad=' ') {
+    uint32_t size = strlen(c_str);
+    if (size < maxsize) {
+
+      write(c_str);
+
+      for (size_t i = 0; i < maxsize - size; i++){
+        write((uint8_t)pad);
+      }
+
+      return maxsize;
+    } 
+    return write(c_str, maxsize); 
+  }
+
+  /**
    * @brief Writes a newline character.
    * @return Number of bytes written.
    */

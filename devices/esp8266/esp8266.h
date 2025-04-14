@@ -25,12 +25,14 @@ created Date    : 1st Jan 2024
 #include <ESP8266WebServer.h>
 #include <ESP8266httpUpdate.h>
 #include <utility/DataTypeDef.h>
+#include "flash_hal.h"
 
 extern "C"
 {
 #include "user_interface.h"
 #include <espnow.h>
 #include <ping.h>
+#include "spi_flash.h"
 }
 
 // redefines

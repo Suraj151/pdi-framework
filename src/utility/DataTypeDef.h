@@ -238,4 +238,29 @@ typedef enum terminal_types {
     TERMINAL_TYPE_MAX
 } terminal_types_t;
 
+/**
+ * File info structure & definitions
+ */
+#define FILE_SEPARATOR "/"
+#define FILE_NAME_MAX_SIZE 24
+
+enum file_type_t {
+    FILE_TYPE_REG = 0, ///< Regular file
+    FILE_TYPE_DIR, ///< Directory
+    FILE_TYPE_LINK, ///< Symbolic link
+    FILE_TYPE_MAX
+};
+
+struct file_info_t {
+    // Type of the file
+    file_type_t type;
+
+    // Size of the file, only valid for REG files.
+    uint64_t size;
+
+    // Name of the file stored as a null-terminated string. must be limited to
+    // FILE_NAME_MAX_SIZE+1,
+    char *name;
+};
+
 #endif

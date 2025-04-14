@@ -37,6 +37,11 @@ created Date    : 1st June 2019
 #define ENABLE_SERIAL_SERVICE
 
 /**
+ * enable/disable storage service
+ */
+#define ENABLE_STORAGE_SERVICE
+
+/**
  * define number of gpios based on device enabled
  */
 #if defined(DEVICE_ARDUINOUNO)

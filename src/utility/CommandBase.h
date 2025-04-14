@@ -32,6 +32,7 @@ typedef enum {
     CMD_RESULT_NEED_AUTH,            ///< Command requires authentication.
     CMD_RESULT_INCOMPLETE,           ///< Command execution is incomplete.
     CMD_RESULT_WRONG_CREDENTIAL,     ///< Wrong credentials provided.
+    CMD_RESULT_FAILED,               ///< Failed
     CMD_RESULT_MAX                   ///< Unknown or unhandled result.
 } cmd_result_t;
 
@@ -370,7 +371,7 @@ typedef struct CommandBase {
      * @param res The result of the command execution.
      */
     void ResultToTerminal(cmd_result_t res){
-        if( nullptr != m_terminal && CMD_RESULT_INCOMPLETE != res && !isWaitingForOption() ){
+        if( nullptr != m_terminal && CMD_RESULT_INCOMPLETE != res && CMD_RESULT_OK != res && !isWaitingForOption() ){
             m_terminal->writeln();
             switch (res){
             case CMD_RESULT_ARGS_ERROR:
@@ -398,7 +399,7 @@ typedef struct CommandBase {
                 m_terminal->write_ro(RODT_ATTR("Unknown"));
                 break;
             case CMD_RESULT_OK:
-                m_terminal->write_ro(RODT_ATTR("Success"));
+                // m_terminal->write_ro(RODT_ATTR("Success"));
                 break;
             default:
                 break;
