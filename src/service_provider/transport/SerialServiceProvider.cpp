@@ -77,7 +77,8 @@ void SerialServiceProvider::processSerial(serial_event_t *se)
 
     // make sure to flush serial if no more data available
     __i_dvc_ctrl.wait(1);
-    if(!se->serial->available()) se->serial->flush();
+    //if(!se->serial->available()) 
+    se->serial->flush();
   }
 }
 

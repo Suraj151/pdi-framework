@@ -40,8 +40,29 @@ CommandLineServiceProvider::CommandLineServiceProvider() : ServiceProvider(SERVI
   m_cmdlist.push_back(svccmd);
 
   #ifdef ENABLE_STORAGE_SERVICE
-  FileSystemCommand *fscmd = new FileSystemCommand();
-  m_cmdlist.push_back(fscmd);
+  ListFSCommand *listfscmd = new ListFSCommand();
+  m_cmdlist.push_back(listfscmd);
+
+  ChangeDirFSCommand *chdircmd = new ChangeDirFSCommand();
+  m_cmdlist.push_back(chdircmd);
+
+  PWDFSCommand *pwdfscmd = new PWDFSCommand();
+  m_cmdlist.push_back(pwdfscmd);
+
+  MakeDirFSCommand *makedircmd = new MakeDirFSCommand();
+  m_cmdlist.push_back(makedircmd);
+
+  MakeFileFSCommand *makefilecmd = new MakeFileFSCommand();
+  m_cmdlist.push_back(makefilecmd);
+
+  RemoveFSCommand *removefdcmd = new RemoveFSCommand();
+  m_cmdlist.push_back(removefdcmd);
+
+  MoveFSCommand *movefscmd = new MoveFSCommand();
+  m_cmdlist.push_back(movefscmd);
+
+  FileFSCommand *filefscmd = new FileFSCommand();
+  m_cmdlist.push_back(filefscmd);
   #endif
 }
 
@@ -50,6 +71,9 @@ CommandLineServiceProvider::CommandLineServiceProvider() : ServiceProvider(SERVI
  */
 CommandLineServiceProvider::~CommandLineServiceProvider()
 {
+  for (auto cmd : m_cmdlist) {
+    if(cmd) delete cmd;
+  }
 }
 
 /**
@@ -112,7 +136,7 @@ void CommandLineServiceProvider::processTerminalInput(iTerminalInterface *termin
       __i_dvc_ctrl.wait(1);
     }
 
-    // 
+    // check if line ending is entered
     if( !isEnteredLF ){
       return;
     }
@@ -120,6 +144,7 @@ void CommandLineServiceProvider::processTerminalInput(iTerminalInterface *termin
     cmd_result_t result = executeCommand(&m_termrecvdata);
 
     // flush stored string
+    m_termrecvdata.clear();
     m_termrecvdata = "";
 }
 
@@ -142,21 +167,26 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd)
       if(nullptr != m_cmdlist[i] && m_cmdlist[i]->isWaitingForOption()){
 
         is_executing_lastcommand = true;
-        res = m_cmdlist[i]->executeCommand((char*)cmd->data(), cmd->size(), true);
+        res = m_cmdlist[i]->executeCommand((char*)cmd->c_str(), cmd->size(), true);
         break;
       }
     }
 
     for (int16_t i = 0; !is_executing_lastcommand && i < m_cmdlist.size(); i++){
 
-      if(nullptr != m_cmdlist[i] && m_cmdlist[i]->isValidCommand((char*)cmd->data())){
+      if(nullptr != m_cmdlist[i] && m_cmdlist[i]->isValidCommand((char*)cmd->c_str())){
 
-        res = m_cmdlist[i]->executeCommand((char*)cmd->data(), cmd->size());
+        res = m_cmdlist[i]->executeCommand((char*)cmd->c_str(), cmd->size());
 
         // if( CMD_RESULT_OK == res ){
           break;
         // }
       }
+    }
+
+    // if command is incomplete then we are in continue execution mode
+    if (CMD_RESULT_INCOMPLETE == res){
+      is_executing_lastcommand = true;
     }
   }
 
@@ -183,7 +213,13 @@ void CommandLineServiceProvider::startInteraction()
       m_cmdterminal->write(__auth_service.getUsername());
 		  m_cmdterminal->write_ro(RODT_ATTR("@"));
       m_cmdterminal->write(__i_dvc_ctrl.getDeviceId());
+      #ifdef ENABLE_STORAGE_SERVICE
+		  m_cmdterminal->write_ro(RODT_ATTR(":("));
+      m_cmdterminal->write(__i_fs.pwd()->c_str());
+		  m_cmdterminal->write_ro(RODT_ATTR("): "));
+      #else
 		  m_cmdterminal->write_ro(RODT_ATTR(": "));
+      #endif
     }else{
       m_cmdterminal->write(CMD_NAME_LOGIN);
 		  m_cmdterminal->write_ro(RODT_ATTR(": "));

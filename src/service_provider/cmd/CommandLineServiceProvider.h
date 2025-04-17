@@ -17,7 +17,14 @@ created Date    : 1st June 2019
 #include "commands/AuthCommand.h"
 #include "commands/GpioCommand.h"
 #include "commands/ServiceCommand.h"
-#include "commands/FSCommand.h"
+#include "commands/ListFSCommand.h"
+#include "commands/ChangeDirFSCommand.h"
+#include "commands/PWDFSCommand.h"
+#include "commands/MakeDirFSCommand.h"
+#include "commands/MakeFileFSCommand.h"
+#include "commands/RemoveFSCommand.h"
+#include "commands/MoveFSCommand.h"
+#include "commands/FileFSCommand.h"
 
 /**
  * CommandLineServiceProvider class

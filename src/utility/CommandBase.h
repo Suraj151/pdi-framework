@@ -51,7 +51,8 @@ typedef enum {
 #define CMD_SIZE_MAX                8   ///< Maximum size of a command.
 #define CMD_OPTION_MAX              3   ///< Maximum number of options for a command.
 #define CMD_OPTION_SIZE_MAX         3   ///< Maximum size of an option.
-#define CMD_OPTION_SEPERATOR        "," ///< Separator for options.
+#define CMD_OPTION_SEPERATOR_COMMA  "," ///< Comma as a Separator for options.
+#define CMD_OPTION_SEPERATOR_SPACE  " " ///< Space as a Separator for options.
 #define CMD_OPTION_ASSIGN_OPERATOR  "=" ///< Assignment operator for options.
 
 /**
@@ -110,6 +111,8 @@ typedef struct CommandBase {
     iTerminalInterface *m_terminal;              ///< Terminal interface for command interaction.
     cmd_status_t m_status;                        ///< Status of the command.
     cmd_result_t m_result;                        ///< Result of the command execution.
+    bool m_acceptArgsOptions;                   ///< Flag to accept argumental options.
+    const char* m_optionseparator;               ///< Separator for options.
 
     /**
      * @brief Constructor for the CommandBase structure.
@@ -184,8 +187,27 @@ typedef struct CommandBase {
      * @return True if the command matches, false otherwise.
      */
     bool isValidCommand(char *_cmd){
-        // return ((nullptr != _cmd) && __are_str_equals(cmd, _cmd, CMD_SIZE_MAX));
-        return ((nullptr != _cmd) && __are_arrays_equal(m_cmd, _cmd, strlen(m_cmd)));
+
+        if( nullptr == _cmd ){
+            return false;
+        }
+
+        int16_t cmd_max_len = pdistd::min((size_t)CMD_SIZE_MAX, strlen(_cmd));
+        int16_t cmd_start_indx = __strstr(_cmd, m_cmd, cmd_max_len);
+        int16_t cmd_end_indx = __strstr(_cmd+cmd_start_indx, " ");
+        cmd_end_indx = cmd_end_indx < 0 ? cmd_max_len : (cmd_start_indx+cmd_end_indx);
+        // cmd_end_indx = cmd_end_indx > cmd_max_len ? cmd_max_len : cmd_end_indx;
+
+        if( cmd_start_indx >= 0 && cmd_start_indx < cmd_end_indx && cmd_end_indx <= cmd_max_len ){
+
+            char argcmd[CMD_SIZE_MAX];
+            memset(argcmd, 0, CMD_SIZE_MAX);
+            memcpy(argcmd, _cmd + cmd_start_indx, pdistd::min(CMD_SIZE_MAX, abs(cmd_end_indx - cmd_start_indx)));
+    
+            return __are_str_equals(m_cmd, argcmd, CMD_SIZE_MAX);
+        }
+        return false;
+        // return ((nullptr != _cmd) && __are_arrays_equal(m_cmd, _cmd, strlen(m_cmd)));
     }
 
     /**
@@ -228,6 +250,22 @@ typedef struct CommandBase {
     }
 
     /**
+     * @brief Sets whether to accept argument options.
+     * @param _accept Indicates whether to accept argument options.
+     */
+    void setAcceptArgsOptions(bool _accept){
+        m_acceptArgsOptions = _accept;
+    }
+
+    /**
+     * @brief Sets the command option separator.
+     * @param separator The separator string for options.
+     */
+    void setCmdOptionSeparator(const char* separator){
+        m_optionseparator = separator;
+    }
+
+    /**
      * @brief Holds the value of an option if provided.
      * @param _optn The option name to hold the value for.
      * @return True if the option value was held successfully, false otherwise.
@@ -262,9 +300,12 @@ typedef struct CommandBase {
         if(_args != nullptr){
             if( !_waiting_option ){
                 int16_t cmd_max_len = _len;
-                int16_t cmd_start_indx = __strstr(_args, m_cmd);
+                int16_t cmd_start_indx = __strstr(_args, m_cmd, _len);
                 int16_t cmd_end_indx = __strstr(_args+cmd_start_indx, " ");
                 cmd_end_indx = cmd_end_indx < 0 ? cmd_max_len : (cmd_start_indx+cmd_end_indx);
+                cmd_end_indx = cmd_end_indx > cmd_max_len ? cmd_max_len : cmd_end_indx;
+
+                // check if command start and end indices are valid
                 if( cmd_start_indx >= 0 && cmd_start_indx < cmd_end_indx && cmd_end_indx <= cmd_max_len ){
                     char argcmd[CMD_SIZE_MAX];
                     memset(argcmd, 0, CMD_SIZE_MAX);
@@ -282,7 +323,7 @@ typedef struct CommandBase {
                                     memcpy(argoptn, _args+optn_start_indx, optn_end_indx-optn_start_indx);
                                     // get the option value start and end indices
                                     int16_t optn_val_start_index = optn_end_indx+strlen(CMD_OPTION_ASSIGN_OPERATOR);
-                                    int16_t optn_val_end_index = __strstr(_args+optn_val_start_index, CMD_OPTION_SEPERATOR);
+                                    int16_t optn_val_end_index = __strstr(_args+optn_val_start_index, m_optionseparator);
                                     optn_val_end_index += optn_val_end_index != -1 ? optn_val_start_index : cmd_max_len+1;
                                     char *argoptntrimmed = __strtrim(argoptn);
                                     int8_t validoptnindex = getOptionIndex(argoptntrimmed);
@@ -295,8 +336,8 @@ typedef struct CommandBase {
                                         break;
                                     }
                                     // next option start index will start with last option value end index
-                                    optn_start_indx = optn_val_end_index+strlen(CMD_OPTION_SEPERATOR);
-                                    // optn_start_indx += optn_start_indx != -1 ? (optn_val_end_index+strlen(CMD_OPTION_SEPERATOR)) : 0;
+                                    optn_start_indx = optn_val_end_index+strlen(m_optionseparator);
+                                    // optn_start_indx += optn_start_indx != -1 ? (optn_val_end_index+strlen(m_optionseparator)) : 0;
                                     optn_end_indx = __strstr(_args+optn_start_indx, CMD_OPTION_ASSIGN_OPERATOR);
                                     optn_end_indx += optn_end_indx != -1 ? optn_start_indx : 0;
                                 } while ( optn_start_indx > 0 && optn_end_indx > 0 && optn_end_indx < cmd_max_len && optn_start_indx < optn_end_indx);
@@ -304,6 +345,29 @@ typedef struct CommandBase {
                                 m_result = CMD_RESULT_ARGS_ERROR;
                             }
                         }else{
+
+                            if(m_acceptArgsOptions){
+
+                                // if command has free options. 
+                                uint8_t option_indx = 0;
+                                int16_t optn_val_start_index = cmd_end_indx + 1;
+                                int16_t optn_val_end_index = -1;
+
+                                do{
+                                    // get the option value start and end indices
+                                    optn_val_end_index = __strstr(_args+optn_val_start_index, m_optionseparator);
+                                    optn_val_end_index += optn_val_end_index != -1 ? optn_val_start_index : cmd_max_len+1;
+                                    optn_val_end_index = optn_val_end_index > cmd_max_len ? cmd_max_len : optn_val_end_index;
+
+                                    m_options[option_indx].optionval = __strtrim(_args+optn_val_start_index);
+                                    m_options[option_indx++].optionvalsize = optn_val_end_index - optn_val_start_index;
+                                    m_result = CMD_RESULT_OK;
+
+                                    // next option value start index will start with last option value end index
+                                    optn_val_start_index = optn_val_end_index+strlen(m_optionseparator);
+                                } while ( optn_val_start_index > 0 && optn_val_end_index > 0 && optn_val_start_index < cmd_max_len && option_indx < CMD_OPTION_MAX);
+                            }
+
                             // if command dont have any options by default
                             m_result = CMD_RESULT_OK;
                         }
@@ -352,6 +416,8 @@ typedef struct CommandBase {
         m_terminal = nullptr;
         m_status = CMD_STATUS_MAX;
         m_result = CMD_RESULT_MAX;
+        m_acceptArgsOptions = false;
+        m_optionseparator = CMD_OPTION_SEPERATOR_COMMA;
     }
 
     /**

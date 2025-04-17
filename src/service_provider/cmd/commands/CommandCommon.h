@@ -49,7 +49,14 @@ created Date    : 1st June 2019
 #endif
 #define CMD_NAME_GPIO 				"gpio"
 #define CMD_NAME_SERVICE 			"srvc"
-#define CMD_NAME_FS 				"fs"
+#define CMD_NAME_LS 				"ls"
+#define CMD_NAME_CD 				"cd"
+#define CMD_NAME_PWD 				"pwd"
+#define CMD_NAME_MKD 				"mkd"
+#define CMD_NAME_MKF 				"mkf"
+#define CMD_NAME_RM 				"rm"
+#define CMD_NAME_MOVE 			    "mv"
+#define CMD_NAME_FILE 				"file"
 
 /* command options */
 #define CMD_OPTION_NAME_P			"p"
@@ -58,6 +65,7 @@ created Date    : 1st June 2019
 #define CMD_OPTION_NAME_U	        "u"
 #define CMD_OPTION_NAME_S	        "s"
 #define CMD_OPTION_NAME_Q	        "q"
+#define CMD_OPTION_NAME_F	        "f"
 
 
 #endif

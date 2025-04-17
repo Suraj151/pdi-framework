@@ -87,13 +87,13 @@ int LittleFSWrapper::initLFSConfig(lfs_config *lfscnfg)
  * @param content The content to write to the file.
  * @return The number of bytes written, or -1 on failure.
  */
-int LittleFSWrapper::createFile(const char* path, const char* content) {
+int LittleFSWrapper::createFile(const char* path, const char* content, int64_t size) {
     lfs_file_t file;
     int fileOpenOrErr = lfs_file_open(&m_lfs, &file, path, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC);
     if (fileOpenOrErr < 0) {
         return fileOpenOrErr; // Failed to create file
     }
-    int bytesWrittenOrErr = lfs_file_write(&m_lfs, &file, content, strlen(content));
+    int bytesWrittenOrErr = lfs_file_write(&m_lfs, &file, content, (size == -1) ? strlen(content) : size);
     lfs_file_close(&m_lfs, &file);
     return bytesWrittenOrErr;
 }
@@ -101,17 +101,40 @@ int LittleFSWrapper::createFile(const char* path, const char* content) {
 /**
  * @brief Reads content from a file.
  * @param path The path of the file to read.
- * @param buffer The buffer to store the read content.
  * @param size The maximum number of bytes to read.
+ * @param readbackfn callback function for readback.
  * @return The number of bytes read, or -1 on failure.
  */
-int LittleFSWrapper::readFile(const char* path, char* buffer, uint64_t size) {
+int LittleFSWrapper::readFile(const char* path, uint64_t size, pdiutil::function<bool(char *, uint32_t)> readbackfn) {
     lfs_file_t file;
-    int fileOpenOrErr = lfs_file_open(&m_lfs, &file, path, LFS_O_RDONLY);
-    if (fileOpenOrErr < 0) {
-        return fileOpenOrErr; // Failed to open file
+    int okOrErr = lfs_file_open(&m_lfs, &file, path, LFS_O_RDONLY);
+    if (okOrErr < 0) {
+        return okOrErr; // Failed to open file
     }
-    int bytesReadOrErr = lfs_file_read(&m_lfs, &file, buffer, size);
+
+    // Buffer to store file content
+    char buffer[size];
+    memset(buffer, 0, sizeof(buffer));
+    int bytesReadOrErr = 0;
+    
+    if (nullptr != readbackfn) {
+
+        lfs_size_t filesize = lfs_file_size(&m_lfs, &file); 
+        for (lfs_size_t i = 0; i < filesize; i += size) {
+            lfs_size_t chunk = lfs_min(size, filesize - i);
+            okOrErr = lfs_file_read(&m_lfs, &file, buffer, chunk);
+            if (okOrErr < 0) {
+                bytesReadOrErr = okOrErr; // Failed to read file
+                break; // Failed to read file
+            }
+
+            bytesReadOrErr += okOrErr;
+            // Call the readback function with the read data. break if callback returns false
+            if(readbackfn(buffer, chunk) == false) {
+                break;
+            }
+        }
+    }
     lfs_file_close(&m_lfs, &file);
     return bytesReadOrErr;
 }
@@ -247,6 +270,48 @@ int LittleFSWrapper::getDirFileList(const char *path, pdiutil::vector<file_info_
 }
 
 /**
+ * @brief Checks if a file exists at the specified path.
+ * @param path The path of the file to check.
+ * @return True if the file exists, false otherwise.
+ */
+bool LittleFSWrapper::isFileExist(const char *path)
+{
+    lfs_file_t file;
+    int fileOpenOrErr = lfs_file_open(&m_lfs, &file, path, LFS_O_RDONLY);
+    if (fileOpenOrErr < 0) {
+        return false;
+    }
+    lfs_file_close(&m_lfs, &file);
+    return true;
+}
+
+/**
+ * @brief Checks if a directory exists at the specified path.
+ * @param path The path of the directory to check.
+ * @return True if the directory exists, false otherwise.
+ */
+bool LittleFSWrapper::isDirExist(const char *path)
+{
+    lfs_dir_t dir;
+    int dirOpenOrErr = lfs_dir_open(&m_lfs, &dir, path);
+    if (dirOpenOrErr < 0) {
+        return false;
+    }
+    lfs_dir_close(&m_lfs, &dir);
+    return true;
+}
+
+/**
+ * @brief Checks whether path is directory or not
+ * @param path The path of the directory to check.
+ * @return True if the type is directory, false otherwise.
+ */
+bool LittleFSWrapper::isDirectory(const char *path)
+{
+    return isDirExist(path);
+}
+
+/**
  * @brief Callback for reading data from storage.
  * @param c The LittleFS configuration.
  * @param block The block number to read from.
@@ -255,8 +320,9 @@ int LittleFSWrapper::getDirFileList(const char *path, pdiutil::vector<file_info_
  * @param size The number of bytes to read.
  * @return 0 on success, or a negative error code on failure.
  */
-int LittleFSWrapper::readCallback(const struct lfs_config* c, lfs_block_t block,
-                                  lfs_off_t offset, void* buffer, lfs_size_t size) {
+int LittleFSWrapper::readCallback(const struct lfs_config *c, lfs_block_t block,
+                                  lfs_off_t offset, void *buffer, lfs_size_t size)
+{
     auto* wrapper = static_cast<LittleFSWrapper*>(c->context);
     int64_t byteRead = wrapper->m_istorage.read(block * c->block_size + offset, buffer, size);
     // LogFmtI("\nlfsread callback: %d, %d, %d, %d", block, c->block_size, offset, byteRead);

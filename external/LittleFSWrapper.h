@@ -73,16 +73,16 @@ public:
      * @param content The content to write to the file.
      * @return The number of bytes written, or -1 on failure.
      */
-    int createFile(const char* path, const char* content) override;
+    int createFile(const char* path, const char* content, int64_t size=-1) override;
 
     /**
      * @brief Reads content from a file.
      * @param path The path of the file to read.
-     * @param buffer The buffer to store the read content.
      * @param size The maximum number of bytes to read.
+     * @param readbackfn callback function for readback.
      * @return The number of bytes read, or -1 on failure.
      */
-    int readFile(const char* path, char *buffer, uint64_t size) override; ;
+    int readFile(const char* path, uint64_t size, pdiutil::function<bool(char *, uint32_t)> readbackfn) override; 
 
     /**
      * @brief Creates a directory.
@@ -143,6 +143,27 @@ public:
      * @return 0 on success, or negative on failure.
      */
     int getDirFileList(const char* path, pdiutil::vector<file_info_t>& items) override;
+
+    /**
+     * @brief Checks if a file exists at the specified path.
+     * @param path The path of the file to check.
+     * @return True if the file exists, false otherwise.
+     */
+    bool isFileExist(const char* path) override;
+
+    /**
+     * @brief Checks if a directory exists at the specified path.
+     * @param path The path of the directory to check.
+     * @return True if the directory exists, false otherwise.
+     */
+    bool isDirExist(const char* path) override;
+
+    /**
+     * @brief Checks whether path is directory or not
+     * @param path The path of the directory to check.
+     * @return True if the type is directory, false otherwise.
+     */
+    bool isDirectory(const char* path) override;
 
 private:
     lfs_t m_lfs;

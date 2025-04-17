@@ -59,18 +59,19 @@ public:
      * @brief Creates a file and writes content to it.
      * @param path The path of the file to create.
      * @param content The content to write to the file.
+     * @param size The size of the content to write. Default is -1 for full content.
      * @return The number of bytes written, or -1 on failure.
      */
-    virtual int createFile(const char* path, const char* content) = 0;
+    virtual int createFile(const char* path, const char* content, int64_t size=-1) = 0;
 
     /**
      * @brief Reads content from a file.
      * @param path The path of the file to read.
-     * @param buffer The buffer to store the read content.
      * @param size The maximum number of bytes to read.
+     * @param readbackfn callback function for readback.
      * @return The number of bytes read, or -1 on failure.
      */
-    virtual int readFile(const char* path, char* buffer, uint64_t size) = 0;
+    virtual int readFile(const char* path, uint64_t size, pdiutil::function<bool(char *, uint32_t)> readbackfn) = 0;
 
     /**
      * @brief Creates a directory.
@@ -132,31 +133,26 @@ public:
      */
     virtual int getDirFileList(const char* path, pdiutil::vector<file_info_t>& items) = 0;
 
-    // /**
-    //  * @brief Sets the current working directory.
-    //  * @param path The new working directory.
-    //  * @param append If true, appends the path to the current working directory.
-    //  * @return 0 on success, or negative on failure.
-    //  */
-    // virtual int setWorkingDirectory(const char* path, bool append = false) {
-    //     if (path) {
-    //         if (append) {
-    //             m_pwd += path;
-    //         } else {
-    //             m_pwd = path;
-    //         }
-    //         return 0;
-    //     }
-    //     return -1; // Invalid path
-    // }
+    /**
+     * @brief Checks if a file exists at the specified path.
+     * @param path The path of the file to check.
+     * @return True if the file exists, false otherwise.
+     */
+    virtual bool isFileExist(const char* path) = 0;
 
-    // /**
-    //  * @brief Gets the current working directory.
-    //  * @return The current working directory.
-    //  */
-    // virtual const char* getWorkingDirectory() const {
-    //     return m_pwd.c_str();
-    // }
+    /**
+     * @brief Checks if a directory exists at the specified path.
+     * @param path The path of the directory to check.
+     * @return True if the directory exists, false otherwise.
+     */
+    virtual bool isDirExist(const char* path) = 0;
+    
+    /**
+     * @brief Checks whether path is directory or not
+     * @param path The path of the directory to check.
+     * @return True if the type is directory, false otherwise.
+     */
+    virtual bool isDirectory(const char* path) = 0;
 
     /**
      * @brief Gets the current working directory.
@@ -174,6 +170,76 @@ public:
         if (nullptr != path && path[strlen(path) - 1] != FILE_SEPARATOR[0]) {
             strncat(path, FILE_SEPARATOR, 1);
         }
+    }
+
+    /**
+     * @brief Changes the current working directory to the specified path.
+     * @param path The new path to change to.
+     * @return True if the directory change was successful, false otherwise.
+     */
+    virtual bool changeDirectory(const char* path) {
+        if (!path || !isDirectory(path)) {
+            return false; // Invalid path or not a directory
+        }
+
+        const int len = strlen(path);
+        char newpath[len + 1]; // Buffer for the resulting path
+        memset(newpath, 0, sizeof(newpath));
+
+        int j = 0; // Index for newpath
+        int lastsepindx = 0; // Index of the last directory separator
+
+        for (int i = 0; i < len; ++i) {
+            if (path[i] == FILE_SEPARATOR[0]) {
+                // Handle directory separator
+                if (i + 1 < len && path[i + 1] == '.') {
+                    if (i + 2 < len && path[i + 2] == '.') {
+                        // Handle ".." (parent directory)
+                        // Backtrack to the previous directory separator
+                        while (j > 0 && newpath[j - 1] != FILE_SEPARATOR[0]) {
+                            --j;
+                        }
+                        if (j > 0) {
+                            --j; // Remove the trailing separator
+                        }
+                        i += 2; // Skip ".."
+                    } else {
+                        // Handle "." (current directory)
+                        i += 1; // Skip "."
+                    }
+                } else {
+                    // Normal directory separator
+                    if (j == 0 || newpath[j - 1] != FILE_SEPARATOR[0]) {
+                        newpath[j++] = FILE_SEPARATOR[0];
+                    }
+                }
+                lastsepindx = j;
+            } else {
+                // Copy normal characters
+                newpath[j++] = path[i];
+            }
+        }
+
+        // Remove trailing separator if it's not the root directory
+        if (j > 1 && newpath[j - 1] == FILE_SEPARATOR[0]) {
+            newpath[--j] = '\0';
+        } else {
+            newpath[j] = '\0';
+        }
+
+        // Handle the case where the path is empty or only contains separators
+        if (j == 0) {
+            newpath[0] = FILE_SEPARATOR[0];
+            newpath[1] = '\0';
+        }
+    
+        // Validate the resulting path
+        if (isDirectory(newpath)) {
+            m_pwd = newpath; // Update the current working directory
+            return true;
+        }
+
+        return false; // Invalid resulting path
     }
 
     /**
