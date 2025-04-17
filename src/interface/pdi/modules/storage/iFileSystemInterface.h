@@ -65,6 +65,16 @@ public:
     virtual int createFile(const char* path, const char* content, int64_t size=-1) = 0;
 
     /**
+     * @brief Writes content to a file.
+     * @param path The path of the file to write to.
+     * @param content The content to write to the file.
+     * @param size The size of the content to write.
+     * @param append Whether to append to the file or overwrite it. Default is false (overwrite).
+     * @return The number of bytes written, or -1 on failure.
+     */
+    virtual int writeFile(const char* path, const char* content, uint32_t size, bool append=false) = 0;
+
+    /**
      * @brief Reads content from a file.
      * @param path The path of the file to read.
      * @param size The maximum number of bytes to read.

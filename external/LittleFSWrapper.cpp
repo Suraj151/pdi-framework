@@ -85,15 +85,36 @@ int LittleFSWrapper::initLFSConfig(lfs_config *lfscnfg)
  * @brief Creates a file and writes content to it.
  * @param path The path of the file to create.
  * @param content The content to write to the file.
+ * @param size The size of the content to write. Default is -1 for full content.
  * @return The number of bytes written, or -1 on failure.
  */
 int LittleFSWrapper::createFile(const char* path, const char* content, int64_t size) {
     lfs_file_t file;
-    int fileOpenOrErr = lfs_file_open(&m_lfs, &file, path, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC);
+    int fileOpenOrErr = lfs_file_open(&m_lfs, &file, path, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC | LFS_O_EXCL);
     if (fileOpenOrErr < 0) {
         return fileOpenOrErr; // Failed to create file
     }
     int bytesWrittenOrErr = lfs_file_write(&m_lfs, &file, content, (size == -1) ? strlen(content) : size);
+    lfs_file_close(&m_lfs, &file);
+    return bytesWrittenOrErr;
+}
+
+/**
+ * @brief Writes content to a file.
+ * @param path The path of the file to write to.
+ * @param content The content to write to the file.
+ * @param size The size of the content to write.
+ * @param append Whether to append to the file or overwrite it. Default is false (overwrite).
+ * @return The number of bytes written, or -1 on failure.
+ */
+int LittleFSWrapper::writeFile(const char *path, const char *content, uint32_t size, bool append)
+{
+    lfs_file_t file;
+    int fileOpenOrErr = lfs_file_open(&m_lfs, &file, path, LFS_O_WRONLY | LFS_O_CREAT | (append ? LFS_O_APPEND : LFS_O_TRUNC) );
+    if (fileOpenOrErr < 0) {
+        return fileOpenOrErr; // Failed to create file
+    }
+    int bytesWrittenOrErr = lfs_file_write(&m_lfs, &file, content, size);
     lfs_file_close(&m_lfs, &file);
     return bytesWrittenOrErr;
 }

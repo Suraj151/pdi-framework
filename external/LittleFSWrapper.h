@@ -71,9 +71,20 @@ public:
      * @brief Creates a file and writes content to it.
      * @param path The path of the file to create.
      * @param content The content to write to the file.
+     * @param size The size of the content to write. Default is -1 for full content.
      * @return The number of bytes written, or -1 on failure.
      */
     int createFile(const char* path, const char* content, int64_t size=-1) override;
+
+    /**
+     * @brief Writes content to a file.
+     * @param path The path of the file to write to.
+     * @param content The content to write to the file.
+     * @param size The size of the content to write.
+     * @param append Whether to append to the file or overwrite it. Default is false (overwrite).
+     * @return The number of bytes written, or -1 on failure.
+     */
+    int writeFile(const char* path, const char* content, uint32_t size, bool append=false) override;
 
     /**
      * @brief Reads content from a file.

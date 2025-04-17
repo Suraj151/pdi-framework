@@ -56,7 +56,8 @@ created Date    : 1st June 2019
 #define CMD_NAME_MKF 				"mkf"
 #define CMD_NAME_RM 				"rm"
 #define CMD_NAME_MOVE 			    "mv"
-#define CMD_NAME_FILE 				"file"
+#define CMD_NAME_FILE_READ 			"frd"
+#define CMD_NAME_FILE_WRITE 		"fwr"
 
 /* command options */
 #define CMD_OPTION_NAME_P			"p"

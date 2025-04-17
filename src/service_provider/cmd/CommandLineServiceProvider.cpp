@@ -61,8 +61,11 @@ CommandLineServiceProvider::CommandLineServiceProvider() : ServiceProvider(SERVI
   MoveFSCommand *movefscmd = new MoveFSCommand();
   m_cmdlist.push_back(movefscmd);
 
-  FileFSCommand *filefscmd = new FileFSCommand();
-  m_cmdlist.push_back(filefscmd);
+  FileReadCommand *fileReadcmd = new FileReadCommand();
+  m_cmdlist.push_back(fileReadcmd);
+
+  FileWriteCommand *fileWritecmd = new FileWriteCommand();
+  m_cmdlist.push_back(fileWritecmd);
   #endif
 }
 
@@ -187,6 +190,21 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd)
     // if command is incomplete then we are in continue execution mode
     if (CMD_RESULT_INCOMPLETE == res){
       is_executing_lastcommand = true;
+    }
+  }else{
+
+    res = CMD_RESULT_MAX;
+
+    // check if any command is waiting for user input
+    // if any command is waiting for user input then we are in continue execution mode
+    for (int16_t i = 0; i < m_cmdlist.size(); i++){
+
+      if(nullptr != m_cmdlist[i] && m_cmdlist[i]->isWaitingForOption()){
+
+        is_executing_lastcommand = true;
+        res = CMD_RESULT_INCOMPLETE;
+        break;
+      }
     }
   }
 

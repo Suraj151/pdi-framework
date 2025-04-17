@@ -349,7 +349,7 @@ typedef struct CommandBase {
                             if(m_acceptArgsOptions){
 
                                 // if command has free options. 
-                                uint8_t option_indx = 0;
+                                uint8_t option_indx = m_waitingoptionindx != -1 ? m_waitingoptionindx : 0;
                                 int16_t optn_val_start_index = cmd_end_indx + 1;
                                 int16_t optn_val_end_index = -1;
 
@@ -428,7 +428,7 @@ typedef struct CommandBase {
         for (uint8_t i = 0; i < CMD_OPTION_MAX; i++){
             m_options[i].Clear(deep);
         }
-        if(deep)
+        // if(deep)
             m_waitingoptionindx = -1;
     }
 
