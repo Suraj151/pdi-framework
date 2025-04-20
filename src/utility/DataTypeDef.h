@@ -238,6 +238,32 @@ typedef enum terminal_types {
     TERMINAL_TYPE_MAX
 } terminal_types_t;
 
+/* 
+ * enumeration for special terminal input sequences 
+ */
+enum cmd_term_inseq_t {
+    CMD_TERM_INSEQ_NONE = 0,
+    CMD_TERM_INSEQ_ENTER,
+    CMD_TERM_INSEQ_BACKSPACE_CHAR,
+    CMD_TERM_INSEQ_DELETE_CHAR,
+    CMD_TERM_INSEQ_DELETE,
+    CMD_TERM_INSEQ_CTRL_C,
+    CMD_TERM_INSEQ_CTRL_Z,
+    CMD_TERM_INSEQ_ESC,
+    CMD_TERM_INSEQ_UP_ARROW,
+    CMD_TERM_INSEQ_DOWN_ARROW,
+    CMD_TERM_INSEQ_RIGHT_ARROW,
+    CMD_TERM_INSEQ_LEFT_ARROW,
+    CMD_TERM_INSEQ_HOME,
+    CMD_TERM_INSEQ_END,
+    CMD_TERM_INSEQ_PAGE_UP,
+    CMD_TERM_INSEQ_PAGE_DOWN,
+    CMD_TERM_INSEQ_MAX
+};
+
+/* escape sequence start chars */
+#define TERMINAL_ESCAPE_SEQ "\033["
+
 /**
  * File info structure & definitions
  */

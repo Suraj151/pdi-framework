@@ -81,11 +81,11 @@ struct LoginCommand : public CommandBase {
 				result = CMD_RESULT_WRONG_CREDENTIAL;
 				ResultToTerminal(result);
 				setWaitingForOption(CMD_OPTION_NAME_U);
-				if( nullptr != m_terminal ){
-					m_terminal->write_ro(RODT_ATTR("\n"));
-      				m_terminal->write(CMD_NAME_LOGIN);
-					m_terminal->write_ro(RODT_ATTR(": "));
-				}
+				// if( nullptr != m_terminal ){
+				// 	m_terminal->write_ro(RODT_ATTR("\n"));
+      			// 	m_terminal->write(CMD_NAME_LOGIN);
+				// 	m_terminal->write_ro(RODT_ATTR(": "));
+				// }
 			}
 		}
 

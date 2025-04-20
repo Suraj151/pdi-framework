@@ -16,7 +16,7 @@ created Date    : 1st Jan 2024
 /**
  * iClientInterface class
  */
-class iClientInterface : public iIOInterface
+class iClientInterface : public iTerminalInterface
 {
 
 public:

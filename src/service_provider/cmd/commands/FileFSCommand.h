@@ -87,7 +87,7 @@ struct FileReadCommand : public CommandBase {
  * file write operation command
  * 
  * e.g. if we want to write on a file in the system then we can execute command as below
- * frw <filename>
+ * fwr <filename>
  * 
  * value can be given in subsequent enter i.e. first give only filename with command then
  * will get notification from where we can enter the data for file
@@ -107,6 +107,24 @@ struct FileWriteCommand : public CommandBase {
 	/* override the necesity of required permission */
 	bool needauth() override { return true; }
 #endif
+
+    /**
+     * @brief Executes the terminal input action.
+     * @param terminputaction The terminal input action to execute.
+     * @return The result of the command execution.
+     */
+    cmd_result_t executeTermInputAction(cmd_term_inseq_t terminputaction) override{
+
+        if( terminputaction == CMD_TERM_INSEQ_ESC ){
+			if( nullptr != m_terminal ){
+				m_terminal->putln();
+				m_terminal->write_ro(RODT_ATTR("quit[!q] : "));
+			}
+			setWaitingForOption(CMD_OPTION_NAME_V);
+			return CMD_RESULT_INCOMPLETE;
+        }
+        return CommandBase::executeTermInputAction(terminputaction);
+    }
 
 	/* execute command with provided options */
 	cmd_result_t execute(){
@@ -141,7 +159,10 @@ struct FileWriteCommand : public CommandBase {
 
 		if( !isFileValueProvided ){
 			setWaitingForOption(CMD_OPTION_NAME_V);
+			
 			if( nullptr != m_terminal ){
+				// clear the display
+				m_terminal->csi_erase_display();
 				m_terminal->putln();
 				m_terminal->write_ro(RODT_ATTR("Enter data ( newline[!n] quit[!q] ) : "));
 			}

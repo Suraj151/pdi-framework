@@ -315,10 +315,150 @@ public:
   virtual void flush() = 0;
 };
 
+
 /**
- * @typedef iTerminalInterface
- * @brief Alias for iIOInterface to represent terminal-based I/O operations.
+ * @class iTerminalInterface
+ * @brief Interface for terminal-specific operations.
+ *
+ * The iTerminalInterface class extends the iIOInterface class and provides
+ * additional methods for terminal-specific operations such as cursor movement,
+ * text color, and background color.
  */
-using iTerminalInterface = iIOInterface;
+class iTerminalInterface : public iIOInterface
+{
+public:
+  /**
+   * @brief Constructor for the iTerminalInterface class.
+   *
+   * Initializes the iTerminalInterface object.
+   */
+  iTerminalInterface() {}
+
+  /**
+   * @brief Destructor for the iTerminalInterface class.
+   *
+   * Cleans up resources used by the iTerminalInterface object.
+   */
+  virtual ~iTerminalInterface() {}
+
+  /**
+   * @brief Erases the display and sets the cursor to home position.
+   * @param None
+   * @return None
+   */
+  void csi_erase_display()
+  {
+    write_ro(RODT_ATTR(TERMINAL_ESCAPE_SEQ));
+    write_ro(RODT_ATTR("2J"));
+    write_ro(RODT_ATTR(TERMINAL_ESCAPE_SEQ));
+    write_ro(RODT_ATTR("H"));
+  }
+
+  /**
+   * @brief Erases in the current line.
+   * @param lineerasemode The mode for erasing in the current line.
+   * 0: Erase from cursor to end of line
+   * 1: Erase from beginning of line to cursor
+   * 2: Erase entire line
+   * @return None
+   */
+  void csi_erase_in_line(int32_t lineerasemode)
+  {
+    write_ro(RODT_ATTR(TERMINAL_ESCAPE_SEQ));
+    write(lineerasemode);
+    write_ro(RODT_ATTR("K"));
+  }
+
+  /**
+   * @brief Moves the cursor to the home position (top-left corner).
+   * @param None
+   * @return None
+   */ 
+  void csi_cursor_home()
+  {
+    write_ro(RODT_ATTR(TERMINAL_ESCAPE_SEQ));
+    write_ro(RODT_ATTR("H"));
+  }
+
+  /**
+   * @brief Moves the cursor to a specified position.
+   * @param x The x-coordinate (column) to move to.
+   * @param y The y-coordinate (row) to move to.
+   * @return None
+   */
+  void csi_cursor_move(uint8_t x, uint8_t y)
+  {
+    write_ro(RODT_ATTR(TERMINAL_ESCAPE_SEQ));
+    write(y);
+    write((uint8_t)';');
+    write(x);
+    write_ro(RODT_ATTR("H"));
+  }
+
+
+  /**
+   * @brief Moves the cursor left by a specified number of steps.
+   * @param steps The number of steps to move left (default is 1).
+   * @return None
+   */
+  void csi_cursor_move_left(int32_t steps=1)
+  {
+    if(steps <= 0) return;
+    write_ro(RODT_ATTR(TERMINAL_ESCAPE_SEQ));
+    write(steps);
+    write_ro(RODT_ATTR("D"));
+  }
+
+
+  /**
+   * @brief Moves the cursor right by a specified number of steps.
+   * @param steps The number of steps to move right (default is 1).
+   * @return None
+   */
+  void csi_cursor_move_right(int32_t steps=1)
+  {
+    if(steps <= 0) return;
+    write_ro(RODT_ATTR(TERMINAL_ESCAPE_SEQ));
+    write(steps);
+    write_ro(RODT_ATTR("C"));
+  }
+
+  /**
+   * @brief Set the text color using ANSI escape codes.
+   * @param color The color code (0-255) for the text.
+   * @return None
+   */
+  // void csi_set_text_color(uint8_t color)
+  // {
+  //   write_ro(RODT_ATTR(TERMINAL_ESCAPE_SEQ));
+  //   write_ro(RODT_ATTR("38;5;"));
+  //   write(color);
+  //   write_ro(RODT_ATTR("m"));
+  // }
+
+  /**
+   * @brief Set the background color using ANSI escape codes.
+   * @param color The color code (0-255) for the background.
+   * @return None
+   */
+  // void csi_bg_color(uint8_t color)
+  // {
+  //   write_ro(RODT_ATTR(TERMINAL_ESCAPE_SEQ));
+  //   write_ro(RODT_ATTR("48;5;"));
+  //   write(color);
+  //   write_ro(RODT_ATTR("m"));
+  // }
+
+  /**
+   * @brief Resets the text and background color to default.
+   * @param None
+   * @return None
+   */
+  void csi_reset_style_color()
+  {
+    write_ro(RODT_ATTR(TERMINAL_ESCAPE_SEQ));
+    write_ro(RODT_ATTR("0m"));
+  }
+};
 
 #endif
