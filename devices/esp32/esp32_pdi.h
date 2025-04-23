@@ -26,5 +26,9 @@ created Date    : 1st Jan 2024
 #ifdef ENABLE_SERIAL_SERVICE
 #include "SerialInterface.h"
 #endif
+#ifdef ENABLE_STORAGE_SERVICE
+#include "StorageInterface.h"
+#include "FileSystemInterface.h"
+#endif
 
 #endif  // _ESP32_PORTABLE_DEVICE_INTERFACE_H_

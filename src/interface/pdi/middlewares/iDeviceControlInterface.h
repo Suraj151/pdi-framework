@@ -68,6 +68,7 @@ public:
   virtual pdiutil::string getDeviceMac() = 0;
   virtual bool isDeviceFactoryRequested() = 0;
   virtual iTerminalInterface* getTerminal(terminal_types_t terminal=TERMINAL_TYPE_SERIAL) = 0;
+  virtual void handleEvents() { } // handle device specific events if any
 
   // below are the utility interface dependencies which needs to be satisfy
   // virtual void wait(uint64_t timeoutms) = 0;

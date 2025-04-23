@@ -71,7 +71,7 @@ struct FileReadCommand : public CommandBase {
 						m_terminal->write_ro(RODT_ATTR("Failed : "));
 						m_terminal->write(filename);
 						m_terminal->write_ro(RODT_ATTR(" : "));
-						m_terminal->write(iStatus);
+						m_terminal->write((int32_t)iStatus);
 					}
 					delete[] filename;	
 				}
@@ -205,7 +205,7 @@ struct FileWriteCommand : public CommandBase {
 					m_terminal->write_ro(RODT_ATTR("Failed : "));
 					m_terminal->write(filename);
 					m_terminal->write_ro(RODT_ATTR(" : "));
-					m_terminal->write(iStatus);
+					m_terminal->write((int32_t)iStatus);
 				}
 
 				delete[] filename;	

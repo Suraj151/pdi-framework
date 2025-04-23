@@ -63,7 +63,7 @@ struct MakeDirFSCommand : public CommandBase {
 						m_terminal->write_ro(RODT_ATTR("Failed to create directory: "));
 						m_terminal->write(dirname);
 						m_terminal->write_ro(RODT_ATTR(" : "));
-						m_terminal->write(bStatus);
+						m_terminal->write((int32_t)bStatus);
 					}
 					delete[] dirname;	
 				}

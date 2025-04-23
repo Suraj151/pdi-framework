@@ -255,7 +255,7 @@ bool DeviceControlInterface::isDeviceFactoryRequested()
 {
     static uint8_t m_flash_key_pressed = 0;
 
-    if (__i_dvc_ctrl.gpioRead(DIGITAL_READ, FLASH_KEY_PIN) == LOW)
+    if (FLASH_KEY_PIN >= 0 && __i_dvc_ctrl.gpioRead(DIGITAL_READ, FLASH_KEY_PIN) == LOW)
     {
         m_flash_key_pressed++;
         LogFmtI("Flash Key pressed : %d\n", m_flash_key_pressed);

@@ -66,10 +66,10 @@ CommandLineServiceProvider::CommandLineServiceProvider() : ServiceProvider(SERVI
 
   FileWriteCommand *fileWritecmd = new FileWriteCommand();
   m_cmdlist.push_back(fileWritecmd);
+  #endif
 
   ClearScreenCommand *clearscreencmd = new ClearScreenCommand();
   m_cmdlist.push_back(clearscreencmd);
-  #endif
 }
 
 /**
@@ -130,10 +130,6 @@ void CommandLineServiceProvider::processTerminalInput(iTerminalInterface *termin
     {
       char c = terminal->read();
 
-      // terminal->write_ro(RODT_ATTR("\r\nentered:"));
-      // terminal->write((uint32_t)c, true, true);  
-      // terminal->write_ro(RODT_ATTR("\r\n"));
-
       // break command on line ending
       if (c == '\n' || c == '\r') {
         
@@ -142,13 +138,6 @@ void CommandLineServiceProvider::processTerminalInput(iTerminalInterface *termin
         break;
       }else if (c == '\b' || c == 0x7F) {
         // backspace or delete char
-
-        // send ANSI escape sequence for delete which remove the 
-        // empty space inserted due to backspace in terminal
-        // terminal->write((char)0x1B);
-        // terminal->write((char)'[');
-        // terminal->write((char)'3');
-        // terminal->write((char)'~');
 
         // remove cursor position char from string
         inseq = c == '\b' ? CMD_TERM_INSEQ_BACKSPACE_CHAR : CMD_TERM_INSEQ_DELETE_CHAR;
@@ -182,6 +171,9 @@ void CommandLineServiceProvider::processTerminalInput(iTerminalInterface *termin
         // Esc
         inseq = CMD_TERM_INSEQ_ESC;
 
+        // wait a 2ms to get the next char
+        __i_dvc_ctrl.wait(2);
+
         // check for ANSI escape sequence
         if(terminal->available()){
 
@@ -196,13 +188,18 @@ void CommandLineServiceProvider::processTerminalInput(iTerminalInterface *termin
           // other escape sequences might be valid but not 
           // considered here
           bool isEscSeqConsidered = true;
-
           bool shouldEcho = true;
   
+          // wait a 2ms to get the next char
+          __i_dvc_ctrl.wait(2);
+          
           // Check for ANSI escape sequence
           if (escseq[1] == '[' && terminal->available()) {
 
             escseq[seqlen++] = terminal->read();
+
+            // wait a 2ms to get the next char
+            __i_dvc_ctrl.wait(2);
 
             // Check for xterm sequence
             if (escseq[2] == 'A') {
@@ -301,9 +298,7 @@ void CommandLineServiceProvider::processTerminalInput(iTerminalInterface *termin
 
             if( shouldEcho ){
               // echo escape sequence
-              for (uint8_t i = 0; i < seqlen; i++){
-                terminal->write(escseq[i]);
-              }
+              terminal->write(escseq, seqlen);
             }
           }else{
 

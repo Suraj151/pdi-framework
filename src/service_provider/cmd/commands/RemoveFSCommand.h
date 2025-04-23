@@ -69,7 +69,7 @@ struct RemoveFSCommand : public CommandBase {
 						m_terminal->write_ro(RODT_ATTR("Failed to delete : "));
 						m_terminal->write(fileOrDir);
 						m_terminal->write_ro(RODT_ATTR(" : "));
-						m_terminal->write(iStatus);
+						m_terminal->write((int32_t)iStatus);
 					}
 
 					delete[] fileOrDir;	

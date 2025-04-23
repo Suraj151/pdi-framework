@@ -120,6 +120,7 @@ void PDIStack::serve(){
   #endif
   __task_scheduler.handle_tasks();
   __i_dvc_ctrl.yield();
+  __i_dvc_ctrl.handleEvents();
 }
 
 /**

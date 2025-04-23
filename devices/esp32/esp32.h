@@ -33,6 +33,7 @@ created Date    : 1st Jan 2024
 #include <WebServer.h>
 #include <HTTPUpdate.h>
 #include <utility/DataTypeDef.h>
+#include "esp_partition.h" // Include ESP32 partition API
 
 // extern "C"
 // {
@@ -50,14 +51,15 @@ created Date    : 1st Jan 2024
 
 /**
  * @define flash key parameters for reset factory
+ * todo : for now not using flash key pin feature
  */
-#define FLASH_KEY_PIN 3
+#define FLASH_KEY_PIN -1
 #define FLASH_KEY_PRESS_COUNT_THR 5
 
 /**
  * enable/disable exception notifier
  */
-#define ENABLE_EXCEPTION_NOTIFIER
+// #define ENABLE_EXCEPTION_NOTIFIER
 
 /**
  * enable/disable esp now feature here. currently this feature is not enabled yet for esp32

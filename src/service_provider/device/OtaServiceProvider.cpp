@@ -213,7 +213,7 @@ void OtaServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
     terminal->writeln_ro(RODT_ATTR("OTA Configs :"));
     terminal->write(_ota_configs.ota_host);
     terminal->write(RODT_ATTR("\t"));
-    terminal->writeln(_ota_configs.ota_port);
+    terminal->writeln((int32_t)_ota_configs.ota_port);
   }
 }
 

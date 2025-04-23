@@ -312,7 +312,7 @@ void EmailServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
 
     terminal->write(_email_config.sending_domain); terminal->write(RODT_ATTR("\t"));
     terminal->write(_email_config.mail_host); terminal->write(RODT_ATTR("\t"));
-    terminal->write(_email_config.mail_port); terminal->write(RODT_ATTR("\t"));
+    terminal->write((int32_t)_email_config.mail_port); terminal->write(RODT_ATTR("\t"));
     terminal->write(_email_config.mail_username); terminal->write(RODT_ATTR("\t"));
     terminal->writeln(_email_config.mail_password);
 
@@ -320,7 +320,7 @@ void EmailServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
     terminal->write(_email_config.mail_from_name); terminal->write(RODT_ATTR("\t"));
     terminal->write(_email_config.mail_to); terminal->write(RODT_ATTR("\t"));
     terminal->write(_email_config.mail_subject); terminal->write(RODT_ATTR("\t"));
-    terminal->writeln(_email_config.mail_frequency);
+    terminal->writeln((int32_t)_email_config.mail_frequency);
   }
 }
 
