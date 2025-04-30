@@ -56,6 +56,13 @@ struct ListFSCommand : public CommandBase {
 
 			// Print the directory and file list
 			m_terminal->putln();
+
+			m_terminal->write_ro(RODT_ATTR("Used : "));
+			m_terminal->write((int64_t)__i_fs.getUsedSize());
+			m_terminal->write_ro(RODT_ATTR(", Free : "));
+			m_terminal->write((int64_t)__i_fs.getFreeSize());
+			m_terminal->putln();
+
 			m_terminal->writeln_ro(RODT_ATTR("Type Name        Size"));
 
 			for (file_info_t item : itemlist) {

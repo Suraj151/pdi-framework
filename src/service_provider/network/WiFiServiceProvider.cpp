@@ -414,23 +414,40 @@ void WiFiServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
 
     terminal->writeln();
     terminal->writeln_ro(RODT_ATTR("WiFi Configs :"));
-    terminal->write(_table.sta_ssid); terminal->write(RODT_ATTR("\t"));
-    terminal->write(_table.sta_password); terminal->write(RODT_ATTR("\t"));
+    terminal->write(_table.sta_ssid); terminal->write_ro(RODT_ATTR("\t"));
+    terminal->write(_table.sta_password); terminal->write_ro(RODT_ATTR("\t"));
 
-    __int_ip_to_str( _ip, _table.sta_local_ip, 20 ); terminal->write(_ip); terminal->write(RODT_ATTR("\t"));
-    __int_ip_to_str( _ip, _table.sta_gateway, 20 ); terminal->write(_ip); terminal->write(RODT_ATTR("\t"));
-    __int_ip_to_str( _ip, _table.sta_subnet, 20 ); terminal->write(_ip); terminal->write(RODT_ATTR("\t\n"));
+    __int_ip_to_str( _ip, _table.sta_local_ip, 20 ); terminal->write(_ip); terminal->write_ro(RODT_ATTR("\t"));
+    __int_ip_to_str( _ip, _table.sta_gateway, 20 ); terminal->write(_ip); terminal->write_ro(RODT_ATTR("\t"));
+    __int_ip_to_str( _ip, _table.sta_subnet, 20 ); terminal->write(_ip); terminal->write_ro(RODT_ATTR("\t\n"));
 
     terminal->writeln();
     terminal->writeln_ro(RODT_ATTR("Access Configs :"));
-    terminal->write(_table.ap_ssid); terminal->write(RODT_ATTR("\t"));
-    terminal->write(_table.ap_password); terminal->write(RODT_ATTR("\t"));
+    terminal->write(_table.ap_ssid); terminal->write_ro(RODT_ATTR("\t"));
+    terminal->write(_table.ap_password); terminal->write_ro(RODT_ATTR("\t"));
 
-    __int_ip_to_str( _ip, _table.ap_local_ip, 20 ); terminal->write(_ip); terminal->write(RODT_ATTR("\t"));
-    __int_ip_to_str( _ip, _table.ap_gateway, 20 ); terminal->write(_ip); terminal->write(RODT_ATTR("\t"));
+    __int_ip_to_str( _ip, _table.ap_local_ip, 20 ); terminal->write(_ip); terminal->write_ro(RODT_ATTR("\t"));
+    __int_ip_to_str( _ip, _table.ap_gateway, 20 ); terminal->write(_ip); terminal->write_ro(RODT_ATTR("\t"));
     __int_ip_to_str( _ip, _table.ap_subnet, 20 ); terminal->writeln(_ip);
   }
 }
+
+/**
+ * print service status to terminal
+ */
+void WiFiServiceProvider::printStatusToTerminal(iTerminalInterface *terminal){
+
+  terminal->writeln();
+  terminal->write_ro((RODT_ATTR("connect :")));
+  terminal->writeln((int32_t)__status_wifi.wifi_connected);
+  terminal->write_ro((RODT_ATTR("gw :")));
+  terminal->write(((pdiutil::string)this->m_wifi->gatewayIP()).c_str());
+  terminal->write_ro((RODT_ATTR(", st :")));
+  terminal->write(((pdiutil::string)this->m_wifi->localIP()).c_str());
+  terminal->write_ro((RODT_ATTR(", ap :")));
+  terminal->writeln(((pdiutil::string)this->m_wifi->softAPIP()).c_str());
+}
+
 
 WiFiServiceProvider __wifi_service;
 

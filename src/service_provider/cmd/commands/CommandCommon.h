@@ -59,6 +59,7 @@ created Date    : 1st June 2019
 #define CMD_NAME_FILE_READ 			"frd"
 #define CMD_NAME_FILE_WRITE 		"fwr"
 #define CMD_NAME_CLS 			    "cls"
+#define CMD_NAME_SCHED_TASK 		"scht"
 
 /* command options */
 #define CMD_OPTION_NAME_P			"p"
@@ -68,6 +69,7 @@ created Date    : 1st June 2019
 #define CMD_OPTION_NAME_S	        "s"
 #define CMD_OPTION_NAME_Q	        "q"
 #define CMD_OPTION_NAME_F	        "f"
+#define CMD_OPTION_NAME_L	        "l"
 
 
 #endif

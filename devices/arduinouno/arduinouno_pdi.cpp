@@ -21,4 +21,8 @@ created Date    : 1st Jan 2024
 #ifdef ENABLE_SERIAL_SERVICE
 #include "SerialInterface.cpp"
 #endif
+#ifdef ENABLE_STORAGE_SERVICE
+#include "StorageInterface.cpp"
+#include "FileSystemInterface.cpp"
+#endif
 

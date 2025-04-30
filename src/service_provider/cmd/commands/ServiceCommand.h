@@ -75,7 +75,8 @@ struct ServiceCommand : public CommandBase {
 
 				srvc->printConfigToTerminal(m_terminal);
 			}else if( srvcq == SERVICE_COMMAND_QUERY_STATUS ){
-
+				
+				srvc->printStatusToTerminal(m_terminal);
 			}
 		}
 

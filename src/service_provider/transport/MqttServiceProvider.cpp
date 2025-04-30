@@ -306,30 +306,30 @@ void MqttServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
     __database_service.get_mqtt_pubsub_config_table(&_mqtt_pubsub_configs);
 
     terminal->write_ro(RODT_ATTR("\nMqtt General Configs :\n"));
-    terminal->write(_mqtt_general_configs.host); terminal->write(RODT_ATTR("\t"));
-    terminal->write((int32_t)_mqtt_general_configs.port); terminal->write(RODT_ATTR("\t"));
-    terminal->write((int32_t)_mqtt_general_configs.security); terminal->write(RODT_ATTR("\t"));
-    terminal->write(_mqtt_general_configs.client_id); terminal->write(RODT_ATTR("\t"));
-    terminal->write(_mqtt_general_configs.username); terminal->write(RODT_ATTR("\t"));
-    terminal->write(_mqtt_general_configs.password); terminal->write(RODT_ATTR("\t"));
-    terminal->write((int32_t)_mqtt_general_configs.keepalive); terminal->write(RODT_ATTR("\t"));
-    terminal->write((int32_t)_mqtt_general_configs.clean_session); terminal->write(RODT_ATTR("\n"));
+    terminal->write(_mqtt_general_configs.host); terminal->write_ro(RODT_ATTR("\t"));
+    terminal->write((int32_t)_mqtt_general_configs.port); terminal->write_ro(RODT_ATTR("\t"));
+    terminal->write((int32_t)_mqtt_general_configs.security); terminal->write_ro(RODT_ATTR("\t"));
+    terminal->write(_mqtt_general_configs.client_id); terminal->write_ro(RODT_ATTR("\t"));
+    terminal->write(_mqtt_general_configs.username); terminal->write_ro(RODT_ATTR("\t"));
+    terminal->write(_mqtt_general_configs.password); terminal->write_ro(RODT_ATTR("\t"));
+    terminal->write((int32_t)_mqtt_general_configs.keepalive); terminal->write_ro(RODT_ATTR("\t"));
+    terminal->write((int32_t)_mqtt_general_configs.clean_session); terminal->write_ro(RODT_ATTR("\n"));
 
 
     terminal->write_ro(RODT_ATTR("\nMqtt Lwt Configs :\n"));
-    terminal->write(_mqtt_lwt_configs.will_topic); terminal->write(RODT_ATTR("\t"));
-    terminal->write(_mqtt_lwt_configs.will_message); terminal->write(RODT_ATTR("\t"));
-    terminal->write((int32_t)_mqtt_lwt_configs.will_qos); terminal->write(RODT_ATTR("\t"));
-    terminal->write((int32_t)_mqtt_lwt_configs.will_retain); terminal->write(RODT_ATTR("\n"));
+    terminal->write(_mqtt_lwt_configs.will_topic); terminal->write_ro(RODT_ATTR("\t"));
+    terminal->write(_mqtt_lwt_configs.will_message); terminal->write_ro(RODT_ATTR("\t"));
+    terminal->write((int32_t)_mqtt_lwt_configs.will_qos); terminal->write_ro(RODT_ATTR("\t"));
+    terminal->write((int32_t)_mqtt_lwt_configs.will_retain); terminal->write_ro(RODT_ATTR("\n"));
 
     terminal->write_ro(RODT_ATTR("\nMqtt Pub Configs :\n"));
     for (uint8_t i = 0; i < MQTT_MAX_PUBLISH_TOPIC; i++) {
 
       if( strlen(_mqtt_pubsub_configs.publish_topics[i].topic) > 0 ){
 
-        terminal->write(_mqtt_pubsub_configs.publish_topics[i].topic); terminal->write(RODT_ATTR("\t"));
-        terminal->write((int32_t)_mqtt_pubsub_configs.publish_topics[i].qos); terminal->write(RODT_ATTR("\t"));
-        terminal->write((int32_t)_mqtt_pubsub_configs.publish_topics[i].retain); terminal->write(RODT_ATTR("\n"));
+        terminal->write(_mqtt_pubsub_configs.publish_topics[i].topic); terminal->write_ro(RODT_ATTR("\t"));
+        terminal->write((int32_t)_mqtt_pubsub_configs.publish_topics[i].qos); terminal->write_ro(RODT_ATTR("\t"));
+        terminal->write((int32_t)_mqtt_pubsub_configs.publish_topics[i].retain); terminal->write_ro(RODT_ATTR("\n"));
       }
     }
 
@@ -338,8 +338,8 @@ void MqttServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
 
       if( strlen(_mqtt_pubsub_configs.subscribe_topics[i].topic) > 0 ){
 
-        terminal->write(_mqtt_pubsub_configs.subscribe_topics[i].topic); terminal->write(RODT_ATTR("\t"));
-        terminal->write((int32_t)_mqtt_pubsub_configs.subscribe_topics[i].qos); terminal->write(RODT_ATTR("\n"));
+        terminal->write(_mqtt_pubsub_configs.subscribe_topics[i].topic); terminal->write_ro(RODT_ATTR("\t"));
+        terminal->write((int32_t)_mqtt_pubsub_configs.subscribe_topics[i].qos); terminal->write_ro(RODT_ATTR("\n"));
       }
     }
   }

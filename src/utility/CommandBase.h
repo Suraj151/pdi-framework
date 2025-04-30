@@ -18,6 +18,10 @@ Created Date    : 1st June 2019
 #include "StringOperations.h"
 #include "iIOInterface.h"
 
+//Elliminate any previously defined macro
+#undef min
+#undef max
+
 /**
  * @enum cmd_result_t
  * @brief Represents the result of a command execution.
@@ -193,6 +197,7 @@ typedef struct CommandBase {
             return false;
         }
 
+        // int16_t cmd_len = strlen(_cmd);
         int16_t cmd_max_len = pdistd::min((size_t)CMD_SIZE_MAX, strlen(_cmd));
         int16_t cmd_start_indx = 0;//__strstr(_cmd, m_cmd, cmd_max_len);
         int16_t cmd_end_indx = __strstr(_cmd+cmd_start_indx, " ");
@@ -203,9 +208,9 @@ typedef struct CommandBase {
 
             char argcmd[CMD_SIZE_MAX];
             memset(argcmd, 0, CMD_SIZE_MAX);
-            memcpy(argcmd, _cmd + cmd_start_indx, pdistd::min(CMD_SIZE_MAX, abs(cmd_end_indx - cmd_start_indx)));
+            memcpy(argcmd, _cmd + cmd_start_indx, pdistd::min((int)CMD_SIZE_MAX, (int)abs(cmd_end_indx - cmd_start_indx)));
     
-            return __are_str_equals(m_cmd, argcmd, pdistd::min(CMD_SIZE_MAX, abs(cmd_end_indx - cmd_start_indx)));
+            return __are_str_equals(m_cmd, argcmd, pdistd::min((int)CMD_SIZE_MAX, (int)abs(cmd_end_indx - cmd_start_indx)));
         }
         return false;
         // return ((nullptr != _cmd) && __are_arrays_equal(m_cmd, _cmd, strlen(m_cmd)));

@@ -26,6 +26,7 @@ created Date    : 1st June 2019
 #include "commands/MoveFSCommand.h"
 #include "commands/FileFSCommand.h"
 #include "commands/ClearScreenCommand.h"
+#include "commands/SchedulerTaskCommand.h"
 
 /**
  * CommandLineServiceProvider class

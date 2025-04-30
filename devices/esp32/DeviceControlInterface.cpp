@@ -339,7 +339,7 @@ void DeviceControlInterface::printtasks(pdiutil::vector<task_t> &tasks, iTermina
 
             Int32ToString(tasks[i]._max_attempts, content, 20, 14);
             terminal->write(content);
-            terminal->write("\n");
+            terminal->writeln();
         }
     }
 }

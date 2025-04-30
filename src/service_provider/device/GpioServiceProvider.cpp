@@ -470,14 +470,14 @@ void GpioServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
     terminal->writeln_ro(RODT_ATTR("GPIO Configs (mode) :"));
     for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
       terminal->write((int32_t)this->m_gpio_config_copy.gpio_mode[_pin]);
-      terminal->write(RODT_ATTR("\t"));
+      terminal->write_ro(RODT_ATTR("\t"));
     }
 
     terminal->writeln();
     terminal->writeln_ro(RODT_ATTR("GPIO Configs (readings) :"));
     for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
       terminal->write((int32_t)this->m_gpio_config_copy.gpio_readings[_pin]);
-      terminal->write(RODT_ATTR("\t"));
+      terminal->write_ro(RODT_ATTR("\t"));
     }
 
 #ifndef ENABLE_GPIO_BASIC_ONLY
@@ -485,29 +485,29 @@ void GpioServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
     terminal->writeln_ro(RODT_ATTR("GPIO Configs (alert comparator) :"));
     for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
       terminal->write((int32_t)this->m_gpio_config_copy.gpio_alert_comparator[_pin]);
-      terminal->write(RODT_ATTR("\t"));
+      terminal->write_ro(RODT_ATTR("\t"));
     }
 
     terminal->writeln();
     terminal->writeln_ro(RODT_ATTR("GPIO Configs (alert channels) :"));
     for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
       terminal->write((int32_t)this->m_gpio_config_copy.gpio_alert_channel[_pin]);
-      terminal->write(RODT_ATTR("\t"));
+      terminal->write_ro(RODT_ATTR("\t"));
     }
 
     terminal->writeln();
     terminal->writeln_ro(RODT_ATTR("GPIO Configs (alert values) :"));
     for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
       terminal->write((int32_t)this->m_gpio_config_copy.gpio_alert_values[_pin]);
-      terminal->write(RODT_ATTR("\t"));
+      terminal->write_ro(RODT_ATTR("\t"));
     }
 
     terminal->writeln();
     terminal->writeln_ro(RODT_ATTR("GPIO Configs (server) :"));
     terminal->write(this->m_gpio_config_copy.gpio_host);
-    terminal->write(RODT_ATTR("\t"));
+    terminal->write_ro(RODT_ATTR("\t"));
     terminal->write((int32_t)this->m_gpio_config_copy.gpio_port);
-    terminal->write(RODT_ATTR("\t"));
+    terminal->write_ro(RODT_ATTR("\t"));
     terminal->writeln((int32_t)this->m_gpio_config_copy.gpio_post_frequency);
 #endif
   }

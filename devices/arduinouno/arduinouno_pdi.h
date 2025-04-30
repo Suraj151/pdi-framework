@@ -18,5 +18,9 @@ created Date    : 1st Jan 2024
 #endif
 #include "DeviceControlInterface.h"
 #include "core/PDIEEPROM.h"
+#ifdef ENABLE_STORAGE_SERVICE
+#include "StorageInterface.h"
+#include "FileSystemInterface.h"
+#endif
 
 #endif  // _ARDUINOUNO_PORTABLE_DEVICE_INTERFACE_H_

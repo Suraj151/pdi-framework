@@ -50,6 +50,7 @@ public:
   void handleWiFiConnectivity(void);
 
   void printConfigToTerminal(iTerminalInterface *terminal) override;
+  void printStatusToTerminal(iTerminalInterface *terminal) override;
 
 
   /**

@@ -70,6 +70,9 @@ CommandLineServiceProvider::CommandLineServiceProvider() : ServiceProvider(SERVI
 
   ClearScreenCommand *clearscreencmd = new ClearScreenCommand();
   m_cmdlist.push_back(clearscreencmd);
+
+  SchedulerTaskCommand *schtaskcmd = new SchedulerTaskCommand();
+  m_cmdlist.push_back(schtaskcmd);
 }
 
 /**
@@ -489,7 +492,7 @@ void CommandLineServiceProvider::startInteraction()
       }
     }
     #else
-      m_cmdterminal->write(__i_dvc_ctrl.getDeviceId());
+      m_cmdterminal->write(__i_dvc_ctrl.getDeviceMac().c_str());
 		  m_cmdterminal->write_ro(RODT_ATTR(": "));
     #endif
   }

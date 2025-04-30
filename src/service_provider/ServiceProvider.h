@@ -96,6 +96,12 @@ class ServiceProvider{
     }
 
     /**
+     * print service status to terminal
+     */
+    virtual void printStatusToTerminal(iTerminalInterface *terminal){
+    }
+
+    /**
      * @array ServiceProvider* m_services
      */
     static ServiceProvider *m_services[SERVICE_MAX]; 

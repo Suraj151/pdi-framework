@@ -39,7 +39,9 @@ created Date    : 1st June 2019
 /**
  * enable/disable storage service
  */
+#if !defined(DEVICE_ARDUINOUNO)
 #define ENABLE_STORAGE_SERVICE
+#endif
 
 /**
  * define number of gpios based on device enabled
@@ -71,7 +73,9 @@ created Date    : 1st June 2019
 /**
  * enable/disable auth service here
  */
+#if !defined(DEVICE_ARDUINOUNO)
 #define ENABLE_AUTH_SERVICE
+#endif
 
 /**
  * enable/disable cmd service here

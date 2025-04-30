@@ -165,6 +165,24 @@ public:
     virtual bool isDirectory(const char* path) = 0;
 
     /**
+     * @brief Gets the total size of the LittleFS file system.
+     * @return The total size of the file system in bytes.
+     */
+    virtual uint64_t getTotalSize() = 0;
+
+    /**
+     * @brief Gets the used size of the LittleFS file system.
+     * @return The used size of the file system in bytes.
+     */
+    virtual uint64_t getUsedSize() = 0;
+
+    /**
+     * @brief Gets the free size of the LittleFS file system.
+     * @return The free size of the file system in bytes.
+     */
+    virtual uint64_t getFreeSize() = 0;
+
+    /**
      * @brief Gets the current working directory.
      * @return The current working directory.
      */

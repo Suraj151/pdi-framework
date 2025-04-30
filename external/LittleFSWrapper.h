@@ -176,6 +176,24 @@ public:
      */
     bool isDirectory(const char* path) override;
 
+    /**
+     * @brief Gets the total size of the LittleFS file system.
+     * @return The total size of the file system in bytes.
+     */
+    uint64_t getTotalSize() override;
+
+    /**
+     * @brief Gets the used size of the LittleFS file system.
+     * @return The used size of the file system in bytes.
+     */
+    uint64_t getUsedSize() override;
+
+    /**
+     * @brief Gets the free size of the LittleFS file system.
+     * @return The free size of the file system in bytes.
+     */
+    uint64_t getFreeSize() override;
+
 private:
     lfs_t m_lfs;
     lfs_config m_lfscfg;

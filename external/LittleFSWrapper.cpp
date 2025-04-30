@@ -59,11 +59,12 @@ int LittleFSWrapper::initLFSConfig(lfs_config *lfscnfg)
         m_lfscfg.lookahead_size = lfscnfg->lookahead_size; // Lookahead buffer size
         m_lfscfg.block_cycles = lfscnfg->block_cycles; // Number of erase cycles before wear leveling
     } else {
-        m_lfscfg.read_size = 16; // Minimum read size (adjust as needed)
-        m_lfscfg.prog_size = 16; // Minimum program size (adjust as needed)
-        m_lfscfg.block_size = 4096; // Block size (adjust as needed)
-        m_lfscfg.cache_size = 16; // Cache size (adjust as needed)
-        m_lfscfg.lookahead_size = 16; // Lookahead buffer size (adjust as needed)
+        // very minimal default sizes to start with
+        m_lfscfg.read_size = 8; // Minimum read size (adjust as needed)
+        m_lfscfg.prog_size = 8; // Minimum program size (adjust as needed)
+        m_lfscfg.block_size = 32; // Block size (adjust as needed)
+        m_lfscfg.cache_size = 8; // Cache size (adjust as needed)
+        m_lfscfg.lookahead_size = 8; // Lookahead buffer size (adjust as needed)
         m_lfscfg.block_cycles = 500; // Number of erase cycles before wear leveling    
     }
     m_lfscfg.block_count = m_istorage.size() / m_lfscfg.block_size;
@@ -330,6 +331,46 @@ bool LittleFSWrapper::isDirExist(const char *path)
 bool LittleFSWrapper::isDirectory(const char *path)
 {
     return isDirExist(path);
+}
+
+/**
+ * @brief Gets the total size of the LittleFS file system.
+ * @return The total size of the file system in bytes.
+ */
+uint64_t LittleFSWrapper::getTotalSize() {
+    return m_lfscfg.block_size * m_lfscfg.block_count;
+}
+
+/**
+ * @brief Gets the used size of the LittleFS file system.
+ * @return The used size of the file system in bytes.
+ */
+uint64_t LittleFSWrapper::getUsedSize() {
+    lfs_info info;
+    int32_t usedBlocks = lfs_fs_size(&m_lfs);
+
+    // Iterate through all files and directories to calculate used blocks
+    // lfs_dir_t dir;
+    // if (lfs_dir_open(&m_lfs, &dir, "/") == 0) {
+    //     while (lfs_dir_read(&m_lfs, &dir, &info) > 0) {
+    //         if (info.type == LFS_TYPE_REG || info.type == LFS_TYPE_DIR) {
+    //             usedBlocks += (info.size + m_lfscfg.block_size - 1) / m_lfscfg.block_size;
+    //         }
+    //     }
+    //     lfs_dir_close(&m_lfs, &dir);
+    // }
+
+    return usedBlocks * m_lfscfg.block_size;
+}
+
+/**
+ * @brief Gets the free size of the LittleFS file system.
+ * @return The free size of the file system in bytes.
+ */
+uint64_t LittleFSWrapper::getFreeSize() {
+    uint64_t totalSize = getTotalSize();
+    uint64_t usedSize = getUsedSize();
+    return totalSize > usedSize ? totalSize - usedSize : 0;
 }
 
 /**
