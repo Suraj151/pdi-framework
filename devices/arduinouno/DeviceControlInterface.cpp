@@ -313,13 +313,14 @@ void DeviceControlInterface::printtasks(pdiutil::vector<task_t> &tasks, iTermina
 {
     if( nullptr != terminal ){
 
-      terminal->write_ro(RODT_ATTR("\nTasks : \n"));
+      terminal->writeln();
+      terminal->writeln_ro(RODT_ATTR("Tasks : "));
       terminal->write_ro(RODT_ATTR("id        ")); // max column size=10
       terminal->write_ro(RODT_ATTR("priority  ")); // max column size=10
       terminal->write_ro(RODT_ATTR("interval  ")); // max column size=10
       terminal->write_ro(RODT_ATTR("last_ms   ")); // max column size=10
       terminal->write_ro(RODT_ATTR("exc_ms    ")); // max column size=10
-      terminal->write_ro(RODT_ATTR("max_attempts\n")); // max column size=14
+      terminal->writeln_ro(RODT_ATTR("max_attempts")); // max column size=14
 
       char content[20];
 
@@ -353,6 +354,63 @@ void DeviceControlInterface::printtasks(pdiutil::vector<task_t> &tasks, iTermina
 void DeviceControlInterface::yield()
 {
     delay(0);
+}
+
+/**
+ * @brief Check and start if possible of measure stack in use for future functions
+ */
+char* ptToBeMesaureFrom = nullptr;
+char* ptToBeMesaureTill = nullptr;
+bool DeviceControlInterface::can_measure_stack() {
+  
+    noInterrupts();
+
+    ptToBeMesaureTill = (char*)SP; // Get the current stack pointer
+    int maxlimit = 300;       // Maximum stack size to measure
+
+    // // Ensure ptToBeMesaureFrom does not go below the valid stack range
+    // extern char __stack_start; // Start of the stack (defined by linker script)
+    ptToBeMesaureFrom = ptToBeMesaureTill - maxlimit;
+    // if (ptToBeMesaureFrom < &__stack_start) {
+    //     ptToBeMesaureFrom = &__stack_start; // Clamp to the start of the stack
+    // }
+
+    // Fill the stack region with 0x55
+    for (char* pt = ptToBeMesaureFrom; pt < ptToBeMesaureTill; pt++) {
+        *pt = 0x55;
+    }
+
+    interrupts();
+
+    return true;
+}
+
+/**
+ * @brief Get used stack size of last function. Must call can_measure_stack once 
+ * before using this function
+ */
+int64_t DeviceControlInterface::measure_lastfn_stack(){
+
+  noInterrupts();
+
+  int64_t ustack = -1;
+
+  if( nullptr != ptToBeMesaureFrom && nullptr != ptToBeMesaureTill ){
+
+    for (char* pt = ptToBeMesaureFrom; pt < ptToBeMesaureTill; pt++) {
+      if(*pt != 0x55){
+        ustack = ptToBeMesaureTill - pt;
+        break;
+      }
+    }
+  }
+
+  ptToBeMesaureFrom = nullptr;
+  ptToBeMesaureTill = nullptr;
+
+  interrupts();
+
+  return ustack;
 }
 
 /**

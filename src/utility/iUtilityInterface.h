@@ -73,6 +73,17 @@ public:
    * @brief Yields control to allow other tasks or processes to execute.
    */
   virtual void yield() = 0;
+
+  /**
+   * @brief Check and start if possible of measure stack in use for next functions
+   */
+  virtual bool can_measure_stack(){ return false; }
+
+  /**
+   * @brief Get used stack size of last function. Must call can_measure_stack once 
+   * before using this function
+   */
+  virtual int64_t measure_lastfn_stack(){ return -1; }
 };
 
 #endif

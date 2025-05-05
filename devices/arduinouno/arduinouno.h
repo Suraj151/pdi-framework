@@ -14,6 +14,7 @@ created Date    : 1st Jan 2024
 #include <Arduino.h>
 #include <Print.h>
 #include <utility/DataTypeDef.h>
+#include <avr/common.h>
 
 // redefines
 #ifdef RODT_ATTR

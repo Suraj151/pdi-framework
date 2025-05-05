@@ -317,13 +317,14 @@ void DeviceControlInterface::printtasks(pdiutil::vector<task_t> &tasks, iTermina
 {
     if( nullptr != terminal ){
 
-        terminal->write_ro(RODT_ATTR("\nTasks : \n"));
+        terminal->writeln();
+        terminal->writeln_ro(RODT_ATTR("Tasks : "));
         terminal->write_ro(RODT_ATTR("id        ")); // max column size=10
         terminal->write_ro(RODT_ATTR("priority  ")); // max column size=10
         terminal->write_ro(RODT_ATTR("interval  ")); // max column size=10
         terminal->write_ro(RODT_ATTR("last_ms   ")); // max column size=10
         terminal->write_ro(RODT_ATTR("exc_ms    ")); // max column size=10
-        terminal->write_ro(RODT_ATTR("max_attempts\n")); // max column size=14
+        terminal->writeln_ro(RODT_ATTR("max_attempts")); // max column size=14
 
         char content[20];
 

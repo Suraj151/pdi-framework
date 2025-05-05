@@ -20,6 +20,15 @@ created Date    : 1st Jan 2024
 const uint8_t EXCEPTIONAL_GPIO_PINS[] = {};
 
 /**
+ * memory analysis members
+ */
+extern char __data_start;
+extern char __bss_start;
+extern char __heap_start;
+extern char __heap_end;
+extern char* __brkval;
+
+/**
  * DeviceControlInterface class
  */
 class DeviceControlInterface: public iDeviceControlInterface
@@ -68,6 +77,8 @@ public:
   void log(logger_type_t log_type, const char *content) override;
   void printtasks(pdiutil::vector<task_t> &tasks, iTerminalInterface *terminal) override;
   void yield() override;
+  bool can_measure_stack() override;
+  int64_t measure_lastfn_stack() override;
 
   // upgrade api
   upgrade_status_t Upgrade(const char *path, const char *version) override;
