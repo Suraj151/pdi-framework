@@ -67,8 +67,8 @@ public:
 		}
 
 		memset(_page, 0, _max_size);
-		strcat_P(_page, WEB_SERVER_HEADER_HTML);
-		strcat_P(_page, WEB_SERVER_OTA_CONFIG_PAGE_TOP);
+		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+		strcat_ro(_page, WEB_SERVER_OTA_CONFIG_PAGE_TOP);
 
 		ota_config_table _ota_configs;
 		this->m_web_resource->m_db_conn->get_ota_config_table(&_ota_configs);
@@ -82,7 +82,7 @@ public:
 		concat_tr_input_html_tags(_page, RODT_ATTR("OTA Host:"), RODT_ATTR("hst"), _ota_configs.ota_host, OTA_HOST_BUF_SIZE - 1);
 		concat_tr_input_html_tags(_page, RODT_ATTR("OTA Port:"), RODT_ATTR("prt"), _port);
 
-		strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
+		strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 #else
 
 		concat_tr_input_html_tags(_page, RODT_ATTR("OTA Host:"), RODT_ATTR("hst"), _ota_configs.ota_host, OTA_HOST_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
@@ -91,7 +91,7 @@ public:
 
 		if (_enable_flash)
 			concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
-		strcat_P(_page, WEB_SERVER_FOOTER_HTML);
+		strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
 	}
 
 	/**

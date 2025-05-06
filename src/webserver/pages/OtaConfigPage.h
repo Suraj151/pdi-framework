@@ -7,7 +7,7 @@ warranty.
 The `OtaConfigPage.h` file defines the HTML content for the OTA (Over-The-Air)
 configuration page of the web server. This page allows users to configure OTA
 update settings through a web interface. The HTML content is stored in program
-memory (PROGMEM) to optimize memory usage on embedded systems.
+memory (PROG_RODT_ATTR) to optimize memory usage on embedded systems.
 
 Author          : Suraj I.
 Created Date    : 1st June 2019
@@ -16,7 +16,7 @@ Created Date    : 1st June 2019
 #ifndef _WEB_SERVER_OTA_CONFIG_PAGE_H_
 #define _WEB_SERVER_OTA_CONFIG_PAGE_H_
 
-#include <Arduino.h>
+#include <interface/pdi.h>
 
 /**
  * @brief HTML content for the OTA configuration page.
@@ -25,7 +25,7 @@ Created Date    : 1st June 2019
  * configuration page on the web server. It includes a form for submitting OTA
  * update settings.
  */
-static const char WEB_SERVER_OTA_CONFIG_PAGE_TOP[] PROGMEM = "\
+static const char WEB_SERVER_OTA_CONFIG_PAGE_TOP[] PROG_RODT_ATTR = "\
 <h2>OTA Configuration</h2>\
 <form action='/ota-config' method='POST'>\
 <table>";

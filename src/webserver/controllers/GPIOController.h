@@ -154,8 +154,8 @@ public:
 		char *_page = new char[PAGE_HTML_MAX_SIZE];
 		memset(_page, 0, PAGE_HTML_MAX_SIZE);
 
-		strcat_P(_page, WEB_SERVER_HEADER_HTML);
-		strcat_P(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_TOP);
+		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+		strcat_ro(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_TOP);
 
 		concat_svg_menu_card(_page, WEB_SERVER_GPIO_MENU_TITLE_MODES, SVG_ICON48_PATH_TUNE, WEB_SERVER_GPIO_MODE_CONFIG_ROUTE);
 		concat_svg_menu_card(_page, WEB_SERVER_GPIO_MENU_TITLE_CONTROL, SVG_ICON48_PATH_GAME_ASSET, WEB_SERVER_GPIO_WRITE_CONFIG_ROUTE);
@@ -163,8 +163,8 @@ public:
 		concat_svg_menu_card(_page, WEB_SERVER_GPIO_MENU_TITLE_MONITOR, SVG_ICON48_PATH_EYE, WEB_SERVER_GPIO_MONITOR_ROUTE);
 		concat_svg_menu_card(_page, WEB_SERVER_GPIO_MENU_TITLE_ALERT, SVG_ICON48_PATH_NOTIFICATION, WEB_SERVER_GPIO_ALERT_CONFIG_ROUTE);
 
-		strcat_P(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_BOTTOM);
-		strcat_P(_page, WEB_SERVER_FOOTER_HTML);
+		strcat_ro(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_BOTTOM);
+		strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
 
 		this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
 		delete[] _page;
@@ -179,13 +179,13 @@ public:
 	void build_gpio_monitor_html(char *_page, int _max_size = PAGE_HTML_MAX_SIZE)
 	{
 		memset(_page, 0, _max_size);
-		strcat_P(_page, WEB_SERVER_HEADER_HTML);
-		strcat_P(_page, WEB_SERVER_GPIO_MONITOR_PAGE_TOP);
+		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+		strcat_ro(_page, WEB_SERVER_GPIO_MONITOR_PAGE_TOP);
 
 		char *_gpio_monitor_table_heading[] = {"Pin", "Mode", "value"};
-		strcat_P(_page, HTML_TABLE_OPEN_TAG);
+		strcat_ro(_page, HTML_TABLE_OPEN_TAG);
 		concat_style_attribute(_page, RODT_ATTR("width:92%"));
-		strcat_P(_page, HTML_TAG_CLOSE_BRACKET);
+		strcat_ro(_page, HTML_TAG_CLOSE_BRACKET);
 		concat_table_heading_row(_page, _gpio_monitor_table_heading, 3, nullptr, nullptr, RODT_ATTR("btn"), nullptr);
 
 		char _name[3];
@@ -211,16 +211,16 @@ public:
 				concat_table_data_row(_page, _gpio_monitor_table_data, 3, nullptr, nullptr, RODT_ATTR("btnd"), nullptr);
 			}
 		}
-		strcat_P(_page, HTML_TABLE_CLOSE_TAG);
+		strcat_ro(_page, HTML_TABLE_CLOSE_TAG);
 
-		strcat_P(_page, HTML_DIV_OPEN_TAG);
+		strcat_ro(_page, HTML_DIV_OPEN_TAG);
 		concat_style_attribute(_page, RODT_ATTR("display:inline-flex;margin-top:25px;"));
-		strcat_P(_page, HTML_TAG_CLOSE_BRACKET);
+		strcat_ro(_page, HTML_TAG_CLOSE_BRACKET);
 		concat_graph_axis_title_div(_page, (char *)"A0 ( 0 - 1024 )", (char *)"writing-mode:vertical-lr");
-		strcat_P(_page, WEB_SERVER_GPIO_MONITOR_SVG_ELEMENT);
-		strcat_P(_page, HTML_DIV_CLOSE_TAG);
+		strcat_ro(_page, WEB_SERVER_GPIO_MONITOR_SVG_ELEMENT);
+		strcat_ro(_page, HTML_DIV_CLOSE_TAG);
 		concat_graph_axis_title_div(_page, (char *)"Time");
-		strcat_P(_page, WEB_SERVER_FOOTER_WITH_ANALOG_MONITOR_HTML);
+		strcat_ro(_page, WEB_SERVER_FOOTER_WITH_ANALOG_MONITOR_HTML);
 	}
 
 	/**
@@ -255,8 +255,8 @@ public:
 	void build_gpio_server_config_html(char *_page, bool _enable_flash = false, int _max_size = PAGE_HTML_MAX_SIZE)
 	{
 		memset(_page, 0, _max_size);
-		strcat_P(_page, WEB_SERVER_HEADER_HTML);
-		strcat_P(_page, WEB_SERVER_GPIO_SERVER_PAGE_TOP);
+		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+		strcat_ro(_page, WEB_SERVER_GPIO_SERVER_PAGE_TOP);
 
 		char _port[10], _freq[10];
 		memset(_port, 0, 10);
@@ -268,10 +268,10 @@ public:
 		concat_tr_input_html_tags(_page, RODT_ATTR("Host Port:"), RODT_ATTR("prt"), _port);
 		concat_tr_input_html_tags(_page, RODT_ATTR("Post Frequency:"), RODT_ATTR("frq"), _freq);
 
-		strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
+		strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 		if (_enable_flash)
 			concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
-		strcat_P(_page, WEB_SERVER_FOOTER_HTML);
+		strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
 	}
 
 	/**
@@ -331,8 +331,8 @@ public:
 	void build_gpio_mode_config_html(char *_page, bool _enable_flash = false, int _max_size = PAGE_HTML_MAX_SIZE)
 	{
 		memset(_page, 0, _max_size);
-		strcat_P(_page, WEB_SERVER_HEADER_HTML);
-		strcat_P(_page, WEB_SERVER_GPIO_CONFIG_PAGE_TOP);
+		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+		strcat_ro(_page, WEB_SERVER_GPIO_CONFIG_PAGE_TOP);
 		char *_gpio_mode_general_options[] = {"OFF", "DOUT", "DIN", "BLINK", "AOUT"};
 		char *_gpio_mode_analog_options[] = {"OFF", "", "", "", "", "AIN"};
 		int _gpio_mode_general_options_size = sizeof(_gpio_mode_general_options) / sizeof(_gpio_mode_general_options[0]);
@@ -371,10 +371,10 @@ public:
 			}
 		}
 
-		strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
+		strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 		if (_enable_flash)
 			concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
-		strcat_P(_page, WEB_SERVER_FOOTER_HTML);
+		strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
 	}
 
 	/**
@@ -462,8 +462,8 @@ public:
 	{
 
 		memset(_page, 0, _max_size);
-		strcat_P(_page, WEB_SERVER_HEADER_HTML);
-		strcat_P(_page, WEB_SERVER_GPIO_WRITE_PAGE_TOP);
+		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+		strcat_ro(_page, WEB_SERVER_GPIO_WRITE_PAGE_TOP);
 		char *_gpio_digital_write_options[] = {"LOW", "HIGH"};
 		int _gpio_digital_write_options_size = sizeof(_gpio_digital_write_options) / sizeof(_gpio_digital_write_options[0]);
 
@@ -507,15 +507,15 @@ public:
 
 		if (_added_options)
 		{
-			strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
+			strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 		}
 		else
 		{
-			strcat_P(_page, WEB_SERVER_GPIO_WRITE_EMPTY_MESSAGE);
+			strcat_ro(_page, WEB_SERVER_GPIO_WRITE_EMPTY_MESSAGE);
 		}
 		if (_enable_flash)
 			concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
-		strcat_P(_page, WEB_SERVER_FOOTER_HTML);
+		strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
 	}
 
 	/**
@@ -580,8 +580,8 @@ public:
 	void build_gpio_alert_config_html(char *_page, bool _enable_flash = false, int _max_size = PAGE_HTML_MAX_SIZE)
 	{
 		memset(_page, 0, _max_size);
-		strcat_P(_page, WEB_SERVER_HEADER_HTML);
-		strcat_P(_page, WEB_SERVER_GPIO_ALERT_PAGE_TOP);
+		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+		strcat_ro(_page, WEB_SERVER_GPIO_ALERT_PAGE_TOP);
 		char *_gpio_digital_alert_options[] = {"LOW", "HIGH"};
 #ifdef ENABLE_EMAIL_SERVICE
 		char *_gpio_alert_channels[] = {"NOALERT", "MAIL", "HTTPSERVER"};
@@ -612,11 +612,11 @@ public:
 			if (!__i_dvc_ctrl.isExceptionalGpio(_pin) && __gpio_service.m_gpio_config_copy.gpio_mode[_pin] == DIGITAL_READ)
 			{
 				_added_options = true;
-				strcat_P(_page, HTML_TR_OPEN_TAG);
-				strcat_P(_page, HTML_TAG_CLOSE_BRACKET);
+				strcat_ro(_page, HTML_TR_OPEN_TAG);
+				strcat_ro(_page, HTML_TAG_CLOSE_BRACKET);
 				concat_td_select_html_tags(_page, _name, _label, _gpio_digital_alert_options, _gpio_digital_alert_options_size, (int)__gpio_service.m_gpio_config_copy.gpio_alert_values[_pin]);
 				concat_td_select_html_tags(_page, (char *)" ? ", _alert_label, _gpio_alert_channels, _gpio_alert_channels_size, (int)__gpio_service.m_gpio_config_copy.gpio_alert_channel[_pin]);
-				strcat_P(_page, HTML_TR_CLOSE_TAG);
+				strcat_ro(_page, HTML_TR_CLOSE_TAG);
 			}
 		}
 
@@ -640,35 +640,35 @@ public:
 				_added_options = true;
 				memset(_analog_value, 0, 10);
 				__appendUintToBuff(_analog_value, "%d", __gpio_service.m_gpio_config_copy.gpio_alert_values[MAX_DIGITAL_GPIO_PINS + _pin], 8);
-				strcat_P(_page, HTML_TR_OPEN_TAG);
-				strcat_P(_page, HTML_TAG_CLOSE_BRACKET);
-				strcat_P(_page, HTML_TD_OPEN_TAG);
-				strcat_P(_page, HTML_TAG_CLOSE_BRACKET);
+				strcat_ro(_page, HTML_TR_OPEN_TAG);
+				strcat_ro(_page, HTML_TAG_CLOSE_BRACKET);
+				strcat_ro(_page, HTML_TD_OPEN_TAG);
+				strcat_ro(_page, HTML_TAG_CLOSE_BRACKET);
 				strcat(_page, _name);
-				strcat_P(_page, HTML_TD_CLOSE_TAG);
-				strcat_P(_page, HTML_TD_OPEN_TAG);
-				strcat_P(_page, HTML_STYLE_ATTR);
+				strcat_ro(_page, HTML_TD_CLOSE_TAG);
+				strcat_ro(_page, HTML_TD_OPEN_TAG);
+				strcat_ro(_page, HTML_STYLE_ATTR);
 				strcat(_page, (char *)"'display:flex;'");
-				strcat_P(_page, HTML_TAG_CLOSE_BRACKET);
+				strcat_ro(_page, HTML_TAG_CLOSE_BRACKET);
 				concat_select_html_tag(_page, _label, _gpio_analog_alert_comparators, _gpio_analog_alert_comparators_size, (int)__gpio_service.m_gpio_config_copy.gpio_alert_comparator[MAX_DIGITAL_GPIO_PINS + _pin]);
 				concat_input_html_tag(_page, _alert_value, _analog_value);
-				strcat_P(_page, HTML_TD_CLOSE_TAG);
+				strcat_ro(_page, HTML_TD_CLOSE_TAG);
 				concat_td_select_html_tags(_page, (char *)" ? ", _alert_label, _gpio_alert_channels, _gpio_alert_channels_size, (int)__gpio_service.m_gpio_config_copy.gpio_alert_channel[MAX_DIGITAL_GPIO_PINS + _pin]);
-				strcat_P(_page, HTML_TR_CLOSE_TAG);
+				strcat_ro(_page, HTML_TR_CLOSE_TAG);
 			}
 		}
 
 		if (_added_options)
 		{
-			strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
+			strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 		}
 		else
 		{
-			strcat_P(_page, WEB_SERVER_GPIO_ALERT_EMPTY_MESSAGE);
+			strcat_ro(_page, WEB_SERVER_GPIO_ALERT_EMPTY_MESSAGE);
 		}
 		if (_enable_flash)
 			concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
-		strcat_P(_page, WEB_SERVER_FOOTER_HTML);
+		strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
 	}
 
 	/**

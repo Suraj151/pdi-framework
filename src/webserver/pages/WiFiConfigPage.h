@@ -7,7 +7,7 @@ warranty.
 The `WiFiConfigPage.h` file defines the HTML content for the WiFi configuration
 page of the web server. This page allows users to configure WiFi settings, such
 as SSID and password, through a web interface. The HTML content is stored in
-program memory (PROGMEM) to optimize memory usage on embedded systems.
+program memory (PROG_RODT_ATTR) to optimize memory usage on embedded systems.
 
 Author          : Suraj I.
 Created Date    : 1st June 2019
@@ -16,7 +16,7 @@ Created Date    : 1st June 2019
 #ifndef _WEB_SERVER_WIFI_CONFIG_PAGE_H_
 #define _WEB_SERVER_WIFI_CONFIG_PAGE_H_
 
-#include <Arduino.h>
+#include <interface/pdi.h>
 
 /**
  * @brief HTML content for the top section of the WiFi configuration page.
@@ -25,7 +25,7 @@ Created Date    : 1st June 2019
  * configuration page on the web server. It includes a form for submitting WiFi
  * settings.
  */
-static const char WEB_SERVER_WIFI_CONFIG_PAGE_TOP[] PROGMEM = "\
+static const char WEB_SERVER_WIFI_CONFIG_PAGE_TOP[] PROG_RODT_ATTR = "\
 <h2>WiFi Configuration</h2>\
 <form action='/wifi-config' method='POST'>\
 <table>";
@@ -37,7 +37,7 @@ static const char WEB_SERVER_WIFI_CONFIG_PAGE_TOP[] PROGMEM = "\
  * configuration page on the web server. It includes a submit button for saving
  * the configuration and a button to navigate back to the home page.
  */
-static const char WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM[] PROGMEM = "\
+static const char WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM[] PROG_RODT_ATTR = "\
 <tr>\
 <td></td>\
 <td>\

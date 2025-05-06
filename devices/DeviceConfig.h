@@ -133,7 +133,7 @@ created Date    : 1st June 2019
 /**
  * enable/disable internet availability based station connections
  */
-#define ENABLE_INTERNET_BASED_CONNECTIONS
+// #define ENABLE_INTERNET_BASED_CONNECTIONS
 
 /**
  * @define wifi & internet connectivity check cycle durations

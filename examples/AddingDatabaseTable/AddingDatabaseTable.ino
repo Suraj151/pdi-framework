@@ -62,32 +62,32 @@ void setup() {
 
 	// Adding sample records to table
 	memset(_students_data.students[0]._name, 0, STUDENT_NAME_MAX_SIZE);
-	strcpy_P(_students_data.students[0]._name, "suraj inamdar");
+	strcpy_ro(_students_data.students[0]._name, "suraj inamdar");
 	_students_data.students[0]._age = 20;
 	_students_data.students[0]._sex = MALE;
 	_students_data.student_count = 1;
 
 	memset(_students_data.students[1]._name, 0, STUDENT_NAME_MAX_SIZE);
-	strcpy_P(_students_data.students[1]._name, "sajeev reddy");
+	strcpy_ro(_students_data.students[1]._name, "sajeev reddy");
 	_students_data.students[1]._age = 21;
 	_students_data.students[1]._sex = MALE;
 	_students_data.student_count++;
 
 
 	memset(_students_data.students[2]._name, 0, STUDENT_NAME_MAX_SIZE);
-	strcpy_P(_students_data.students[2]._name, "sakshi mehta");
+	strcpy_ro(_students_data.students[2]._name, "sakshi mehta");
 	_students_data.students[2]._age = 19;
 	_students_data.students[2]._sex = FEMALE;
 	_students_data.student_count++;
 
 	memset(_students_data.students[3]._name, 0, STUDENT_NAME_MAX_SIZE);
-	strcpy_P(_students_data.students[3]._name, "john stephens");
+	strcpy_ro(_students_data.students[3]._name, "john stephens");
 	_students_data.students[3]._age = 22;
 	_students_data.students[3]._sex = MALE;
 	_students_data.student_count++;
 
 	memset(_students_data.students[4]._name, 0, STUDENT_NAME_MAX_SIZE);
-	strcpy_P(_students_data.students[4]._name, "angelina jolie");
+	strcpy_ro(_students_data.students[4]._name, "angelina jolie");
 	_students_data.students[4]._age = 18;
 	_students_data.students[4]._sex = FEMALE;
 	_students_data.student_count++;

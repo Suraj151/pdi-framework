@@ -79,15 +79,15 @@ public:
     char *_page = new char[PAGE_HTML_MAX_SIZE];
     memset(_page, 0, PAGE_HTML_MAX_SIZE);
 
-    strcat_P(_page, WEB_SERVER_HEADER_HTML);
-    strcat_P(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_TOP);
+    strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+    strcat_ro(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_TOP);
 
     concat_svg_menu_card(_page, WEB_SERVER_MQTT_MENU_TITLE_GENERAL, SVG_ICON48_PATH_SETTINGS, WEB_SERVER_MQTT_GENERAL_CONFIG_ROUTE);
     concat_svg_menu_card(_page, WEB_SERVER_MQTT_MENU_TITLE_LWT, SVG_ICON48_PATH_BEENHERE, WEB_SERVER_MQTT_LWT_CONFIG_ROUTE);
     concat_svg_menu_card(_page, WEB_SERVER_MQTT_MENU_TITLE_PUBSUB, SVG_ICON48_PATH_IMPORT_EXPORT, WEB_SERVER_MQTT_PUBSUB_CONFIG_ROUTE);
 
-    strcat_P(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_BOTTOM);
-    strcat_P(_page, WEB_SERVER_FOOTER_HTML);
+    strcat_ro(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_BOTTOM);
+    strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
 
     this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
     delete[] _page;
@@ -109,8 +109,8 @@ public:
     }
 
     memset(_page, 0, _max_size);
-    strcat_P(_page, WEB_SERVER_HEADER_HTML);
-    strcat_P(_page, WEB_SERVER_MQTT_GENERAL_PAGE_TOP);
+    strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+    strcat_ro(_page, WEB_SERVER_MQTT_GENERAL_PAGE_TOP);
 
     mqtt_general_config_table _mqtt_general_configs;
     this->m_web_resource->m_db_conn->get_mqtt_general_config_table(&_mqtt_general_configs);
@@ -131,7 +131,7 @@ public:
     concat_tr_input_html_tags(_page, RODT_ATTR("Keep Alive:"), RODT_ATTR("kpalv"), _keepalive);
     concat_tr_input_html_tags(_page, RODT_ATTR("Clean Session:"), RODT_ATTR("cln"), "clean", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_general_configs.clean_session != 0);
 
-    strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
+    strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 
 #else
 
@@ -147,7 +147,7 @@ public:
 
     if (_enable_flash)
       concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
-    strcat_P(_page, WEB_SERVER_FOOTER_HTML);
+    strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
   }
 
   /**
@@ -236,8 +236,8 @@ public:
 
     memset(_page, 0, _max_size);
     char _ip_address[20];
-    strcat_P(_page, WEB_SERVER_HEADER_HTML);
-    strcat_P(_page, WEB_SERVER_MQTT_LWT_PAGE_TOP);
+    strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+    strcat_ro(_page, WEB_SERVER_MQTT_LWT_PAGE_TOP);
 
     mqtt_lwt_config_table _mqtt_lwt_configs;
     this->m_web_resource->m_db_conn->get_mqtt_lwt_config_table(&_mqtt_lwt_configs);
@@ -251,7 +251,7 @@ public:
     concat_tr_select_html_tags(_page, RODT_ATTR("Will QoS:"), RODT_ATTR("wqos"), _qos_options, 3, _mqtt_lwt_configs.will_qos);
     concat_tr_input_html_tags(_page, RODT_ATTR("Will Retain:"), RODT_ATTR("wrtn"), "retain", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_lwt_configs.will_retain != 0);
 
-    strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
+    strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 
 #else
 
@@ -264,7 +264,7 @@ public:
 
     if (_enable_flash)
       concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
-    strcat_P(_page, WEB_SERVER_FOOTER_HTML);
+    strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
   }
 
   /**
@@ -342,8 +342,8 @@ public:
 
     memset(_page, 0, _max_size);
     char _ip_address[20];
-    strcat_P(_page, WEB_SERVER_HEADER_HTML);
-    strcat_P(_page, WEB_SERVER_MQTT_PUBSUB_PAGE_TOP);
+    strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+    strcat_ro(_page, WEB_SERVER_MQTT_PUBSUB_PAGE_TOP);
 
     mqtt_pubsub_config_table _mqtt_pubsub_configs;
     this->m_web_resource->m_db_conn->get_mqtt_pubsub_config_table(&_mqtt_pubsub_configs);
@@ -428,12 +428,12 @@ public:
     }
 
 #ifdef ALLOW_MQTT_CONFIG_MODIFICATION
-    strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
+    strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 #endif
 
     if (_enable_flash)
       concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
-    strcat_P(_page, WEB_SERVER_FOOTER_HTML);
+    strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
   }
 
   /**

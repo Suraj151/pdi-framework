@@ -78,8 +78,8 @@ public:
 	{
 
 		memset(_page, 0, _max_size);
-		strcat_P(_page, WEB_SERVER_HEADER_HTML);
-		strcat_P(_page, WEB_SERVER_EMAIL_CONFIG_PAGE_TOP);
+		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+		strcat_ro(_page, WEB_SERVER_EMAIL_CONFIG_PAGE_TOP);
 
 		char _port[10];
 		memset(_port, 0, 10);
@@ -102,13 +102,13 @@ public:
 		concat_tr_input_html_tags(_page, RODT_ATTR("Send Test Mail ?"), RODT_ATTR("tstml"), "test", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, false);
 		// concat_tr_input_html_tags( _page, RODT_ATTR("Mail Frequency:"), RODT_ATTR("ml_freq"), _freq );
 
-		strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
+		strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 
 		if (_enable_flash)
 			concat_flash_message_div(_page, _is_error ? RODT_ATTR("Invalid length error") : _is_test_mail ? HTML_EMAIL_SUCCESS_FLASH
 																									 : HTML_SUCCESS_FLASH,
 									 _is_error ? ALERT_DANGER : ALERT_SUCCESS);
-		strcat_P(_page, WEB_SERVER_FOOTER_HTML);
+		strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
 	}
 
 	/**

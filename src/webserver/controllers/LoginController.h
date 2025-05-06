@@ -81,11 +81,11 @@ class LoginController : public Controller {
 
       memset( _page, 0, _max_size );
 
-      if( _enable_header_footer ) strcat_P( _page, WEB_SERVER_HEADER_HTML );
-      strcat_P( _page, _pgm_page );
+      if( _enable_header_footer ) strcat_ro( _page, WEB_SERVER_HEADER_HTML );
+      strcat_ro( _page, _pgm_page );
       if( _enable_flash )
       concat_flash_message_div( _page, _message, _alert_type );
-      if( _enable_header_footer ) strcat_P( _page, WEB_SERVER_FOOTER_HTML );
+      if( _enable_header_footer ) strcat_ro( _page, WEB_SERVER_FOOTER_HTML );
     }
 
 		/**
@@ -99,16 +99,16 @@ class LoginController : public Controller {
 		void build_login_config_html( char* _page, bool _is_error=false, bool _enable_flash=false, int _max_size=PAGE_HTML_MAX_SIZE ){
 
       memset( _page, 0, _max_size );
-      strcat_P( _page, WEB_SERVER_HEADER_HTML );
-      strcat_P( _page, WEB_SERVER_LOGIN_CONFIG_PAGE_TOP );
+      strcat_ro( _page, WEB_SERVER_HEADER_HTML );
+      strcat_ro( _page, WEB_SERVER_LOGIN_CONFIG_PAGE_TOP );
 
       concat_tr_input_html_tags( _page, RODT_ATTR("Username:"), RODT_ATTR("usrnm"), this->login_credentials.username, LOGIN_CONFIGS_BUF_SIZE-1 );
       concat_tr_input_html_tags( _page, RODT_ATTR("Password:"), RODT_ATTR("pswd"), this->login_credentials.password, LOGIN_CONFIGS_BUF_SIZE-1, (char*)"password" );
 
-      strcat_P( _page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM );
+      strcat_ro( _page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM );
       if( _enable_flash )
       concat_flash_message_div( _page, _is_error ? RODT_ATTR("Invalid length error(3-20)"): HTML_SUCCESS_FLASH, _is_error ? ALERT_DANGER:ALERT_SUCCESS );
-      strcat_P( _page, WEB_SERVER_FOOTER_HTML );
+      strcat_ro( _page, WEB_SERVER_FOOTER_HTML );
     }
 
 		/**

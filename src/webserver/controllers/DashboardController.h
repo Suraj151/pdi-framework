@@ -120,9 +120,9 @@ class DashboardController : public Controller {
 			char *_page = new char[PAGE_HTML_MAX_SIZE];
 			memset(_page, 0, PAGE_HTML_MAX_SIZE);
 
-			strcat_P(_page, WEB_SERVER_HEADER_HTML);
-			strcat_P(_page, WEB_SERVER_DASHBOARD_PAGE);
-			strcat_P(_page, WEB_SERVER_FOOTER_WITH_DASHBOARD_MONITOR_HTML);
+			strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+			strcat_ro(_page, WEB_SERVER_DASHBOARD_PAGE);
+			strcat_ro(_page, WEB_SERVER_FOOTER_WITH_DASHBOARD_MONITOR_HTML);
 
 			this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
 			delete[] _page;

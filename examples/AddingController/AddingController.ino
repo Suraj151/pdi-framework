@@ -52,20 +52,20 @@ class TestController : public Controller {
       /**
        * first append header part of html to reponse
   		 */
-			strcat_P( _page, WEB_SERVER_HEADER_HTML );
+			strcat_ro( _page, WEB_SERVER_HEADER_HTML );
 
       /**
        * then append body part of html to response
        * for demo purpose, dashboard card added with the help of html helpers available in framework
   		 */
-			strcat_P( _page, WEB_SERVER_MENU_CARD_PAGE_WRAP_TOP );
+			strcat_ro( _page, WEB_SERVER_MENU_CARD_PAGE_WRAP_TOP );
 			concat_svg_menu_card( _page, WEB_SERVER_HOME_MENU_TITLE_DASHBOARD, SVG_ICON48_PATH_DASHBOARD, WEB_SERVER_DASHBOARD_ROUTE );
-			strcat_P( _page, WEB_SERVER_MENU_CARD_PAGE_WRAP_BOTTOM );
+			strcat_ro( _page, WEB_SERVER_MENU_CARD_PAGE_WRAP_BOTTOM );
 
       /**
        * lastely append footer part of html to response
   		 */
-			strcat_P( _page, WEB_SERVER_FOOTER_HTML );
+			strcat_ro( _page, WEB_SERVER_FOOTER_HTML );
 
       /**
        * finally send response and deallocate page

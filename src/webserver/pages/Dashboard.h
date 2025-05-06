@@ -7,7 +7,7 @@ warranty.
 The `Dashboard.h` file defines the HTML content for the dashboard page of the
 web server. The dashboard provides information about the device's network
 status, connected devices, and other relevant details. The HTML content is
-stored in program memory (PROGMEM) to optimize memory usage on embedded systems.
+stored in program memory (PROG_RODT_ATTR) to optimize memory usage on embedded systems.
 
 Author          : Suraj I.
 Created Date    : 1st June 2019
@@ -16,7 +16,7 @@ Created Date    : 1st June 2019
 #ifndef _WEB_SERVER_DASHBOARD_PAGE_H_
 #define _WEB_SERVER_DASHBOARD_PAGE_H_
 
-#include <Arduino.h>
+#include <interface/pdi.h>
 
 /**
  * @brief HTML content for the dashboard page.
@@ -26,7 +26,7 @@ Created Date    : 1st June 2019
  * address, RSSI, status, MAC address, internet connectivity, and network time.
  * Additionally, it provides a section for listing connected devices.
  */
-static const char WEB_SERVER_DASHBOARD_PAGE[] PROGMEM = "\
+static const char WEB_SERVER_DASHBOARD_PAGE[] PROG_RODT_ATTR = "\
 <h2>Dashboard</h2>\
 \
 <style>\

@@ -73,8 +73,8 @@ public:
 
     memset(_page, 0, _max_size);
     char _ip_address[20];
-    strcat_P(_page, WEB_SERVER_HEADER_HTML);
-    strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_TOP);
+    strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+    strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_TOP);
 
 #ifdef ALLOW_WIFI_CONFIG_MODIFICATION
 
@@ -98,7 +98,7 @@ public:
     __int_ip_to_str(_ip_address, this->wifi_configs.ap_subnet, 20);
     concat_tr_input_html_tags(_page, RODT_ATTR("Access Subnet:"), RODT_ATTR("ap_sip"), _ip_address);
 
-    strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
+    strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 
 #else
 
@@ -133,7 +133,7 @@ public:
 
 #ifdef ALLOW_WIFI_SSID_PASSKEY_CONFIG_MODIFICATION_ONLY
 
-    strcat_P(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
+    strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 
 #endif
 
@@ -141,7 +141,7 @@ public:
 
     if (_enable_flash)
       concat_flash_message_div(_page, _is_error ? RODT_ATTR("Invalid length error(3-20)") : RODT_ATTR("Config saved Successfully..applying new configs."), _is_error ? ALERT_DANGER : ALERT_SUCCESS);
-    strcat_P(_page, WEB_SERVER_FOOTER_HTML);
+    strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
   }
 
   /**

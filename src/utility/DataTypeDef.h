@@ -47,6 +47,24 @@ namespace pdiutil {
 
 // Attribute for read-only data (can be redefined in derived interfaces)
 #define RODT_ATTR(x) x
+#define PROG_RODT_ATTR
+
+// String operations api for read-write-modify string data (can be redefined in derived interfaces)
+// _ro for each of api referes to read-only data region specific api
+#define strcat strcat
+#define strcat_ro strcat
+#define strncat strncat
+#define strncat_ro strncat
+#define strcpy strcpy
+#define strcpy_ro strcpy
+#define strncpy strncpy
+#define strncpy_ro strncpy
+#define strlen strlen
+#define strlen_ro strlen
+#define strcmp strcmp
+#define strcmp_ro strcmp
+#define strncmp strncmp
+#define strncmp_ro strncmp
 
 /* Connection status enums */
 typedef enum {

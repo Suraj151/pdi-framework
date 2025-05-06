@@ -8,7 +8,7 @@ The `Header.h` file defines the HTML content for the header section of the web
 server pages. This header includes the basic structure of an HTML document,
 such as the `<html>` and `<head>` tags, along with styling for the web interface.
 It also includes a title and a container for the main content of the page. The
-HTML content is stored in program memory (PROGMEM) to optimize memory usage on
+HTML content is stored in program memory (PROG_RODT_ATTR) to optimize memory usage on
 embedded systems.
 
 Author          : Suraj I.
@@ -18,7 +18,7 @@ Created Date    : 1st June 2019
 #ifndef _WEB_SERVER_HEADER_HTML_H_
 #define _WEB_SERVER_HEADER_HTML_H_
 
-#include <Arduino.h>
+#include <interface/pdi.h>
 
 /**
  * @brief HTML content for the header section of the web server pages.
@@ -31,7 +31,7 @@ Created Date    : 1st June 2019
  *   containers, and other UI elements.
  * - A `<div>` container for the main content of the page.
  */
-static const char WEB_SERVER_HEADER_HTML[] PROGMEM = "\
+static const char WEB_SERVER_HEADER_HTML[] PROG_RODT_ATTR = "\
 <html>\
 <head>\
 <title>Device Manager</title>\

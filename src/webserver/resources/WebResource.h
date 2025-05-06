@@ -28,7 +28,7 @@ Created Date    : 1st June 2019
 /**
  * @brief MIME type for HTML content.
  */
-static const char TEXT_HTML_CONTENT[] PROGMEM = "text/html";
+static const char TEXT_HTML_CONTENT[] PROG_RODT_ATTR = "text/html";
 
 /**
  * @define PAGE_HTML_MAX_SIZE

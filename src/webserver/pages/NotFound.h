@@ -8,7 +8,7 @@ The `NotFound.h` file defines the HTML content for the "404 Not Found" page of
 the web server. This page is displayed when a user attempts to access a route
 or resource that does not exist. It provides a message indicating the page was
 not found and includes a link to navigate back to the home page. The HTML content
-is stored in program memory (PROGMEM) to optimize memory usage on embedded systems.
+is stored in program memory (PROG_RODT_ATTR) to optimize memory usage on embedded systems.
 
 Author          : Suraj I.
 Created Date    : 1st June 2019
@@ -17,7 +17,7 @@ Created Date    : 1st June 2019
 #ifndef _WEB_SERVER_404_PAGE_H_
 #define _WEB_SERVER_404_PAGE_H_
 
-#include <Arduino.h>
+#include <interface/pdi.h>
 
 /**
  * @brief HTML content for the "404 Not Found" page.
@@ -26,7 +26,7 @@ Created Date    : 1st June 2019
  * web server. It includes a message indicating the page was not found and a
  * button linking to the home page.
  */
-static const char WEB_SERVER_404_PAGE[] PROGMEM = "\
+static const char WEB_SERVER_404_PAGE[] PROG_RODT_ATTR = "\
 <h3>Page Not Found</h3>\
 <div>\
 Go to\

@@ -73,12 +73,12 @@ public:
 		memset(_page, 0, _max_size);
 
 		if (_enable_header_footer)
-			strcat_P(_page, WEB_SERVER_HEADER_HTML);
-		strcat_P(_page, _pgm_page);
+			strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+		strcat_ro(_page, _pgm_page);
 		if (_enable_flash)
 			concat_flash_message_div(_page, _message, _alert_type);
 		if (_enable_header_footer)
-			strcat_P(_page, WEB_SERVER_FOOTER_HTML);
+			strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
 	}
 
 	/**
@@ -118,12 +118,12 @@ public:
 		char *_page = new char[PAGE_HTML_MAX_SIZE];
 
 		memset(_page, 0, PAGE_HTML_MAX_SIZE);
-		strcat_P(_page, WEB_SERVER_HEADER_HTML);
+		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
 
 		if (this->m_route_handler->has_active_session())
 		{
 
-			strcat_P(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_TOP);
+			strcat_ro(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_TOP);
 
 			concat_svg_menu_card(_page, WEB_SERVER_HOME_MENU_TITLE_LOGIN, SVG_ICON48_PATH_ACCOUNT_CIRCLE, WEB_SERVER_LOGIN_CONFIG_ROUTE);
 			concat_svg_menu_card(_page, WEB_SERVER_HOME_MENU_TITLE_WIFI, SVG_ICON48_PATH_WIFI, WEB_SERVER_WIFI_CONFIG_ROUTE);
@@ -143,15 +143,15 @@ public:
 			concat_svg_menu_card(_page, WEB_SERVER_HOME_MENU_TITLE_DASHBOARD, SVG_ICON48_PATH_DASHBOARD, WEB_SERVER_DASHBOARD_ROUTE);
 			concat_svg_menu_card(_page, WEB_SERVER_HOME_MENU_TITLE_LOGOUT, SVG_ICON48_PATH_POWER, WEB_SERVER_LOGOUT_ROUTE);
 
-			strcat_P(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_BOTTOM);
+			strcat_ro(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_BOTTOM);
 		}
 		else
 		{
 
-			strcat_P(_page, WEB_SERVER_HOME_PAGE);
+			strcat_ro(_page, WEB_SERVER_HOME_PAGE);
 		}
 
-		strcat_P(_page, WEB_SERVER_FOOTER_HTML);
+		strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
 
 		this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
 		delete[] _page;

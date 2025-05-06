@@ -7,7 +7,7 @@ warranty.
 The `GpioConfigPage.h` file defines the HTML content for various GPIO-related
 pages of the web server. These pages allow users to configure GPIO modes, control
 GPIO states, monitor GPIO activity, and manage GPIO alerts. The HTML content is
-stored in program memory (PROGMEM) to optimize memory usage on embedded systems.
+stored in program memory (PROG_RODT_ATTR) to optimize memory usage on embedded systems.
 
 Author          : Suraj I.
 Created Date    : 1st June 2019
@@ -16,7 +16,7 @@ Created Date    : 1st June 2019
 #ifndef _EW_GPIO_CONFIG_PAGE_H_
 #define _EW_GPIO_CONFIG_PAGE_H_
 
-#include <Arduino.h>
+#include <interface/pdi.h>
 
 /**
  * @brief Titles for GPIO menu options.
@@ -24,11 +24,11 @@ Created Date    : 1st June 2019
  * These strings represent the titles for different GPIO-related menu options
  * displayed on the web server.
  */
-static const char WEB_SERVER_GPIO_MENU_TITLE_MODES[] PROGMEM = "gpio modes";
-static const char WEB_SERVER_GPIO_MENU_TITLE_CONTROL[] PROGMEM = "gpio control";
-static const char WEB_SERVER_GPIO_MENU_TITLE_SERVER[] PROGMEM = "gpio server";
-static const char WEB_SERVER_GPIO_MENU_TITLE_MONITOR[] PROGMEM = "gpio monitor";
-static const char WEB_SERVER_GPIO_MENU_TITLE_ALERT[] PROGMEM = "gpio alerts";
+static const char WEB_SERVER_GPIO_MENU_TITLE_MODES[] PROG_RODT_ATTR = "gpio modes";
+static const char WEB_SERVER_GPIO_MENU_TITLE_CONTROL[] PROG_RODT_ATTR = "gpio control";
+static const char WEB_SERVER_GPIO_MENU_TITLE_SERVER[] PROG_RODT_ATTR = "gpio server";
+static const char WEB_SERVER_GPIO_MENU_TITLE_MONITOR[] PROG_RODT_ATTR = "gpio monitor";
+static const char WEB_SERVER_GPIO_MENU_TITLE_ALERT[] PROG_RODT_ATTR = "gpio alerts";
 
 /**
  * @brief HTML content for the GPIO monitor page.
@@ -36,7 +36,7 @@ static const char WEB_SERVER_GPIO_MENU_TITLE_ALERT[] PROGMEM = "gpio alerts";
  * This static HTML content is used to render the top section of the GPIO monitor
  * page on the web server.
  */
-static const char WEB_SERVER_GPIO_MONITOR_PAGE_TOP[] PROGMEM = "\
+static const char WEB_SERVER_GPIO_MONITOR_PAGE_TOP[] PROG_RODT_ATTR = "\
 <h2>GPIO Monitor</h2>\
 ";
 
@@ -46,7 +46,7 @@ static const char WEB_SERVER_GPIO_MONITOR_PAGE_TOP[] PROGMEM = "\
  * This SVG element is used to render a graphical representation of GPIO activity
  * on the GPIO monitor page.
  */
-static const char WEB_SERVER_GPIO_MONITOR_SVG_ELEMENT[] PROGMEM = "\
+static const char WEB_SERVER_GPIO_MONITOR_SVG_ELEMENT[] PROG_RODT_ATTR = "\
 <svg id='svga0' width='300' height='150'>\
 <rect width='300' height='150'/>\
 <line x1='0' y1='25' x2='300' y2='25' stroke='white'></line>\
@@ -60,7 +60,7 @@ static const char WEB_SERVER_GPIO_MONITOR_SVG_ELEMENT[] PROGMEM = "\
  * This static HTML content is used to render the top section of the GPIO server
  * configuration page on the web server.
  */
-static const char WEB_SERVER_GPIO_SERVER_PAGE_TOP[] PROGMEM = "\
+static const char WEB_SERVER_GPIO_SERVER_PAGE_TOP[] PROG_RODT_ATTR = "\
 <h2>GPIO Server Configuration</h2>\
 <form action='/gpio-server' method='POST'>\
 <table>";
@@ -71,7 +71,7 @@ static const char WEB_SERVER_GPIO_SERVER_PAGE_TOP[] PROGMEM = "\
  * This static HTML content is used to render the top section of the GPIO mode
  * configuration page on the web server.
  */
-static const char WEB_SERVER_GPIO_CONFIG_PAGE_TOP[] PROGMEM = "\
+static const char WEB_SERVER_GPIO_CONFIG_PAGE_TOP[] PROG_RODT_ATTR = "\
 <h2>GPIO Mode Configuration</h2>\
 <form action='/gpio-config' method='POST'>\
 <table>";
@@ -82,7 +82,7 @@ static const char WEB_SERVER_GPIO_CONFIG_PAGE_TOP[] PROGMEM = "\
  * This static HTML content is used to render the top section of the GPIO control
  * page on the web server.
  */
-static const char WEB_SERVER_GPIO_WRITE_PAGE_TOP[] PROGMEM = "\
+static const char WEB_SERVER_GPIO_WRITE_PAGE_TOP[] PROG_RODT_ATTR = "\
 <h2>GPIO Control</h2>\
 <form action='/gpio-write' method='POST'>\
 <table>";
@@ -93,7 +93,7 @@ static const char WEB_SERVER_GPIO_WRITE_PAGE_TOP[] PROGMEM = "\
  * This static HTML content is used to render the top section of the GPIO alert
  * control page on the web server.
  */
-static const char WEB_SERVER_GPIO_ALERT_PAGE_TOP[] PROGMEM = "\
+static const char WEB_SERVER_GPIO_ALERT_PAGE_TOP[] PROG_RODT_ATTR = "\
 <h2>GPIO Alert Control</h2>\
 <form action='/gpio-alert' method='POST'>\
 <table>";
@@ -104,7 +104,7 @@ static const char WEB_SERVER_GPIO_ALERT_PAGE_TOP[] PROGMEM = "\
  * This static HTML content is displayed when no GPIO is enabled for alert
  * operations. It provides a link to enable GPIO modes.
  */
-static const char WEB_SERVER_GPIO_ALERT_EMPTY_MESSAGE[] PROGMEM = "\
+static const char WEB_SERVER_GPIO_ALERT_EMPTY_MESSAGE[] PROG_RODT_ATTR = "\
 <h4>No GPIO enabled for operation.</h4>\
 <div>enable from \
 <a href='/gpio-config'>\

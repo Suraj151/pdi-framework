@@ -25,9 +25,9 @@ created Date    : 1st June 2019
 void concat_style_attribute( char *_page, const char *_style ){
 
   if( _style ){
-    strcat_P( _page, HTML_STYLE_ATTR );
+    strcat_ro( _page, HTML_STYLE_ATTR );
     strcat( _page, "'" );
-    strcat_P( _page, _style );
+    strcat_ro( _page, _style );
     strcat( _page, "'" );
   }
 }
@@ -35,7 +35,7 @@ void concat_style_attribute( char *_page, const char *_style ){
 void concat_style_attribute( char *_page, char *_style ){
 
   if( _style ){
-    strcat_P( _page, HTML_STYLE_ATTR );
+    strcat_ro( _page, HTML_STYLE_ATTR );
     strcat( _page, "'" );
     strcat( _page, _style );
     strcat( _page, "'" );
@@ -53,9 +53,9 @@ void concat_style_attribute( char *_page, char *_style ){
 void concat_class_attribute( char *_page, const char *_class ){
 
   if( _class ){
-    strcat_P( _page, HTML_CLASS_ATTR );
+    strcat_ro( _page, HTML_CLASS_ATTR );
     strcat( _page, "'" );
-    strcat_P( _page, _class );
+    strcat_ro( _page, _class );
     strcat( _page, "'" );
   }
 }
@@ -63,7 +63,7 @@ void concat_class_attribute( char *_page, const char *_class ){
 void concat_class_attribute( char *_page, char *_class ){
 
   if( _class ){
-    strcat_P( _page, HTML_CLASS_ATTR );
+    strcat_ro( _page, HTML_CLASS_ATTR );
     strcat( _page, "'" );
     strcat( _page, _class );
     strcat( _page, "'" );
@@ -81,9 +81,9 @@ void concat_class_attribute( char *_page, char *_class ){
 void concat_id_attribute( char *_page, const char *_id ){
 
   if( _id ){
-    strcat_P( _page, HTML_ID_ATTR );
+    strcat_ro( _page, HTML_ID_ATTR );
     strcat( _page, "'" );
-    strcat_P( _page, _id );
+    strcat_ro( _page, _id );
     strcat( _page, "'" );
   }
 }
@@ -91,7 +91,7 @@ void concat_id_attribute( char *_page, const char *_id ){
 void concat_id_attribute( char *_page, char *_id ){
 
   if( _id ){
-    strcat_P( _page, HTML_ID_ATTR );
+    strcat_ro( _page, HTML_ID_ATTR );
     strcat( _page, "'" );
     strcat( _page, _id );
     strcat( _page, "'" );
@@ -109,9 +109,9 @@ void concat_id_attribute( char *_page, char *_id ){
 void concat_colspan_attribute( char *_page, const char *_colspan ){
 
   if( _colspan ){
-    strcat_P( _page, HTML_COLSPAN_ATTR );
+    strcat_ro( _page, HTML_COLSPAN_ATTR );
     strcat( _page, "'" );
-    strcat_P( _page, _colspan );
+    strcat_ro( _page, _colspan );
     strcat( _page, "'" );
   }
 }
@@ -130,7 +130,7 @@ void concat_colspan_attribute( char *_page, const char *_colspan ){
  */
 void concat_heading_html_tag( char *_page, const char *_heading, uint8_t _heading_level, const char *_class_attr, const char *_style_attr ){
 
-  strcat_P( _page,
+  strcat_ro( _page,
     _heading_level == 1 ? HTML_H1_OPEN_TAG :
     _heading_level == 2 ? HTML_H2_OPEN_TAG :
     _heading_level == 3 ? HTML_H3_OPEN_TAG :
@@ -138,9 +138,9 @@ void concat_heading_html_tag( char *_page, const char *_heading, uint8_t _headin
   );
   concat_class_attribute( _page, _class_attr );
   concat_style_attribute( _page, _style_attr );
-  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
-  strcat_P( _page, _heading );
-  strcat_P( _page,
+  strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
+  strcat_ro( _page, _heading );
+  strcat_ro( _page,
     _heading_level == 1 ? HTML_H1_CLOSE_TAG :
     _heading_level == 2 ? HTML_H2_CLOSE_TAG :
     _heading_level == 3 ? HTML_H3_CLOSE_TAG :
@@ -184,8 +184,8 @@ void concat_input_html_tag(
   if( 0 <= __strstr( _type, HTML_INPUT_RANGE_TAG_TYPE, 10 ) )
     _is_range = true;
 
-  strcat_P( _page, HTML_INPUT_OPEN );
-  strcat_P( _page, HTML_TYPE_ATTR );
+  strcat_ro( _page, HTML_INPUT_OPEN );
+  strcat_ro( _page, HTML_TYPE_ATTR );
   strcat( _page, "'" );
   strcat( _page, _type );
   strcat( _page, "'" );
@@ -194,14 +194,14 @@ void concat_input_html_tag(
     char _maxlen[7]; memset(_maxlen, 0, 7);
     itoa( _maxlength, _maxlen, 10 );
 
-    strcat_P( _page, HTML_MAXLEN_ATTR );
+    strcat_ro( _page, HTML_MAXLEN_ATTR );
     strcat( _page, "'" );
     strcat( _page, _maxlen );
     strcat( _page, "'" );
   }
 
   if( _checked ){
-    strcat_P( _page, HTML_CHECKED_ATTR );
+    strcat_ro( _page, HTML_CHECKED_ATTR );
   }
 
   if( _is_range ){
@@ -209,25 +209,25 @@ void concat_input_html_tag(
     memset(_minbuff, 0, 7); memset(_maxbuff, 0, 7);
     itoa( _min, _minbuff, 10 ); itoa( _max, _maxbuff, 10 );
 
-    strcat_P( _page, HTML_MIN_RANGE_ATTR );
+    strcat_ro( _page, HTML_MIN_RANGE_ATTR );
     strcat( _page, "'" );
     strcat( _page, _minbuff );
     strcat( _page, "'" );
-    strcat_P( _page, HTML_MAX_RANGE_ATTR );
+    strcat_ro( _page, HTML_MAX_RANGE_ATTR );
     strcat( _page, "'" );
     strcat( _page, _maxbuff );
     strcat( _page, "'" );
   }
 
-  strcat_P( _page, HTML_NAME_ATTR );
+  strcat_ro( _page, HTML_NAME_ATTR );
   strcat( _page, "'" );
-  strcat_P( _page, _name );
+  strcat_ro( _page, _name );
   strcat( _page, "'" );
-  if(_disabled)strcat_P( _page, HTML_DISABLED_ATTR );
-  strcat_P( _page, HTML_VALUE_ATTR );
+  if(_disabled)strcat_ro( _page, HTML_DISABLED_ATTR );
+  strcat_ro( _page, HTML_VALUE_ATTR );
   strcat( _page, "'" );
   strcat( _page, _value );
-  strcat_P( _page, RODT_ATTR("'/>") );
+  strcat_ro( _page, RODT_ATTR("'/>") );
 }
 
 void concat_input_html_tag(
@@ -250,8 +250,8 @@ void concat_input_html_tag(
   if( 0 <= __strstr( _type, HTML_INPUT_RANGE_TAG_TYPE, 10 ) )
     _is_range = true;
 
-  strcat_P( _page, HTML_INPUT_OPEN );
-  strcat_P( _page, HTML_TYPE_ATTR );
+  strcat_ro( _page, HTML_INPUT_OPEN );
+  strcat_ro( _page, HTML_TYPE_ATTR );
   strcat( _page, "'" );
   strcat( _page, _type );
   strcat( _page, "'" );
@@ -260,14 +260,14 @@ void concat_input_html_tag(
     char _maxlen[7]; memset(_maxlen, 0, 7);
     itoa( _maxlength, _maxlen, 10 );
 
-    strcat_P( _page, HTML_MAXLEN_ATTR );
+    strcat_ro( _page, HTML_MAXLEN_ATTR );
     strcat( _page, "'" );
     strcat( _page, _maxlen );
     strcat( _page, "'" );
   }
 
   if( _checked ){
-    strcat_P( _page, HTML_CHECKED_ATTR );
+    strcat_ro( _page, HTML_CHECKED_ATTR );
   }
 
   if( _is_range ){
@@ -275,25 +275,25 @@ void concat_input_html_tag(
     memset(_minbuff, 0, 7); memset(_maxbuff, 0, 7);
     itoa( _min, _minbuff, 10 ); itoa( _max, _maxbuff, 10 );
 
-    strcat_P( _page, HTML_MIN_RANGE_ATTR );
+    strcat_ro( _page, HTML_MIN_RANGE_ATTR );
     strcat( _page, "'" );
     strcat( _page, _minbuff );
     strcat( _page, "'" );
-    strcat_P( _page, HTML_MAX_RANGE_ATTR );
+    strcat_ro( _page, HTML_MAX_RANGE_ATTR );
     strcat( _page, "'" );
     strcat( _page, _maxbuff );
     strcat( _page, "'" );
   }
 
-  strcat_P( _page, HTML_NAME_ATTR );
+  strcat_ro( _page, HTML_NAME_ATTR );
   strcat( _page, "'" );
   strcat( _page, _name );
   strcat( _page, "'" );
-  if(_disabled)strcat_P( _page, HTML_DISABLED_ATTR );
-  strcat_P( _page, HTML_VALUE_ATTR );
+  if(_disabled)strcat_ro( _page, HTML_DISABLED_ATTR );
+  strcat_ro( _page, HTML_VALUE_ATTR );
   strcat( _page, "'" );
   strcat( _page, _value );
-  strcat_P( _page, RODT_ATTR("'/>") );
+  strcat_ro( _page, RODT_ATTR("'/>") );
 }
 
 /**
@@ -325,14 +325,14 @@ void concat_td_input_html_tags(
   int _min,
   int _max ){
 
-  strcat_P( _page, HTML_TD_OPEN_TAG );
-  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
-  strcat_P( _page, _label );
-  strcat_P( _page, HTML_TD_CLOSE_TAG );
-  strcat_P( _page, HTML_TD_OPEN_TAG );
-  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+  strcat_ro( _page, HTML_TD_OPEN_TAG );
+  strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
+  strcat_ro( _page, _label );
+  strcat_ro( _page, HTML_TD_CLOSE_TAG );
+  strcat_ro( _page, HTML_TD_OPEN_TAG );
+  strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
   concat_input_html_tag( _page, _name, _value, _maxlength, _type, _checked, _disabled, _min, _max );
-  strcat_P( _page, HTML_TD_CLOSE_TAG );
+  strcat_ro( _page, HTML_TD_CLOSE_TAG );
 }
 
 void concat_td_input_html_tags(
@@ -347,14 +347,14 @@ void concat_td_input_html_tags(
   int _min,
   int _max ){
 
-  strcat_P( _page, HTML_TD_OPEN_TAG );
-  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+  strcat_ro( _page, HTML_TD_OPEN_TAG );
+  strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
   strcat( _page, _label );
-  strcat_P( _page, HTML_TD_CLOSE_TAG );
-  strcat_P( _page, HTML_TD_OPEN_TAG );
-  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+  strcat_ro( _page, HTML_TD_CLOSE_TAG );
+  strcat_ro( _page, HTML_TD_OPEN_TAG );
+  strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
   concat_input_html_tag( _page, _name, _value, _maxlength, _type, _checked, _disabled, _min, _max );
-  strcat_P( _page, HTML_TD_CLOSE_TAG );
+  strcat_ro( _page, HTML_TD_CLOSE_TAG );
 }
 
 /**
@@ -386,10 +386,10 @@ void concat_tr_input_html_tags(
     int _min,
     int _max ){
   
-      strcat_P( _page, HTML_TR_OPEN_TAG );
-      strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+      strcat_ro( _page, HTML_TR_OPEN_TAG );
+      strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
       concat_td_input_html_tags(_page, _label, _name, _value, _maxlength, _type, _checked, _disabled, _min, _max);
-      strcat_P( _page, HTML_TR_CLOSE_TAG );
+      strcat_ro( _page, HTML_TR_CLOSE_TAG );
   }
   
   
@@ -405,10 +405,10 @@ void concat_tr_input_html_tags(
   int _min,
   int _max ){
 
-    strcat_P( _page, HTML_TR_OPEN_TAG );
-    strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+    strcat_ro( _page, HTML_TR_OPEN_TAG );
+    strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
     concat_td_input_html_tags(_page, _label, _name, _value, _maxlength, _type, _checked, _disabled, _min, _max);
-    strcat_P( _page, HTML_TR_CLOSE_TAG );
+    strcat_ro( _page, HTML_TR_CLOSE_TAG );
 }
 
 /**
@@ -427,9 +427,9 @@ void concat_tr_input_html_tags(
  */
 void concat_select_html_tag( char *_page, char *_name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
 
-  strcat_P( _page, HTML_SELECT_OPEN );
-  if(_disabled)strcat_P( _page, HTML_DISABLED_ATTR );
-  strcat_P( _page, HTML_NAME_ATTR );
+  strcat_ro( _page, HTML_SELECT_OPEN );
+  if(_disabled)strcat_ro( _page, HTML_DISABLED_ATTR );
+  strcat_ro( _page, HTML_NAME_ATTR );
   strcat( _page, "'" );
   strcat( _page, _name );
   strcat( _page, "'>" );
@@ -440,28 +440,28 @@ void concat_select_html_tag( char *_page, char *_name, char** _options, int _siz
       char buf[3];
       memset( buf, 0, 3 );
       itoa( i, buf, 10 );
-      strcat_P( _page, HTML_OPTION_OPEN );
-      strcat_P( _page, HTML_VALUE_ATTR );
+      strcat_ro( _page, HTML_OPTION_OPEN );
+      strcat_ro( _page, HTML_VALUE_ATTR );
       strcat( _page, "'" );
       strcat( _page, buf );
       strcat( _page, "'" );
       if( _selected == i )
-      strcat_P( _page, HTML_SELECTED_ATTR );
+      strcat_ro( _page, HTML_SELECTED_ATTR );
       strcat( _page, ">" );
       strcat( _page, _options[i] );
-      strcat_P( _page, HTML_OPTION_CLOSE );
+      strcat_ro( _page, HTML_OPTION_CLOSE );
     }
   }
-  strcat_P( _page, HTML_SELECT_CLOSE );
+  strcat_ro( _page, HTML_SELECT_CLOSE );
 }
 
 void concat_select_html_tag( char *_page, const char *_name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
 
-  strcat_P( _page, HTML_SELECT_OPEN );
-  if(_disabled)strcat_P( _page, HTML_DISABLED_ATTR );
-  strcat_P( _page, HTML_NAME_ATTR );
+  strcat_ro( _page, HTML_SELECT_OPEN );
+  if(_disabled)strcat_ro( _page, HTML_DISABLED_ATTR );
+  strcat_ro( _page, HTML_NAME_ATTR );
   strcat( _page, "'" );
-  strcat_P( _page, _name );
+  strcat_ro( _page, _name );
   strcat( _page, "'>" );
 
   for (int i = 0; i < _size; i++) {
@@ -470,19 +470,19 @@ void concat_select_html_tag( char *_page, const char *_name, char** _options, in
       char buf[3];
       memset( buf, 0, 3 );
       itoa( i, buf, 10 );
-      strcat_P( _page, HTML_OPTION_OPEN );
-      strcat_P( _page, HTML_VALUE_ATTR );
+      strcat_ro( _page, HTML_OPTION_OPEN );
+      strcat_ro( _page, HTML_VALUE_ATTR );
       strcat( _page, "'" );
       strcat( _page, buf );
       strcat( _page, "'" );
       if( _selected == i )
-      strcat_P( _page, HTML_SELECTED_ATTR );
+      strcat_ro( _page, HTML_SELECTED_ATTR );
       strcat( _page, ">" );
       strcat( _page, _options[i] );
-      strcat_P( _page, HTML_OPTION_CLOSE );
+      strcat_ro( _page, HTML_OPTION_CLOSE );
     }
   }
-  strcat_P( _page, HTML_SELECT_CLOSE );
+  strcat_ro( _page, HTML_SELECT_CLOSE );
 }
 
 /**
@@ -502,26 +502,26 @@ void concat_select_html_tag( char *_page, const char *_name, char** _options, in
  */
 void concat_td_select_html_tags( char *_page, char *_label, char *_name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
 
-  strcat_P( _page, HTML_TD_OPEN_TAG );
-  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+  strcat_ro( _page, HTML_TD_OPEN_TAG );
+  strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
   strcat( _page, _label );
-  strcat_P( _page, HTML_TD_CLOSE_TAG );
-  strcat_P( _page, HTML_TD_OPEN_TAG );
-  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+  strcat_ro( _page, HTML_TD_CLOSE_TAG );
+  strcat_ro( _page, HTML_TD_OPEN_TAG );
+  strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
   concat_select_html_tag( _page, _name, _options, _size, _selected, _exception, _disabled );
-  strcat_P( _page, HTML_TD_CLOSE_TAG );
+  strcat_ro( _page, HTML_TD_CLOSE_TAG );
 }
 
 void concat_td_select_html_tags( char *_page, const char *_label, const char *_name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
 
-  strcat_P( _page, HTML_TD_OPEN_TAG );
-  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
-  strcat_P( _page, _label );
-  strcat_P( _page, HTML_TD_CLOSE_TAG );
-  strcat_P( _page, HTML_TD_OPEN_TAG );
-  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+  strcat_ro( _page, HTML_TD_OPEN_TAG );
+  strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
+  strcat_ro( _page, _label );
+  strcat_ro( _page, HTML_TD_CLOSE_TAG );
+  strcat_ro( _page, HTML_TD_OPEN_TAG );
+  strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
   concat_select_html_tag( _page, _name, _options, _size, _selected, _exception, _disabled );
-  strcat_P( _page, HTML_TD_CLOSE_TAG );
+  strcat_ro( _page, HTML_TD_CLOSE_TAG );
 }
 
 /**
@@ -541,18 +541,18 @@ void concat_td_select_html_tags( char *_page, const char *_label, const char *_n
  */
 void concat_tr_select_html_tags( char *_page, const char *_label, const char *_name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
 
-  strcat_P( _page, HTML_TR_OPEN_TAG );
-  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+  strcat_ro( _page, HTML_TR_OPEN_TAG );
+  strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
   concat_td_select_html_tags( _page, _label, _name, _options, _size, _selected, _exception, _disabled );
-  strcat_P( _page, HTML_TR_CLOSE_TAG );
+  strcat_ro( _page, HTML_TR_CLOSE_TAG );
 }
 
 void concat_tr_select_html_tags( char *_page, char *_label, char *_name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
 
-  strcat_P( _page, HTML_TR_OPEN_TAG );
-  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+  strcat_ro( _page, HTML_TR_OPEN_TAG );
+  strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
   concat_td_select_html_tags( _page, _label, _name, _options, _size, _selected, _exception, _disabled );
-  strcat_P( _page, HTML_TR_CLOSE_TAG );
+  strcat_ro( _page, HTML_TR_CLOSE_TAG );
 }
 
 
@@ -571,16 +571,16 @@ void concat_tr_select_html_tags( char *_page, char *_label, char *_name, char** 
  */
 void concat_tr_heading_html_tags( char *_page, const char *_heading, uint8_t	_header_level, const char *_colspan_attr, const char *_class_attr, const char *_style_attr ){
 
-  strcat_P( _page, HTML_TR_OPEN_TAG );
-  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
-  strcat_P( _page, HTML_TD_OPEN_TAG );
+  strcat_ro( _page, HTML_TR_OPEN_TAG );
+  strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
+  strcat_ro( _page, HTML_TD_OPEN_TAG );
   concat_colspan_attribute( _page, _colspan_attr );
   concat_class_attribute( _page, _class_attr );
   concat_style_attribute( _page, _style_attr );
-  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+  strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
   concat_heading_html_tag( _page, _heading, _header_level );
-  strcat_P( _page, HTML_TD_CLOSE_TAG );
-  strcat_P( _page, HTML_TR_CLOSE_TAG );
+  strcat_ro( _page, HTML_TD_CLOSE_TAG );
+  strcat_ro( _page, HTML_TR_CLOSE_TAG );
 }
 
 /**
@@ -595,28 +595,28 @@ void concat_tr_heading_html_tags( char *_page, const char *_heading, uint8_t	_he
  */
 void concat_flash_message_div( char *_page, const char *_message, int _status ){
 
-  strcat_P( _page, HTML_DIV_OPEN_TAG );
-  strcat_P( _page, HTML_CLASS_ATTR );
-  strcat_P( _page, RODT_ATTR("'msg'") );
-  strcat_P( _page, HTML_STYLE_ATTR );
-  strcat_P( _page, RODT_ATTR("'background:") );
-  strcat_P( _page, _status==ALERT_DANGER ? RODT_ATTR("#ffb2c7"): _status==ALERT_SUCCESS ? RODT_ATTR("#a6eaa8") : RODT_ATTR("#f9dc87") );
-  strcat_P( _page, RODT_ATTR(";'>") );
-  strcat_P( _page, _message );
-  strcat_P( _page, HTML_DIV_CLOSE_TAG );
+  strcat_ro( _page, HTML_DIV_OPEN_TAG );
+  strcat_ro( _page, HTML_CLASS_ATTR );
+  strcat_ro( _page, RODT_ATTR("'msg'") );
+  strcat_ro( _page, HTML_STYLE_ATTR );
+  strcat_ro( _page, RODT_ATTR("'background:") );
+  strcat_ro( _page, _status==ALERT_DANGER ? RODT_ATTR("#ffb2c7"): _status==ALERT_SUCCESS ? RODT_ATTR("#a6eaa8") : RODT_ATTR("#f9dc87") );
+  strcat_ro( _page, RODT_ATTR(";'>") );
+  strcat_ro( _page, _message );
+  strcat_ro( _page, HTML_DIV_CLOSE_TAG );
 }
 
 void concat_flash_message_div( char *_page, char *_message, int _status ){
 
-  strcat_P( _page, HTML_DIV_OPEN_TAG );
-  strcat_P( _page, HTML_CLASS_ATTR );
-  strcat_P( _page, RODT_ATTR("'msg'") );
-  strcat_P( _page, HTML_STYLE_ATTR );
-  strcat_P( _page, RODT_ATTR("'background:") );
-  strcat_P( _page, _status==ALERT_DANGER ? RODT_ATTR("#ffb2c7"): _status==ALERT_SUCCESS ? RODT_ATTR("#a6eaa8") : RODT_ATTR("#f9dc87") );
-  strcat_P( _page, RODT_ATTR(";'>") );
+  strcat_ro( _page, HTML_DIV_OPEN_TAG );
+  strcat_ro( _page, HTML_CLASS_ATTR );
+  strcat_ro( _page, RODT_ATTR("'msg'") );
+  strcat_ro( _page, HTML_STYLE_ATTR );
+  strcat_ro( _page, RODT_ATTR("'background:") );
+  strcat_ro( _page, _status==ALERT_DANGER ? RODT_ATTR("#ffb2c7"): _status==ALERT_SUCCESS ? RODT_ATTR("#a6eaa8") : RODT_ATTR("#f9dc87") );
+  strcat_ro( _page, RODT_ATTR(";'>") );
   strcat( _page, _message );
-  strcat_P( _page, HTML_DIV_CLOSE_TAG );
+  strcat_ro( _page, HTML_DIV_CLOSE_TAG );
 }
 
 /**
@@ -631,13 +631,13 @@ void concat_flash_message_div( char *_page, char *_message, int _status ){
  */
 void concat_graph_axis_title_div( char *_page, char *_title, char *_style ){
 
-  strcat_P( _page, HTML_DIV_OPEN_TAG );
-  strcat_P( _page, HTML_STYLE_ATTR );
+  strcat_ro( _page, HTML_DIV_OPEN_TAG );
+  strcat_ro( _page, HTML_STYLE_ATTR );
   strcat( _page, "'" );
   strcat( _page, _style );
   strcat( _page, ";'>" );
   strcat( _page, _title );
-  strcat_P( _page, HTML_DIV_CLOSE_TAG );
+  strcat_ro( _page, HTML_DIV_CLOSE_TAG );
 }
 
 /**
@@ -659,21 +659,21 @@ void concat_svg_tag( char *_page, const char *_path, int _width, int _height, ch
   char _heightbuff[7]; memset(_heightbuff, 0, 7);
   itoa( _height, _heightbuff, 10 );
 
-  strcat_P( _page, HTML_SVG_OPEN_TAG );
-  strcat_P( _page, HTML_WIDTH_ATTR );
+  strcat_ro( _page, HTML_SVG_OPEN_TAG );
+  strcat_ro( _page, HTML_WIDTH_ATTR );
   strcat( _page, "'" );
   strcat( _page, _widthbuff );
   strcat( _page, "'" );
-  strcat_P( _page, HTML_HEIGHT_ATTR );
+  strcat_ro( _page, HTML_HEIGHT_ATTR );
   strcat( _page, "'" );
   strcat( _page, _heightbuff );
   strcat( _page, "'" );
-  strcat_P( _page, HTML_FILL_ATTR );
+  strcat_ro( _page, HTML_FILL_ATTR );
   strcat( _page, "'" );
   strcat( _page, _fill );
   strcat( _page, "'>" );
-  strcat_P( _page, _path );
-  strcat_P( _page, HTML_SVG_CLOSE_TAG );
+  strcat_ro( _page, _path );
+  strcat_ro( _page, HTML_SVG_CLOSE_TAG );
 }
 
 /**
@@ -689,10 +689,10 @@ void concat_svg_tag( char *_page, const char *_path, int _width, int _height, ch
  */
 void concat_svg_menu_card( char *_page, const char *_menu_title, const char *_svg_path, char *_menu_link ){
 
-  strcat_P( _page, HTML_DIV_OPEN_TAG );
+  strcat_ro( _page, HTML_DIV_OPEN_TAG );
   strcat( _page, ">" );
-  strcat_P( _page, HTML_LINK_OPEN_TAG );
-  strcat_P( _page, HTML_HREF_ATTR );
+  strcat_ro( _page, HTML_LINK_OPEN_TAG );
+  strcat_ro( _page, HTML_HREF_ATTR );
 
   strcat( _page, "'" );
   strcat( _page, _menu_link );
@@ -700,13 +700,13 @@ void concat_svg_menu_card( char *_page, const char *_menu_title, const char *_sv
 
   concat_svg_tag( _page, _svg_path );
 
-  strcat_P( _page, HTML_SPAN_OPEN_TAG );
+  strcat_ro( _page, HTML_SPAN_OPEN_TAG );
   strcat( _page, ">" );
-  strcat_P( _page, _menu_title );
-  strcat_P( _page, HTML_SPAN_CLOSE_TAG );
+  strcat_ro( _page, _menu_title );
+  strcat_ro( _page, HTML_SPAN_CLOSE_TAG );
 
-  strcat_P( _page, HTML_LINK_CLOSE_TAG );
-  strcat_P( _page, HTML_DIV_CLOSE_TAG );
+  strcat_ro( _page, HTML_LINK_CLOSE_TAG );
+  strcat_ro( _page, HTML_DIV_CLOSE_TAG );
 }
 
 /**
@@ -725,21 +725,21 @@ void concat_svg_menu_card( char *_page, const char *_menu_title, const char *_sv
  */
 void concat_table_heading_row( char *_page, char** _headings, int _size, const char *_row_class, const char *_row_style, const char *_head_class, const char *_head_style ){
 
-  strcat_P( _page, HTML_TR_OPEN_TAG );
+  strcat_ro( _page, HTML_TR_OPEN_TAG );
   concat_class_attribute( _page, _row_class );
   concat_style_attribute( _page, _row_style );
-  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+  strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
 
   for (int i = 0; i < _size; i++) {
-    strcat_P( _page, HTML_TH_OPEN_TAG );
+    strcat_ro( _page, HTML_TH_OPEN_TAG );
     concat_class_attribute( _page, _head_class );
     concat_style_attribute( _page, _head_style );
-    strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+    strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
     strcat( _page, _headings[i] );
-    strcat_P( _page, HTML_TH_CLOSE_TAG );
+    strcat_ro( _page, HTML_TH_CLOSE_TAG );
   }
 
-  strcat_P( _page, HTML_TR_CLOSE_TAG );
+  strcat_ro( _page, HTML_TR_CLOSE_TAG );
 }
 
 /**
@@ -758,21 +758,21 @@ void concat_table_heading_row( char *_page, char** _headings, int _size, const c
  */
 void concat_table_data_row( char *_page, char** _data_items, int _size, const char *_row_class, const char *_row_style, const char *_data_class, const char *_data_style ){
 
-  strcat_P( _page, HTML_TR_OPEN_TAG );
+  strcat_ro( _page, HTML_TR_OPEN_TAG );
   concat_class_attribute( _page, _row_class );
   concat_style_attribute( _page, _row_style );
-  strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+  strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
 
   for (int i = 0; i < _size; i++) {
-    strcat_P( _page, HTML_TD_OPEN_TAG );
+    strcat_ro( _page, HTML_TD_OPEN_TAG );
     concat_class_attribute( _page, _data_class );
     concat_style_attribute( _page, _data_style );
-    strcat_P( _page, HTML_TAG_CLOSE_BRACKET );
+    strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
     strcat( _page, _data_items[i] );
-    strcat_P( _page, HTML_TD_CLOSE_TAG );
+    strcat_ro( _page, HTML_TD_CLOSE_TAG );
   }
 
-  strcat_P( _page, HTML_TR_CLOSE_TAG );
+  strcat_ro( _page, HTML_TR_CLOSE_TAG );
 }
 
 #endif
