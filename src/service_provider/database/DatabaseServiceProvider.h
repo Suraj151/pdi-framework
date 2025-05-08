@@ -54,7 +54,7 @@ public:
    */
   ~DatabaseServiceProvider();
 
-  void init_default_database();
+  bool initService(void *arg = nullptr) override;
   void clear_default_tables();
 
   bool get_global_config_table(global_config_table *_table);

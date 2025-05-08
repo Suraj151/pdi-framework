@@ -30,7 +30,7 @@ GpioServiceProvider::GpioServiceProvider():
   #ifdef ENABLE_HTTP_CLIENT
   m_http_client(Http_Client::GetStaticInstance()),
   #endif
-  ServiceProvider(SERVICE_GPIO)
+  ServiceProvider(SERVICE_GPIO, "GPIO")
 {
   for (size_t i = 0; i < MAX_DIGITAL_GPIO_PINS; i++) {
     this->m_digital_blinker[i] = nullptr;
@@ -55,20 +55,20 @@ GpioServiceProvider::~GpioServiceProvider(){
 }
 
 /**
- * start gpio services if enabled
+ * Init gpio services if enabled
  */
+bool GpioServiceProvider::initService(void *arg){
+
 #ifdef ENABLE_HTTP_CLIENT
-void GpioServiceProvider::begin( iClientInterface* _client ){
+  iClientInterface* _client = static_cast<iClientInterface*>(arg);
 
   if( nullptr == _client ){
-    return;
+    return false;
   }
 
   if( nullptr != this->m_http_client ){
     this->m_http_client->SetClient(_client);
   }
-#else
-void GpioServiceProvider::begin(){
 #endif
 
   this->handleGpioModes();
@@ -76,6 +76,8 @@ void GpioServiceProvider::begin(){
 
   __task_scheduler.setInterval( [&]() { this->handleGpioOperations(); }, GPIO_OPERATION_DURATION, __i_dvc_ctrl.millis_now() );
   __task_scheduler.setInterval( [&]() { this->enable_update_gpio_table_from_copy(); }, GPIO_TABLE_UPDATE_DURATION, __i_dvc_ctrl.millis_now() );
+
+  return ServiceProvider::initService(arg);
 }
 
 #ifdef ENABLE_HTTP_CLIENT

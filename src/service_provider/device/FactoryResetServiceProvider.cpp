@@ -12,7 +12,7 @@ created Date    : 1st June 2019
 /**
  * DeviceFactoryReset constructor
  */
-DeviceFactoryReset::DeviceFactoryReset() : m_flash_key_pressed(0), ServiceProvider(SERVICE_FACTORY)
+DeviceFactoryReset::DeviceFactoryReset() : m_flash_key_pressed(0), ServiceProvider(SERVICE_FACTORY, "FactoryReset")
 {
 }
 
@@ -26,12 +26,13 @@ DeviceFactoryReset::~DeviceFactoryReset()
 /**
  * initialize the service
  */
-bool DeviceFactoryReset::initService()
+bool DeviceFactoryReset::initService(void *arg)
 {
   __task_scheduler.setInterval([&](){ 
     this->check_device_factory_request(); 
   }, MILLISECOND_DURATION_1000, __i_dvc_ctrl.millis_now());
-  return true;
+
+  return ServiceProvider::initService(arg);
 }
 
 /**

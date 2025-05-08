@@ -17,7 +17,7 @@ created Date    : 1st June 2019
 /**
  * AuthServiceProvider constructor
  */
-AuthServiceProvider::AuthServiceProvider(): m_initStatus(false), m_isAuthorized(false), ServiceProvider(SERVICE_AUTH)
+AuthServiceProvider::AuthServiceProvider(): m_initStatus(false), m_isAuthorized(false), ServiceProvider(SERVICE_AUTH, "Auth")
 {
 }
 
@@ -33,10 +33,11 @@ AuthServiceProvider::~AuthServiceProvider()
  *
  * @return bool status
  */
-bool AuthServiceProvider::initService()
+bool AuthServiceProvider::initService(void *arg)
 {
   m_initStatus = __database_service.get_login_credential_table(&m_login_credentials);
-  return m_initStatus;
+
+  return (m_initStatus & ServiceProvider::initService(arg));
 }
 
 /**

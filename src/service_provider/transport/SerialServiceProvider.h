@@ -30,7 +30,7 @@ public:
 	 */
 	~SerialServiceProvider();
 
-	bool initService() override;
+	bool initService(void *arg = nullptr) override;
 	void processSerial(serial_event_t *se);
 };
 

@@ -33,7 +33,7 @@ class DeviceIotServiceProvider : public ServiceProvider {
 		 */
     ~DeviceIotServiceProvider();
 
-    void init( iClientInterface *_iclient );
+    bool initService(void *arg = nullptr) override;
     void handleRegistrationOtpRequest(  device_iot_config_table *_device_iot_configs, pdiutil::string &_response  );
     void handleDeviceIotConfigRequest( void );
     void handleConnectivityCheck( void );

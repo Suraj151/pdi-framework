@@ -136,13 +136,17 @@ public:
    * @param pad The character to use for padding (default is space).
    * @return Number of bytes written.
    */
-  virtual uint32_t write_pad(const char *c_str, uint32_t maxsize, char pad=' ') {
+  virtual uint32_t write_pad(const char *c_str, uint32_t maxsize, bool prepad=false, char pad=' ') {
     uint32_t size = strlen(c_str);
     if (size < maxsize) {
 
+      for (size_t i = 0; prepad && (i < maxsize - size); i++) {
+        write((uint8_t)pad);
+      }
+
       write(c_str);
 
-      for (size_t i = 0; i < maxsize - size; i++){
+      for (size_t i = 0; !prepad && (i < maxsize - size); i++){
         write((uint8_t)pad);
       }
 
@@ -458,6 +462,17 @@ public:
   {
     write_ro(RODT_ATTR(TERMINAL_ESCAPE_SEQ));
     write_ro(RODT_ATTR("0m"));
+  }
+
+  /**
+   * @brief With timestamp will print timestamp first
+   * derived class should implement this function to print timestamp
+   * @param None
+   * @return this
+   */
+  virtual iTerminalInterface* with_timestamp()
+  {
+    return this;
   }
 };
 

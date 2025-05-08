@@ -51,6 +51,9 @@ public:
   void flush() override;
   iClientInterface* getNewInstance() override;
 
+  // terminal api
+  iTerminalInterface* with_timestamp() override;
+
 private:
   bool m_connected;
 

@@ -48,7 +48,7 @@ Created Date    : 1st June 2019
  * services. It integrates modular controllers that can be enabled or disabled
  * based on the configuration.
  */
-class HttpServer {
+class HttpServer : public ServiceProvider{
 
   public:
     /**
@@ -74,7 +74,7 @@ class HttpServer {
      * @param iServer Pointer to the server interface implementation.
      * @return True if the server started successfully, false otherwise.
      */
-    bool start_server(iServerInterface *iServer);
+    bool initService(void *arg = nullptr) override;
 
     /**
      * @brief Handles incoming client requests.

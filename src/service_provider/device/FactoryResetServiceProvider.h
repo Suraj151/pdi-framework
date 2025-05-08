@@ -29,7 +29,7 @@ public:
 	 */
 	~DeviceFactoryReset();
 
-	bool initService() override;
+	bool initService(void *arg = nullptr) override;
 	void factory_reset(void);
 	void check_device_factory_request(void);
 

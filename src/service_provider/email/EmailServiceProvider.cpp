@@ -19,7 +19,7 @@ created Date    : 1st June 2019
  */
 EmailServiceProvider::EmailServiceProvider() : m_mail_handler_cb_id(0),
                                                m_client(nullptr),
-                                               ServiceProvider(SERVICE_EMAIL)
+                                               ServiceProvider(SERVICE_EMAIL, "Email")
 {
 }
 
@@ -33,14 +33,16 @@ EmailServiceProvider::~EmailServiceProvider()
 }
 
 /**
- * begin email service with client
+ * Init email service with client
  *
  * @param iClientInterface*	      _client
  */
-void EmailServiceProvider::begin(iClientInterface *_client)
+bool EmailServiceProvider::initService(void *arg)
 {
-  this->m_client = _client;
+  this->m_client = static_cast<iClientInterface*>(arg);
   this->m_mail_handler_cb_id = 0;
+
+  return ServiceProvider::initService(arg);
 }
 
 /**

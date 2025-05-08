@@ -31,7 +31,7 @@ public:
 	 */
 	~AuthServiceProvider();
 
-	bool initService() override;
+	bool initService(void *arg = nullptr) override;
 	bool isAuthorized(const char *username, const char *password);
 
 	void setAuthorized(bool auth);

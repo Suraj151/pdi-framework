@@ -51,6 +51,9 @@ typedef enum services{
 #ifdef ENABLE_SERIAL_SERVICE
   SERVICE_SERIAL,
 #endif
+#ifdef ENABLE_HTTP_SERVER
+  SERVICE_HTTP_SERVER,
+#endif
   SERVICE_MAX
 } service_t;
 
@@ -65,7 +68,7 @@ class ServiceProvider{
     /**
      * ServiceProvider constructor.
      */
-    ServiceProvider(service_t st) : m_service_t(st) {
+    ServiceProvider(service_t st, const char *_svc_name) : m_service_t(st), m_service_name(_svc_name) {
       m_services[st] = this;
     }
 
@@ -78,7 +81,12 @@ class ServiceProvider{
     /**
      * init service
      */
-    virtual bool initService(){
+    virtual bool initService(void *arg = nullptr){
+      if(nullptr != m_terminal){
+        m_terminal->with_timestamp()->write_ro(RODT_ATTR(" Starting "));
+        m_terminal->write(m_service_name);
+        m_terminal->writeln_ro(RODT_ATTR(" Service"));
+      }
       return true;
     }
 
@@ -90,13 +98,23 @@ class ServiceProvider{
     }
 
     /**
+     * Set terminal interface
+     * @param terminal Pointer to the terminal interface.
+     */
+    static void setTerminal(iTerminalInterface *terminal){
+      m_terminal = terminal;
+    }
+
+    /**
      * print service config to terminal
+     * @param terminal Pointer to the terminal interface.
      */
     virtual void printConfigToTerminal(iTerminalInterface *terminal){
     }
 
     /**
      * print service status to terminal
+     * @param terminal Pointer to the terminal interface.
      */
     virtual void printStatusToTerminal(iTerminalInterface *terminal){
     }
@@ -106,12 +124,24 @@ class ServiceProvider{
      */
     static ServiceProvider *m_services[SERVICE_MAX]; 
 
+    /**
+     * @var const char* m_service_name
+     * @brief Name of the service.
+     */
+    const char *m_service_name;
+
   protected:
 
     /**
      * print service config to terminal
      */
     service_t m_service_t;
+
+    /**
+     * @var iTerminalInterface* m_terminal
+     * @brief Pointer to the terminal interface for output.
+     */
+    static iTerminalInterface *m_terminal;
 };
 
 #endif

@@ -31,7 +31,7 @@ public:
    */
   ~WiFiServiceProvider();
 
-  void begin(iWiFiInterface *_wifi);
+  bool initService(void *arg = nullptr) override;
   bool configure_wifi_access_point(wifi_config_table *_wifi_credentials);
   bool configure_wifi_station(wifi_config_table *_wifi_credentials, uint8_t *mac = nullptr);
 

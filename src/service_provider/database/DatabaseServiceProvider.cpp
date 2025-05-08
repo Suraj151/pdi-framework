@@ -76,7 +76,7 @@ DeviceIotTable __device_iot_table;
 /**
  * Constructor
  */
-DatabaseServiceProvider::DatabaseServiceProvider() : ServiceProvider(SERVICE_DATABASE)
+DatabaseServiceProvider::DatabaseServiceProvider() : ServiceProvider(SERVICE_DATABASE, "DB")
 {
 }
 
@@ -88,9 +88,9 @@ DatabaseServiceProvider::~DatabaseServiceProvider()
 }
 
 /**
- * init all tables.
+ * init all DB tables.
  */
-void DatabaseServiceProvider::init_default_database()
+bool DatabaseServiceProvider::initService(void *arg)
 {
   __i_db.beginConfigs(__i_db.getMaxDBSize());
   __database.init_database(__i_db.getMaxDBSize());
@@ -112,6 +112,8 @@ void DatabaseServiceProvider::init_default_database()
     __database_service.clear_default_tables();
   });
   #endif
+
+  return ServiceProvider::initService(arg);
 }
 
 /**

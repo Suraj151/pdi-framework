@@ -25,7 +25,7 @@ MqttServiceProvider::MqttServiceProvider():
   m_mqtt_publish_data_cb(nullptr),
   m_mqtt_subscribe_data_cb(nullptr),
   m_client(nullptr),
-  ServiceProvider(SERVICE_MQTT)
+  ServiceProvider(SERVICE_MQTT, "MQTT")
 {
 }
 
@@ -45,17 +45,25 @@ MqttServiceProvider::~MqttServiceProvider(){
 /**
  * start mqtt service. initialize it with mqtt configs at database
  */
-void MqttServiceProvider::begin( iClientInterface* _client ){
+bool MqttServiceProvider::initService( void *arg ){
 
-  m_client = _client;
+  if ( nullptr == arg ) {
+    return false;
+  }
+
+  m_client = reinterpret_cast<iClientInterface*>(arg);
+
   this->m_mqtt_payload = new char[ MQTT_PAYLOAD_BUF_SIZE ];
   if( nullptr != this->m_mqtt_payload ){
     memset( this->m_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
   }
+
   this->m_mqtt_client.m_mqttDataCallbackArgs = reinterpret_cast<uint32_t*>(this);
   this->m_mqtt_client.OnData( MqttServiceProvider::handleMqttDataCb );
 
   this->handleMqttConfigChange();
+
+  return ServiceProvider::initService(arg);
 }
 
 /**

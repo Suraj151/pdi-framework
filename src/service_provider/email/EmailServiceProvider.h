@@ -33,7 +33,7 @@ public:
    */
   ~EmailServiceProvider();
 
-  void begin(iClientInterface *_client);
+  bool initService(void *arg = nullptr) override;
   bool sendMail(pdiutil::string &mail_body);
   bool sendMail(char *mail_body);
   bool sendMail(const char * mail_body);

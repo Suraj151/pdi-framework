@@ -51,59 +51,75 @@ void PDIStack::initialize(){
   LOGBEGIN;
   // LogFmtI("\n________________________\n\nInitializing PDI Stack\nRelease : %s\nConfig  : %s\n________________________\n", RELEASE, CONFIG_VERSION);
 
-  __database_service.init_default_database();
-  
   __i_dvc_ctrl.initDeviceSpecificFeatures();
+
+  // Get terminal
+  iTerminalInterface *terminal = __i_dvc_ctrl.getTerminal();
+  if (nullptr != terminal) {
+    terminal->writeln();
+    terminal->writeln();
+		terminal->writeln_ro(RODT_ATTR("Starting PDIStack !"));
+		terminal->write_ro(RODT_ATTR("Release : "));
+    terminal->writeln(RELEASE);
+		terminal->write_ro(RODT_ATTR("Config : "));
+    terminal->writeln(CONFIG_VERSION);
+    terminal->writeln();
+  }
+
+  // Set the terminal interface for the service providers
+  ServiceProvider::setTerminal(terminal);
+
+  __database_service.initService();
 
   #ifdef ENABLE_SERIAL_SERVICE
   __serial_service.initService();
   #endif
 
   #ifdef ENABLE_WIFI_SERVICE
-  __wifi_service.begin( &__i_wifi );
+  __wifi_service.initService( &__i_wifi );
   #endif
 
-  #ifdef ENABLE_HTTP_SERVER
-  __web_server.start_server( this->m_server );
-  #endif
-  
   #ifdef ENABLE_OTA_SERVICE
-  __ota_service.begin_ota( this->m_client );
+  __ota_service.initService( this->m_client );
   #endif
   
   #ifdef ENABLE_GPIO_SERVICE
-  __gpio_service.begin( 
+  __gpio_service.initService( 
     #ifdef ENABLE_HTTP_CLIENT
     this->m_client 
-    #else 
     #endif
     );
   #endif
   
   #ifdef ENABLE_MQTT_SERVICE
-  __mqtt_service.begin( this->m_client );
+  __mqtt_service.initService( this->m_client );
   #endif
 
   #ifdef ENABLE_EMAIL_SERVICE
-  __email_service.begin( this->m_client );
+  __email_service.initService( this->m_client );
   #endif
 
   __factory_reset.initService();
 
   #ifdef ENABLE_DEVICE_IOT
-  __device_iot_service.init( this->m_client );
+  __device_iot_service.initService( this->m_client );
   #endif
 
   #ifdef ENABLE_AUTH_SERVICE
   __auth_service.initService();
   #endif
 
-  #ifdef ENABLE_CMD_SERVICE
-  __cmd_service.initService();
-  #endif
-
   #ifdef ENABLE_STORAGE_SERVICE
   __i_fs.init();
+  #endif
+
+  #ifdef ENABLE_HTTP_SERVER
+  __web_server.initService( this->m_server );
+  #endif
+
+  #ifdef ENABLE_CMD_SERVICE
+  __cmd_service.initService();
+  CommandLineServiceProvider::startInteraction();
   #endif
 }
 

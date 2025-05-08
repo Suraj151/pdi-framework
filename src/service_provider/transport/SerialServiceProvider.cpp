@@ -20,7 +20,7 @@ created Date    : 1st June 2019
 /**
  * SerialServiceProvider constructor
  */
-SerialServiceProvider::SerialServiceProvider() : ServiceProvider(SERVICE_SERIAL)
+SerialServiceProvider::SerialServiceProvider() : ServiceProvider(SERVICE_SERIAL, "Serial")
 {
 }
 
@@ -36,7 +36,7 @@ SerialServiceProvider::~SerialServiceProvider()
  *
  * @return bool status
  */
-bool SerialServiceProvider::initService()
+bool SerialServiceProvider::initService(void *arg)
 {
   __utl_event.add_event_listener(EVENT_SERIAL_AVAILABLE, [&](void *e){
 
@@ -55,7 +55,7 @@ bool SerialServiceProvider::initService()
     }
   });
 
-  return true;
+  return ServiceProvider::initService(arg);
 }
 
 /**

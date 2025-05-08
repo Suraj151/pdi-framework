@@ -26,7 +26,8 @@ Created Date    : 1st June 2019
  * Initializes the HTTP server with default values.
  */
 HttpServer::HttpServer() : 
-  m_server(nullptr)
+  m_server(nullptr),
+  ServiceProvider(SERVICE_HTTP_SERVER, "HTTP Server")
 {
 }
 
@@ -50,13 +51,18 @@ HttpServer::~HttpServer()
  * @param iServer Pointer to the server interface implementation.
  * @return True if the server started successfully, false otherwise.
  */
-bool HttpServer::start_server(iServerInterface *iServer)
+bool HttpServer::initService(void *arg)
 {
   bool bStatus = false;
+  iServerInterface  *iServer = reinterpret_cast<iServerInterface*>(arg);
 
   if (nullptr == iServer) {
     return bStatus;
   }
+
+  // if(nullptr != m_terminal){
+  //   m_terminal->writeln_ro(RODT_ATTR("Initializing HTTP Server"));
+  // }
 
   this->m_server = iServer;
 
@@ -65,7 +71,13 @@ bool HttpServer::start_server(iServerInterface *iServer)
 
   // Boot all registered controllers
   for (int i = 0; i < Controller::m_controllers.size(); i++) {
-    LogFmtI("Booting: %s controller\n", Controller::m_controllers[i].controller->m_controller_name);
+    // if(nullptr != m_terminal){
+    //   m_terminal->write_ro(RODT_ATTR("  Booting "));
+    //   m_terminal->write(Controller::m_controllers[i].controller->m_controller_name);
+    //   m_terminal->writeln_ro(RODT_ATTR(" Controller"));
+    // }
+  
+    // LogFmtI("Booting: %s controller\n", Controller::m_controllers[i].controller->m_controller_name);
     Controller::m_controllers[i].controller->boot();
   }
 
@@ -76,8 +88,10 @@ bool HttpServer::start_server(iServerInterface *iServer)
 
   // Start the server
   this->m_server->begin();
-  LogI("HTTP server started!\n");
-  bStatus = true;
+
+  // LogI("HTTP server started!\n");
+
+  bStatus = ServiceProvider::initService(arg);
 
   return bStatus;
 }

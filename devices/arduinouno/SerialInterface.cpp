@@ -151,6 +151,25 @@ iClientInterface *UARTSerial::getNewInstance()
   return iSerialInterface::instances[SERIAL_TYPE_UART];
 }
 
+/**
+ * @brief With timestamp will print timestamp first
+ * derived class should implement this function to print timestamp
+ * @param None
+ * @return this
+ */
+iTerminalInterface* UARTSerial::with_timestamp()
+{
+  char tembuff[15];
+  memset(tembuff, 0, 15);
+  sprintf(tembuff, "%ld", millis());
+  
+  write('[');
+  write_pad(tembuff, 10, true);
+  write(']');
+  
+  return this;
+}
+
 UARTSerial __serial_uart;
 
 /*

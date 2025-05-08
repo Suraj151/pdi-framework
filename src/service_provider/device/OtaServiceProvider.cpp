@@ -17,7 +17,7 @@ created Date    : 1st June 2019
 /**
  * OtaServiceProvider constructor.
  */
-OtaServiceProvider::OtaServiceProvider() : m_http_client(Http_Client::GetStaticInstance()), ServiceProvider(SERVICE_OTA)
+OtaServiceProvider::OtaServiceProvider() : m_http_client(Http_Client::GetStaticInstance()), ServiceProvider(SERVICE_OTA, "OTA")
 {
 }
 
@@ -35,11 +35,13 @@ OtaServiceProvider::~OtaServiceProvider()
  *
  * @param iClientInterface* _client
  */
-void OtaServiceProvider::begin_ota(iClientInterface *_client)
+bool OtaServiceProvider::initService(void *arg)
 {
+  iClientInterface* _client = static_cast<iClientInterface*>(arg);
+  
   if (nullptr == _client)
   {
-    return;
+    return false;
   }
 
   if (nullptr != this->m_http_client)
@@ -50,6 +52,8 @@ void OtaServiceProvider::begin_ota(iClientInterface *_client)
   __task_scheduler.setInterval([&]()
                                { this->handleOta(); },
                                OTA_API_CHECK_DURATION, __i_dvc_ctrl.millis_now());
+
+  return ServiceProvider::initService(arg);
 }
 
 /**

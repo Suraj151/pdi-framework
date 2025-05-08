@@ -27,7 +27,7 @@ DeviceIotServiceProvider::DeviceIotServiceProvider():
   m_device_config_request_cb_id(0),
   m_device_iot(nullptr),
   m_http_client(Http_Client::GetStaticInstance()),
-  ServiceProvider(SERVICE_DVCIOT)
+  ServiceProvider(SERVICE_DVCIOT, "IOT")
 {
 }
 
@@ -42,10 +42,10 @@ DeviceIotServiceProvider::~DeviceIotServiceProvider(){
 /**
  * start device registration services if enabled
  */
-void DeviceIotServiceProvider::init( iClientInterface *_iclient ){
+bool DeviceIotServiceProvider::initService( void *arg ){
 
   if( nullptr != this->m_http_client ){
-    this->m_http_client->SetClient(_iclient);
+    this->m_http_client->SetClient(reinterpret_cast<iClientInterface*>(arg));
   }
 
   // __task_scheduler.setInterval( [&]() { this->handleDeviceIotConfigRequest(); }, HTTP_REQUEST_DURATION, __i_dvc_ctrl.millis_now() );
@@ -63,6 +63,8 @@ void DeviceIotServiceProvider::init( iClientInterface *_iclient ){
   __mqtt_pubsub_table.clear();
   __mqtt_lwt_table.clear();
 #endif
+
+  return ServiceProvider::initService(arg);
 }
 
 /**

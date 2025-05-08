@@ -23,7 +23,7 @@ __status_wifi_t __status_wifi = {
 WiFiServiceProvider::WiFiServiceProvider():
   m_wifi_connection_timeout(WIFI_STATION_CONNECT_ATTEMPT_TIMEOUT),
   m_wifi(nullptr),
-  ServiceProvider(SERVICE_WIFI)
+  ServiceProvider(SERVICE_WIFI, "WiFi")
 {
   memset(m_temp_mac, 0, 6);
 }
@@ -36,15 +36,15 @@ WiFiServiceProvider::~WiFiServiceProvider(){
 }
 
 /**
- * begin wifi functionality
+ * Init wifi functionality
  */
-void WiFiServiceProvider::begin( iWiFiInterface* _wifi ){
+bool WiFiServiceProvider::initService( void *arg ){
 
-  if ( nullptr == _wifi ) {
-    return;
+  if ( nullptr == arg ) {
+    return false;
   }
 
-  this->m_wifi = _wifi;
+  this->m_wifi = reinterpret_cast<iWiFiInterface*>(arg);
   wifi_config_table _wifi_credentials;
   __database_service.get_wifi_config_table( &_wifi_credentials );
 
@@ -52,6 +52,7 @@ void WiFiServiceProvider::begin( iWiFiInterface* _wifi ){
   this->m_wifi->setAutoReconnect(false);
   this->configure_wifi_station( &_wifi_credentials );
   this->configure_wifi_access_point( &_wifi_credentials );
+
   __task_scheduler.setInterval( [&]() {
     this->handleWiFiConnectivity();
     #ifdef ENABLE_DYNAMIC_SUBNETTING
@@ -69,6 +70,8 @@ void WiFiServiceProvider::begin( iWiFiInterface* _wifi ){
   __utl_event.add_event_listener(EVENT_FACTORY_RESET, [&](void *e){
     this->m_wifi->disconnect(true);
   });
+
+  return ServiceProvider::initService(arg);
 }
 
 /**

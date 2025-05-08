@@ -40,7 +40,7 @@ public:
    */
   ~MqttServiceProvider();
 
-  void begin( iClientInterface* _client );
+  bool initService(void *arg = nullptr) override;
   void handleMqttPublish(void);
   void handleMqttSubScribe(void);
   void handleMqttConfigChange(int _mqtt_config_type = MQTT_GENERAL_CONFIG);

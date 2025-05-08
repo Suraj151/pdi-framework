@@ -15,12 +15,10 @@ created Date    : 1st June 2019
 #include "CommandLineServiceProvider.h"
 
 
-iTerminalInterface *CommandLineServiceProvider::m_cmdterminal = nullptr;
-
 /**
  * CommandLineServiceProvider constructor
  */
-CommandLineServiceProvider::CommandLineServiceProvider() : ServiceProvider(SERVICE_CMD)
+CommandLineServiceProvider::CommandLineServiceProvider() : ServiceProvider(SERVICE_CMD, "CMD")
 {
   // Add commands in list  
   #ifdef ENABLE_AUTH_SERVICE
@@ -89,28 +87,23 @@ CommandLineServiceProvider::~CommandLineServiceProvider()
  * Initialize cmd service 
  *
  */
-bool CommandLineServiceProvider::initService()
+bool CommandLineServiceProvider::initService(void *arg)
 {
 
-  m_cmdterminal = __i_dvc_ctrl.getTerminal();
-
-  if( nullptr != m_cmdterminal ){
+  if( nullptr != m_terminal ){
 
     for (int16_t i = 0; i < m_cmdlist.size(); i++){
 
       if( nullptr != m_cmdlist[i] ){
 
         // Set default terminal at start
-        m_cmdlist[i]->SetTerminal(m_cmdterminal);
+        m_cmdlist[i]->SetTerminal(m_terminal);
       }
     }
 
-		m_cmdterminal->write_ro(RODT_ATTR("\n\nStarted PDI Stack CMD\r\nRelease : "));
-    m_cmdterminal->writeln(RELEASE);
+    // startInteraction();
 
-    startInteraction();
-
-    return true;
+    return ServiceProvider::initService(arg);
   }
 
   return false;
@@ -466,25 +459,25 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
  */
 void CommandLineServiceProvider::startInteraction()
 {
-  if( nullptr != m_cmdterminal ){
+  if( nullptr != m_terminal ){
 
-    m_cmdterminal->putln();
+    m_terminal->putln();
 
     #ifdef ENABLE_AUTH_SERVICE
     if( __auth_service.getAuthorized() ){
-      m_cmdterminal->write(__auth_service.getUsername());
-		  m_cmdterminal->write_ro(RODT_ATTR("@"));
-      m_cmdterminal->write(__i_dvc_ctrl.getDeviceId());
+      m_terminal->write(__auth_service.getUsername());
+		  m_terminal->write_ro(RODT_ATTR("@"));
+      m_terminal->write(__i_dvc_ctrl.getDeviceId());
       #ifdef ENABLE_STORAGE_SERVICE
-		  m_cmdterminal->write_ro(RODT_ATTR(":("));
-      m_cmdterminal->write(__i_fs.pwd()->c_str());
-		  m_cmdterminal->write_ro(RODT_ATTR("): "));
+		  m_terminal->write_ro(RODT_ATTR(":("));
+      m_terminal->write(__i_fs.pwd()->c_str());
+		  m_terminal->write_ro(RODT_ATTR("): "));
       #else
-		  m_cmdterminal->write_ro(RODT_ATTR(": "));
+		  m_terminal->write_ro(RODT_ATTR(": "));
       #endif
     }else{
-      m_cmdterminal->write(CMD_NAME_LOGIN);
-		  m_cmdterminal->write_ro(RODT_ATTR(": "));
+      m_terminal->write(CMD_NAME_LOGIN);
+		  m_terminal->write_ro(RODT_ATTR(": "));
 
       cmd_t *logincmd = __cmd_service.getCommandByName(CMD_NAME_LOGIN);
       if( nullptr != logincmd ){
@@ -492,8 +485,8 @@ void CommandLineServiceProvider::startInteraction()
       }
     }
     #else
-      m_cmdterminal->write(__i_dvc_ctrl.getDeviceMac().c_str());
-		  m_cmdterminal->write_ro(RODT_ATTR(": "));
+      m_terminal->write(__i_dvc_ctrl.getDeviceMac().c_str());
+		  m_terminal->write_ro(RODT_ATTR(": "));
     #endif
   }
 }

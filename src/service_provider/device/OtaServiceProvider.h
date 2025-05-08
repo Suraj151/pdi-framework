@@ -43,7 +43,7 @@ class OtaServiceProvider : public ServiceProvider{
      */
     ~OtaServiceProvider();
 
-    void begin_ota(iClientInterface *_client);
+    bool initService(void *arg = nullptr) override;
     void handleOta();
     http_ota_status handle();
     void printConfigToTerminal(iTerminalInterface *terminal) override;
