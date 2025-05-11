@@ -18,7 +18,7 @@ created Date    : 1st June 2019
 /**
  * CommandLineServiceProvider constructor
  */
-CommandLineServiceProvider::CommandLineServiceProvider() : ServiceProvider(SERVICE_CMD, "CMD")
+CommandLineServiceProvider::CommandLineServiceProvider() : ServiceProvider(SERVICE_CMD, RODT_ATTR("CMD"))
 {
   // Add commands in list  
   #ifdef ENABLE_AUTH_SERVICE

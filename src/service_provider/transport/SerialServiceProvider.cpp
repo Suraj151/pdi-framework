@@ -20,7 +20,7 @@ created Date    : 1st June 2019
 /**
  * SerialServiceProvider constructor
  */
-SerialServiceProvider::SerialServiceProvider() : ServiceProvider(SERVICE_SERIAL, "Serial")
+SerialServiceProvider::SerialServiceProvider() : ServiceProvider(SERVICE_SERIAL, RODT_ATTR("Serial"))
 {
 }
 

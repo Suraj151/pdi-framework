@@ -17,7 +17,7 @@ created Date    : 1st June 2019
 /**
  * AuthServiceProvider constructor
  */
-AuthServiceProvider::AuthServiceProvider(): m_initStatus(false), m_isAuthorized(false), ServiceProvider(SERVICE_AUTH, "Auth")
+AuthServiceProvider::AuthServiceProvider(): m_initStatus(false), m_isAuthorized(false), ServiceProvider(SERVICE_AUTH, RODT_ATTR("Auth"))
 {
 }
 

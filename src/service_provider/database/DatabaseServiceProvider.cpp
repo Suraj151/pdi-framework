@@ -76,7 +76,7 @@ DeviceIotTable __device_iot_table;
 /**
  * Constructor
  */
-DatabaseServiceProvider::DatabaseServiceProvider() : ServiceProvider(SERVICE_DATABASE, "DB")
+DatabaseServiceProvider::DatabaseServiceProvider() : ServiceProvider(SERVICE_DATABASE, RODT_ATTR("DB"))
 {
 }
 

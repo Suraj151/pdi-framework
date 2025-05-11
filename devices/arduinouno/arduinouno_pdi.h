@@ -11,7 +11,9 @@ created Date    : 1st Jan 2024
 #ifndef _ARDUINOUNO_PORTABLE_DEVICE_INTERFACE_H_
 #define _ARDUINOUNO_PORTABLE_DEVICE_INTERFACE_H_
 
+#if defined(LOGBEGIN) && ( defined(ENABLE_LOG_ALL) || defined(ENABLE_LOG_INFO) || defined(ENABLE_LOG_ERROR) || defined(ENABLE_LOG_WARNING) || defined(ENABLE_LOG_SUCCESS) )
 #include "LoggerInterface.h"
+#endif
 #include "DatabaseInterface.h"
 #ifdef ENABLE_SERIAL_SERVICE
 #include "SerialInterface.h"

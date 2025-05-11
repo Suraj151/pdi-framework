@@ -15,7 +15,9 @@ created Date    : 1st Jan 2024
  * So, here we are importing cpp source files which are part of this portable device interface (pdi) and which
  * needs to be compiled
  */
+#if defined(LOGBEGIN) && ( defined(ENABLE_LOG_ALL) || defined(ENABLE_LOG_INFO) || defined(ENABLE_LOG_ERROR) || defined(ENABLE_LOG_WARNING) || defined(ENABLE_LOG_SUCCESS) )
 #include "LoggerInterface.cpp"
+#endif
 #include "DatabaseInterface.cpp"
 #include "DeviceControlInterface.cpp"
 #ifdef ENABLE_WIFI_SERVICE

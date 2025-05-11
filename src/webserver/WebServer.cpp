@@ -27,7 +27,7 @@ Created Date    : 1st June 2019
  */
 HttpServer::HttpServer() : 
   m_server(nullptr),
-  ServiceProvider(SERVICE_HTTP_SERVER, "HTTP Server")
+  ServiceProvider(SERVICE_HTTP_SERVER, RODT_ATTR("HTTP Server"))
 {
 }
 

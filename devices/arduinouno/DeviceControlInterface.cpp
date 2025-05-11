@@ -276,9 +276,11 @@ bool DeviceControlInterface::isDeviceFactoryRequested()
  */
 iTerminalInterface * DeviceControlInterface::getTerminal(terminal_types_t terminal)
 {
+    #ifdef ENABLE_SERIAL_SERVICE
     if( TERMINAL_TYPE_MAX > terminal ){
       return &__serial_uart;
     } 
+    #endif
     return nullptr; 
 }
 
@@ -303,7 +305,9 @@ uint32_t DeviceControlInterface::millis_now()
  */
 void DeviceControlInterface::log(logger_type_t log_type, const char *content)
 {
-    __i_logger.log(log_type, content);
+  #if defined(LOGBEGIN) && ( defined(ENABLE_LOG_ALL) || defined(ENABLE_LOG_INFO) || defined(ENABLE_LOG_ERROR) || defined(ENABLE_LOG_WARNING) || defined(ENABLE_LOG_SUCCESS) )
+  __i_logger.log(log_type, content);
+  #endif
 }
 
 /**

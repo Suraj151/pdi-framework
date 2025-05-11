@@ -84,7 +84,7 @@ class ServiceProvider{
     virtual bool initService(void *arg = nullptr){
       if(nullptr != m_terminal){
         m_terminal->with_timestamp()->write_ro(RODT_ATTR(" Starting "));
-        m_terminal->write(m_service_name);
+        m_terminal->write_ro(m_service_name);
         m_terminal->writeln_ro(RODT_ATTR(" Service"));
       }
       return true;

@@ -47,17 +47,17 @@ public:
 extern LoggerInterface __i_logger;
 
 
-// redefine these in derived interface
-#define LOGBEGIN
+// // redefine these in derived interface
+// #define LOGBEGIN
 
-#define LogI(v) // info log
-#define LogE(v) // error log
-#define LogW(v) // warning log
-#define LogS(v) // success log
+// #define LogI(v) // info log
+// #define LogE(v) // error log
+// #define LogW(v) // warning log
+// #define LogS(v) // success log
 
-#define LogFmtI(f, args...)
-#define LogFmtE(f, args...)
-#define LogFmtW(f, args...)
-#define LogFmtS(f, args...)
+// #define LogFmtI(f, args...)
+// #define LogFmtE(f, args...)
+// #define LogFmtW(f, args...)
+// #define LogFmtS(f, args...)
 
 #endif

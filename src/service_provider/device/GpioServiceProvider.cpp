@@ -30,7 +30,7 @@ GpioServiceProvider::GpioServiceProvider():
   #ifdef ENABLE_HTTP_CLIENT
   m_http_client(Http_Client::GetStaticInstance()),
   #endif
-  ServiceProvider(SERVICE_GPIO, "GPIO")
+  ServiceProvider(SERVICE_GPIO, RODT_ATTR("GPIO"))
 {
   for (size_t i = 0; i < MAX_DIGITAL_GPIO_PINS; i++) {
     this->m_digital_blinker[i] = nullptr;

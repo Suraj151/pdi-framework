@@ -12,7 +12,7 @@ created Date    : 1st June 2019
 /**
  * DeviceFactoryReset constructor
  */
-DeviceFactoryReset::DeviceFactoryReset() : m_flash_key_pressed(0), ServiceProvider(SERVICE_FACTORY, "FactoryReset")
+DeviceFactoryReset::DeviceFactoryReset() : m_flash_key_pressed(0), ServiceProvider(SERVICE_FACTORY, RODT_ATTR("FactoryReset"))
 {
 }
 

@@ -27,7 +27,7 @@ DeviceIotServiceProvider::DeviceIotServiceProvider():
   m_device_config_request_cb_id(0),
   m_device_iot(nullptr),
   m_http_client(Http_Client::GetStaticInstance()),
-  ServiceProvider(SERVICE_DVCIOT, "IOT")
+  ServiceProvider(SERVICE_DVCIOT, RODT_ATTR("IOT"))
 {
 }
 

@@ -23,7 +23,7 @@ __status_wifi_t __status_wifi = {
 WiFiServiceProvider::WiFiServiceProvider():
   m_wifi_connection_timeout(WIFI_STATION_CONNECT_ATTEMPT_TIMEOUT),
   m_wifi(nullptr),
-  ServiceProvider(SERVICE_WIFI, "WiFi")
+  ServiceProvider(SERVICE_WIFI, RODT_ATTR("WiFi"))
 {
   memset(m_temp_mac, 0, 6);
 }

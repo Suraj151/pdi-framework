@@ -66,6 +66,20 @@ namespace pdiutil {
 #define strncmp strncmp
 #define strncmp_ro strncmp
 
+// redefine these in derived interface
+#define LOGBEGIN
+
+#define LogI(v) // info log
+#define LogE(v) // error log
+#define LogW(v) // warning log
+#define LogS(v) // success log
+
+#define LogFmtI(f, args...)
+#define LogFmtE(f, args...)
+#define LogFmtW(f, args...)
+#define LogFmtS(f, args...)
+
+
 /* Connection status enums */
 typedef enum {
     CONN_STATUS_IDLE = 0,

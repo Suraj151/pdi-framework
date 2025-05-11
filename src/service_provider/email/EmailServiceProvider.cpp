@@ -19,7 +19,7 @@ created Date    : 1st June 2019
  */
 EmailServiceProvider::EmailServiceProvider() : m_mail_handler_cb_id(0),
                                                m_client(nullptr),
-                                               ServiceProvider(SERVICE_EMAIL, "Email")
+                                               ServiceProvider(SERVICE_EMAIL, RODT_ATTR("Email"))
 {
 }
 

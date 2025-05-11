@@ -457,40 +457,42 @@ typedef struct CommandBase {
     void ResultToTerminal(cmd_result_t res){
         if( nullptr != m_terminal && CMD_RESULT_INCOMPLETE != res && CMD_RESULT_OK != res && !isWaitingForOption() ){
             m_terminal->writeln();
-            switch (res){
-            case CMD_RESULT_ARGS_ERROR:
-                m_terminal->write_ro(RODT_ATTR("Arg Error"));
-                break;
-            case CMD_RESULT_ARGS_MISSING:
-                m_terminal->write_ro(RODT_ATTR("Arg Missing"));
-                break;
-            case CMD_RESULT_NOT_FOUND:
-                m_terminal->write_ro(RODT_ATTR("CMD Not Found"));
-                break;
-            case CMD_RESULT_INVALID:
-                m_terminal->write_ro(RODT_ATTR("CMD invalid"));
-                break;
-            case CMD_RESULT_INVALID_OPTION:
-                m_terminal->write_ro(RODT_ATTR("Option invalid"));
-                break;
-            case CMD_RESULT_NEED_AUTH:
-                m_terminal->write_ro(RODT_ATTR("Required login"));
-                break;
-            case CMD_RESULT_WRONG_CREDENTIAL:
-                m_terminal->write_ro(RODT_ATTR("Wrong Credential"));
-                break;
-            case CMD_RESULT_ABORTED:
-                m_terminal->write_ro(RODT_ATTR("Aborted!"));
-                break;
-            case CMD_RESULT_MAX:
-                m_terminal->write_ro(RODT_ATTR("Unknown"));
-                break;
-            case CMD_RESULT_OK:
-                // m_terminal->write_ro(RODT_ATTR("Success"));
-                break;
-            default:
-                break;
-            }
+            m_terminal->write_ro(RODT_ATTR("Err : "));
+            m_terminal->write((int32_t)res);
+            // switch (res){
+            // case CMD_RESULT_ARGS_ERROR:
+            //     // m_terminal->write_ro(RODT_ATTR("Arg Error"));
+            //     // break;
+            // case CMD_RESULT_ARGS_MISSING:
+            //     // m_terminal->write_ro(RODT_ATTR("Arg Missing"));
+            //     // break;
+            // case CMD_RESULT_NOT_FOUND:
+            //     // m_terminal->write_ro(RODT_ATTR("CMD Not Found"));
+            //     // break;
+            // case CMD_RESULT_INVALID:
+            //     // m_terminal->write_ro(RODT_ATTR("CMD invalid"));
+            //     // break;
+            // case CMD_RESULT_INVALID_OPTION:
+            //     // m_terminal->write_ro(RODT_ATTR("Option invalid"));
+            //     // break;
+            // case CMD_RESULT_NEED_AUTH:
+            //     // m_terminal->write_ro(RODT_ATTR("Required login"));
+            //     // break;
+            // case CMD_RESULT_WRONG_CREDENTIAL:
+            //     // m_terminal->write_ro(RODT_ATTR("Wrong Credential"));
+            //     // break;
+            // case CMD_RESULT_ABORTED:
+            //     // m_terminal->write_ro(RODT_ATTR("Aborted!"));
+            //     // break;
+            // case CMD_RESULT_MAX:
+            //     // m_terminal->write_ro(RODT_ATTR("Unknown"));
+            //     // break;
+            // // case CMD_RESULT_OK:
+            //     // m_terminal->write_ro(RODT_ATTR("Success"));
+            //     // break;
+            // default:
+            //     break;
+            // }
             m_terminal->writeln();
         }
     }
