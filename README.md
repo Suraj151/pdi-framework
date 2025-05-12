@@ -7,7 +7,7 @@ Basically it is designed on the top of portable interface layers that any device
 
 
 <p align="center">
-  <img width="500" src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/ewings_stack.jpg">
+  <img width="500" src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/pdi-framework.jpg">
 </p>
 
 
@@ -82,6 +82,13 @@ you can play with all settings. you can modify configs by making changes in file
 ### Terminal
 
 Once flashed open serial port on putty with default baud rate of 115200. It will prompt for login where you can enter default(in case not modified) user & password ( user: **pdiStack**, pass: **pdiStack@123** ). Once login success you can use below available commands in terminal.
+
+
+<p align="center">
+  <img width="500" src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/terminal.png">
+</p>
+
+
 
 | Command                                  | Options                             | Brief                                                                                                                                                                                                                                                                                                                                                                                                                       |
 |------------------------------------------|-------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
