@@ -133,6 +133,7 @@ public:
    * @brief Writes a specified number of characters.
    * @param c_str Pointer to the character string.
    * @param maxsize The maximum number of characters to write.
+   * @param prepad If true, pads before the string; otherwise, pads after.
    * @param pad The character to use for padding (default is space).
    * @return Number of bytes written.
    */

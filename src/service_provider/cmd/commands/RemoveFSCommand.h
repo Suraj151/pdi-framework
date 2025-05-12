@@ -17,7 +17,7 @@ created Date    : 1st June 2019
 /**
  * remove file/directory command
  * e.g. if we want to remove a file or directory, we can execute command as below
- * rmd <file_or_dir_name>
+ * rm <file_or_dir_name>
  */
 struct RemoveFSCommand : public CommandBase {
 

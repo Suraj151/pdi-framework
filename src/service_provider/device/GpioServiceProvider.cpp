@@ -234,22 +234,26 @@ void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payloa
   ){
 
     int _pin_data_max_len = 30, _pin_values_max_len = 6;
-    char _pin_label[_pin_values_max_len]; memset( _pin_label, 0, _pin_values_max_len); _pin_label[0] = 'D';
+    char _pin_label[_pin_values_max_len]; //memset( _pin_label, 0, _pin_values_max_len); _pin_label[0] = 'D';
     char _pin_data[_pin_data_max_len], _pin_mode[_pin_values_max_len], _pin_value[_pin_values_max_len];
     // Decode the pin mode and value
-    for (uint8_t _pin = 0; _pin < (MAX_DIGITAL_GPIO_PINS + MAX_ANALOG_GPIO_PINS); _pin++) {
+    for (uint8_t _pin = 0; _pin < (MAX_GPIO_PINS); _pin++) {
 
       uint8_t _pin_label_n = _pin;
 
+      memset( _pin_label, 0, _pin_values_max_len);
       if( _pin < MAX_DIGITAL_GPIO_PINS ){
 
+        __appendUintToBuff(_pin_label, "D%d", _pin_label_n, _pin_values_max_len-1);
       }else{
         _pin_label_n = _pin - MAX_DIGITAL_GPIO_PINS;
-        _pin_label[0] = 'A';
+
+        __appendUintToBuff(_pin_label, "A%d", _pin_label_n, _pin_values_max_len-1);
       }
 
-      _pin_label[1] = ( 0x30 + _pin_label_n ); memset( _pin_data, 0, _pin_data_max_len);
-      memset( _pin_mode, 0, _pin_values_max_len); memset( _pin_value, 0, _pin_values_max_len);
+      memset( _pin_data, 0, _pin_data_max_len);
+      memset( _pin_mode, 0, _pin_values_max_len); 
+      memset( _pin_value, 0, _pin_values_max_len);
       if( !__i_dvc_ctrl.isExceptionalGpio(_pin) && __get_from_json( _payload, _pin_label, _pin_data, _pin_data_max_len ) ){
 
         if( __get_from_json( _pin_data, (char*)GPIO_PAYLOAD_MODE_KEY, _pin_mode, _pin_values_max_len ) ){
@@ -308,7 +312,7 @@ bool GpioServiceProvider::handleGpioEmailAlert(){
  */
 void GpioServiceProvider::handleGpioOperations(){
 
-  for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
+  for (uint8_t _pin = 0; _pin < MAX_GPIO_PINS; _pin++) {
 
     if( DIGITAL_BLINK != this->m_gpio_config_copy.gpio_mode[_pin] ){
 
@@ -435,7 +439,7 @@ void GpioServiceProvider::handleGpioModes( int _gpio_config_type ){
   gpio_config_table _gpio_configs;
   __database_service.get_gpio_config_table(&_gpio_configs);
 
-  for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
+  for (uint8_t _pin = 0; _pin < MAX_GPIO_PINS; _pin++) {
 
     if( !__i_dvc_ctrl.isExceptionalGpio(_pin) ){
       __i_dvc_ctrl.gpioMode((GPIO_MODE)_gpio_configs.gpio_mode[_pin], _pin);
@@ -470,14 +474,14 @@ void GpioServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
 
     terminal->writeln();
     terminal->writeln_ro(RODT_ATTR("GPIO Configs (mode) :"));
-    for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
+    for (uint8_t _pin = 0; _pin < MAX_GPIO_PINS; _pin++) {
       terminal->write((int32_t)this->m_gpio_config_copy.gpio_mode[_pin]);
       terminal->write_ro(RODT_ATTR("\t"));
     }
 
     terminal->writeln();
     terminal->writeln_ro(RODT_ATTR("GPIO Configs (readings) :"));
-    for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
+    for (uint8_t _pin = 0; _pin < MAX_GPIO_PINS; _pin++) {
       terminal->write((int32_t)this->m_gpio_config_copy.gpio_readings[_pin]);
       terminal->write_ro(RODT_ATTR("\t"));
     }
@@ -485,21 +489,21 @@ void GpioServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
 #ifndef ENABLE_GPIO_BASIC_ONLY
     terminal->writeln();
     terminal->writeln_ro(RODT_ATTR("GPIO Configs (alert comparator) :"));
-    for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
+    for (uint8_t _pin = 0; _pin < MAX_GPIO_PINS; _pin++) {
       terminal->write((int32_t)this->m_gpio_config_copy.gpio_alert_comparator[_pin]);
       terminal->write_ro(RODT_ATTR("\t"));
     }
 
     terminal->writeln();
     terminal->writeln_ro(RODT_ATTR("GPIO Configs (alert channels) :"));
-    for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
+    for (uint8_t _pin = 0; _pin < MAX_GPIO_PINS; _pin++) {
       terminal->write((int32_t)this->m_gpio_config_copy.gpio_alert_channel[_pin]);
       terminal->write_ro(RODT_ATTR("\t"));
     }
 
     terminal->writeln();
     terminal->writeln_ro(RODT_ATTR("GPIO Configs (alert values) :"));
-    for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS; _pin++) {
+    for (uint8_t _pin = 0; _pin < MAX_GPIO_PINS; _pin++) {
       terminal->write((int32_t)this->m_gpio_config_copy.gpio_alert_values[_pin]);
       terminal->write_ro(RODT_ATTR("\t"));
     }

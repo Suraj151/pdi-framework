@@ -325,9 +325,40 @@ void TaskScheduler::setUtilityInterface(iUtilityInterface *util)
  */
 void TaskScheduler::printTasksToTerminal(iTerminalInterface *terminal)
 {
-    if (nullptr != m_util)
-    {
-        m_util->printtasks(this->m_tasks, terminal);
+    if( nullptr != terminal ){
+
+        terminal->writeln();
+        terminal->writeln_ro(RODT_ATTR("Tasks : "));
+        terminal->write_ro(RODT_ATTR("id        ")); // max column size=10
+        terminal->write_ro(RODT_ATTR("priority  ")); // max column size=10
+        terminal->write_ro(RODT_ATTR("interval  ")); // max column size=10
+        terminal->write_ro(RODT_ATTR("last_ms   ")); // max column size=10
+        terminal->write_ro(RODT_ATTR("exc_ms    ")); // max column size=10
+        terminal->writeln_ro(RODT_ATTR("max_attempts")); // max column size=14
+
+        char content[20];
+
+        for (int i = 0; i < this->m_tasks.size(); i++)
+        {
+            Int32ToString(this->m_tasks[i]._task_id, content, 20, 10);
+            terminal->write(content);
+
+            Int32ToString(this->m_tasks[i]._task_priority, content, 20, 10);
+            terminal->write(content);
+
+            Int64ToString(this->m_tasks[i]._duration, content, 20, 10);
+            terminal->write(content);
+
+            Int64ToString(this->m_tasks[i]._last_millis, content, 20, 10);
+            terminal->write(content);
+
+            Int64ToString(this->m_tasks[i]._task_exec_millis, content, 20, 10);
+            terminal->write(content);
+
+            Int32ToString(this->m_tasks[i]._max_attempts, content, 20, 14);
+            terminal->write(content);
+            terminal->writeln();
+        }
     }
 }
 

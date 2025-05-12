@@ -315,48 +315,6 @@ void DeviceControlInterface::log(logger_type_t log_type, const char *content)
 }
 
 /**
- * log helper for print task
- */
-void DeviceControlInterface::printtasks(pdiutil::vector<task_t> &tasks, iTerminalInterface *terminal)
-{
-    if( nullptr != terminal ){
-
-        terminal->writeln();
-        terminal->writeln_ro(RODT_ATTR("Tasks : "));
-        terminal->write_ro(RODT_ATTR("id        ")); // max column size=10
-        terminal->write_ro(RODT_ATTR("priority  ")); // max column size=10
-        terminal->write_ro(RODT_ATTR("interval  ")); // max column size=10
-        terminal->write_ro(RODT_ATTR("last_ms   ")); // max column size=10
-        terminal->write_ro(RODT_ATTR("exc_ms    ")); // max column size=10
-        terminal->writeln_ro(RODT_ATTR("max_attempts")); // max column size=14
-
-        char content[20];
-
-        for (int i = 0; i < tasks.size(); i++)
-        {
-            Int32ToString(tasks[i]._task_id, content, 20, 10);
-            terminal->write(content);
-
-            Int32ToString(tasks[i]._task_priority, content, 20, 10);
-            terminal->write(content);
-
-            Int64ToString(tasks[i]._duration, content, 20, 10);
-            terminal->write(content);
-
-            Int64ToString(tasks[i]._last_millis, content, 20, 10);
-            terminal->write(content);
-
-            Int64ToString(tasks[i]._task_exec_millis, content, 20, 10);
-            terminal->write(content);
-
-            Int32ToString(tasks[i]._max_attempts, content, 20, 14);
-            terminal->write(content);
-            terminal->writeln();
-        }
-    }
-}
-
-/**
  * yield
  */
 void DeviceControlInterface::yield()

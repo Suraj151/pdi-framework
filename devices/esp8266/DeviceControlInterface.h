@@ -66,7 +66,6 @@ public:
   void wait(uint64_t timeoutms) override;
   uint32_t millis_now() override;
   void log(logger_type_t log_type, const char *content) override;
-  void printtasks(pdiutil::vector<task_t> &tasks, iTerminalInterface *terminal) override;
   void yield() override;
 
   // upgrade api

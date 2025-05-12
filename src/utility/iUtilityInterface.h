@@ -63,13 +63,6 @@ public:
   virtual void log(logger_type_t log_type, const char *content) = 0;
 
   /**
-   * @brief Prints the list of tasks to a terminal interface.
-   * @param tasks A vector of tasks to print.
-   * @param terminal The terminal interface to print the tasks to.
-   */
-  virtual void printtasks(pdiutil::vector<task_t> &tasks, iTerminalInterface *terminal) = 0;
-
-  /**
    * @brief Yields control to allow other tasks or processes to execute.
    */
   virtual void yield() = 0;

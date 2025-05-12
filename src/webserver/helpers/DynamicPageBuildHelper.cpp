@@ -432,7 +432,8 @@ void concat_select_html_tag( char *_page, char *_name, char** _options, int _siz
   strcat_ro( _page, HTML_NAME_ATTR );
   strcat( _page, "'" );
   strcat( _page, _name );
-  strcat( _page, "'>" );
+  strcat( _page, "'" );
+  strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
 
   for (int i = 0; i < _size; i++) {
 
@@ -447,7 +448,7 @@ void concat_select_html_tag( char *_page, char *_name, char** _options, int _siz
       strcat( _page, "'" );
       if( _selected == i )
       strcat_ro( _page, HTML_SELECTED_ATTR );
-      strcat( _page, ">" );
+      strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
       strcat( _page, _options[i] );
       strcat_ro( _page, HTML_OPTION_CLOSE );
     }
@@ -462,7 +463,8 @@ void concat_select_html_tag( char *_page, const char *_name, char** _options, in
   strcat_ro( _page, HTML_NAME_ATTR );
   strcat( _page, "'" );
   strcat_ro( _page, _name );
-  strcat( _page, "'>" );
+  strcat( _page, "'" );
+  strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
 
   for (int i = 0; i < _size; i++) {
 
@@ -477,7 +479,7 @@ void concat_select_html_tag( char *_page, const char *_name, char** _options, in
       strcat( _page, "'" );
       if( _selected == i )
       strcat_ro( _page, HTML_SELECTED_ATTR );
-      strcat( _page, ">" );
+      strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
       strcat( _page, _options[i] );
       strcat_ro( _page, HTML_OPTION_CLOSE );
     }

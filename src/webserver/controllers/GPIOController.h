@@ -188,26 +188,27 @@ public:
 		strcat_ro(_page, HTML_TAG_CLOSE_BRACKET);
 		concat_table_heading_row(_page, _gpio_monitor_table_heading, 3, nullptr, nullptr, RODT_ATTR("btn"), nullptr);
 
-		char _name[3];
-		memset(_name, 0, 3);
-		strcpy(_name, "D0");
+		char _name[5];
 		char *_gpio_monitor_table_data[] = {_name, "", ""};
 
 		for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS; _pin++)
 		{
 			if (!__i_dvc_ctrl.isExceptionalGpio(_pin))
 			{
-				_name[1] = (0x30 + _pin);
+				memset(_name, 0, 5);
+				__appendUintToBuff(_name, "D%d", _pin, 4);
+
 				concat_table_data_row(_page, _gpio_monitor_table_data, 3, nullptr, nullptr, RODT_ATTR("btnd"), nullptr);
 			}
 		}
-		memset(_name, 0, 3);
-		strcpy(_name, "A0");
+
 		for (uint8_t _pin = 0; _pin < MAX_ANALOG_GPIO_PINS; _pin++)
 		{
 			if (!__i_dvc_ctrl.isExceptionalGpio(_pin))
 			{
-				_name[1] = (0x30 + _pin);
+				memset(_name, 0, 5);
+				__appendUintToBuff(_name, "A%d", _pin, 4);
+
 				concat_table_data_row(_page, _gpio_monitor_table_data, 3, nullptr, nullptr, RODT_ATTR("btnd"), nullptr);
 			}
 		}
@@ -338,17 +339,15 @@ public:
 		int _gpio_mode_general_options_size = sizeof(_gpio_mode_general_options) / sizeof(_gpio_mode_general_options[0]);
 		int _gpio_mode_analog_options_size = sizeof(_gpio_mode_analog_options) / sizeof(_gpio_mode_analog_options[0]);
 
-		char _name[4], _label[4];
-		memset(_name, 0, 4);
-		memset(_label, 0, 4);
-		strcpy(_name, "D0:");
-		strcpy(_label, "d0");
+		char _name[6], _label[6];
 		int _exception = -1;
 
 		for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS; _pin++)
 		{
-			_name[1] = (0x30 + _pin);
-			_label[1] = (0x30 + _pin);
+			memset(_name, 0, 6);
+			memset(_label, 0, 6);
+			__appendUintToBuff(_name, "D%d:", _pin, 5);
+			__appendUintToBuff(_label, "d%d", _pin, 5);
 			_exception = _pin == 0 ? ANALOG_WRITE : -1;
 			if (!__i_dvc_ctrl.isExceptionalGpio(_pin))
 			{
@@ -356,15 +355,12 @@ public:
 			}
 		}
 
-		memset(_name, 0, 4);
-		memset(_label, 0, 4);
-		strcpy(_name, "A0:");
-		strcpy(_label, "a0");
-
 		for (uint8_t _pin = 0; _pin < MAX_ANALOG_GPIO_PINS; _pin++)
 		{
-			_name[1] = (0x30 + _pin);
-			_label[1] = (0x30 + _pin);
+			memset(_name, 0, 6);
+			memset(_label, 0, 6);
+			__appendUintToBuff(_name, "A%d:", _pin, 5);
+			__appendUintToBuff(_label, "a%d", _pin, 5);
 			if (!__i_dvc_ctrl.isExceptionalGpio(_pin))
 			{
 				concat_tr_select_html_tags(_page, _name, _label, _gpio_mode_analog_options, _gpio_mode_analog_options_size, (int)__gpio_service.m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS + _pin]);
@@ -399,11 +395,12 @@ public:
 			LogI("\nSubmitted info :\n");
 
 			char _label[6];
-			memset(_label, 0, 6);
-			strcpy(_label, "d0");
+
 			for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS; _pin++)
 			{
-				_label[1] = (0x30 + _pin);
+				memset(_label, 0, 6);
+				__appendUintToBuff(_label, "d%d", _pin, 5);
+
 				uint8_t _val = StringToUint8(this->m_web_resource->m_server->arg(_label).c_str());
 				__gpio_service.m_gpio_config_copy.gpio_mode[_pin] = !__i_dvc_ctrl.isExceptionalGpio(_pin) ? _val : 0;
 
@@ -417,11 +414,11 @@ public:
 				}
 			}
 
-			memset(_label, 0, 6);
-			strcpy(_label, "a0");
 			for (uint8_t _pin = 0; _pin < MAX_ANALOG_GPIO_PINS; _pin++)
 			{
-				_label[1] = (0x30 + _pin);
+				memset(_label, 0, 6);
+				__appendUintToBuff(_label, "a%d", _pin, 5);
+
 				uint16_t _val = StringToUint16(this->m_web_resource->m_server->arg(_label).c_str());
 				__gpio_service.m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS + _pin] = !__i_dvc_ctrl.isExceptionalGpio(_pin) ? _val : 0;
 
@@ -467,17 +464,15 @@ public:
 		char *_gpio_digital_write_options[] = {"LOW", "HIGH"};
 		int _gpio_digital_write_options_size = sizeof(_gpio_digital_write_options) / sizeof(_gpio_digital_write_options[0]);
 
-		char _input_value[10], _name[4], _label[4];
-		memset(_name, 0, 4);
-		memset(_label, 0, 4);
-		strcpy(_name, "D0:");
-		strcpy(_label, "d0");
+		char _input_value[10], _name[6], _label[6];
 
 		bool _added_options = false;
 		for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS; _pin++)
 		{
-			_name[1] = (0x30 + _pin);
-			_label[1] = (0x30 + _pin);
+			memset(_name, 0, 6);
+			memset(_label, 0, 6);
+			__appendUintToBuff(_name, "D%d:", _pin, 5);
+			__appendUintToBuff(_label, "d%d", _pin, 5);
 
 			if (!__i_dvc_ctrl.isExceptionalGpio(_pin))
 			{
@@ -538,11 +533,12 @@ public:
 		if (true)
 		{
 			char _label[6];
-			memset(_label, 0, 6);
-			strcpy(_label, "d0");
+
 			for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS; _pin++)
 			{
-				_label[1] = (0x30 + _pin);
+				memset(_label, 0, 6);
+				__appendUintToBuff(_label, "d%d", _pin, 5);
+
 				uint16_t _val = StringToUint16(this->m_web_resource->m_server->arg(_label).c_str());
 				if (this->m_web_resource->m_server->hasArg(_label))
 				{
@@ -594,20 +590,17 @@ public:
 		int _gpio_alert_channels_size = sizeof(_gpio_alert_channels) / sizeof(_gpio_alert_channels[0]);
 		int _gpio_analog_alert_comparators_size = sizeof(_gpio_analog_alert_comparators) / sizeof(_gpio_analog_alert_comparators[0]);
 
-		char _analog_value[10], _name[7], _label[7], _alert_label[7], _alert_value[7];
-		memset(_name, 0, 7);
-		memset(_label, 0, 7);
-		memset(_alert_label, 0, 7);
-		strcpy(_name, "D0");
-		strcpy(_label, "d0");
-		strcpy(_alert_label, "al0");
+		char _analog_value[10], _name[8], _label[8], _alert_label[8], _alert_value[8];
 
 		bool _added_options = false;
 		for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS; _pin++)
 		{
-			_name[1] = (0x30 + _pin);
-			_label[1] = (0x30 + _pin);
-			_alert_label[2] = (0x30 + _pin);
+			memset(_name, 0, 8);
+			memset(_label, 0, 8);
+			memset(_alert_label, 0, 8);
+			__appendUintToBuff(_name, "D%d", _pin, 7);
+			__appendUintToBuff(_label, "d%d", _pin, 7);
+			__appendUintToBuff(_alert_label, "al%d", _pin, 7);
 
 			if (!__i_dvc_ctrl.isExceptionalGpio(_pin) && __gpio_service.m_gpio_config_copy.gpio_mode[_pin] == DIGITAL_READ)
 			{
@@ -620,20 +613,16 @@ public:
 			}
 		}
 
-		memset(_name, 0, 7);
-		memset(_label, 0, 7);
-		memset(_alert_label, 0, 7);
-		memset(_alert_value, 0, 7);
-		strcpy(_name, "A0");
-		strcpy(_label, "a0");
-		strcpy(_alert_label, "anlt0");
-		strcpy(_alert_value, "aval0");
 		for (uint8_t _pin = 0; _pin < MAX_ANALOG_GPIO_PINS; _pin++)
 		{
-			_name[1] = (0x30 + _pin);
-			_label[1] = (0x30 + _pin);
-			_alert_label[4] = (0x30 + _pin);
-			_alert_value[4] = (0x30 + _pin);
+			memset(_name, 0, 8);
+			memset(_label, 0, 8);
+			memset(_alert_label, 0, 8);
+			memset(_alert_value, 0, 8);
+			__appendUintToBuff(_name, "A%d", _pin, 7);
+			__appendUintToBuff(_label, "a%d", _pin, 7);
+			__appendUintToBuff(_alert_label, "anlt%d", _pin, 7);
+			__appendUintToBuff(_alert_value, "aval%d", _pin, 7);
 
 			if (__gpio_service.m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS + _pin] == ANALOG_READ)
 			{
@@ -690,15 +679,15 @@ public:
 
 		if (true)
 		{
-			char _label[7], _alert_label[7], _alert_value[7];
-			memset(_label, 0, 7);
-			memset(_alert_label, 0, 7);
-			strcpy(_label, "d0");
-			strcpy(_alert_label, "al0");
+			char _label[8], _alert_label[8], _alert_value[8];
+
 			for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS; _pin++)
 			{
-				_label[1] = (0x30 + _pin);
-				_alert_label[2] = (0x30 + _pin);
+				memset(_label, 0, 8);
+				memset(_alert_label, 0, 8);
+				__appendUintToBuff(_label, "d%d", _pin, 7);
+				__appendUintToBuff(_alert_label, "al%d", _pin, 7);
+
 				if (this->m_web_resource->m_server->hasArg(_label) && this->m_web_resource->m_server->hasArg(_alert_label))
 				{
 					__gpio_service.m_gpio_config_copy.gpio_alert_comparator[_pin] = EQUAL;
@@ -713,17 +702,14 @@ public:
 				}
 			}
 
-			memset(_label, 0, 7);
-			memset(_alert_label, 0, 7);
-			memset(_alert_value, 0, 7);
-			strcpy(_label, "a0");
-			strcpy(_alert_label, "anlt0");
-			strcpy(_alert_value, "aval0");
 			for (uint8_t _pin = 0; _pin < MAX_ANALOG_GPIO_PINS; _pin++)
 			{
-				_label[1] = (0x30 + _pin);
-				_alert_label[4] = (0x30 + _pin);
-				_alert_value[4] = (0x30 + _pin);
+				memset(_label, 0, 8);
+				memset(_alert_label, 0, 8);
+				memset(_alert_value, 0, 8);
+				__appendUintToBuff(_label, "a%d", _pin, 7);
+				__appendUintToBuff(_alert_label, "anlt%d", _pin, 7);
+				__appendUintToBuff(_alert_value, "aval%d", _pin, 7);
 
 				if (this->m_web_resource->m_server->hasArg(_label) && this->m_web_resource->m_server->hasArg(_alert_value) && this->m_web_resource->m_server->hasArg(_alert_label))
 				{

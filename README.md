@@ -13,7 +13,7 @@ Basically it is designed on the top of portable interface layers that any device
 
 Arduino has provided user-friendly libraries that use different devices SDK APIs at bottom. Since arduino has made its easy iot development environment impact over developers, it's easy for them to develop applications with Arduino ide.
 
-PDI framework sits on the top of service layers which internally uses the portable interface. So the device which needs to run this framework should write the interface provided.
+PDI framework sits on the top of service layers which internally uses the portable interface. So the device which needs to run this framework should write/implement the interface provided.
 
 # Installation
 
@@ -23,11 +23,16 @@ Goto Tools->Manage Libraries... then in library manager window type pdi-framewor
 
 **install manually**
 
-To install manually for esp8266 clone or download source, copy folder to esp8266 libraries path ( in windows 10 generally path is like ==> C:\Users\suraj\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\2.6.2\libraries...).
+To install manually for esp8266 clone or download source, copy folder to esp8266 libraries path ( in windows 10 generally path is like ==> C:\Users\suraj\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\x.x.x\libraries...).
 
-# AutoGen Script
+**install external dependency**
 
-Before start compiling for the specific device make sure that device specific auto gen source files has been generated. Currently database table source files are auto generated.
+Currently for some devices, this library is using external dependencies which are added in git submodule config. To install this submodule open terminal in library root directory and execute command ``git submodule update --init --recursive`` 
+
+
+### AutoGen Script
+
+Before start compiling for the specific device make sure that device specific auto gen source files has been generated and device has been selected in device config file (mentioned in below note). Currently database table source files are auto generated.
 
 Open terminal and navigate to `scripts` directory in this library and then run below device specific script.
 
@@ -39,11 +44,7 @@ replace DEVICENAME in above command with specific device folder name for which b
 `` python3 CreateDBSourceFromJson.py -s ../devices/arduinouno/config/DBTableSchema.json
 ``
 
-# Usage
-
-Restart the arduino ide and navigate to File->Examples->pdi-framework->PdiStack example compile and upload.
-
-**Note :** before compile make sure that you have selected correct board in arduino ide and in `devices/DeviceConfig.h` file as below
+**Note :** Also make sure that you have selected correct device/board in arduino ide and in `devices/DeviceConfig.h` file as below
 ```
 /**
  * enable/disable devices. enable/uncomment one from below list to get it compiled
@@ -55,6 +56,11 @@ Restart the arduino ide and navigate to File->Examples->pdi-framework->PdiStack 
 ```
 
 for example we selected esp8266 device to compile and flash as above.
+
+# Usage
+
+Restart the arduino ide and navigate to File->Examples->pdi-framework->PdiStack example compile and upload.
+
 
 * after flash and initializing device completely, check in pc/mobile wifi list if **pdiStack** name appear.
 * select it and enter default password **pdiStack@123**.
@@ -69,10 +75,29 @@ for example we selected esp8266 device to compile and flash as above.
 
 you can play with all settings. you can modify configs by making changes in files of src/config folder. Go to wifi settings and change the default station ssid, password to connect to your station. you can also change ssid and password for access point. device will reset once after you submit wifi settings, i.e. you have to reconnect device.
 
-**Note** that by default session will active for 300 seconds once login, you can change its timeout in server config file.
+**Note** that by default session will active for 300 seconds once login for web portal, you can change its timeout in server config file.
 
 **Note** not all devices having wifi/network feature to run web server on device as mentioned in above esp8266 example. e.g. arduino uno device wont have the web server enabled due to lack of network feature.
 
+### Terminal
+
+Once flashed open serial port on putty with default baud rate of 115200. It will prompt for login where you can enter default(in case not modified) user & password ( user: **pdiStack**, pass: **pdiStack@123** ). Once login success you can use below available commands in terminal.
+
+| Command                                  | Options                             | Brief                                                                                                                                                                                                                                                                                                                                                                                                                       |
+|------------------------------------------|-------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ls                                       |                                     | List the file's or dir's in current directory                                                                                                                                                                                                                                                                                                                                                                               |
+| mkd \<directory_name>                     |                                     | Make directory with name provided in terminal. space are not allowed in name                                                                                                                                                                                                                                                                                                                                                |
+| mkf \<file_name>                          |                                     | Make file with name provided in terminal. space are not allowed in name                                                                                                                                                                                                                                                                                                                                                     |
+| move \<old_path_name> \<new_path_name>     |                                     | Move/Rename the file/dir. space not allowed in name                                                                                                                                                                                                                                                                                                                                                                         |
+| pwd                                      |                                     | It will print present working directory path                                                                                                                                                                                                                                                                                                                                                                                |
+| rm \<file_or_dir_name>                    |                                     | Remove the file or directory provided                                                                                                                                                                                                                                                                                                                                                                                       |
+| frd \<filename>                           |                                     | Read and Print the file content of given filename over terminal                                                                                                                                                                                                                                                                                                                                                             |
+| fwr \<filename>                           |                                     | Open file for write. prompt will provide available option for new line and quit. Note that this command will not show file existing content, rather it will open file to append the content we write.                                                                                                                                                                                                                       |
+| cls                                      |                                     | Clear screen command                                                                                                                                                                                                                                                                                                                                                                                                        |
+| cd \<directory_path>                      |                                     | Change Directory to the provided directory path                                                                                                                                                                                                                                                                                                                                                                             |
+| gpio p=\<pin>,m=\<mode>,v=\<value>          | p=\<pin> m=\<mode> v=\<value>          | To perform gpio operations we can use this command. p\<pin> option can be the GPIO pin number to operate with. m\<mode> is the GPIO mode number we want to use. available GPIO modes are OFF=0 DIGITAL_WRITE=1 DIGITAL_READ=2 DIGITAL_BLINK=3 ANALOG_WRITE=4 ANALOG_READ=5 . v\<value> is the value respective to the mode used.  e.g. If we want to blink GPIO 4 with 500ms the we can use command like:  gpio p=4,m=3,v=500  |
+| srvc s=\<service_number>,q=\<query_number> | s=\<service_number> q=\<query_number> | Services related command. currently supporting to get running service config and status.  service number can be get from srvc l command which will list the running services with their id numbers below are the query number we can use in command QUERY_CONFIG=1 QUERY_STATUS=2                                                                                                                                           |
+| scht                                     | l<list>                             | List the running Scheduler tasks                                                                                                                                                                                                                                                                                                                                                                                            |
 # Services
 
 PDI framework provides some basic services that required to develop simple iot application. All services are available globally to each other. The services are
@@ -198,7 +223,10 @@ As name clears the purpose of this utility. It just used to convert the data typ
 This is to handle specific event tasks that should be executed on event arrival. just register the event listener as task to perticular event and fire it when event happens.
 
 * **CommandBase :**
-This is to handle user commands. It will help to parse command options and provide it to command line service to execute the command.
+This is to handle user commands. It will help to parse command options and provide it to respective command implementation to execute the command.
+
+* **PdiStl :**
+This is an low weight implementation of a C++ standard library for memory constrained devices imported from https://github.com/mike-matera/ArduinoSTL Thanks to mike for building this STL baseline for memory constrained devices. 
 
 # Device Iot (beta)
 
@@ -217,9 +245,9 @@ other configs like
 
 you can modify them as per requirements
 
-**Note** that currently mqtt configs (in **config/MqttConfig.h**/web portal) are not used for device iot purpose.
+**Note** that currently mqtt configs (in **config/MqttConfig.h** OR in web portals) are not used for device iot purpose.
 
-by default this service is disabled. to enable, just uncomment ENABLE_DEVICE_IOT in **config/Common.h** file
+by default this service is disabled. to enable, just uncomment ENABLE_DEVICE_IOT in **devices/DeviceConfig.h** file
 
 # Detailed Documentation
 Detailed documentation is ongoing..., please visit [wiki page](https://github.com/Suraj151/esp8266-framework/wiki)....
