@@ -35,6 +35,9 @@ extern "C"
 #include "spi_flash.h"
 }
 
+#include <lwip/tcp.h>
+#include <lwip/inet.h> // For IP address conversion
+
 // redefines
 #ifdef RODT_ATTR
 #undef RODT_ATTR

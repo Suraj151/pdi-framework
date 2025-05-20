@@ -35,6 +35,9 @@ created Date    : 1st Jan 2024
 #include <utility/DataTypeDef.h>
 #include "esp_partition.h" // Include ESP32 partition API
 
+#include <lwip/tcp.h>
+#include <lwip/inet.h> // For IP address conversion
+
 // extern "C"
 // {
 // // #include "user_interface.h"

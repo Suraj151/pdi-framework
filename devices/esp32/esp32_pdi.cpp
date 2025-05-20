@@ -28,6 +28,7 @@ created Date    : 1st Jan 2024
 #ifdef ENABLE_NETWORK_SERVICE
 #include "NtpInterface.cpp"
 #include "PingInterface.cpp"
+#include "TcpClientInterface.cpp"
 #endif
 #include "ExceptionsNotifier.cpp"
 #include "core/EEPROM.cpp"

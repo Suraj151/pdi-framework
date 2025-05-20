@@ -42,4 +42,8 @@ public:
   }
 };
 
+// Using typedefs for easier reference
+using iTcpClientInterface = iClientInterface;
+using iUdpClientInterface = iClientInterface;
+
 #endif

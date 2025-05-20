@@ -269,7 +269,7 @@ public:
    * @param c_str The string to write.
    * @return Number of bytes written.
    */
-  virtual uint32_t write_ro(const char *c_str) { return -1; }
+  virtual uint32_t write_ro(const char *c_str) { return 0; }
 
   /**
    * @brief Writes a read-only string followed by a newline.
@@ -317,7 +317,7 @@ public:
   /**
    * @brief Flushes the I/O buffer.
    */
-  virtual void flush() = 0;
+  virtual void flush() {};
 };
 
 

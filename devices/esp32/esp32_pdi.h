@@ -24,6 +24,7 @@ created Date    : 1st Jan 2024
 #ifdef ENABLE_NETWORK_SERVICE
 #include "NtpInterface.h"
 #include "PingInterface.h"
+#include "TcpClientInterface.h"
 #endif
 #ifdef ENABLE_SERIAL_SERVICE
 #include "SerialInterface.h"
