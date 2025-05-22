@@ -89,7 +89,7 @@ int8_t TcpClientInterface::connected() {
 /**
  * @brief Write data to the server.
  */
-uint32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
+int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
     if (!m_isConnected || !m_pcb) {
         return 0;
     }
@@ -109,12 +109,12 @@ uint32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
 /**
  * @brief Read data from the server.
  */
-uint32_t TcpClientInterface::read(uint8_t* buffer, uint32_t size) {
+int32_t TcpClientInterface::read(uint8_t* buffer, uint32_t size) {
     if (!m_rxBuffer || m_rxBufferSize == 0) {
         return 0;
     }
 
-    uint32_t bytesToRead = (size < m_rxBufferSize) ? size : m_rxBufferSize;
+    int32_t bytesToRead = (size < m_rxBufferSize) ? size : m_rxBufferSize;
     memset(buffer, 0, size); // Clear the buffer
     // Copy data from the receive buffer to the provided buffer
     memcpy(buffer, m_rxBuffer, bytesToRead);

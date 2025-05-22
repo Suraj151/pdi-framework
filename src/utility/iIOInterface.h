@@ -90,14 +90,14 @@ public:
    * @param c The byte to write.
    * @return Number of bytes written.
    */
-  virtual uint32_t write(uint8_t c) = 0;
+  virtual int32_t write(uint8_t c) = 0;
 
   /**
    * @brief Writes a string of bytes.
    * @param c_str Pointer to the byte string.
    * @return Number of bytes written.
    */
-  virtual uint32_t write(const uint8_t *c_str) = 0;
+  virtual int32_t write(const uint8_t *c_str) = 0;
 
   /**
    * @brief Writes a specified number of bytes.
@@ -105,21 +105,21 @@ public:
    * @param size The number of bytes to write.
    * @return Number of bytes written.
    */
-  virtual uint32_t write(const uint8_t *c_str, uint32_t size) = 0;
+  virtual int32_t write(const uint8_t *c_str, uint32_t size) = 0;
 
   /**
    * @brief Writes a single character.
    * @param c The character to write.
    * @return Number of bytes written.
    */
-  virtual uint32_t write(char c) { return write((uint8_t)c); }
+  virtual int32_t write(char c) { return write((uint8_t)c); }
 
   /**
    * @brief Writes a string of characters.
    * @param c_str Pointer to the character string.
    * @return Number of bytes written.
    */
-  virtual uint32_t write(const char *c_str) { return write((const uint8_t *)c_str); }
+  virtual int32_t write(const char *c_str) { return write((const uint8_t *)c_str); }
 
   /**
    * @brief Writes a specified number of characters.
@@ -127,7 +127,7 @@ public:
    * @param size The number of characters to write.
    * @return Number of bytes written.
    */
-  virtual uint32_t write(const char *c_str, uint32_t size) { return write((const uint8_t *)c_str, size); }
+  virtual int32_t write(const char *c_str, uint32_t size) { return write((const uint8_t *)c_str, size); }
 
   /**
    * @brief Writes a specified number of characters.
@@ -137,7 +137,7 @@ public:
    * @param pad The character to use for padding (default is space).
    * @return Number of bytes written.
    */
-  virtual uint32_t write_pad(const char *c_str, uint32_t maxsize, bool prepad=false, char pad=' ') {
+  virtual int32_t write_pad(const char *c_str, uint32_t maxsize, bool prepad=false, char pad=' ') {
     uint32_t size = strlen(c_str);
     if (size < maxsize) {
 
@@ -160,21 +160,21 @@ public:
    * @brief Writes a newline character.
    * @return Number of bytes written.
    */
-  virtual uint32_t putln() { return write("\r\n"); }
+  virtual int32_t putln() { return write("\r\n"); }
 
   /**
    * @brief Writes a character followed by a newline.
    * @param c The character to write.
    * @return Number of bytes written.
    */
-  virtual uint32_t writeln(char c) { return (write(c) + putln()); }
+  virtual int32_t writeln(char c) { return (write(c) + putln()); }
 
   /**
    * @brief Writes a string followed by a newline.
    * @param c_str The string to write.
    * @return Number of bytes written.
    */
-  virtual uint32_t writeln(const char *c_str = "") { return (write(c_str) + putln()); }
+  virtual int32_t writeln(const char *c_str = "") { return (write(c_str) + putln()); }
 
   /**
    * @brief Writes a string of characters followed by a newline.
@@ -182,14 +182,14 @@ public:
    * @param size The number of characters to write.
    * @return Number of bytes written.
    */
-  virtual uint32_t writeln(const char *c_str, uint32_t size) { return (write(c_str, size) + putln()); }
+  virtual int32_t writeln(const char *c_str, uint32_t size) { return (write(c_str, size) + putln()); }
 
   /**
    * @brief Writes an integer value as a string.
    * @param val The integer value to write.
    * @return Number of bytes written.
    */
-  virtual uint32_t write(int32_t val) {
+  virtual int32_t write(int32_t val) {
     char tembuff[25];
     memset(tembuff, 0, 25);
     sprintf(tembuff, "%d", val);
@@ -201,7 +201,7 @@ public:
    * @param val The long integer value to write.
    * @return Number of bytes written.
    */
-  virtual uint32_t write(int64_t val) {
+  virtual int32_t write(int64_t val) {
     char tembuff[25];
     memset(tembuff, 0, 25);
     sprintf(tembuff, "%ld", val);
@@ -215,7 +215,7 @@ public:
    * @param cap If true, uses uppercase letters for hexadecimal.
    * @return Number of bytes written.
    */
-  virtual uint32_t write(uint32_t val, bool hex = false, bool cap = false) {
+  virtual int32_t write(uint32_t val, bool hex = false, bool cap = false) {
     char tembuff[25];
     memset(tembuff, 0, 25);
     sprintf(tembuff, hex ? (cap ? "%X" : "%x") : "%u", val);
@@ -227,7 +227,7 @@ public:
    * @param val The floating-point value to write.
    * @return Number of bytes written.
    */
-  virtual uint32_t write(double val) {
+  virtual int32_t write(double val) {
     char tembuff[25];
     memset(tembuff, 0, 25);
     sprintf(tembuff, "%f", val);
@@ -239,21 +239,21 @@ public:
    * @param val The integer value to write.
    * @return Number of bytes written.
    */
-  virtual uint32_t writeln(int32_t val) { return (write(val) + putln()); }
+  virtual int32_t writeln(int32_t val) { return (write(val) + putln()); }
 
   /**
    * @brief Writes a long integer value followed by a newline.
    * @param val The long integer value to write.
    * @return Number of bytes written.
    */
-  virtual uint32_t writeln(int64_t val) { return (write(val) + putln()); }
+  virtual int32_t writeln(int64_t val) { return (write(val) + putln()); }
 
   /**
    * @brief Writes a floating-point value followed by a newline.
    * @param val The floating-point value to write.
    * @return Number of bytes written.
    */
-  virtual uint32_t writeln(double val) { return (write(val) + putln()); }
+  virtual int32_t writeln(double val) { return (write(val) + putln()); }
 
   /**
    * @brief Writes an unsigned integer value followed by a newline.
@@ -262,21 +262,21 @@ public:
    * @param cap If true, uses uppercase letters for hexadecimal.
    * @return Number of bytes written.
    */
-  virtual uint32_t writeln(uint32_t val, bool hex = false, bool cap = false) { return (write(val, hex, cap) + putln()); }
+  virtual int32_t writeln(uint32_t val, bool hex = false, bool cap = false) { return (write(val, hex, cap) + putln()); }
 
   /**
    * @brief Writes a read-only string.
    * @param c_str The string to write.
    * @return Number of bytes written.
    */
-  virtual uint32_t write_ro(const char *c_str) { return 0; }
+  virtual int32_t write_ro(const char *c_str) { return 0; }
 
   /**
    * @brief Writes a read-only string followed by a newline.
    * @param c_str The string to write.
    * @return Number of bytes written.
    */
-  virtual uint32_t writeln_ro(const char *c_str) { return (write_ro(c_str) + putln()); }
+  virtual int32_t writeln_ro(const char *c_str) { return (write_ro(c_str) + putln()); }
 
   // Data receiving APIs
 
@@ -292,7 +292,7 @@ public:
    * @param size The number of bytes to read.
    * @return Number of bytes read.
    */
-  virtual uint32_t read(uint8_t *buf, uint32_t size) = 0;
+  virtual int32_t read(uint8_t *buf, uint32_t size) = 0;
 
   // Utility APIs
 

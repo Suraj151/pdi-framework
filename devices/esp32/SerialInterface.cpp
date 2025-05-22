@@ -61,7 +61,7 @@ int16_t UARTSerial::disconnect()
 /**
  * write
  */
-uint32_t UARTSerial::write(uint8_t c)
+int32_t UARTSerial::write(uint8_t c)
 {
   return Serial.write(c);
 }
@@ -69,7 +69,7 @@ uint32_t UARTSerial::write(uint8_t c)
 /**
  * write
  */
-uint32_t UARTSerial::write(const uint8_t *c_str)
+int32_t UARTSerial::write(const uint8_t *c_str)
 {
   return Serial.write((const char*)c_str);
 }
@@ -77,7 +77,7 @@ uint32_t UARTSerial::write(const uint8_t *c_str)
 /**
  * write
  */
-uint32_t UARTSerial::write(const uint8_t *c_str, uint32_t size)
+int32_t UARTSerial::write(const uint8_t *c_str, uint32_t size)
 {
   return Serial.write(c_str, size);
 }
@@ -85,7 +85,7 @@ uint32_t UARTSerial::write(const uint8_t *c_str, uint32_t size)
 /**
  * write
  */
-uint32_t UARTSerial::write_ro(const char *c_str)
+int32_t UARTSerial::write_ro(const char *c_str)
 {
   return Serial.print(c_str);
 }
@@ -101,9 +101,9 @@ uint8_t UARTSerial::read()
 /**
  * read
  */
-uint32_t UARTSerial::read(uint8_t *buf, uint32_t size)
+int32_t UARTSerial::read(uint8_t *buf, uint32_t size)
 {
-  uint32_t count = 0;
+  int32_t count = 0;
   for (; count < size && Serial.available(); ++count)
   {
     buf[count] = Serial.read();

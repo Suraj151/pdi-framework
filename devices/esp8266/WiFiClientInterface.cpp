@@ -43,15 +43,15 @@ int16_t WiFiClientInterface::disconnect()
 /**
  * write
  */
-uint32_t WiFiClientInterface::write(uint8_t c)
+int32_t WiFiClientInterface::write(uint8_t c)
 {
-  return this->m_wifi_client.write(c);
+  return (int32_t)this->m_wifi_client.write(c);
 }
 
 /**
  * write
  */
-uint32_t WiFiClientInterface::write(const uint8_t *c_str)
+int32_t WiFiClientInterface::write(const uint8_t *c_str)
 {
   return this->m_wifi_client.write(c_str, strlen((const char*)c_str));
 }
@@ -59,7 +59,7 @@ uint32_t WiFiClientInterface::write(const uint8_t *c_str)
 /**
  * write
  */
-uint32_t WiFiClientInterface::write(const uint8_t *c_str, uint32_t size)
+int32_t WiFiClientInterface::write(const uint8_t *c_str, uint32_t size)
 {
   return this->m_wifi_client.write(c_str, size);
 }
@@ -75,7 +75,7 @@ uint8_t WiFiClientInterface::read()
 /**
  * read
  */
-uint32_t WiFiClientInterface::read(uint8_t *buf, uint32_t size)
+int32_t WiFiClientInterface::read(uint8_t *buf, uint32_t size)
 {
   return this->m_wifi_client.read(buf, size);
 }

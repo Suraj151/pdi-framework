@@ -46,23 +46,21 @@ public:
      * @param size The size of the data.
      * @return The number of bytes written, or 0 on failure.
      */
-    uint32_t write(const uint8_t* c_str, uint32_t size) override;
+    int32_t write(const uint8_t* c_str, uint32_t size) override;
 
     /**
      * @brief Writes a single byte of data.
      * @param c The byte to write.
      * @return Number of bytes written.
      */
-    uint32_t write(uint8_t c) override {
-        return write(&c, 1);
-    }
+    int32_t write(uint8_t c) override { return write(&c, 1); }
 
     /**
      * @brief Writes a string of bytes.
      * @param c_str Pointer to the byte string.
      * @return Number of bytes written.
      */
-    uint32_t write(const uint8_t *c_str) override {
+    int32_t write(const uint8_t *c_str) override {
         return write(c_str, strlen(reinterpret_cast<const char*>(c_str)));
     }
 
@@ -72,17 +70,13 @@ public:
      * @param size The maximum number of bytes to read.
      * @return The number of bytes read, or 0 on failure.
      */
-    uint32_t read(uint8_t* buffer, uint32_t size) override;
+    int32_t read(uint8_t* buffer, uint32_t size) override;
 
     /**
      * @brief Reads a single byte of data.
      * @return The byte read.
      */
-    uint8_t read() override {
-        uint8_t byte = 0;
-        read(&byte, 1);
-        return byte;
-    }
+    uint8_t read() override { uint8_t byte = 0; read(&byte, 1); return byte; }
     
     /**
      * @brief Check the number of bytes available to read.

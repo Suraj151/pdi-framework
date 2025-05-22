@@ -36,14 +36,14 @@ public:
   int16_t disconnect() override;
 
   // data sending api
-  uint32_t write(uint8_t c) override;
+  int32_t write(uint8_t c) override;
   // size_t write(uint8_t c) override; // from Print
-  uint32_t write(const uint8_t *c_str) override;
-  uint32_t write(const uint8_t *c_str, uint32_t size) override;
+  int32_t write(const uint8_t *c_str) override;
+  int32_t write(const uint8_t *c_str, uint32_t size) override;
 
   // received data read api
   uint8_t read() override;
-  uint32_t read(uint8_t *buf, uint32_t size) override;
+  int32_t read(uint8_t *buf, uint32_t size) override;
 
   // useful api
   int32_t available() override;
