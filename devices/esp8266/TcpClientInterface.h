@@ -1,3 +1,12 @@
+/************************* TCP Client Interface *******************************
+This file is part of the pdi stack.
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+Author          : Suraj I.
+created Date    : 1st May 2025
+******************************************************************************/
 #ifndef _TCP_CLIENT_INTERFACE_H_
 #define _TCP_CLIENT_INTERFACE_H_
 
@@ -11,7 +20,23 @@
  */
 class TcpClientInterface : public iTcpClientInterface {
 public:
+    /**
+     * @brief Constructor for TcpClientInterface.
+     */
     TcpClientInterface();
+
+    /**
+     * @brief Constructor for TcpClientInterface.
+     * @note This constructor is used when you want to reuse an existing TCP connection.
+     *       most probably when server gets new connections we will construct the clients 
+     *       with this constructor.
+     * @param pcb Pointer to an existing TCP protocol control block (pcb).
+     */
+    TcpClientInterface(struct tcp_pcb* pcb);
+    
+    /**
+     * @brief Destructor for TcpClientInterface.
+     */
     ~TcpClientInterface();
 
     /**
@@ -65,6 +90,13 @@ public:
     }
 
     /**
+     * @brief Writes a read-only string.
+     * @param c_str The string to write.
+     * @return Number of bytes written.
+     */
+    int32_t write_ro(const char *c_str) override;
+
+    /**
      * @brief Read data from the socket.
      * @param buffer The buffer to store the read data.
      * @param size The maximum number of bytes to read.
@@ -86,27 +118,27 @@ public:
 
     /**
      * @brief Get the local IP address.
-     * @return The local IP address as uint32_t.
+     * @return The local IP address.
      */
-    uint32_t getLocalIp() const;
+    ipaddress_t getLocalIp() const override;
 
     /**
      * @brief Get the local port.
      * @return The local port number.
      */
-    uint16_t getLocalPort() const;
+    uint16_t getLocalPort() const override;
 
     /**
      * @brief Get the remote IP address.
-     * @return The remote IP address as uint32_t.
+     * @return The remote IP address.
      */
-    uint32_t getRemoteIp() const;
+    ipaddress_t getRemoteIp() const override;
 
     /**
      * @brief Get the remote port.
      * @return The remote port number.
      */
-    uint16_t getRemotePort() const;
+    uint16_t getRemotePort() const override;
 
     /**
      * @brief Enable TCP keep-alive and configure its parameters.
@@ -115,7 +147,13 @@ public:
      * @param count The number of keep-alive packets to send before considering the connection dead.
      * @return True if keep-alive was successfully enabled, false otherwise.
      */
-    bool setKeepAlive(uint16_t idleTime, uint16_t interval, uint16_t count);
+    bool setKeepAlive(uint16_t idleTime, uint16_t interval, uint16_t count) override;
+
+    /**
+     * @brief Set the NoDelay option for TCP.
+     * @param noDelay If true, disables Nagle's algorithm (reducing latency).
+     */
+    void setNoDelay(bool noDelay) override;
 
     /**
      * @brief Set the timeout.

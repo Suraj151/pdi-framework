@@ -88,16 +88,16 @@ public:
    *
    * @param _server Pointer to the server interface implementation.
    */
-  void collect_resource(iServerInterface *_server);
+  void collect_resource(iHttpServerInterface *_server);
 
   // Protected members (commented out for now)
   // protected:
 
   /**
-   * @var iServerInterface* m_server
+   * @var iHttpServerInterface* m_server
    * @brief Pointer to the server interface implementation.
    */
-  iServerInterface *m_server;
+  iHttpServerInterface *m_server;
 
   /**
    * @var DatabaseServiceProvider* m_db_conn

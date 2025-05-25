@@ -508,6 +508,28 @@ cmd_t *CommandLineServiceProvider::getCommandByName(char *_cmd)
   return nullptr;
 }
 
+/**
+ * @brief Use terminal for command line interaction
+ * @param terminal iTerminalInterface* terminal
+ */
+void CommandLineServiceProvider::useTerminal(iTerminalInterface *terminal)
+{
+  setTerminal(terminal);
+
+  // set terminal for all commands
+  for (int16_t i = 0; i < m_cmdlist.size(); i++){
+
+    if(nullptr != m_cmdlist[i]){
+      m_cmdlist[i]->SetTerminal(terminal);
+    }
+  }
+
+  if( nullptr != terminal ){
+    // start interaction
+    startInteraction();
+  }
+}
+
 CommandLineServiceProvider __cmd_service;
 
 #endif

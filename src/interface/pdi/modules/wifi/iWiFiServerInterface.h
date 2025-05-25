@@ -16,26 +16,26 @@ created Date    : 1st June 2019
 #include <interface/pdi/middlewares/iServerInterface.h>
 
 // forward declaration of derived class for this interface
-class WiFiServerInterface;
+class WiFiHttpServerInterface;
 
 /**
- * iWiFiServerInterface class
+ * iWiFiHttpServerInterface class
  */
-class iWiFiServerInterface : public iServerInterface
+class iWiFiHttpServerInterface : public iHttpServerInterface
 {
 
 public:
   /**
-   * iWiFiServerInterface constructor.
+   * iWiFiHttpServerInterface constructor.
    */
-  iWiFiServerInterface() {}
+  iWiFiHttpServerInterface() {}
   /**
-   * iWiFiServerInterface destructor.
+   * iWiFiHttpServerInterface destructor.
    */
-  virtual ~iWiFiServerInterface() {}
+  virtual ~iWiFiHttpServerInterface() {}
 };
 
 // derived class must define this
-extern WiFiServerInterface __i_wifi_server;
+extern WiFiHttpServerInterface __i_wifi_http_server;
 
 #endif

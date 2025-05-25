@@ -70,8 +70,16 @@ void SerialServiceProvider::processSerial(serial_event_t *se)
     if( SERIAL_TYPE_UART == se->type && nullptr != se->serial ){
 
       // process and execute if command has provided
+      se->serial->set_terminal_type(TERMINAL_TYPE_SERIAL);
       #ifdef ENABLE_CMD_SERVICE
-      __cmd_service.processTerminalInput(se->serial);
+      iTerminalInterface *terminal = __cmd_service.getTerminal();
+      if( nullptr == terminal ){
+        __cmd_service.useTerminal(se->serial);
+        terminal = __cmd_service.getTerminal();
+      }
+      if( terminal->get_terminal_type() == TERMINAL_TYPE_SERIAL ){
+          __cmd_service.processTerminalInput(se->serial);
+      }
       #endif
     }
 

@@ -337,7 +337,7 @@ public:
    *
    * Initializes the iTerminalInterface object.
    */
-  iTerminalInterface() {}
+  iTerminalInterface(): m_terminal_type(TERMINAL_TYPE_SERIAL) {}
 
   /**
    * @brief Destructor for the iTerminalInterface class.
@@ -475,6 +475,27 @@ public:
   {
     return this;
   }
+
+  /**
+   * @brief Sets the terminal type.
+   * @param type The terminal type to set.
+   */
+  void set_terminal_type(terminal_types_t type)
+  {
+    m_terminal_type = type;
+  }
+
+  /**
+   * @brief Gets the terminal type.
+   * @return The current terminal type.
+   */
+  terminal_types_t get_terminal_type() const
+  {
+    return m_terminal_type;
+  }
+
+  private:
+    terminal_types_t m_terminal_type;
 };
 
 #endif

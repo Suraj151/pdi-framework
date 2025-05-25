@@ -54,6 +54,8 @@ public:
 	cmd_result_t executeCommand(pdiutil::string *cmd = nullptr, cmd_term_inseq_t inseq = CMD_TERM_INSEQ_NONE);
 	static void startInteraction();
 	cmd_t* getCommandByName(char* _cmd);
+    void useTerminal(iTerminalInterface *terminal);
+
 
 private:
 

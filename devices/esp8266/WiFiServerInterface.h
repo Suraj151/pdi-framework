@@ -22,20 +22,20 @@ created Date    : 1st June 2019
 // typedef std::function<void(void)> THandlerFunction;
 
 /**
- * WiFiServerInterface class
+ * WiFiHttpServerInterface class
  */
-class WiFiServerInterface : public iWiFiServerInterface
+class WiFiHttpServerInterface : public iWiFiHttpServerInterface
 {
 
 public:
   /**
-   * WiFiServerInterface constructor.
+   * WiFiHttpServerInterface constructor.
    */
-  WiFiServerInterface();
+  WiFiHttpServerInterface();
   /**
-   * WiFiServerInterface destructor.
+   * WiFiHttpServerInterface destructor.
    */
-  ~WiFiServerInterface();
+  ~WiFiHttpServerInterface();
 
   void begin() override;
   void begin(uint16_t port) override;

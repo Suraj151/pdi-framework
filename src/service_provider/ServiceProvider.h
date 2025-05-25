@@ -54,6 +54,9 @@ typedef enum services{
 #ifdef ENABLE_HTTP_SERVER
   SERVICE_HTTP_SERVER,
 #endif
+#ifdef ENABLE_TELNET_SERVICE
+  SERVICE_TELNET,
+#endif
   SERVICE_MAX
 } service_t;
 
@@ -105,6 +108,14 @@ class ServiceProvider{
       m_terminal = terminal;
     }
 
+    /**
+     * Get terminal interface
+     * @return Pointer to the terminal interface.
+     */
+    static iTerminalInterface* getTerminal(){
+      return m_terminal;
+    }
+    
     /**
      * print service config to terminal
      * @param terminal Pointer to the terminal interface.

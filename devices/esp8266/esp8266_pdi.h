@@ -25,6 +25,7 @@ created Date    : 1st Jan 2024
 #include "NtpInterface.h"
 #include "PingInterface.h"
 #include "TcpClientInterface.h"
+#include "TcpServerInterface.h"
 #endif
 #include "core/Espnow.h"
 #ifdef ENABLE_SERIAL_SERVICE

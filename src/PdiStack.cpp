@@ -20,7 +20,7 @@ PDIStack::PDIStack()
 #ifdef ENABLE_WIFI_SERVICE
   :
   m_client(&__i_wifi_client),
-  m_server(&__i_wifi_server)
+  m_server(&__i_wifi_http_server)
 #endif
 {
   __utl_event.begin(&__i_dvc_ctrl);
@@ -115,6 +115,11 @@ void PDIStack::initialize(){
 
   #ifdef ENABLE_HTTP_SERVER
   __web_server.initService( this->m_server );
+  #endif
+
+  #ifdef ENABLE_TELNET_SERVICE
+  uint16_t telnet_port = 23; // Default Telnet port
+  __telnet_service.initService(&telnet_port);
   #endif
 
   #ifdef ENABLE_CMD_SERVICE

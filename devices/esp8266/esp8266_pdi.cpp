@@ -29,6 +29,7 @@ created Date    : 1st Jan 2024
 #include "NtpInterface.cpp"
 #include "PingInterface.cpp"
 #include "TcpClientInterface.cpp"
+#include "TcpServerInterface.cpp"
 #endif
 #include "ExceptionsNotifier.cpp"
 #include "core/Espnow.cpp"

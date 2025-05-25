@@ -54,7 +54,7 @@ HttpServer::~HttpServer()
 bool HttpServer::initService(void *arg)
 {
   bool bStatus = false;
-  iServerInterface  *iServer = reinterpret_cast<iServerInterface*>(arg);
+  iHttpServerInterface  *iServer = reinterpret_cast<iHttpServerInterface*>(arg);
 
   if (nullptr == iServer) {
     return bStatus;

@@ -86,10 +86,10 @@ class HttpServer : public ServiceProvider{
 
   protected:
     /**
-     * @var iServerInterface* m_server
+     * @var iHttpServerInterface* m_server
      * @brief Pointer to the server interface implementation.
      */
-    iServerInterface *m_server;
+    iHttpServerInterface *m_server;
 
   private:
     /**

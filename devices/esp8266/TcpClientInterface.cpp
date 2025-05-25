@@ -1,3 +1,12 @@
+/************************* TCP Client Interface *******************************
+This file is part of the pdi stack.
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+Author          : Suraj I.
+created Date    : 1st May 2025
+******************************************************************************/
 #include "TcpClientInterface.h"
 
 /**
@@ -9,6 +18,26 @@ TcpClientInterface::TcpClientInterface() :
     m_rxBuffer(nullptr),
     m_rxBufferSize(0),
     m_timeout(3000) {}
+
+/**
+ * @brief Parameterized Constructor for TcpClientInterface.
+ * @note This constructor is used when you want to reuse an existing TCP connection.
+ *       with this constructor.
+ * @param pcb Pointer to an existing TCP protocol control block (pcb).
+ */
+TcpClientInterface::TcpClientInterface(struct tcp_pcb* pcb):
+    m_pcb(pcb), 
+    m_isConnected(true), 
+    m_rxBuffer(nullptr),
+    m_rxBufferSize(0),
+    m_timeout(3000) {
+
+    if (m_pcb) {
+        tcp_arg(m_pcb, this);
+        tcp_err(m_pcb, &TcpClientInterface::onError);
+        tcp_recv(m_pcb, &TcpClientInterface::onReceive);
+    }
+}
 
 /**
  * @brief Destructor for TcpClientInterface.
@@ -26,14 +55,14 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
     // Allocate a new TCP protocol control block
     m_pcb = tcp_new();
     if (!m_pcb) {
-        return -1;
+        return -99;
     }
 
     // Convert the host to an IP address
     ip_addr_t serverIp;
     if (!ipaddr_aton(reinterpret_cast<const char*>(host), &serverIp)) {
         close();
-        return -1;
+        return -99;
     }
 
     // Set the connection callback
@@ -44,7 +73,7 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
     err_t err = tcp_connect(m_pcb, &serverIp, port, &TcpClientInterface::onConnected);
     if (err != ERR_OK) {
         close();
-        return -1;
+        return err < 0 ? err : -99; // Return error code if connection fails
     }
 
     return 0;
@@ -91,19 +120,43 @@ int8_t TcpClientInterface::connected() {
  */
 int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
     if (!m_isConnected || !m_pcb) {
-        return 0;
+        return -99;
     }
 
     err_t err = tcp_write(m_pcb, c_str, size, TCP_WRITE_FLAG_COPY);
     if (err != ERR_OK) {
-        return 0;
+        return err < 0 ? err : -99; // Return error code if write fails
     }
 
     err = tcp_output(m_pcb); // Ensure the data is sent
     if (err != ERR_OK) {
-        return 0;
+        return err < 0 ? err : -99; // Return error code if write fails
     }
     return size;
+}
+
+/**
+ * @brief Write read only string
+ */
+int32_t TcpClientInterface::write_ro(const char *c_str)
+{
+    PGM_P p = reinterpret_cast<PGM_P>(c_str);
+
+    uint8_t buff[128] __attribute__ ((aligned(4)));
+    auto len = strlen_P(p);
+    int32_t n = 0;
+    while (n < len) {
+        int to_write = std::min(sizeof(buff), len - n);
+        memcpy_P(buff, p, to_write);
+        auto written = write(buff, to_write);
+        n += written;
+        p += written;
+        if (!written) {
+            // Some error, write() should write at least 1 byte before returning
+            break;
+        }
+    }
+    return n;
 }
 
 /**
@@ -111,7 +164,7 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
  */
 int32_t TcpClientInterface::read(uint8_t* buffer, uint32_t size) {
     if (!m_rxBuffer || m_rxBufferSize == 0) {
-        return 0;
+        return -99;
     }
 
     int32_t bytesToRead = (size < m_rxBufferSize) ? size : m_rxBufferSize;
@@ -203,7 +256,7 @@ void TcpClientInterface::onError(void* arg, err_t err) {
 /**
  * @brief Get the local IP address.
  */
-uint32_t TcpClientInterface::getLocalIp() const {
+ipaddress_t TcpClientInterface::getLocalIp() const {
     // if (!m_pcb) {
     //     return "";
     // }
@@ -230,7 +283,7 @@ uint16_t TcpClientInterface::getLocalPort() const {
 /**
  * @brief Get the remote IP address.
  */
-uint32_t TcpClientInterface::getRemoteIp() const {
+ipaddress_t TcpClientInterface::getRemoteIp() const {
     if (!m_pcb) {
         return 0;
     }
@@ -273,6 +326,22 @@ bool TcpClientInterface::setKeepAlive(uint16_t idleTime, uint16_t interval, uint
     m_pcb->keep_cnt = count;
 
     return true;
+}
+
+/**
+ * @brief Set the NoDelay option for TCP.
+ * @param noDelay If true, disables Nagle's algorithm (reducing latency).
+ */
+void TcpClientInterface::setNoDelay(bool noDelay) {
+    if (!m_pcb) {
+        return; // No active connection
+    }
+
+    if (noDelay) {
+        m_pcb->so_options |= TF_NODELAY; // Disable Nagle's algorithm
+    } else {
+        m_pcb->so_options &= ~TF_NODELAY; // Enable Nagle's algorithm
+    }
 }
 
 /**

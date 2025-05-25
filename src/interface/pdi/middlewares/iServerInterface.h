@@ -13,6 +13,9 @@ created Date    : 1st June 2019
 
 #include <interface/interface_includes.h>
 
+// forward declaration
+class iClientInterface;
+
 /**
  * iServerInterface class
  */
@@ -28,6 +31,56 @@ public:
    * iServerInterface destructor.
    */
   virtual ~iServerInterface() {}
+
+  virtual int32_t begin(uint16_t port) = 0;
+  virtual bool hasClient() const = 0;
+  virtual iClientInterface* accept() = 0;
+  virtual void setTimeout(uint32_t timeout_ms) = 0;
+  virtual void close() = 0;
+  virtual iServerInterface* getNewServerInterface() = 0;
+  static void releaseServerInterface( iServerInterface **instance )
+  {
+    if( nullptr != *instance )
+    {
+      delete *instance;
+      *instance = nullptr;
+    }
+  }
+};
+
+/**
+ * iTcpServerInterface class
+ */
+class iTcpServerInterface : public iServerInterface
+{
+
+public:
+  /**
+   * iTcpServerInterface constructor.
+   */
+  iTcpServerInterface() {}
+  /**
+   * iTcpServerInterface destructor.
+   */
+  virtual ~iTcpServerInterface() {}
+};
+
+
+/**
+ * iHttpServerInterface class
+ */
+class iHttpServerInterface
+{
+
+public:
+  /**
+   * iHttpServerInterface constructor.
+   */
+  iHttpServerInterface() {}
+  /**
+   * iHttpServerInterface destructor.
+   */
+  virtual ~iHttpServerInterface() {}
 
   virtual void begin() = 0;
   virtual void begin(uint16_t port) = 0;

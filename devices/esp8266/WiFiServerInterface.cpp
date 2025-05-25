@@ -11,23 +11,23 @@ created Date    : 1st June 2019
 #include "WiFiServerInterface.h"
 
 /**
- * WiFiServerInterface constructor.
+ * WiFiHttpServerInterface constructor.
  */
-WiFiServerInterface::WiFiServerInterface()
+WiFiHttpServerInterface::WiFiHttpServerInterface()
 {
 }
 
 /**
- * WiFiServerInterface destructor.
+ * WiFiHttpServerInterface destructor.
  */
-WiFiServerInterface::~WiFiServerInterface()
+WiFiHttpServerInterface::~WiFiHttpServerInterface()
 {
 }
 
 /**
  * begin
  */
-void WiFiServerInterface::begin()
+void WiFiHttpServerInterface::begin()
 {
   this->m_server.begin();
 }
@@ -35,7 +35,7 @@ void WiFiServerInterface::begin()
 /**
  * begin
  */
-void WiFiServerInterface::begin(uint16_t port)
+void WiFiHttpServerInterface::begin(uint16_t port)
 {
   this->m_server.begin(port);
 }
@@ -43,7 +43,7 @@ void WiFiServerInterface::begin(uint16_t port)
 /**
  * handleClient
  */
-void WiFiServerInterface::handleClient()
+void WiFiHttpServerInterface::handleClient()
 {
   this->m_server.handleClient();
 }
@@ -51,7 +51,7 @@ void WiFiServerInterface::handleClient()
 /**
  * close
  */
-void WiFiServerInterface::close()
+void WiFiHttpServerInterface::close()
 {
   this->m_server.close();
 }
@@ -59,7 +59,7 @@ void WiFiServerInterface::close()
 /**
  * on
  */
-void WiFiServerInterface::on(const pdiutil::string &uri, CallBackVoidArgFn handler)
+void WiFiHttpServerInterface::on(const pdiutil::string &uri, CallBackVoidArgFn handler)
 {
   this->m_server.on(uri.c_str(), handler);
 }
@@ -68,7 +68,7 @@ void WiFiServerInterface::on(const pdiutil::string &uri, CallBackVoidArgFn handl
  * onNotFound
  * called when handler is not assigned
  */
-void WiFiServerInterface::onNotFound(CallBackVoidArgFn fn)
+void WiFiHttpServerInterface::onNotFound(CallBackVoidArgFn fn)
 {
   this->m_server.onNotFound(fn);
 }
@@ -77,7 +77,7 @@ void WiFiServerInterface::onNotFound(CallBackVoidArgFn fn)
  * onFileUpload
  * handle file uploads
  */
-void WiFiServerInterface::onFileUpload(CallBackVoidArgFn fn)
+void WiFiHttpServerInterface::onFileUpload(CallBackVoidArgFn fn)
 {
   this->m_server.onFileUpload(fn);
 }
@@ -86,7 +86,7 @@ void WiFiServerInterface::onFileUpload(CallBackVoidArgFn fn)
  * arg
  * get request argument value by name
  */
-pdiutil::string WiFiServerInterface::arg(const pdiutil::string &name)
+pdiutil::string WiFiHttpServerInterface::arg(const pdiutil::string &name)
 {
   return this->m_server.arg(name.c_str()).c_str();
 }
@@ -95,7 +95,7 @@ pdiutil::string WiFiServerInterface::arg(const pdiutil::string &name)
  * hasArg
  * check if argument exists
  */
-bool WiFiServerInterface::hasArg(const pdiutil::string &name) const
+bool WiFiHttpServerInterface::hasArg(const pdiutil::string &name) const
 {
   return this->m_server.hasArg(name.c_str());
 }
@@ -104,7 +104,7 @@ bool WiFiServerInterface::hasArg(const pdiutil::string &name) const
  * collectHeaders
  * set the request headers to collect
  */
-void WiFiServerInterface::collectHeaders(const char *headerKeys[], const size_t headerKeysCount)
+void WiFiHttpServerInterface::collectHeaders(const char *headerKeys[], const size_t headerKeysCount)
 {
   this->m_server.collectHeaders(headerKeys, headerKeysCount);
 }
@@ -113,7 +113,7 @@ void WiFiServerInterface::collectHeaders(const char *headerKeys[], const size_t 
  * header
  * get request header value by name
  */
-pdiutil::string WiFiServerInterface::header(const pdiutil::string &name)
+pdiutil::string WiFiHttpServerInterface::header(const pdiutil::string &name)
 {
   return this->m_server.header(name.c_str()).c_str();
 }
@@ -122,7 +122,7 @@ pdiutil::string WiFiServerInterface::header(const pdiutil::string &name)
  * hasHeader
  * check if header exists
  */
-bool WiFiServerInterface::hasHeader(const pdiutil::string &name) const
+bool WiFiHttpServerInterface::hasHeader(const pdiutil::string &name) const
 {
   return this->m_server.hasHeader(name.c_str());
 }
@@ -130,7 +130,7 @@ bool WiFiServerInterface::hasHeader(const pdiutil::string &name) const
 /**
  * send
  */
-void WiFiServerInterface::send(int code, const char *content_type, const char *content)
+void WiFiHttpServerInterface::send(int code, const char *content_type, const char *content)
 {
   if( nullptr != content_type ){
     this->m_server.send(code, content_type, content);
@@ -142,9 +142,9 @@ void WiFiServerInterface::send(int code, const char *content_type, const char *c
 /**
  * sendHeader
  */
-void WiFiServerInterface::sendHeader(const pdiutil::string &name, const pdiutil::string &value, bool first)
+void WiFiHttpServerInterface::sendHeader(const pdiutil::string &name, const pdiutil::string &value, bool first)
 {
   this->m_server.sendHeader(name.c_str(), value.c_str(), first);
 }
 
-WiFiServerInterface __i_wifi_server;
+WiFiHttpServerInterface __i_wifi_http_server;
