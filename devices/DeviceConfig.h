@@ -96,6 +96,11 @@ created Date    : 1st June 2019
 #define ENABLE_WIFI_SERVICE
 
 /**
+ * enable/disable telent
+ */
+#define ENABLE_TELNET_SERVICE
+
+/**
  * enable/disable ota feature here
  */
 #define ENABLE_OTA_SERVICE
