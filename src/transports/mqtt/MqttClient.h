@@ -153,7 +153,6 @@ protected:
 	uint8_t m_security;
 
 	iClientInterface *m_client;
-	iClientInterface *m_baseclient;
 
 	MqttCallback m_connectedCb;
 	MqttCallback m_disconnectedCb;

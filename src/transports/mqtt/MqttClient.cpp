@@ -624,12 +624,13 @@ void MQTTClient::mqtt_client_delete()
     this->m_mqttClient.msgQueue.buf = nullptr;
   }
 
-  iClientInterface::releaseInstance(&this->m_client);
-  // if (nullptr != this->m_client)
-  // {
-  //   delete this->m_client;
-  //   this->m_client = nullptr;
-  // }
+  if (nullptr != this->m_client)
+  {
+    // delete this->m_client;
+    this->m_client->flush();
+    this->m_client->close();
+    this->m_client = nullptr;
+  }
 
   this->clear_all_subscribed_topics();
 }
@@ -739,7 +740,6 @@ MQTTClient::MQTTClient() : m_mqttDataCallbackArgs(reinterpret_cast<uint32_t *>(t
                            m_port(0),
                            m_security(0),
                            m_client(nullptr),
-                           m_baseclient(nullptr),
                            m_connectedCb(nullptr),
                            m_disconnectedCb(nullptr),
                            m_publishedCb(nullptr),
@@ -753,17 +753,16 @@ MQTTClient::MQTTClient() : m_mqttDataCallbackArgs(reinterpret_cast<uint32_t *>(t
 MQTTClient::~MQTTClient()
 {
   this->mqtt_client_delete();
-  m_baseclient = nullptr;
 }
 
 bool MQTTClient::begin(iClientInterface *_client, mqtt_general_config_table *_mqtt_general_configs, mqtt_lwt_config_table *_mqtt_lwt_configs)
 {
-  m_baseclient = _client;
-
-  if (nullptr == _mqtt_general_configs || nullptr == _mqtt_lwt_configs)
+  if (_client == nullptr || nullptr == _mqtt_general_configs || nullptr == _mqtt_lwt_configs)
   {
     return false;
   }
+
+  m_client = _client;
 
   if (strlen(_mqtt_general_configs->host) > 5 && _mqtt_general_configs->port > 0)
   {
@@ -1012,11 +1011,9 @@ void MQTTClient::mqtt_timer()
 
 void MQTTClient::Connect()
 {
-  if( nullptr == m_baseclient ) return;
-
   if (nullptr == this->m_client)
   {
-    this->m_client = m_baseclient->getNewInstance();
+    return;
   }
   this->m_mqttClient.keepAliveTick = 0;
   this->m_mqttClient.host_connect_tick = 0;

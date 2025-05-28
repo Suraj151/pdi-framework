@@ -144,14 +144,6 @@ void UARTSerial::flush()
 }
 
 /**
- * return the new client interface object
- */
-iClientInterface *UARTSerial::getNewInstance()
-{
-  return iSerialInterface::instances[SERIAL_TYPE_UART];
-}
-
-/**
  * @brief With timestamp will print timestamp first
  * derived class should implement this function to print timestamp
  * @param None

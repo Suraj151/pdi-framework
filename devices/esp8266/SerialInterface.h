@@ -49,7 +49,6 @@ public:
   int8_t connected() override;
   void setTimeout(uint32_t timeout) override;
   void flush() override;
-  iClientInterface* getNewInstance() override;
 
   // terminal api
   iTerminalInterface* with_timestamp() override;

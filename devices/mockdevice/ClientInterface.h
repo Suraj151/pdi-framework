@@ -48,7 +48,6 @@ public:
   int8_t connected() override{return 0;}
   void setTimeout(uint32_t timeout) override{}
   void flush() override{}
-  iClientInterface* getNewInstance() override{return nullptr;}
 
 };
 

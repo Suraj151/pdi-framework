@@ -161,12 +161,6 @@ public:
      */
     void setTimeout(uint32_t timeout) override;
 
-    /**
-     * @brief Get new instance
-     */
-    iClientInterface* getNewInstance() override {
-        return new TcpClientInterface();
-    }
     
 private:
     struct tcp_pcb* m_pcb; ///< The TCP protocol control block.

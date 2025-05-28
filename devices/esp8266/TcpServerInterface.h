@@ -49,13 +49,6 @@ public:
      */
     void close() override;
 
-    /**
-     * @brief Get new instance
-     */
-    iServerInterface* getNewServerInterface() override {
-        return new TcpServerInterface();
-    }
-
 private:
 
     /**

@@ -37,15 +37,6 @@ public:
   virtual iClientInterface* accept() = 0;
   virtual void setTimeout(uint32_t timeout_ms) = 0;
   virtual void close() = 0;
-  virtual iServerInterface* getNewServerInterface() = 0;
-  static void releaseServerInterface( iServerInterface **instance )
-  {
-    if( nullptr != *instance )
-    {
-      delete *instance;
-      *instance = nullptr;
-    }
-  }
 };
 
 /**

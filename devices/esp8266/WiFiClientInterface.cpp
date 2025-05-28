@@ -112,12 +112,4 @@ void WiFiClientInterface::flush()
   this->m_wifi_client.flush();
 }
 
-/**
- * return the new client interface object
- */
-iClientInterface *WiFiClientInterface::getNewInstance()
-{
-  return (new WiFiClientInterface);
-}
-
 WiFiClientInterface __i_wifi_client;

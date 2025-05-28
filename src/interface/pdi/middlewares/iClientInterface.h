@@ -31,15 +31,6 @@ public:
 
   // useful api
   virtual void setTimeout(uint32_t timeout) = 0;
-  virtual iClientInterface* getNewInstance() = 0;
-  static void releaseInstance( iClientInterface **instance )
-  {
-    if( nullptr != *instance )
-    {
-      delete *instance;
-      *instance = nullptr;
-    }
-  }
 };
 
 /**
