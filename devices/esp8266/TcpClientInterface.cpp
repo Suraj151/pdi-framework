@@ -99,13 +99,9 @@ int16_t TcpClientInterface::disconnect() {
  * @brief close the session.
  */
 int16_t TcpClientInterface::close() {
-    disconnect();
-    if (m_rxBuffer) {
-        delete[] m_rxBuffer;
-        m_rxBuffer = nullptr;
-        m_rxBufferSize = 0;
-    }
-    return 0;
+    int16_t res = disconnect();
+    flush();
+    return res;
 }
 
 /**
@@ -350,4 +346,15 @@ void TcpClientInterface::setNoDelay(bool noDelay) {
  */
 void TcpClientInterface::setTimeout(uint32_t timeout) {
     m_timeout = timeout;
+}
+
+/**
+ * @brief Flush the buffer.
+ */
+void TcpClientInterface::flush() {
+    if (m_rxBuffer) {
+        delete[] m_rxBuffer;
+        m_rxBuffer = nullptr;
+        m_rxBufferSize = 0;
+    }
 }

@@ -65,18 +65,24 @@ bool SerialServiceProvider::initService(void *arg)
  */
 void SerialServiceProvider::processSerial(serial_event_t *se)
 {
-  if( nullptr != se ){
+  if(nullptr != se && nullptr != se->serial){
 
-    if( SERIAL_TYPE_UART == se->type && nullptr != se->serial ){
+    se->serial->set_terminal_type(TERMINAL_TYPE_SERIAL);
+
+    if( SERIAL_TYPE_UART == se->type ){
 
       // process and execute if command has provided
-      se->serial->set_terminal_type(TERMINAL_TYPE_SERIAL);
       #ifdef ENABLE_CMD_SERVICE
       iTerminalInterface *terminal = __cmd_service.getTerminal();
       if( nullptr == terminal ){
         __cmd_service.useTerminal(se->serial);
         terminal = __cmd_service.getTerminal();
       }
+
+      // Currently supporting multiple client (tcp, telnet, serial) for command service.
+      // And at a time currently only one terminal can be used for command service.
+      // So checking the terminal type before proceeding the command service
+      // Other client types can override running serial terminal and use it for command service
       if( terminal->get_terminal_type() == TERMINAL_TYPE_SERIAL ){
           __cmd_service.processTerminalInput(se->serial);
       }

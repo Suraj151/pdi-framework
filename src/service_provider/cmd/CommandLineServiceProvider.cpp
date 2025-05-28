@@ -362,6 +362,11 @@ void CommandLineServiceProvider::processTerminalInput(iTerminalInterface *termin
     m_termrecvdata.clear();
     m_termrecvdata = "";
     terminalCursorIndex = 0;
+
+    // flush terminal if command has been processed
+    if( CMD_RESULT_NOT_FOUND != result && CMD_RESULT_MAX != result ){
+      terminal->flush();
+    }
 }
 
 /**

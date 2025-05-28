@@ -89,7 +89,13 @@ void TelnetServiceProvider::stop() {
 void TelnetServiceProvider::closeClient() {
     if (m_client) {
         #ifdef ENABLE_CMD_SERVICE
+        // Notify command service to stop using the terminal
         __cmd_service.useTerminal(nullptr);
+        // Inform serial terminal about the end of telnet client session
+        if(__i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)){
+            __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln();
+            __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln_ro(RODT_ATTR("Telnet Client Session ended."));
+        }
         #endif
         m_client->close();
         delete m_client;
@@ -112,9 +118,14 @@ void TelnetServiceProvider::handle() {
             // const char* welcome = "Welcome to Telnet Service!\r\n";
             // m_client->write((const uint8_t*)welcome, strlen(welcome));
 
-            // process and start interaction
+            // process and start interaction with telnet remote client
             m_client->set_terminal_type(TERMINAL_TYPE_TELNET);
             #ifdef ENABLE_CMD_SERVICE
+            // Inform serial terminal about the new telnet client session
+            if(__i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)){
+                __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln();
+                __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln_ro(RODT_ATTR("Telnet Client Session started."));
+            }
             __cmd_service.useTerminal(m_client);
             #endif            
         }
@@ -122,20 +133,16 @@ void TelnetServiceProvider::handle() {
 
     if (m_client && m_client->connected()) {
 
-        // process and execute if command has provided
-        #ifdef ENABLE_CMD_SERVICE
-        __cmd_service.processTerminalInput(m_client);
-        #endif
+        if( m_client->available() ){
 
-        // uint8_t buf[128];
-        // int avail = m_client->available();
-        // if (avail > 0) {
-        //     int len = m_client->read(buf, sizeof(buf));
-        //     // Echo back received data
-        //     if (len > 0) {
-        //         m_client->write(buf, len);
-        //     }
-        // }
+            // process and execute if command has provided
+            #ifdef ENABLE_CMD_SERVICE
+            __cmd_service.processTerminalInput(m_client);
+            #endif
+
+            // Flush the client buffer
+            m_client->flush();
+        }
     } else if (m_client && !m_client->connected()) {
         closeClient();
     }

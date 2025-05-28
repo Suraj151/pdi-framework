@@ -161,7 +161,10 @@ public:
      */
     void setTimeout(uint32_t timeout) override;
 
-    
+    /** 
+     * @brief Flush the output buffer.
+     */
+    void flush() override;    
 private:
     struct tcp_pcb* m_pcb; ///< The TCP protocol control block.
     bool m_isConnected;    ///< Connection status.
