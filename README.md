@@ -1,13 +1,13 @@
 # Portable Device Interface Stack
 
 PDIStack Framework covers all essential things to build IoT applications easily.
-Basically it is designed on the top of portable interface layers that any device can create their interface from. esp8266-arduino examples provided to make things easy to understand for developers.
+Basically it is designed on the top of portable interface layers that any device can create their interface from. esp*-arduino examples provided to make things easy to understand for developers.
 
 **PDI Framework Structure**
 
 
 <p align="center">
-  <img width="500" src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/pdi-framework.jpg">
+  <img width="500" src="https://github.com/Suraj151/pdi-framework/blob/master/doc/pdi-framework.jpg">
 </p>
 
 
@@ -23,11 +23,11 @@ Goto Tools->Manage Libraries... then in library manager window type pdi-framewor
 
 **install manually**
 
-To install manually for esp8266 clone or download source, copy folder to esp8266 libraries path ( in windows 10 generally path is like ==> C:\Users\suraj\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\x.x.x\libraries...).
+To install manually, clone or download source of this repo and copy root folder to devices libraries path. for example with Esp8266 device it will be copied in esp8266 libraries path ( in windows 10 generally path is like ==> C:\Users\suraj\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\x.x.x\libraries...).
 
 **install external dependency**
 
-Currently for some devices, this library is using external dependencies which are added in git submodule config. To install this submodule open terminal in library root directory and execute command ``git submodule update --init --recursive`` 
+Currently for some devices, this library is using external dependencies which are added in git submodule config. To install this submodule, open a terminal in this framework library root directory path and execute command ``git submodule update --init --recursive`` 
 
 
 ### AutoGen Script
@@ -130,7 +130,7 @@ Over The Air (OTA) feature has ability to update the device firmware remotely. B
 
 
 * **ESPNOW Service:**
-This service is extended version of ESPNOW feature available in esp8266 with some easy to use api. with help of this feature we can build mesh networking, broadcasting etc n/w as per requirements. this service is not configurable from server for now. but you can manage it with easily available api of this service.
+This service is extended version of ESPNOW feature available in esp with some easy to use api. with help of this feature we can build mesh networking, broadcasting etc n/w as per requirements. this service is not configurable from server for now. but you can manage it with easily available api of this service.
 
 * **WiFi Service:**
 This service provides simplified api's to dynamically interact with wifi devices on practical field. it has internet based connection ability over same network configs devices which are usefull in mesh scenarios. it also has ability to enable dynamic subnetting heiraechy where each individual device sits in different network and knows how far (in hop distance manner) he is from main hub centre.
@@ -158,9 +158,12 @@ Serial service is mostly related to the serial communication of device. Serial s
 * **CommandLine Service:**
 CommandLine service provides few basic commands to use. this will be covered in another section
 
+* **Telnet Service:**
+Telnet service accepts the client connections on default port 23. It will provide the terminal access through telent service. with this we can access device terminal remotely.
+
 # Local Web Server
 
-PDI framework has local web portal. In case if device supports the internet then web server can be enabled. As aexample Esp8266 has built in WiFi feature that work in both station as well as access point mode. Station mode is mode using which we can connect to other wifi network. Access point mode is mode using which Esp8266 create its own network. PDI stack comes with a local http server facility using access point mode of esp8266. By default this server has setting, monitor pages added.
+PDI framework has local web portal. In case if device supports the internet then web server can be enabled. As aexample Esp series devices has built in WiFi feature that work in both station as well as access point mode. Station mode is mode using which we can connect to other wifi network. Access point mode is mode using which Esp's create its own network. PDI stack comes with a local http server facility using access point mode of esp wifi. By default this server has setting, monitor pages added.
 
 Web Server Framework has following components
 
@@ -177,7 +180,7 @@ Session handler takes care of login sessions. By default, login session expire a
 This handles routing operations of the server. It registers a specific controllers method to URL with facility of authentication through middlware.
 
 * **Database :**
-Devices can have non volatile memories where DB can store its data. Database service is used to store PDI framework related config data. Web Server uses this database service to fetch and view settings and control panel of device. For example Esp8266 has software eeprom library that actually uses space in flash memory
+Devices can have non volatile memories where DB can store its data. Database service is used to store PDI framework related config data. Web Server uses this database service to fetch and view settings and control panel of device. For example Esp* has software eeprom library that actually uses space in flash memory
 
 * **View Helpers :**
 These helpers help to dynamically creates html elements.
@@ -204,7 +207,7 @@ Network address translation (NAT) is a method of remapping one IP address space 
     By default this feature is active based on what lwip variant from ide tool option is selected.
 
 * **MESH :**
-This feature easily possible with esp device esponow feature. in devices with esp8266 provided basic espnow service to make this available in application where mesh network is required. The basic motive to bring this feature is connectivity.
+This feature easily possible with esp device esponow feature. in devices with esp* provided basic espnow service to make this available in application where mesh network is required. The basic motive to bring this feature is connectivity.
 
 
 # Utilities
@@ -257,4 +260,4 @@ you can modify them as per requirements
 by default this service is disabled. to enable, just uncomment ENABLE_DEVICE_IOT in **devices/DeviceConfig.h** file
 
 # Detailed Documentation
-Detailed documentation is ongoing..., please visit [wiki page](https://github.com/Suraj151/esp8266-framework/wiki)....
+Detailed documentation is ongoing..., please visit [wiki page](https://github.com/Suraj151/pdi-framework/wiki)....

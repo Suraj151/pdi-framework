@@ -96,7 +96,7 @@ created Date    : 1st June 2019
 #define ENABLE_WIFI_SERVICE
 
 /**
- * enable/disable telent
+ * enable/disable telnet
  */
 #define ENABLE_TELNET_SERVICE
 
