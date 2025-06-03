@@ -1,0 +1,144 @@
+
+/***************************** PDI STD File ***********************************
+This file is taken from external sources. this is taken from open source uClibc++ 
+library available on github. below is reference link. Thanking to author for
+providing this .
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+referred from   : https://github.com/mike-matera/ArduinoSTL
+                  https://iq.opengenus.org/std-function/
+added Date      : 1st Dec 2024
+added by        : Suraj I.
+******************************************************************************/
+
+#ifndef __PDISTD_HEADER_FUNCTIONAL
+#define __PDISTD_HEADER_FUNCTIONAL 1
+
+#include "stl_function"
+#include "move.h"
+#include "memory"
+
+namespace pdistd
+{
+
+    template <typename T>
+    class function;
+
+    template <typename ReturnType, typename... Args>
+    struct FunctorHolderBase
+    {
+        virtual ~FunctorHolderBase() {}
+        virtual ReturnType operator()(Args...) = 0;
+        virtual FunctorHolderBase<ReturnType, Args...>* clone() const = 0;
+    };
+
+    template <typename Functor, typename ReturnType, typename... Args>
+    struct FunctorHolder final : FunctorHolderBase<ReturnType, Args...>
+    {
+        FunctorHolder (Functor func) : f (func) {}
+
+        ReturnType operator()(Args... args) override
+        {
+            // if(sizeof...(Args) > 0)
+                return f(pdistd::forward<Args>(args)...);
+            // else
+            //     return f(args...);
+        }
+
+        FunctorHolderBase<ReturnType, Args...>* clone() const override
+        {
+            return new FunctorHolder (f);
+        }
+
+        Functor f;
+    };
+
+    template <typename ReturnType, typename... Args>
+    class function<ReturnType(Args...)>
+    {
+        public:
+        template <typename Functor>
+        function (Functor f) : functorHolderPtr (new FunctorHolder<Functor, ReturnType, Args...> (f))
+        {}
+
+        function (){}
+
+        function (nullptr_t){}
+
+        function (const function& other)
+        {
+            if (other.functorHolderPtr != nullptr)
+                functorHolderPtr = other.functorHolderPtr->clone();
+        }
+
+        ~function()
+        {
+            delete functorHolderPtr;
+        }
+
+        function& operator= (nullptr_t)
+        {
+            if( nullptr != functorHolderPtr ){
+
+                delete functorHolderPtr;
+                functorHolderPtr = nullptr;
+            }
+
+            return *this;
+        }
+
+        function& operator= (function const& other)
+        {
+            delete functorHolderPtr;
+
+            if (other.functorHolderPtr != nullptr)
+                functorHolderPtr = other.functorHolderPtr->clone();
+
+            return *this;
+        }
+
+        ReturnType operator() (Args... args) const
+        {
+            return (*functorHolderPtr) (args...);
+        }
+
+
+        inline bool operator!=(nullptr_t rhs) const
+        {
+            return functorHolderPtr != nullptr;
+        }
+
+        inline bool operator==(nullptr_t rhs) const
+        {
+            return functorHolderPtr == nullptr;
+        }
+
+        inline operator bool() const
+        {
+            return functorHolderPtr != nullptr;
+        }
+
+
+        FunctorHolderBase<ReturnType, Args...>* functorHolderPtr = nullptr;
+    };
+
+    /// function comparison with nullptr
+    template <typename Res, typename... Args>
+    inline bool
+    operator!=(const function<Res, Args...> &__a, nullptr_t) noexcept
+    {
+        return __a != nullptr;
+    }
+
+    /// function comparison with nullptr
+    template <typename Res, typename... Args>
+    inline bool
+    operator!=(nullptr_t, const function<Res, Args...> &__a) noexcept
+    {
+        return __a != nullptr;
+    }
+
+} // namespace pdistd
+#endif

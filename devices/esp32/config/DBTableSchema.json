@@ -1,0 +1,122 @@
+{
+    "id": "DBTableSchema",
+    "definitions": [
+        {
+            "name": "$$defItemName$$",
+            "description": "$$defItemDesc$$",
+            "type": "class",
+            "onlyHeader": true,
+            "$defItems": [
+                {
+                    "defItemName": "EmailTable",
+                    "defItemDesc": "Email table handles email service related config load/store operations",
+                    "defItemArg": "email_config_table",
+                    "defItemAddressKey": "EMAIL_CONFIG_TABLE_ADDRESS",
+                    "defItemAddressValue": "1900",
+                    "defItemExtVar": "__email_table"
+                },
+                {
+                    "defItemName": "GlobalTable",
+                    "defItemDesc": "Global table handles global config load/store operations",
+                    "defItemArg": "global_config_table",
+                    "defItemAddressKey": "GLOBAL_CONFIG_TABLE_ADDRESS",
+                    "defItemAddressValue": "CONFIG_START",
+                    "defItemExtVar": "__global_table"
+                },
+                {
+                    "defItemName": "DeviceIotTable",
+                    "defItemDesc": "DeviceIot table handles iot configs load/store operations",
+                    "defItemArg": "device_iot_config_table",
+                    "defItemAddressKey": "DEVICE_IOT_CONFIG_TABLE_ADDRESS",
+                    "defItemAddressValue": "2500",
+                    "defItemExtVar": "__device_iot_table"
+                },
+                {
+                    "defItemName": "GpioTable",
+                    "defItemDesc": "GPIO table handles GPIO configs load/store operations",
+                    "defItemArg": "gpio_config_table",
+                    "defItemAddressKey": "GPIO_CONFIG_TABLE_ADDRESS",
+                    "defItemAddressValue": "500",
+                    "defItemExtVar": "__gpio_table"
+                },
+                {
+                    "defItemName": "LoginTable",
+                    "defItemDesc": "Login table handles credential configs load/store operations",
+                    "defItemArg": "login_credential_table",
+                    "defItemAddressKey": "LOGIN_CREDENTIAL_TABLE_ADDRESS",
+                    "defItemAddressValue": "50",
+                    "defItemExtVar": "__login_table"
+                },
+                {
+                    "defItemName": "MqttGeneralTable",
+                    "defItemDesc": "MqttGeneral table handles general configs load/store operations",
+                    "defItemArg": "mqtt_general_config_table",
+                    "defItemAddressKey": "MQTT_GENERAL_CONFIG_TABLE_ADDRESS",
+                    "defItemAddressValue": "700",
+                    "defItemExtVar": "__mqtt_general_table"
+                },
+                {
+                    "defItemName": "MqttLwtTable",
+                    "defItemDesc": "Mqtt Lwt table handles LWT configs load/store operations",
+                    "defItemArg": "mqtt_lwt_config_table",
+                    "defItemAddressKey": "MQTT_LWT_CONFIG_TABLE_ADDRESS",
+                    "defItemAddressValue": "1400",
+                    "defItemExtVar": "__mqtt_lwt_table"
+                },
+                {
+                    "defItemName": "MqttPubSubTable",
+                    "defItemDesc": "Mqtt PubSub table handles publish & subscribe topic configs load/store operations",
+                    "defItemArg": "mqtt_pubsub_config_table",
+                    "defItemAddressKey": "MQTT_PUBSUB_CONFIG_TABLE_ADDRESS",
+                    "defItemAddressValue": "1600",
+                    "defItemExtVar": "__mqtt_pubsub_table"
+                },
+                {
+                    "defItemName": "OtaTable",
+                    "defItemDesc": "OTA table handles ota server configs load/store operations",
+                    "defItemArg": "ota_config_table",
+                    "defItemAddressKey": "OTA_CONFIG_TABLE_ADDRESS",
+                    "defItemAddressValue": "300",
+                    "defItemExtVar": "__ota_table"
+                },
+                {
+                    "defItemName": "WiFiTable",
+                    "defItemDesc": "Wifi table handles wifi configs load/store operations",
+                    "defItemArg": "wifi_config_table",
+                    "defItemAddressKey": "WIFI_CONFIG_TABLE_ADDRESS",
+                    "defItemAddressValue": "150",
+                    "defItemExtVar": "__wifi_table"
+                }
+            ],
+            "includes": [
+                "<database/core/DatabaseTable.h>"
+            ],
+            "macrodefines":[
+                {
+                    "macroDefine": "$$defItemAddressKey$$ $$defItemAddressValue$$"
+                }
+            ],
+            "parent": {
+                "name": "DatabaseTable",
+                "type": "template",
+                "access": "public",
+                "template": {
+                    "isDeclaration": false,
+                    "args": [
+                        "$$defItemAddressKey$$",
+                        "$$defItemArg$$"
+                    ]
+                }
+            },
+            "members": [
+            ],
+            "postclassdeclaration":[
+                {
+                    "name": "$$defItemExtVar$$",
+                    "preprop": "extern ",
+                    "type": "$$defItemName$$"
+                }
+            ]
+        }
+    ]
+}

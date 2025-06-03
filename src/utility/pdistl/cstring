@@ -1,0 +1,72 @@
+/***************************** PDI STD File ***********************************
+This file is taken from external sources. this is taken from open source uClibc++ 
+library available on github. below is reference link. Thanking to author for
+providing this .
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+referred from   : https://github.com/mike-matera/ArduinoSTL
+added Date      : 1st Dec 2024
+added by        : Suraj I.
+******************************************************************************/
+
+#include "cstddef"
+#include <string.h>
+
+#ifndef __HEADER_CSTRING
+#define __HEADER_CSTRING 1
+
+
+namespace pdistd{
+
+	using ::memchr;
+	using ::memcmp;
+	using ::memcpy;
+	using ::memmove;
+	using ::memset;
+	using ::strcat;
+	using ::strchr;
+	using ::strcmp;
+	using ::strcoll;
+	using ::strcpy;
+	using ::strcspn;
+	using ::strerror;
+	using ::strlen;
+	using ::strncat;
+	using ::strncmp;
+	using ::strncpy;
+	using ::strpbrk;
+	using ::strrchr;
+	using ::strspn;
+	using ::strstr;
+	using ::strtok;
+	using ::strxfrm;
+
+#ifndef __CORRECT_ISO_CPP_STRING_H_PROTO
+	//Extra definitions required in c++ spec
+
+	inline void* memchr(void* s, int c, size_t n){
+		return memchr(const_cast<const void *>(s), c, n);
+	}
+
+	inline char* strchr(char* s, int c){
+		return strchr(const_cast<const char *>(s), c);
+	}
+
+	inline char* strpbrk(char* s1, const char* s2){
+		return strpbrk(const_cast<const char *>(s1), s2);
+	}
+
+	inline char* strrchr(char* s, int c){
+		return strrchr(const_cast<const char *>(s), c);
+	}
+
+	inline char* strstr(char* s1, const char* s2){
+		return strstr(const_cast<const char *>(s1), s2);
+	}
+#endif
+}
+
+#endif
+

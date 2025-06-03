@@ -1,5 +1,5 @@
 /******************************** Config page *********************************
-This file is part of the Ewings Esp Stack.
+This file is part of the pdi stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -12,18 +12,24 @@ created Date    : 1st June 2019
 
 #include "Common.h"
 #include "GlobalConfig.h"
+
+#ifdef ENABLE_WIFI_SERVICE
 #include "WifiConfig.h"
+#endif
+
+#if defined(ENABLE_HTTP_SERVER) || defined(ENABLE_AUTH_SERVICE)
 #include "ServerConfig.h"
+#endif
+
+#ifdef ENABLE_OTA_SERVICE
 #include "OtaConfig.h"
+#endif
+
 #include "EventConfig.h"
 #include "NetworkConfig.h"
 
 #ifdef ENABLE_MQTT_SERVICE
 #include "MqttConfig.h"
-#endif
-
-#ifdef ENABLE_ESP_NOW
-#include "EspnowConfig.h"
 #endif
 
 #ifdef ENABLE_GPIO_SERVICE
@@ -52,27 +58,27 @@ created Date    : 1st June 2019
 // #endif
 
 /**
- * table addresses in ewings database.
+ * table addresses in database.
  */
-enum eeprom_db_table_address {
-  GLOBAL_CONFIG_TABLE_ADDRESS = CONFIG_START,
-  LOGIN_CREDENTIAL_TABLE_ADDRESS = 50,
-  WIFI_CONFIG_TABLE_ADDRESS = 150,
-  OTA_CONFIG_TABLE_ADDRESS = 300,
-  #ifdef ENABLE_GPIO_SERVICE
-  GPIO_CONFIG_TABLE_ADDRESS = 500,
-  #endif
-  #ifdef ENABLE_MQTT_SERVICE
-  MQTT_GENERAL_CONFIG_TABLE_ADDRESS = 700,
-  MQTT_LWT_CONFIG_TABLE_ADDRESS = 1400,
-  MQTT_PUBSUB_CONFIG_TABLE_ADDRESS = 1600,
-  #endif
-  #ifdef ENABLE_EMAIL_SERVICE
-  EMAIL_CONFIG_TABLE_ADDRESS = 1900,
-  #endif
-  #ifdef ENABLE_DEVICE_IOT
-  DEVICE_IOT_CONFIG_TABLE_ADDRESS = 2500,
-  #endif
-};
+// enum eeprom_db_table_address {
+//   GLOBAL_CONFIG_TABLE_ADDRESS = CONFIG_START,
+//   LOGIN_CREDENTIAL_TABLE_ADDRESS = 50,
+//   WIFI_CONFIG_TABLE_ADDRESS = 150,
+//   OTA_CONFIG_TABLE_ADDRESS = 300,
+//   #ifdef ENABLE_GPIO_SERVICE
+//   GPIO_CONFIG_TABLE_ADDRESS = 500,
+//   #endif
+//   #ifdef ENABLE_MQTT_SERVICE
+//   MQTT_GENERAL_CONFIG_TABLE_ADDRESS = 700,
+//   MQTT_LWT_CONFIG_TABLE_ADDRESS = 1400,
+//   MQTT_PUBSUB_CONFIG_TABLE_ADDRESS = 1600,
+//   #endif
+//   #ifdef ENABLE_EMAIL_SERVICE
+//   EMAIL_CONFIG_TABLE_ADDRESS = 1900,
+//   #endif
+//   #ifdef ENABLE_DEVICE_IOT
+//   DEVICE_IOT_CONFIG_TABLE_ADDRESS = 2500,
+//   #endif
+// };
 
 #endif

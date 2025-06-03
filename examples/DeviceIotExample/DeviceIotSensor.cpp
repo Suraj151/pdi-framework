@@ -1,5 +1,4 @@
 /*************************** Device IOT Sensor ********************************
-
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
 
@@ -56,24 +55,18 @@ void DeviceIotSensor::sampleHook(){
  * this method get called from internal service while sending data to iot server
  * make sure that data should be in json format enclosed within curly brackets i.e. "{... data in json format ....}"
  */
-void DeviceIotSensor::dataHook( String &_payload ){
+void DeviceIotSensor::dataHook( pdiutil::string &_payload ){
 
-  #ifdef EW_SERIAL_LOG
-  Log(F("Gathering sensor data samples : "));
-  #endif
+  LogI("Gathering sensor data samples : ");
+
   float _total = 0;
   for (int i = 0; i < this->m_sensor_sample_index; i++) {
     _total += this->m_sensor_samples[i];
-    #ifdef EW_SERIAL_LOG
-    Log(this->m_sensor_samples[i]);
-    Log(F(" "));
-    #endif
+    LogFmtI("%f ", this->m_sensor_samples[i]);
   }
   this->m_sensor_sample_value = _total/this->m_sensor_sample_index;
-  #ifdef EW_SERIAL_LOG
-  Log(F("\nAverage : "));
-  Logln(this->m_sensor_sample_value);
-  #endif
+
+  LogFmtI("\nAverage : %f\n", this->m_sensor_sample_value);
 
   this->m_sensor_sample_index = 0;
 

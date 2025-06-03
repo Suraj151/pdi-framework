@@ -1,19 +1,37 @@
-/***************************** header html page ********************************
-This file is part of the Ewings Esp Stack.
+/***************************** Header HTML Page *******************************
+This file is part of the PDI stack.
 
-This is free software. you can redistribute it and/or modify it but without any
+This is free software. You can redistribute it and/or modify it but without any
 warranty.
 
+The `Header.h` file defines the HTML content for the header section of the web
+server pages. This header includes the basic structure of an HTML document,
+such as the `<html>` and `<head>` tags, along with styling for the web interface.
+It also includes a title and a container for the main content of the page. The
+HTML content is stored in program memory (PROG_RODT_ATTR) to optimize memory usage on
+embedded systems.
+
 Author          : Suraj I.
-created Date    : 1st June 2019
+Created Date    : 1st June 2019
 ******************************************************************************/
 
-#ifndef _EW_SERVER_HEADER_HTML_H_
-#define _EW_SERVER_HEADER_HTML_H_
+#ifndef _WEB_SERVER_HEADER_HTML_H_
+#define _WEB_SERVER_HEADER_HTML_H_
 
-#include <Arduino.h>
+#include <interface/pdi.h>
 
-static const char EW_SERVER_HEADER_HTML[] PROGMEM = "\
+/**
+ * @brief HTML content for the header section of the web server pages.
+ *
+ * This static HTML content defines the structure and styling for the header
+ * section of the web server pages. It includes:
+ * - A `<title>` tag for the page title ("Device Manager").
+ * - A `<meta>` tag for responsive design.
+ * - A `<style>` block for CSS styling, including styles for buttons, inputs,
+ *   containers, and other UI elements.
+ * - A `<div>` container for the main content of the page.
+ */
+static const char WEB_SERVER_HEADER_HTML[] PROG_RODT_ATTR = "\
 <html>\
 <head>\
 <title>Device Manager</title>\
@@ -68,6 +86,7 @@ margin:10px 3px;\
 padding:10px 0px;\
 border:1px solid #d0d0d0;\
 border-radius:4px;\
+font-size:12px;\
 }\
 .btn,.btnd{\
 padding:6px;\

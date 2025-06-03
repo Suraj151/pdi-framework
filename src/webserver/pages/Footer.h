@@ -1,20 +1,30 @@
-/**************************** footer html page ********************************
-This file is part of the Ewings Esp Stack.
+/**************************** Footer HTML Page ********************************
+This file is part of the PDI stack.
 
-This is free software. you can redistribute it and/or modify it but without any
+This is free software. You can redistribute it and/or modify it but without any
 warranty.
 
+The `Footer.h` file defines various HTML footer templates for the web server.
+These templates include JavaScript code for dynamic updates and monitoring
+features, such as analog monitoring, dashboard updates, client listening, and
+OTP requests for IoT devices. The HTML content is stored in program memory
+(PROG_RODT_ATTR) to optimize memory usage on embedded systems.
+
 Author          : Suraj I.
-created Date    : 1st June 2019
+Created Date    : 1st June 2019
 ******************************************************************************/
 
-#ifndef _EW_SERVER_FOOTER_HTML_H_
-#define _EW_SERVER_FOOTER_HTML_H_
+#ifndef _WEB_SERVER_FOOTER_HTML_H_
+#define _WEB_SERVER_FOOTER_HTML_H_
 
-#include <Arduino.h>
-#include <config/Config.h>
+#include <interface/pdi.h>
 
-static const char EW_SERVER_FOOTER_HTML[] PROGMEM = "\
+/**
+ * @brief Basic footer HTML template.
+ *
+ * This template includes a script to hide messages after a timeout.
+ */
+static const char WEB_SERVER_FOOTER_HTML[] PROG_RODT_ATTR = "\
 </div>\
 <script>\
 setTimeout(function(){\
@@ -24,7 +34,13 @@ document.getElementsByClassName('msg')[0].style.display='none';\
 </body>\
 </html>";
 
-static const char EW_SERVER_FOOTER_WITH_ANALOG_MONITOR_HTML[] PROGMEM = "\
+/**
+ * @brief Footer HTML template with analog monitoring.
+ *
+ * This template includes JavaScript code to dynamically update analog monitoring
+ * data and render it on the page using SVG elements.
+ */
+static const char WEB_SERVER_FOOTER_WITH_ANALOG_MONITOR_HTML[] PROG_RODT_ATTR = "\
 </div>\
 <script>\
 var rq=new XMLHttpRequest();\
@@ -66,7 +82,13 @@ rq.send();\
 </html>\
 ";
 
-static const char EW_SERVER_FOOTER_WITH_DASHBOARD_MONITOR_HTML[] PROGMEM = "\
+/**
+ * @brief Footer HTML template with dashboard monitoring.
+ *
+ * This template includes JavaScript code to dynamically update dashboard data,
+ * such as network status, IP address, RSSI, and connected devices.
+ */
+static const char WEB_SERVER_FOOTER_WITH_DASHBOARD_MONITOR_HTML[] PROG_RODT_ATTR = "\
 </div>\
 <script>\
 var rq=new XMLHttpRequest();\
@@ -92,7 +114,13 @@ rq.send();\
 </html>\
 ";
 
-static const char EW_SERVER_FOOTER_WITH_CLIENT_LISTEN_HTML[] PROGMEM = "\
+/**
+ * @brief Footer HTML template with client listening.
+ *
+ * This template includes JavaScript code to dynamically update client-related
+ * data by polling the server at regular intervals.
+ */
+static const char WEB_SERVER_FOOTER_WITH_CLIENT_LISTEN_HTML[] PROG_RODT_ATTR = "\
 </div>\
 <script>\
 setTimeout(function(){\
@@ -116,7 +144,13 @@ rq.send();\
 
 #ifdef ENABLE_DEVICE_IOT
 
-static const char EW_SERVER_FOOTER_WITH_OTP_MONITOR_HTML[] PROGMEM = "\
+/**
+ * @brief Footer HTML template with OTP monitoring for IoT devices.
+ *
+ * This template includes JavaScript code to handle OTP requests and display
+ * the OTP or related status messages dynamically.
+ */
+static const char WEB_SERVER_FOOTER_WITH_OTP_MONITOR_HTML[] PROG_RODT_ATTR = "\
 <tr>\
 <td></td>\
 <td>\

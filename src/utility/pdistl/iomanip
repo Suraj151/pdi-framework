@@ -1,0 +1,164 @@
+/***************************** PDI STD File ***********************************
+This file is taken from external sources. this is taken from open source uClibc++ 
+library available on github. below is reference link. Thanking to author for
+providing this .
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+referred from   : https://github.com/mike-matera/ArduinoSTL
+added Date      : 1st Dec 2024
+added by        : Suraj I.
+******************************************************************************/
+
+#include "exception"
+#include "ios"
+
+#ifndef __PDISTD_IOMANIP
+#define __PDISTD_IOMANIP 1
+
+#pragma GCC visibility push(default)
+
+namespace pdistd{
+
+// These are the helper classes which we are going to be using to
+// hold the required data
+
+class _UCXXEXPORT __resetiosflags{
+public:
+	ios_base::fmtflags m;
+	_UCXXEXPORT __resetiosflags(ios_base::fmtflags mask) : m(mask){ }
+};
+
+class _UCXXEXPORT __setiosflags{
+public:
+	ios_base::fmtflags m;
+	_UCXXEXPORT __setiosflags(ios_base::fmtflags mask) : m(mask){ }
+};
+
+class _UCXXEXPORT __setbase{
+public:
+	int base;
+	_UCXXEXPORT __setbase(int b) : base(b){ }
+};
+
+class _UCXXEXPORT __setfill{
+public:
+	int character;
+	_UCXXEXPORT __setfill(int c): character(c){  }
+};
+
+class _UCXXEXPORT __setprecision{
+public:
+	int digits;
+	_UCXXEXPORT __setprecision(int n): digits(n) {  }
+};
+
+class _UCXXEXPORT __setw{
+public:
+	int width;
+	_UCXXEXPORT __setw(int n): width(n) {  }
+};
+
+
+//Actual manipulator functions
+
+inline __resetiosflags resetiosflags(ios_base::fmtflags mask){
+	return __resetiosflags(mask);
+}
+
+inline __setiosflags setiosflags(ios_base::fmtflags mask){
+	return __setiosflags(mask);
+}
+
+inline __setbase setbase(int b){
+	return __setbase(b);
+}
+
+inline __setfill setfill(int c){
+	return __setfill(c);
+}
+
+inline __setprecision setprecision(int n){
+	return __setprecision(n);
+}
+
+inline __setw setw(int n){
+	return __setw(n);
+}
+
+
+//How to handle interaction with [i|o]stream classes
+
+template<class Ch, class Tr> _UCXXEXPORT basic_ostream<Ch, Tr>&
+	operator<<(basic_ostream<Ch, Tr>& os, const __resetiosflags s)
+{
+	os.setf(ios_base::fmtflags(0),s.m);
+	return os;
+}
+
+template<class Ch, class Tr> _UCXXEXPORT basic_istream<Ch, Tr>&
+	operator>>(basic_istream<Ch, Tr>& is, const __resetiosflags s)
+{
+	is.setf(ios_base::fmtflags(0),s.m);
+	return is;
+}
+
+template<class Ch, class Tr> _UCXXEXPORT basic_ostream<Ch, Tr>&
+	operator<<(basic_ostream<Ch, Tr>& os, const __setiosflags s)
+{
+	os.setf(s.m);
+	return os;
+}
+
+template<class Ch, class Tr> _UCXXEXPORT basic_ostream<Ch, Tr>&
+	operator<<(basic_ostream<Ch, Tr>& os, const __setbase s)
+{
+	ios_base::fmtflags f(0);
+	switch(s.base){
+		case 8:
+			f = ios_base::oct;
+			break;
+		case 10:
+			f = ios_base::dec;
+			break;
+		case 16:
+			f = ios_base::hex;
+			break;
+		default:
+			break;
+
+	}
+	os.setf(f, ios_base::basefield);
+	return os;
+}
+
+template<class Ch, class Tr> _UCXXEXPORT basic_ostream<Ch, Tr>&
+	operator<<(basic_ostream<Ch, Tr>& os, const __setfill s)
+{
+	os.fill(s.character);
+	return os;
+}
+
+template<class Ch, class Tr> _UCXXEXPORT basic_ostream<Ch, Tr>&
+	operator<<(basic_ostream<Ch, Tr>& os, const __setprecision s)
+{
+	os.precision(s.digits);
+	return os;
+}
+
+template<class Ch, class Tr> _UCXXEXPORT basic_ostream<Ch, Tr>&
+	operator<<(basic_ostream<Ch, Tr>& os, const __setw s)
+{
+	os.width(s.width);
+	return os;
+}
+
+
+
+}
+
+#pragma GCC visibility pop
+
+#endif
+

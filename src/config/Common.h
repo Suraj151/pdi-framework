@@ -1,5 +1,5 @@
 /*************************** Common Config page *******************************
-This file is part of the Ewings Esp Stack.
+This file is part of the pdi stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -10,10 +10,7 @@ created Date    : 1st June 2019
 #ifndef _COMMON_CONFIG_H_
 #define _COMMON_CONFIG_H_
 
-#include <Arduino.h>
-extern "C" {
-  #include "user_interface.h"
-}
+#include <utility/DataTypeDef.h>
 
 /**
  * @define common time durations
@@ -22,109 +19,13 @@ extern "C" {
 #define MILLISECOND_DURATION_5000   5000
 #define MILLISECOND_DURATION_10000  10000
 
-
-/**
- * @define task scheduler which makes use of timers
- */
-// #define ENABLE_TIMER_TASK_SCHEDULER
-
-/**
- * enable/disable gpio and mqtt feature here
- */
-#define ENABLE_MQTT_SERVICE
-#define ENABLE_GPIO_SERVICE
-
-/**
- * enable/disable email service here
- */
-#define ENABLE_EMAIL_SERVICE
-
-/**
- * enable/disable device iot feature here
- */
-// #define ENABLE_DEVICE_IOT
-
-/**
- * enable/disable serial log
- */
-#define EW_SERIAL_LOG
-
-/**
- * enable/disable auto factory reset on invalid database config found
- */
-#define AUTO_FACTORY_RESET_ON_INVALID_CONFIGS
-
-/**
- * enable/disable exception notifier
- */
-// #define ENABLE_EXCEPTION_NOTIFIER
-
-/**
- * ignore free relay connections created by same ssid
- */
-#define IGNORE_FREE_RELAY_CONNECTIONS
-
-/**
- * enable/disable http server feature here
- */
-#define ENABLE_EWING_HTTP_SERVER
-
-/**
- * enable/disable network subnetting ( dynamically set ap subnet,gateway etc. )
- */
-// #define ENABLE_DYNAMIC_SUBNETTING
-
-/**
- * enable/disable internet availability based station connections
- */
-// #define ENABLE_INTERNET_BASED_CONNECTIONS
-
-/**
- * enable/disable esp now feature here
- */
-// #define ENABLE_ESP_NOW
-
-/**
- * @define flash key parameters for reset factory
- */
-#define FLASH_KEY_PIN             D3
-#define FLASH_KEY_PRESS_DURATION  MILLISECOND_DURATION_1000
-#define FLASH_KEY_PRESS_COUNT_THR 5
-
-/**
- * @define wifi & internet connectivity check cycle durations
- */
-#define WIFI_STATION_CONNECT_ATTEMPT_TIMEOUT  5  // will try to connect within this seconds
-#define WIFI_CONNECTIVITY_CHECK_DURATION      MILLISECOND_DURATION_10000
-#define INTERNET_CONNECTIVITY_CHECK_DURATION  WIFI_CONNECTIVITY_CHECK_DURATION
-
-/**
- * define connection switch duration once device recognise internet unavailability on current network
- * it should be multiple of INTERNET_CONNECTIVITY_CHECK_DURATION
- */
-#ifdef ENABLE_INTERNET_BASED_CONNECTIONS
-#define SWITCHING_DURATION_FOR_NO_INTERNET_CONNECTION INTERNET_CONNECTIVITY_CHECK_DURATION*6
-#endif
-
-/**
- * @define network address & port translation feature
- */
-#if IP_NAPT && LWIP_VERSION_MAJOR == 1
-  #define ENABLE_NAPT_FEATURE
-#elif IP_NAPT && LWIP_VERSION_MAJOR >= 2
-  #define ENABLE_NAPT_FEATURE_LWIP_V2
-#endif
-
-
-#if defined( ENABLE_NAPT_FEATURE ) || defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
-  #define NAPT_INIT_DURATION_AFTER_WIFI_CONNECT MILLISECOND_DURATION_5000
-#endif
-
 /**
  * @define default username/ssid and password
  */
-#define USER            "esp8266Stack"
-#define PASSPHRASE      "espStack@8266"
+#if defined(ENABLE_HTTP_SERVER) || defined(ENABLE_AUTH_SERVICE) || defined(ENABLE_WIFI_SERVICE)
+#define USER            "pdiStack"
+#define PASSPHRASE      "pdiStack@123"
+#endif
 
 /**
  * @define general http parameters
@@ -138,13 +39,6 @@ extern "C" {
  */
 #define MAX_SCHEDULABLE_TASKS	25
 #define MAX_FACTORY_RESET_CALLBACKS	MAX_SCHEDULABLE_TASKS
-#define MAX_EVENT_CALLBACK_TASKS	MAX_SCHEDULABLE_TASKS
 
-/**
- * Define required callback type
- */
-typedef std::function<void(int)> CallBackIntArgFn;
-typedef std::function<void(void)> CallBackVoidArgFn;
-typedef std::function<void(void*)> CallBackVoidPointerArgFn;
 
 #endif

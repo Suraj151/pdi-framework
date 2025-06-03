@@ -1,42 +1,71 @@
-# EwingsEspStack
+# Portable Device Interface Stack
 
-Ewings Framework covers all essential things to build ESP8266 IoT applications easily.
-Basically it is designed on the top of arduino-esp8266 layer to make things easy to understand for developers.
+PDIStack Framework covers all essential things to build IoT applications easily.
+Basically it is designed on the top of portable interface layers that any device can create their interface from. esp*-arduino examples provided to make things easy to understand for developers.
 
-**Ewings Esp Framework Structure**
+**PDI Framework Structure**
 
 
 <p align="center">
-  <img width="500" src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/ewings_stack.jpg">
+  <img width="500" src="https://github.com/Suraj151/pdi-framework/blob/master/doc/pdi-framework.jpg">
 </p>
 
 
-ESP8266EX integrates an enhanced version of Tensilica’s L106 Diamond series 32-bit processor, with on-chip SRAM, on top of its Wi-Fi functionalities. Its non-OS SDK provides a set of application programming interfaces (APIs) for core ESP8266 functionalities such as data reception/transmission over Wi-Fi, TCP/IP stack functions, hardware interface functions and basic system management functions.
+Arduino has provided user-friendly libraries that use different devices SDK APIs at bottom. Since arduino has made its easy iot development environment impact over developers, it's easy for them to develop applications with Arduino ide.
 
-Arduino has provided user-friendly libraries that use these SDK APIs at bottom. Since arduino has made its easy iot development environment impact over developers, it's easy for them to develop applications with Arduino ide.
-
-Ewings framework sits on the top of these Arduino libraries. So the whole structure looks as shown in the above figure of Ewings Esp8266 Structure.
+PDI framework sits on the top of service layers which internally uses the portable interface. So the device which needs to run this framework should write/implement the interface provided.
 
 # Installation
 
 **install from arduino ide**
 
-Goto Tools->Manage Libraries... then in library manager window type esp8266-framework in search bar then from results find esp8266-framework by Suraj I., select latest version and click on install.
+Goto Tools->Manage Libraries... then in library manager window type pdi-framework in search bar then from results find pdi-framework by Suraj I., select latest version and click on install.
 
 **install manually**
 
-To install manually clone or download source, copy folder to esp8266 libraries path ( in windows 10 generally path is like ==> C:\Users\suraj\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\2.6.2\libraries...).
+To install manually, clone or download source of this repo and copy root folder to devices libraries path. for example with Esp8266 device it will be copied in esp8266 libraries path ( in windows 10 generally path is like ==> C:\Users\suraj\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\x.x.x\libraries...).
+
+**install external dependency**
+
+Currently for some devices, this library is using external dependencies which are added in git submodule config. To install this submodule, open a terminal in this framework library root directory path and execute command ``git submodule update --init --recursive`` 
+
+
+### AutoGen Script
+
+Before start compiling for the specific device make sure that device specific auto gen source files has been generated and device has been selected in device config file (mentioned in below note). Currently database table source files are auto generated.
+
+Open terminal and navigate to `scripts` directory in this library and then run below device specific script.
+
+`` python3 CreateDBSourceFromJson.py -s ../devices/{DEVICENAME}/config/DBTableSchema.json
+``
+
+replace DEVICENAME in above command with specific device folder name for which build has to be done. for example if we want to build for arduino uno then command will be
+
+`` python3 CreateDBSourceFromJson.py -s ../devices/arduinouno/config/DBTableSchema.json
+``
+
+**Note :** Also make sure that you have selected correct device/board in arduino ide and in `devices/DeviceConfig.h` file as below
+```
+/**
+ * enable/disable devices. enable/uncomment one from below list to get it compiled
+ */
+// #define MOCK_DEVICE_TEST
+#define DEVICE_ESP8266
+// #define DEVICE_ESP32
+// #define DEVICE_ARDUINOUNO
+```
+
+for example we selected esp8266 device to compile and flash as above.
 
 # Usage
 
-Restart the arduino ide and navigate to File->Examples->esp8266-framework->EwStack example compile and upload.
+Restart the arduino ide and navigate to File->Examples->pdi-framework->PdiStack example compile and upload.
 
-**Note** that installed version of esp8266 should be > 3.0.x. 3.0.2 or greater is recommended. you can check your installed esp8266 version in tools->boards->board manager (type "esp" in top search bar).
 
-* after initializing device completely, check in pc/mobile wifi list if **esp8266Stack** name appear.
-* select it and enter default password **espStack@8266**.
+* after flash and initializing device completely, check in pc/mobile wifi list if **pdiStack** name appear.
+* select it and enter default password **pdiStack@123**.
 * finally after succesful connectinon to device open browser, type **192.168.0.1** in address bar and press enter
-* you will directed to login screen, enter default username and password **( username: esp8266Stack, password: espStack@8266 )**
+* you will directed to login screen, enter default username and password **( username: pdiStack, password: pdiStack@123 )**
 * now you will able to see below menu options
 
 <p align="center">
@@ -46,26 +75,44 @@ Restart the arduino ide and navigate to File->Examples->esp8266-framework->EwSta
 
 you can play with all settings. you can modify configs by making changes in files of src/config folder. Go to wifi settings and change the default station ssid, password to connect to your station. you can also change ssid and password for access point. device will reset once after you submit wifi settings, i.e. you have to reconnect device.
 
-**Note** that by default session will active for 300 seconds once login, you can change its timeout in server config file.
+**Note** that by default session will active for 300 seconds once login for web portal, you can change its timeout in server config file.
+
+**Note** not all devices having wifi/network feature to run web server on device as mentioned in above esp8266 example. e.g. arduino uno device wont have the web server enabled due to lack of network feature.
+
+### Terminal
+
+Once flashed open serial port on putty with default baud rate of 115200. It will prompt for login where you can enter default(in case not modified) user & password ( user: **pdiStack**, pass: **pdiStack@123** ). Once login success you can use below available commands in terminal.
 
 
+<p align="center">
+  <img width="500" src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/terminal.png">
+</p>
+
+
+
+| Command                                  | Options                             | Brief                                                                                                                                                                                                                                                                                                                                                                                                                       |
+|------------------------------------------|-------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ls                                       |                                     | List the file's or dir's in current directory                                                                                                                                                                                                                                                                                                                                                                               |
+| mkd \<directory_name>                     |                                     | Make directory with name provided in terminal. space are not allowed in name                                                                                                                                                                                                                                                                                                                                                |
+| mkf \<file_name>                          |                                     | Make file with name provided in terminal. space are not allowed in name                                                                                                                                                                                                                                                                                                                                                     |
+| move \<old_path_name> \<new_path_name>     |                                     | Move/Rename the file/dir. space not allowed in name                                                                                                                                                                                                                                                                                                                                                                         |
+| pwd                                      |                                     | It will print present working directory path                                                                                                                                                                                                                                                                                                                                                                                |
+| rm \<file_or_dir_name>                    |                                     | Remove the file or directory provided                                                                                                                                                                                                                                                                                                                                                                                       |
+| frd \<filename>                           |                                     | Read and Print the file content of given filename over terminal                                                                                                                                                                                                                                                                                                                                                             |
+| fwr \<filename>                           |                                     | Open file for write. prompt will provide available option for new line and quit. Note that this command will not show file existing content, rather it will open file to append the content we write.                                                                                                                                                                                                                       |
+| cls                                      |                                     | Clear screen command                                                                                                                                                                                                                                                                                                                                                                                                        |
+| cd \<directory_path>                      |                                     | Change Directory to the provided directory path                                                                                                                                                                                                                                                                                                                                                                             |
+| gpio p=\<pin>,m=\<mode>,v=\<value>          | p=\<pin> m=\<mode> v=\<value>          | To perform gpio operations we can use this command. p\<pin> option can be the GPIO pin number to operate with. m\<mode> is the GPIO mode number we want to use. available GPIO modes are OFF=0 DIGITAL_WRITE=1 DIGITAL_READ=2 DIGITAL_BLINK=3 ANALOG_WRITE=4 ANALOG_READ=5 . v\<value> is the value respective to the mode used.  e.g. If we want to blink GPIO 4 with 500ms the we can use command like:  gpio p=4,m=3,v=500  |
+| srvc s=\<service_number>,q=\<query_number> | s=\<service_number> q=\<query_number> | Services related command. currently supporting to get running service config and status.  service number can be get from srvc l command which will list the running services with their id numbers below are the query number we can use in command QUERY_CONFIG=1 QUERY_STATUS=2                                                                                                                                           |
+| scht                                     | l<list>                             | List the running Scheduler tasks                                                                                                                                                                                                                                                                                                                                                                                            |
 # Services
 
-Ewings provides some basic services that required to develop simple iot application. All services are available globally to each other. The services are
-
-* **HTTP Service:**
-The application can use this rest API service to make HTTP requests such as get, post, etc. this service is just extended version of arduino http client for esp8266.
-
-* **NTP Service:**
-This service provides network time to the application.
+PDI framework provides some basic services that required to develop simple iot application. All services are available globally to each other. The services are
 
 * **MQTT Service:**
 This lightweight messaging protocol can be used to monitor or operate device itself or sensors that are connected to the device.
 To configure and test MQTT go on device local server and select MQTT section under main menu.
 
-
-* **Event Service:**
-This service is introduced to handle specific event tasks that should be executed on event arrival. just register the event listener as task to perticular event and fire it when event happens.
 
 * **OTA Service:**
 Over The Air (OTA) feature has ability to update the device firmware remotely. By default OTA configurations are accessible with local server. OTA service is uses firmware version to decide whether start to update or not. OTA server can be set in OTA configuration which is accesible through local server.
@@ -83,32 +130,42 @@ Over The Air (OTA) feature has ability to update the device firmware remotely. B
 
 
 * **ESPNOW Service:**
-This service is extended version of ESPNOW feature available in esp8266 with some easy to use api. with help of this feature we can build mesh networking, broadcasting etc n/w as per requirements. this service is not configurable from server for now. but you can manage it with easily available api of this service.
+This service is extended version of ESPNOW feature available in esp with some easy to use api. with help of this feature we can build mesh networking, broadcasting etc n/w as per requirements. this service is not configurable from server for now. but you can manage it with easily available api of this service.
 
 * **WiFi Service:**
-This is extended version of arduino wifi library. this service provides simplified api's to dynamically interact with wifi devices on practical field. it has internet based connection ability over same network configs devices which are usefull in mesh scenarios. it also has ability to enable dynamic subnetting heiraechy where each individual device sits in different network and knows how far (in hop distance manner) he is from main hub centre.
-
-* **PING Service:**
-As name suggest this service extends basic ping feature of esp8266 sdk api. this service is utilized in wifi service to check active internet.
+This service provides simplified api's to dynamically interact with wifi devices on practical field. it has internet based connection ability over same network configs devices which are usefull in mesh scenarios. it also has ability to enable dynamic subnetting heiraechy where each individual device sits in different network and knows how far (in hop distance manner) he is from main hub centre.
 
 * **GPIO Service:**
-GPIOs are actually going to interact with sensors. We can read sensor or we can drive appliances with the help of this GPIO services.
+GPIOs are actually going to interact with sensors. We can read sensor or we can drive appliances with the help of this GPIO services. More on this GPIO service can work with MQTT/HTTP transports provided to monitor/control the GPIO's remotely
 
 * **MAIL Service:**
-MAIL service is uses SMTP driver to connect and send mail to any account. you should have a SMTP server account credentials that device uses to send mail. to set configuration goto local server and select Email section under main menu.
+MAIL service is uses SMTP transport to connect and send mail to any account. you should have a SMTP server account credentials that device uses to send mail. to set configuration goto local server and select Email section under main menu.
 you can test it with tick option provided in email section before submit configuration form. the best demo way to test this section is create free mailtrap account where we get configurations.
 this service should be enabled from common configuration file wherever this service act as dependency service. for example GPIO alert system has alert channel of email. GPIO alerts generated on user selected alert channel.
 
 * **GPIO Alerts:**
-GPIO alerts are provided to get notified on specific condition met. from local server GPIO alert conditions can be set in GPIO alert section which is available under GPIO manage section.
+GPIO alerts are provided to get notified on specific condition met. from local web portal of device GPIO alert conditions can be set in GPIO alert section which is available under GPIO manage section.
 
+* **Database:**
+Database service can be used to get/set any config in device NVM memory.
 
+* **Auth Service:**
+Auth service can be used to check whether user is logged in or not which required for few auth dependent services.
 
-# Ewings Local Server
+* **Serial Service:**
+Serial service is mostly related to the serial communication of device. Serial service handles the serial events received on devices.
 
-Esp8266 has built in WiFi feature that work in both station as well as access point mode. Station mode is mode using which we can connect to other wifi network. Access point mode is mode using which Esp8266 create its own network. Ewings stack comes with a local http server facility using access point mode of esp8266. By default this server has setting, monitor pages added.
+* **CommandLine Service:**
+CommandLine service provides few basic commands to use. this will be covered in another section
 
-Ewings Server Framework has following components
+* **Telnet Service:**
+Telnet service accepts the client connections on default port 23. It will provide the terminal access through telent service. with this we can access device terminal remotely.
+
+# Local Web Server
+
+PDI framework has local web portal. In case if device supports the internet then web server can be enabled. As aexample Esp series devices has built in WiFi feature that work in both station as well as access point mode. Station mode is mode using which we can connect to other wifi network. Access point mode is mode using which Esp's create its own network. PDI stack comes with a local http server facility using access point mode of esp wifi. By default this server has setting, monitor pages added.
+
+Web Server Framework has following components
 
 * **Controllers :**
 Controllers used to handle request from client. collecting user inputs, processing, building response for requests etc. works can be carried out in this component.
@@ -122,8 +179,8 @@ Session handler takes care of login sessions. By default, login session expire a
 * **Route Handler :**
 This handles routing operations of the server. It registers a specific controllers method to URL with facility of authentication through middlware.
 
-* **EEPROM Database :**
-Esp8266 has software eeprom library that actually uses space in flash memory to store Ewings framework related config data. Server uses this database to fetch and view settings and control panel of device.
+* **Database :**
+Devices can have non volatile memories where DB can store its data. Database service is used to store PDI framework related config data. Web Server uses this database service to fetch and view settings and control panel of device. For example Esp* has software eeprom library that actually uses space in flash memory
 
 * **View Helpers :**
 These helpers help to dynamically creates html elements.
@@ -136,7 +193,7 @@ These are required resources to server framework components.
 
 # Features
 
-Esp8266 has many built in features that will be useful in network applications. Those features are added with Ewings Framework structure.
+Devices might have many built in features that will be useful in network applications. Those features are added with PDI Framework structure.
 
 * **NAT :**
 Network address translation (NAT) is a method of remapping one IP address space into another by modifying network address information in the IP header of packets while they are in transit across a traffic routing device. With this feature we can extend station network ( network that has active internet ) range.
@@ -150,7 +207,7 @@ Network address translation (NAT) is a method of remapping one IP address space 
     By default this feature is active based on what lwip variant from ide tool option is selected.
 
 * **MESH :**
-This feature easily possible with esp8266 esponow feature. Ewings stack provided basic espnow service to make this available in application where mesh network is required. The basic motive to bring this feature is connectivity.
+This feature easily possible with esp device esponow feature. in devices with esp* provided basic espnow service to make this available in application where mesh network is required. The basic motive to bring this feature is connectivity.
 
 
 # Utilities
@@ -172,8 +229,14 @@ This helps to reset the whole device to its default settings in case of device m
 * **Data Type Converters :**
 As name clears the purpose of this utility. It just used to convert the data types from one to another like integer to string and vice versa.
 
-* **Logger :**
-Logger enables log on uart0 pins at 115200 baud rate. This is useful in case of debugging application flow.
+* **Event :**
+This is to handle specific event tasks that should be executed on event arrival. just register the event listener as task to perticular event and fire it when event happens.
+
+* **CommandBase :**
+This is to handle user commands. It will help to parse command options and provide it to respective command implementation to execute the command.
+
+* **PdiStl :**
+This is an low weight implementation of a C++ standard library for memory constrained devices imported from https://github.com/mike-matera/ArduinoSTL Thanks to mike for building this STL baseline for memory constrained devices. 
 
 # Device Iot (beta)
 
@@ -192,9 +255,9 @@ other configs like
 
 you can modify them as per requirements
 
-**Note** that currently mqtt configs (in **config/MqttConfig.h**/web portal) are not used for device iot purpose.
+**Note** that currently mqtt configs (in **config/MqttConfig.h** OR in web portals) are not used for device iot purpose.
 
-by default this service is disabled. to enable, just uncomment ENABLE_DEVICE_IOT in **config/Common.h** file
+by default this service is disabled. to enable, just uncomment ENABLE_DEVICE_IOT in **devices/DeviceConfig.h** file
 
 # Detailed Documentation
-Detailed documentation is ongoing..., please visit [wiki page](https://github.com/Suraj151/esp8266-framework/wiki)....
+Detailed documentation is ongoing..., please visit [wiki page](https://github.com/Suraj151/pdi-framework/wiki)....

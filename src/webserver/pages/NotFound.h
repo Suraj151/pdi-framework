@@ -1,19 +1,32 @@
-/************************** 404-not found html page ****************************
-This file is part of the Ewings Esp Stack.
+/************************** 404 Not Found HTML Page ****************************
+This file is part of the PDI stack.
 
-This is free software. you can redistribute it and/or modify it but without any
+This is free software. You can redistribute it and/or modify it but without any
 warranty.
 
+The `NotFound.h` file defines the HTML content for the "404 Not Found" page of
+the web server. This page is displayed when a user attempts to access a route
+or resource that does not exist. It provides a message indicating the page was
+not found and includes a link to navigate back to the home page. The HTML content
+is stored in program memory (PROG_RODT_ATTR) to optimize memory usage on embedded systems.
+
 Author          : Suraj I.
-created Date    : 1st June 2019
+Created Date    : 1st June 2019
 ******************************************************************************/
 
-#ifndef _EW_SERVER_404_PAGE_H_
-#define _EW_SERVER_404_PAGE_H_
+#ifndef _WEB_SERVER_404_PAGE_H_
+#define _WEB_SERVER_404_PAGE_H_
 
-#include <Arduino.h>
+#include <interface/pdi.h>
 
-static const char EW_SERVER_404_PAGE[] PROGMEM = "\
+/**
+ * @brief HTML content for the "404 Not Found" page.
+ *
+ * This static HTML content is used to render the "404 Not Found" page of the
+ * web server. It includes a message indicating the page was not found and a
+ * button linking to the home page.
+ */
+static const char WEB_SERVER_404_PAGE[] PROG_RODT_ATTR = "\
 <h3>Page Not Found</h3>\
 <div>\
 Go to\

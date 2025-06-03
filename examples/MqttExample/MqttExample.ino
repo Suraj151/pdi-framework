@@ -1,19 +1,19 @@
 /* Demo example about how to use mqtt service provider
  */
 
-#include <EwingsEspStack.h>
+#include <PdiStack.h>
 
 // mqtt grneral configuration
-#define MQTT_HOST             "---mqtt host---"
+#define MQTT_HOST             "test.mosquitto.org" // using mosquitto test server for example
 #define MQTT_PORT             1883
-#define MQTT_CLIENT_ID        "---client id---"
+#define MQTT_CLIENT_ID        "client_[mac]"
 #define MQTT_USERNAME         ""
 #define MQTT_PASSWORD         ""
-#define MQTT_KEEP_ALIVE       60
+#define MQTT_KEEP_ALIVE       30
 
 // mqtt publish / subscribe configuration
-#define MQTT_PUBLISH_TOPIC    "test_publish"
-#define MQTT_SUBSCRIBE_TOPIC  "test_subscribe"
+#define MQTT_PUBLISH_TOPIC    "pidstack_[mac]"
+#define MQTT_SUBSCRIBE_TOPIC  "pidstack_[mac]"
 #define MQTT_PUBLISH_FREQ     5   // publish after every 5 second
 #define MQTT_PUBLISH_QOS      0
 #define MQTT_SUBSCRIBE_QOS    0
@@ -23,7 +23,7 @@
 #define MQTT_WILL_MESSAGE     "[mac] is disconnected" // [mac] will get replaced internally with actual mac id
 #define MQTT_WILL_QOS         0
 
-#if defined(ENABLE_EWING_HTTP_SERVER)
+#if defined(ENABLE_HTTP_SERVER)
 
 
 // mqtt service will call this function whenever it initiate publish process to set user data for publish in payload
@@ -52,10 +52,8 @@ void subscribe_callback( uint32_t *args, const char* topic, uint32_t topic_len, 
   memcpy(dataBuf, data, data_len);
   dataBuf[data_len] = 0;
 
-  #ifdef EW_SERIAL_LOG
-  Logln(F("\n\nMQTT: user data callback"));
+  Serial.println(F("\n\nMQTT: user data callback"));
   Serial.printf("MQTT: user Receive topic: %s, data: %s \n\n", topicBuf, dataBuf);
-  #endif
 
   delete[] topicBuf; delete[] dataBuf;
 }
@@ -63,9 +61,12 @@ void subscribe_callback( uint32_t *args, const char* topic, uint32_t topic_len, 
 void configure_mqtt(){
 
   // take mqtt tables from database
-  mqtt_general_config_table _mqtt_general_configs = __database_service.get_mqtt_general_config_table();
-  mqtt_pubsub_config_table _mqtt_pubsub_configs = __database_service.get_mqtt_pubsub_config_table();
-  mqtt_lwt_config_table _mqtt_lwt_configs = __database_service.get_mqtt_lwt_config_table();
+  mqtt_general_config_table _mqtt_general_configs;
+  mqtt_lwt_config_table _mqtt_lwt_configs;
+  mqtt_pubsub_config_table _mqtt_pubsub_configs;
+  __database_service.get_mqtt_general_config_table(&_mqtt_general_configs);
+  __database_service.get_mqtt_lwt_config_table(&_mqtt_lwt_configs);
+  __database_service.get_mqtt_pubsub_config_table(&_mqtt_pubsub_configs);
 
   // copy general configs in mqtt general table
   memcpy( _mqtt_general_configs.host, MQTT_HOST, strlen( MQTT_HOST ) );
@@ -98,16 +99,16 @@ void configure_mqtt(){
   __mqtt_service.setMqttSubscribeDataCallback( subscribe_callback );
 
   // start mqtt service with new configuration immediate after this call. e.g. here after 10 ms
-  __task_scheduler.setTimeout( [&]() { __mqtt_service.handleMqttConfigChange(); }, 10 );
+  __task_scheduler.setTimeout( [&]() { __mqtt_service.handleMqttConfigChange(); }, 10, millis() );
 }
 
 
 #else
-  #error "Mqtt service is disabled ( in config/Common.h of framework library ). please enable(uncomment) it for this example"
+  #error "Mqtt portal service is disabled ( in config/Common.h of framework library ). please enable(uncomment ENABLE_HTTP_SERVER) it for this example"
 #endif
 
 void setup() {
-  EwStack.initialize();
+  PdiStack.initialize();
 
   // call it only after framework initialization
   configure_mqtt();
@@ -115,5 +116,5 @@ void setup() {
 
 void loop() {
 
-  EwStack.serve();
+  PdiStack.serve();
 }

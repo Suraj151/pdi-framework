@@ -1,0 +1,42 @@
+// -*- C++ -*- forwarding header.
+
+// Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002
+// Free Software Foundation, Inc.
+//
+// This file is part of the GNU ISO C++ Library.  This library is free
+// software; you can redistribute it and/or modify it under the
+// terms of the GNU General Public License as published by the
+// Free Software Foundation; either version 2, or (at your option)
+// any later version.
+
+/***************************** PDI STD File ***********************************
+This file is taken from external sources. this is taken from open source uClibc++ 
+library available on github. below is reference link. Thanking to author for
+providing this .
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+referred from   : https://github.com/mike-matera/ArduinoSTL
+added Date      : 1st Dec 2024
+added by        : Suraj I.
+******************************************************************************/
+
+#ifndef _CPP_CSIGNAL
+#define _CPP_CSIGNAL 1
+
+#pragma GCC system_header
+
+#include <signal.h>
+
+// Get rid of those macros defined in <signal.h> in lieu of real functions.
+#undef raise
+
+namespace pdistd
+{
+  using ::sig_atomic_t;
+  using ::signal;
+  using ::raise;
+}
+
+#endif

@@ -1,19 +1,32 @@
-/************************** Dashboard html page *******************************
-This file is part of the Ewings Esp Stack.
+/************************** Dashboard HTML Page *******************************
+This file is part of the PDI stack.
 
-This is free software. you can redistribute it and/or modify it but without any
+This is free software. You can redistribute it and/or modify it but without any
 warranty.
 
+The `Dashboard.h` file defines the HTML content for the dashboard page of the
+web server. The dashboard provides information about the device's network
+status, connected devices, and other relevant details. The HTML content is
+stored in program memory (PROG_RODT_ATTR) to optimize memory usage on embedded systems.
+
 Author          : Suraj I.
-created Date    : 1st June 2019
+Created Date    : 1st June 2019
 ******************************************************************************/
 
-#ifndef _EW_SERVER_DASHBOARD_PAGE_H_
-#define _EW_SERVER_DASHBOARD_PAGE_H_
+#ifndef _WEB_SERVER_DASHBOARD_PAGE_H_
+#define _WEB_SERVER_DASHBOARD_PAGE_H_
 
-#include <Arduino.h>
+#include <interface/pdi.h>
 
-static const char EW_SERVER_DASHBOARD_PAGE[] PROGMEM = "\
+/**
+ * @brief HTML content for the dashboard page.
+ *
+ * This static HTML content is used to render the dashboard page on the web
+ * server. It includes a table displaying network information such as SSID, IP
+ * address, RSSI, status, MAC address, internet connectivity, and network time.
+ * Additionally, it provides a section for listing connected devices.
+ */
+static const char WEB_SERVER_DASHBOARD_PAGE[] PROG_RODT_ATTR = "\
 <h2>Dashboard</h2>\
 \
 <style>\
@@ -62,4 +75,5 @@ min-width:100px;\
 \
 <table id='cndl'>\
 </table>";
+
 #endif

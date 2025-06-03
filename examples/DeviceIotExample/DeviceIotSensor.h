@@ -1,5 +1,4 @@
 /*************************** Device IOT Sensor ********************************
-
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
 
@@ -10,10 +9,10 @@ created Date    : 1st June 2019
 #ifndef _DEVICE_IOT_SENSOR_H_
 #define _DEVICE_IOT_SENSOR_H_
 
-#include <EwingsEspStack.h>
+#include <PdiStack.h>
 
 #ifndef ENABLE_DEVICE_IOT
-  #error "device iot service is disabled ( in config/Common.h of ewings esp framework library ). please enable(uncomment) it for this example"
+  #error "device iot service is disabled ( in config/Common.h of ewings esp framework library ). please enable(uncomment ENABLE_DEVICE_IOT) it for this example"
 #endif
 
 #define DEVICE_IOT_SENSOR_TYPE  "sensor_t"
@@ -36,7 +35,7 @@ class DeviceIotSensor : public iDeviceIotInterface {
 
     void init( void );
     void sampleHook( void );
-    void dataHook( String &_payload );
+    void dataHook( pdiutil::string &_payload );
     void resetSampleHook( void );
 
   protected:

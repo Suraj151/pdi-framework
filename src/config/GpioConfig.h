@@ -1,5 +1,5 @@
 /***************************** GPIO Config page *******************************
-This file is part of the Ewings Esp Stack.
+This file is part of the pdi stack.
 
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
@@ -12,10 +12,22 @@ created Date    : 1st June 2019
 
 #include "Common.h"
 
+#if !defined(MAX_DIGITAL_GPIO_PINS)
 #define MAX_DIGITAL_GPIO_PINS         9
+#endif
+#if !defined(MAX_ANALOG_GPIO_PINS)
 #define MAX_ANALOG_GPIO_PINS          1
+#endif
+
+#if !defined(MAX_GPIO_PINS)
+#define MAX_GPIO_PINS                 MAX_DIGITAL_GPIO_PINS + MAX_ANALOG_GPIO_PINS // Assuming analog and digital pins are not same
+#endif
+
 #define GPIO_HOST_BUF_SIZE            60
 #define ANALOG_GPIO_RESOLUTION        1024
+
+#ifndef ENABLE_GPIO_BASIC_ONLY
+
 #define GPIO_GRAPH_ADJ_POINT_DISTANCE 10
 #define GPIO_MAX_GRAPH_WIDTH          300
 #define GPIO_MAX_GRAPH_HEIGHT         150
@@ -27,12 +39,6 @@ created Date    : 1st June 2019
 
 #define GPIO_ALERT_DURATION_FOR_SUCCEED 3600000
 #define GPIO_ALERT_DURATION_FOR_FAILED  300000
-
-/**
- * @define gpio parameters
- */
-#define GPIO_OPERATION_DURATION MILLISECOND_DURATION_1000
-#define GPIO_TABLE_UPDATE_DURATION 300000
 
 /**
  * global gpio alert status
@@ -49,7 +55,16 @@ struct last_gpio_monitor_point{
   int x;
   int y;
 };
-const uint8_t EXCEPTIONAL_GPIO_PINS[] = {3};
+
+#endif
+
+
+/**
+ * @define gpio parameters
+ */
+#define GPIO_OPERATION_DURATION MILLISECOND_DURATION_1000
+#define GPIO_TABLE_UPDATE_DURATION 300000
+
 
 enum GPIO_CONFIG_TYPE {
   GPIO_MODE_CONFIG,
@@ -89,19 +104,41 @@ enum GPIO_ALERT_CHANNEL {
 };
 
 struct gpio_configs {
-  uint8_t gpio_mode[MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS];
-  uint16_t gpio_readings[MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS];
-  uint8_t gpio_alert_comparator[MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS];
-  uint8_t gpio_alert_channel[MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS];
-  uint16_t gpio_alert_values[MAX_DIGITAL_GPIO_PINS+MAX_ANALOG_GPIO_PINS];
+
+  // Default Constructor
+  gpio_configs(){
+    clear();
+  }
+
+  // Clear members method
+  void clear(){
+    memset(gpio_mode, OFF, MAX_GPIO_PINS);
+    memset(gpio_readings, 0, MAX_GPIO_PINS);
+#ifndef ENABLE_GPIO_BASIC_ONLY
+    memset(gpio_alert_comparator, EQUAL, MAX_GPIO_PINS);
+    memset(gpio_alert_channel, NO_ALERT, MAX_GPIO_PINS);
+    memset(gpio_alert_values, 0, MAX_GPIO_PINS);
+    memset(gpio_host, 0, GPIO_HOST_BUF_SIZE);
+    gpio_port = 80;
+    gpio_post_frequency = GPIO_DATA_POST_FREQ;
+#endif
+  }
+
+  uint8_t gpio_mode[MAX_GPIO_PINS];
+  uint16_t gpio_readings[MAX_GPIO_PINS];
+#ifndef ENABLE_GPIO_BASIC_ONLY
+  uint8_t gpio_alert_comparator[MAX_GPIO_PINS];
+  uint8_t gpio_alert_channel[MAX_GPIO_PINS];
+  uint16_t gpio_alert_values[MAX_GPIO_PINS];
   char gpio_host[GPIO_HOST_BUF_SIZE];
   int gpio_port;
   int gpio_post_frequency;
+#endif
 };
 
-const gpio_configs PROGMEM _gpio_config_defaults = {
-  {OFF}, {0}, {EQUAL}, {NO_ALERT}, {0}, "", 80, GPIO_DATA_POST_FREQ
-};
+// const gpio_configs PROGMEM _gpio_config_defaults = {
+//   {OFF}, {0}, {EQUAL}, {NO_ALERT}, {0}, "", 80, GPIO_DATA_POST_FREQ
+// };
 
 const int gpio_config_size = sizeof(gpio_configs) + 5;
 

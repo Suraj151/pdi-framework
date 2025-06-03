@@ -5,10 +5,10 @@
  *
  */
 
-#include <EwingsEspStack.h>
+#include <PdiStack.h>
 
 
-#if defined(ENABLE_EWING_HTTP_SERVER)
+#if defined(ENABLE_HTTP_SERVER)
 
 /**
  * TestController class must be derived from Controller class
@@ -40,39 +40,37 @@ class TestController : public Controller {
 		 */
     void handleTestRoute( void ) {
 
-      #ifdef EW_SERIAL_LOG
-      Logln(F("Handling Test route"));
-      #endif
+      LogI("Handling Test route\n");
 
       /**
        * take new dynamic array to build html response page
-       * EW_HTML_MAX_SIZE defined in framework as 5000
+       * PAGE_HTML_MAX_SIZE defined in framework as 5000
        */
-      char* _page = new char[EW_HTML_MAX_SIZE];
-			memset( _page, 0, EW_HTML_MAX_SIZE );
+      char* _page = new char[PAGE_HTML_MAX_SIZE];
+			memset( _page, 0, PAGE_HTML_MAX_SIZE );
 
       /**
        * first append header part of html to reponse
   		 */
-			strcat_P( _page, EW_SERVER_HEADER_HTML );
+			strcat_ro( _page, WEB_SERVER_HEADER_HTML );
 
       /**
        * then append body part of html to response
        * for demo purpose, dashboard card added with the help of html helpers available in framework
   		 */
-			strcat_P( _page, EW_SERVER_MENU_CARD_PAGE_WRAP_TOP );
-			concat_svg_menu_card( _page, EW_SERVER_HOME_MENU_TITLE_DASHBOARD, SVG_ICON48_PATH_DASHBOARD, EW_SERVER_DASHBOARD_ROUTE );
-			strcat_P( _page, EW_SERVER_MENU_CARD_PAGE_WRAP_BOTTOM );
+			strcat_ro( _page, WEB_SERVER_MENU_CARD_PAGE_WRAP_TOP );
+			concat_svg_menu_card( _page, WEB_SERVER_HOME_MENU_TITLE_DASHBOARD, SVG_ICON48_PATH_DASHBOARD, WEB_SERVER_DASHBOARD_ROUTE );
+			strcat_ro( _page, WEB_SERVER_MENU_CARD_PAGE_WRAP_BOTTOM );
 
       /**
        * lastely append footer part of html to response
   		 */
-			strcat_P( _page, EW_SERVER_FOOTER_HTML );
+			strcat_ro( _page, WEB_SERVER_FOOTER_HTML );
 
       /**
        * finally send response and deallocate page
   		 */
-      this->m_web_resource->m_server->send( HTTP_OK, EW_HTML_CONTENT, _page );
+      this->m_web_resource->m_server->send( HTTP_OK, TEXT_HTML_CONTENT, _page );
       delete[] _page;
     }
 };
@@ -82,14 +80,14 @@ class TestController : public Controller {
  */
 TestController test_controller;
 #else
-  #error "Ewings HTTP server is disabled ( in config/Common.h of framework library ). please enable(uncomment) it for this example"
+  #error "HTTP server is disabled ( in config/Common.h of framework library ). please enable(uncomment) it for this example"
 #endif
 
 
 void setup() {
- EwStack.initialize();
+ PdiStack.initialize();
 }
 
 void loop() {
- EwStack.serve();
+ PdiStack.serve();
 }

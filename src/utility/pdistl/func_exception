@@ -1,0 +1,35 @@
+/***************************** PDI STD File ***********************************
+This file is taken from external sources. this is taken from open source uClibc++ 
+library available on github. below is reference link. Thanking to author for
+providing this .
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+referred from   : https://github.com/mike-matera/ArduinoSTL
+added Date      : 1st Dec 2024
+added by        : Suraj I.
+******************************************************************************/
+
+#include "basic_definitions"
+#include "exception"
+
+
+#ifndef HEADER_IMPLEMENTATION_FUNC_EXCEPTION
+#define HEADER_IMPLEMENTATION_FUNC_EXCEPTION
+
+#pragma GCC visibility push(default)
+
+namespace pdistd{
+
+	_UCXXEXPORT void __throw_bad_alloc();
+	_UCXXEXPORT void __throw_out_of_range(const char * message = 0);
+	_UCXXEXPORT void __throw_overflow_error(const char * message = 0);
+	_UCXXEXPORT void __throw_length_error(const char * message = 0);
+	_UCXXEXPORT void __throw_invalid_argument(const char * message = 0);
+}
+
+#pragma GCC visibility pop
+
+#endif
+

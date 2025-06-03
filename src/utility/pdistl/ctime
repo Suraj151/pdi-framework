@@ -1,0 +1,51 @@
+/***************************** PDI STD File ***********************************
+This file is taken from external sources. this is taken from open source uClibc++ 
+library available on github. below is reference link. Thanking to author for
+providing this .
+
+This is free software. you can redistribute it and/or modify it but without any
+warranty.
+
+referred from   : https://github.com/mike-matera/ArduinoSTL
+added Date      : 1st Dec 2024
+added by        : Suraj I.
+******************************************************************************/
+
+#ifndef _CPP_CTIME
+#define _CPP_CTIME 1
+
+#pragma GCC system_header
+
+#include "cstddef"
+
+#include <time.h>
+
+// Get rid of those macros defined in <time.h> in lieu of real functions.
+#undef clock
+#undef difftime
+#undef mktime
+#undef time
+#undef asctime
+#undef ctime
+#undef gmtime
+#undef localtime
+#undef strftime
+
+namespace pdistd
+{
+  using ::clock_t;
+  using ::time_t;
+  using ::tm;
+
+  using ::clock;
+  using ::difftime;
+  using ::mktime;
+  using ::time;
+  using ::asctime;
+  using ::ctime;
+  using ::gmtime;
+  using ::localtime;
+  using ::strftime;
+}
+
+#endif
