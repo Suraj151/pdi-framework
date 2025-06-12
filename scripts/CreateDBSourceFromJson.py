@@ -7,27 +7,20 @@ Create sets of DB C++ classes based on json schemas
 import os
 import sys
 import argparse
+import shutil
 
 # consts
 IsPython3 = ( sys.version_info[0] >= 3 )
 
 def cleanpath(pathtoclean):
 
-    path = os.path.dirname(os.path.realpath(__file__))
+    pathtoclean = os.path.abspath(pathtoclean)
 
-    if not path.endswith(os.sep):
-        path += os.sep
+    if os.path.exists(pathtoclean) and os.path.isdir(pathtoclean):
+        shutil.rmtree(pathtoclean)
 
-    if pathtoclean != "":
-        path += pathtoclean
-
-    if not path.endswith(os.sep):
-        path += os.sep
-
-    dir_list = os.listdir(path)
-
-    for file in dir_list:
-        os.remove(path+file)
+    if not os.path.exists(pathtoclean):
+        os.makedirs(pathtoclean)
 
 if __name__ == "__main__":
 
@@ -50,15 +43,15 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    try:
+    # try:
 
-        schema = args.schema
-        outpath = args.outpath
-        cleanpath(outpath)
-        os.system('python3 JsonToCpp.py -s ' + schema + ' -o ' + outpath)
+    schema = args.schema
+    outpath = args.outpath
+    cleanpath(outpath)
+    os.system('python3 JsonToCpp.py -s ' + schema + ' -o ' + outpath)
     
-    except Exception as ex:
-        print("Exception : %s" %ex)
+    # except Exception as ex:
+        # print("Exception : %s" %ex)
 
-    except KeyboardInterrupt:
-        print("Aborted by keyboard interrupt !")
+    # except KeyboardInterrupt:
+        # print("Aborted by keyboard interrupt !")
