@@ -8,10 +8,16 @@ Author          : Suraj I.
 created Date    : 1st May 2025
 ******************************************************************************/
 #include "TcpServerInterface.h"
+#include "DeviceControlInterface.h"
 
 
-TcpServerInterface::TcpServerInterface()
-    : m_serverPcb(nullptr), m_clientPcb(nullptr), m_timeout(30000), m_hasClient(false) {}
+TcpServerInterface::TcpServerInterface(): 
+    m_serverPcb(nullptr), 
+    m_clientPcb(nullptr), 
+    m_timeout(30000), 
+    m_hasClient(false),
+    m_onAcceptCallbk(nullptr),
+    m_onAcceptCallbkArg(nullptr) {}
 
 TcpServerInterface::~TcpServerInterface() {
     close();
@@ -67,6 +73,14 @@ void TcpServerInterface::close() {
 }
 
 /**
+ * @brief Set callback event for when a new client connection is accepted.
+ */
+void TcpServerInterface::setOnAcceptClientEventCallback(CallBackVoidPointerArgFn callbk, void* arg) {
+    m_onAcceptCallbk = callbk;
+    m_onAcceptCallbkArg = arg;
+}
+
+/**
  * @brief Check if there is a client connected.
  * @return true if a client is connected, false otherwise.
  */
@@ -118,6 +132,11 @@ err_t TcpServerInterface::onAccept(void* arg, struct tcp_pcb* newpcb, err_t err)
 
     // Optionally set keepalive or other options here
     // newpcb->so_options |= SOF_KEEPALIVE;
+
+    // trigger the callback if registered
+    if( server->m_onAcceptCallbk ){
+        server->m_onAcceptCallbk(server->m_onAcceptCallbkArg);
+    }
 
     return ERR_OK;
 }

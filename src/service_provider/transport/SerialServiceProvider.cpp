@@ -79,7 +79,7 @@ void SerialServiceProvider::processSerial(serial_event_t *se)
         terminal = __cmd_service.getTerminal();
       }
 
-      // Currently supporting multiple client (tcp, telnet, serial) for command service.
+      // Currently supporting multiple client (tcp, telnet, serial, ssh) for command service.
       // And at a time currently only one terminal can be used for command service.
       // So checking the terminal type before proceeding the command service
       // Other client types can override running serial terminal and use it for command service

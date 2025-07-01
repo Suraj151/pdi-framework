@@ -8,6 +8,7 @@ Author          : Suraj I.
 created Date    : 1st May 2025
 ******************************************************************************/
 #include "TcpClientInterface.h"
+#include "DeviceControlInterface.h"
 
 /**
  * @brief Constructor for TcpClientInterface.
@@ -17,7 +18,8 @@ TcpClientInterface::TcpClientInterface() :
     m_isConnected(false), 
     m_rxBuffer(nullptr),
     m_rxBufferSize(0),
-    m_timeout(3000) {}
+    m_timeout(3000),
+    m_isLastWriteAcked(true) {}
 
 /**
  * @brief Parameterized Constructor for TcpClientInterface.
@@ -30,12 +32,16 @@ TcpClientInterface::TcpClientInterface(struct tcp_pcb* pcb):
     m_isConnected(true), 
     m_rxBuffer(nullptr),
     m_rxBufferSize(0),
-    m_timeout(3000) {
+    m_timeout(3000),
+    m_isLastWriteAcked(true) {
 
     if (m_pcb) {
         tcp_arg(m_pcb, this);
         tcp_err(m_pcb, &TcpClientInterface::onError);
         tcp_recv(m_pcb, &TcpClientInterface::onReceive);
+        tcp_sent(m_pcb, &TcpClientInterface::onSent);
+
+        setNoDelay(true);
     }
 }
 
@@ -68,6 +74,7 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
     // Set the connection callback
     tcp_arg(m_pcb, this);
     tcp_err(m_pcb, &TcpClientInterface::onError);
+    tcp_sent(m_pcb, &TcpClientInterface::onSent);
 
     // Connect to the server
     err_t err = tcp_connect(m_pcb, &serverIp, port, &TcpClientInterface::onConnected);
@@ -76,6 +83,8 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
         return err < 0 ? err : -99; // Return error code if connection fails
     }
 
+    setNoDelay(true);
+    
     return 0;
 }
 
@@ -115,19 +124,50 @@ int8_t TcpClientInterface::connected() {
  * @brief Write data to the server.
  */
 int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
+
     if (!m_isConnected || !m_pcb) {
         return -99;
     }
 
-    err_t err = tcp_write(m_pcb, c_str, size, TCP_WRITE_FLAG_COPY);
-    if (err != ERR_OK) {
-        return err < 0 ? err : -99; // Return error code if write fails
+    uint8_t flags = TCP_WRITE_FLAG_COPY;
+
+    if (!m_isLastWriteAcked){
+        flags |= TCP_WRITE_FLAG_MORE; // do not tcp-PuSH (yet)
     }
 
-    err = tcp_output(m_pcb); // Ensure the data is sent
-    if (err != ERR_OK) {
-        return err < 0 ? err : -99; // Return error code if write fails
+    err_t err = ERR_OK;
+    int32_t total_sent = 0;
+
+    while (total_sent < size) {
+
+        int32_t remaining = size - total_sent;
+        int32_t chunk = std::min(remaining, (int32_t)TCP_SND_BUF); // TCP_SND_BUF is lwIP's max send size
+
+        // uint8_t flags = TCP_WRITE_FLAG_COPY;
+        if (chunk < remaining)
+            flags |= TCP_WRITE_FLAG_MORE; // do not tcp-PuSH (yet)
+
+        err = tcp_write(m_pcb, c_str + total_sent, chunk, flags);
+        if (err != ERR_OK) {
+            return err < 0 ? err : -99; // Return error code if write fails
+        }
+
+        total_sent += chunk;
     }
+
+    // Ensure last write has been ackowledged
+    if (m_isLastWriteAcked){
+
+        err = tcp_output(m_pcb); // Ensure the data is sent
+        if (err != ERR_OK) {
+            return err < 0 ? err : -99; // Return error code if write fails
+        }
+    }
+
+    m_isLastWriteAcked = false;
+
+    __i_dvc_ctrl.yield();
+
     return size;
 }
 
@@ -247,6 +287,17 @@ void TcpClientInterface::onError(void* arg, err_t err) {
         client->m_pcb = nullptr;
         client->disconnect();
     }
+}
+
+/**
+ * @brief Callback for when an data sent occurs.
+ */
+err_t TcpClientInterface::onSent(void* arg, struct tcp_pcb* tpcb, u16_t len) {
+    TcpClientInterface* client = static_cast<TcpClientInterface*>(arg);
+    if (client) {
+        client->m_isLastWriteAcked = true;
+    }
+    return ERR_OK;
 }
 
 /**

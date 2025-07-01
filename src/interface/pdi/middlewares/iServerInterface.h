@@ -35,8 +35,9 @@ public:
   virtual int32_t begin(uint16_t port) = 0;
   virtual bool hasClient() const = 0;
   virtual iClientInterface* accept() = 0;
-  virtual void setTimeout(uint32_t timeout_ms) = 0;
+  virtual void setTimeout(uint32_t timeout_ms) {}
   virtual void close() = 0;
+  virtual void setOnAcceptClientEventCallback(CallBackVoidPointerArgFn callbk, void* arg = nullptr) {}
 };
 
 /**

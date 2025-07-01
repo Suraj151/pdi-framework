@@ -31,7 +31,7 @@ struct LoginCommand : public CommandBase {
 	}
 
 	/* execute command with provided options */
-	cmd_result_t execute(){
+	cmd_result_t execute(cmd_term_inseq_t terminputaction){
 
 		cmd_result_t result = CMD_RESULT_OK;
 
@@ -81,11 +81,6 @@ struct LoginCommand : public CommandBase {
 				result = CMD_RESULT_WRONG_CREDENTIAL;
 				ResultToTerminal(result);
 				setWaitingForOption(CMD_OPTION_NAME_U);
-				// if( nullptr != m_terminal ){
-				// 	m_terminal->write_ro(RODT_ATTR("\n"));
-      			// 	m_terminal->write(CMD_NAME_LOGIN);
-				// 	m_terminal->write_ro(RODT_ATTR(": "));
-				// }
 			}
 		}
 
@@ -106,10 +101,15 @@ struct LogoutCommand : public CommandBase {
 	}
 
 	/* execute command with provided options */
-	cmd_result_t execute(){
+	cmd_result_t execute(cmd_term_inseq_t terminputaction){
 
 		cmd_result_t result = CMD_RESULT_OK;
 		__auth_service.setAuthorized(false);
+
+		#ifdef ENABLE_STORAGE_SERVICE
+		*(__i_fs.pwd()) = __i_fs.getHomeDirectory();
+		#endif
+		
 		return result;
 	}
 };

@@ -13,6 +13,7 @@ Created Date    : 1st June 2019
 ******************************************************************************/
 
 #include "Base64.h"
+#include "DataTypeDef.h"
 
 // Character set of the Base64 encoding scheme
 static char char_set[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -97,4 +98,21 @@ bool base64Encode(char input_str[], int len_str, char *res_str)
   res_str[k] = '\0';
 
   return true;
+}
+
+/**
+ * @brief Generates a unique key of specified length.
+ * 
+ * This function generates a random unique key consisting of alphanumeric characters.
+ * The key is generated using a predefined character set and is null-terminated.
+ *
+ * @param key Pointer to the buffer where the unique key will be stored.
+ * @param len Length of the unique key to be generated (including null terminator).
+ */
+void genUniqueKey(char *key, int len){
+
+  for (int i = 0; i < len; i++){
+
+    key[i] = char_set[rand() % (sizeof(char_set) - 1)];
+  }
 }

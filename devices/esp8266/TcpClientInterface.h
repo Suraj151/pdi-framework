@@ -171,11 +171,13 @@ private:
     uint8_t* m_rxBuffer;   ///< Receive buffer.
     uint32_t m_rxBufferSize; ///< Size of the receive buffer.
     uint32_t m_timeout;    ///< Timeout value in milliseconds.
+    bool m_isLastWriteAcked;
 
     // LWIP callback functions
     static err_t onConnected(void* arg, struct tcp_pcb* tpcb, err_t err);
     static err_t onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf* p, err_t err);
     static void onError(void* arg, err_t err);
+    static err_t onSent(void* arg, struct tcp_pcb* tpcb, u16_t len);
 };
 
 #endif // _TCP_CLIENT_INTERFACE_H_

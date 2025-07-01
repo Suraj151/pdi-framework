@@ -57,6 +57,9 @@ typedef enum services{
 #ifdef ENABLE_TELNET_SERVICE
   SERVICE_TELNET,
 #endif
+#ifdef ENABLE_SSH_SERVICE
+  SERVICE_SSH,
+#endif
   SERVICE_MAX
 } service_t;
 

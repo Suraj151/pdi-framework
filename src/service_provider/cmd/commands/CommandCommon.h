@@ -56,10 +56,11 @@ created Date    : 1st June 2019
 #define CMD_NAME_MKF 				"mkf"
 #define CMD_NAME_RM 				"rm"
 #define CMD_NAME_MOVE 			    "mv"
-#define CMD_NAME_FILE_READ 			"frd"
-#define CMD_NAME_FILE_WRITE 		"fwr"
+#define CMD_NAME_FILE_READ 			"fread"
+#define CMD_NAME_FILE_WRITE 		"fwrite"
 #define CMD_NAME_CLS 			    "cls"
 #define CMD_NAME_SCHED_TASK 		"scht"
+#define CMD_NAME_SSH 				"ssh"
 
 /* command options */
 #define CMD_OPTION_NAME_P			"p"
@@ -70,6 +71,7 @@ created Date    : 1st June 2019
 #define CMD_OPTION_NAME_Q	        "q"
 #define CMD_OPTION_NAME_F	        "f"
 #define CMD_OPTION_NAME_L	        "l"
+#define CMD_OPTION_NAME_T	        "t"
 
 
 #endif

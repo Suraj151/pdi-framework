@@ -57,20 +57,26 @@ bool TelnetServiceProvider::start(uint16_t port) {
  * @brief Start the Telnet service on the specified port.
  */
 bool TelnetServiceProvider::initService(void *arg) {
-    if (arg) {
-        uint16_t port = *(uint16_t*)arg;
-        bool started = start(port);
 
-        // If the service started successfully, set up a periodic task to handle incoming clients
-        if(started){
-            __task_scheduler.setInterval( [&]() {
-                this->handle();
-            }, 1, __i_dvc_ctrl.millis_now() );
-        }
+    bool started = false;
+
+    if (arg) {
         
-        return started && ServiceProvider::initService(arg);
+        uint16_t port = *(uint16_t*)arg;
+        started = start(port);
+    }else{
+
+        started = start();
     }
-    return false;
+
+    // If the service started successfully, set up a periodic task to handle incoming clients
+    if(started){
+        __task_scheduler.setInterval( [&]() {
+            this->handle();
+        }, 1, __i_dvc_ctrl.millis_now() );
+    }
+    
+    return started && ServiceProvider::initService(arg);
 }
 
 /**
@@ -124,9 +130,22 @@ void TelnetServiceProvider::handle() {
             // Inform serial terminal about the new telnet client session
             if(__i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)){
                 __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln();
-                __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln_ro(RODT_ATTR("Telnet Client Session started."));
+                __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln_ro(RODT_ATTR("Telnet Client Session starting."));
             }
-            __cmd_service.useTerminal(m_client);
+
+            iTerminalInterface *current_terminal = __cmd_service.getTerminal();
+            if( current_terminal && TERMINAL_TYPE_SSH == current_terminal->get_terminal_type() ){
+
+                if(__i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)){
+                    __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln();
+                    __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln_ro(RODT_ATTR("Unable to start telnet client session."));
+                }
+
+                m_client->writeln_ro(RODT_ATTR("Can't start session due to existing ssh session."));
+                closeClient();
+            }else{
+                __cmd_service.useTerminal(m_client);
+            }
             #endif            
         }
     }
@@ -137,7 +156,12 @@ void TelnetServiceProvider::handle() {
 
             // process and execute if command has provided
             #ifdef ENABLE_CMD_SERVICE
-            __cmd_service.processTerminalInput(m_client);
+            cmd_result_t res = __cmd_service.processTerminalInput(m_client);
+            if( res == CMD_RESULT_ABORTED ||
+                res == CMD_RESULT_TERMINAL_ABORTED
+            ){
+                m_client->disconnect();
+            }
             #endif
 
             // Flush the client buffer

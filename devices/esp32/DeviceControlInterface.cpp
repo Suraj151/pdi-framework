@@ -217,6 +217,22 @@ void DeviceControlInterface::restartDevice()
 }
 
 /**
+ * device watchdog enable
+ */
+void DeviceControlInterface::enableWdt(uint8_t mode_if_any)
+{
+    // ESP.wdtEnable((uint32_t)0);
+}
+
+/**
+ * device watchdog disable
+ */
+void DeviceControlInterface::disableWdt()
+{
+    // ESP.wdtDisable();
+}
+
+/**
  * device watchdog feed
  */
 void DeviceControlInterface::feedWdt()
@@ -312,6 +328,10 @@ void DeviceControlInterface::log(logger_type_t log_type, const char *content)
  */
 void DeviceControlInterface::yield()
 {
+    // run_scheduled_functions();
+    // run_scheduled_recurrent_functions();
+    // esp_schedule();
+    vPortYield();
     delay(0);
 }
 

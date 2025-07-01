@@ -46,7 +46,7 @@ struct ServiceCommand : public CommandBase {
 #endif
 
 	/* execute command with provided options */
-	cmd_result_t execute(){
+	cmd_result_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
 		// return in case authentication needed and not authorized yet

@@ -27,6 +27,7 @@ created Date    : 1st June 2019
 #include "commands/FileFSCommand.h"
 #include "commands/ClearScreenCommand.h"
 #include "commands/SchedulerTaskCommand.h"
+#include "commands/SSHCommand.h"
 
 /**
  * CommandLineServiceProvider class
@@ -50,7 +51,7 @@ public:
      */
     bool initService(void *arg = nullptr) override;
 
-	void processTerminalInput(iTerminalInterface *terminal);
+	cmd_result_t processTerminalInput(iTerminalInterface *terminal);
 	cmd_result_t executeCommand(pdiutil::string *cmd = nullptr, cmd_term_inseq_t inseq = CMD_TERM_INSEQ_NONE);
 	static void startInteraction();
 	cmd_t* getCommandByName(char* _cmd);

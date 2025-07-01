@@ -122,6 +122,11 @@ void PDIStack::initialize(){
   __telnet_service.initService(&telnet_port);
   #endif
 
+  #ifdef ENABLE_SSH_SERVICE
+  uint16_t ssh_port = 22; // Default SSH port
+  __sshserver_service.initService(&ssh_port);
+  #endif
+
   #ifdef ENABLE_CMD_SERVICE
   __cmd_service.initService();
   CommandLineServiceProvider::startInteraction();

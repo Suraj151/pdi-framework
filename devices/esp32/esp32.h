@@ -56,6 +56,11 @@ created Date    : 1st Jan 2024
 #define PROG_RODT_ATTR PROGMEM
 #endif
 
+#ifdef PROG_RODT_PTR
+#undef PROG_RODT_PTR
+#define PROG_RODT_PTR PGM_P
+#endif
+
 #ifdef strcat_ro
 #undef strcat_ro
 #define strcat_ro strcat_P
@@ -91,6 +96,10 @@ created Date    : 1st Jan 2024
 #define strncmp_ro strncmp_P
 #endif
 
+#ifdef memcpy_ro
+#undef memcpy_ro
+#define memcpy_ro memcpy_P
+#endif
 
 /**
  * @define flash key parameters for reset factory

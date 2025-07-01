@@ -64,6 +64,21 @@ int TaskScheduler::setTimeout(CallBackVoidArgFn _task_fn, uint64_t _duration, ui
 }
 
 /**
+ * @brief Update a one-time timeout for a task.
+ *
+ * @param _task_id The unique ID of the task to update.
+ * @param _task_fn The callback function to execute after the timeout.
+ * @param _duration The timeout duration in milliseconds.
+ * @param _now_millis The current time in milliseconds.
+ * @param _task_priority The priority of the task (default is DEFAULT_TASK_PRIORITY).
+ * @return The unique ID of the registered task.
+ */
+int TaskScheduler::updateTimeout(int _task_id, CallBackVoidArgFn _task_fn, uint64_t _duration, uint64_t _now_millis, int _task_priority)
+{
+    return updateInterval(_task_id, _task_fn, _duration, _task_priority, _now_millis, 1);
+}
+
+/**
  * @brief Sets a recurring interval for a task.
  *
  * @param _task_fn The callback function to execute at each interval.

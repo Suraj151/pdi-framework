@@ -38,6 +38,8 @@ typedef enum {
     CMD_RESULT_WRONG_CREDENTIAL,     ///< Wrong credentials provided.
     CMD_RESULT_FAILED,               ///< Failed
     CMD_RESULT_ABORTED,              ///< Command execution was aborted.
+    CMD_RESULT_TERMINAL_ERR,         ///< Terminal is not available.
+    CMD_RESULT_TERMINAL_ABORTED,     ///< Terminal was aborted.
     CMD_RESULT_MAX                   ///< Unknown or unhandled result.
 } cmd_result_t;
 
@@ -118,6 +120,7 @@ typedef struct CommandBase {
     cmd_result_t m_result;                        ///< Result of the command execution.
     bool m_acceptArgsOptions;                   ///< Flag to accept argumental options.
     const char* m_optionseparator;               ///< Separator for options.
+    uint16_t m_iterations;
 
     /**
      * @brief Constructor for the CommandBase structure.
@@ -400,11 +403,6 @@ typedef struct CommandBase {
             }
         }
 
-        /* Perform terminal input actions if any */
-        if( inseq > CMD_TERM_INSEQ_ENTER && inseq < CMD_TERM_INSEQ_MAX ){
-            m_result = executeTermInputAction(inseq);
-        }
-
         /* execute command if format is ok */
         if( CMD_RESULT_OK == m_result ){
             // if( nullptr != m_terminal ){
@@ -413,13 +411,21 @@ typedef struct CommandBase {
             // 	m_terminal->write(RODT_ATTR("\n"));
             // }
             m_status = CMD_STATUS_ACTIVE;
-            m_result = execute();
+            m_result = execute(inseq);
+            m_iterations++;
         }
+
+        /* Perform terminal input actions if any */
+        if( inseq > CMD_TERM_INSEQ_NONE && inseq < CMD_TERM_INSEQ_MAX ){
+            m_result = executeTermInputAction(inseq);
+        }
+
         if( CMD_RESULT_INCOMPLETE != m_result ){
             m_status = CMD_STATUS_INACTIVE;
             ResultToTerminal(m_result);
             // once executed clear the options
             ClearOptions();
+            m_iterations = 0;
         }
         return m_result;
     }
@@ -436,6 +442,7 @@ typedef struct CommandBase {
         m_result = CMD_RESULT_MAX;
         m_acceptArgsOptions = false;
         m_optionseparator = CMD_OPTION_SEPERATOR_COMMA;
+        m_iterations = 0;
     }
 
     /**
@@ -457,7 +464,7 @@ typedef struct CommandBase {
     void ResultToTerminal(cmd_result_t res){
         if( nullptr != m_terminal && CMD_RESULT_INCOMPLETE != res && CMD_RESULT_OK != res && !isWaitingForOption() ){
             m_terminal->writeln();
-            m_terminal->write_ro(RODT_ATTR("Err : "));
+            m_terminal->write_ro(RODT_ATTR("CmdErr : "));
             m_terminal->write((int32_t)res);
             // switch (res){
             // case CMD_RESULT_ARGS_ERROR:
@@ -507,7 +514,7 @@ typedef struct CommandBase {
      * @brief Executes the command logic.
      * @return The result of the command execution.
      */
-    virtual cmd_result_t execute() = 0;
+    virtual cmd_result_t execute(cmd_term_inseq_t terminputaction) = 0;
 
     /**
      * @brief Executes the terminal input action.
@@ -521,7 +528,7 @@ typedef struct CommandBase {
             m_status = CMD_STATUS_INACTIVE;
             return CMD_RESULT_ABORTED;
         }
-        return CMD_RESULT_OK;
+        return m_result;
     }
     
 } cmd_t;

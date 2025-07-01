@@ -26,7 +26,14 @@ created Date    : 1st June 2019
 #endif
 
 #include "EventConfig.h"
+
+#ifdef ENABLE_NETWORK_SERVICE
 #include "NetworkConfig.h"
+#endif
+
+#ifdef ENABLE_SSH_SERVICE
+#include "SshConfig.h"
+#endif
 
 #ifdef ENABLE_MQTT_SERVICE
 #include "MqttConfig.h"

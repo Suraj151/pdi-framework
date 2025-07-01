@@ -33,17 +33,10 @@ Created Date    : 1st June 2019
 #ifdef ENABLE_CMD_SERVICE
 #include "CommandBase.h"
 #endif
+// #ifdef ENABLE_SSH_SERVICE
+// #include "crypto/ed25519/ed25519.h"
+// #endif
 
-/**
- * @brief This template clone program memory object to data memory.
- *
- * @param	cost T* sce
- * @param	T&	dest
- */
-// template <typename T> void PROGMEM_readAnything (const T * sce, T& dest)
-// {
-// 	memcpy_P (&dest, sce, sizeof (T));
-// }
 
 /**
  * @brief This template returns static copy of program memory object.

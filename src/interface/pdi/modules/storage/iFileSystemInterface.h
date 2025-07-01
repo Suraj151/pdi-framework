@@ -40,7 +40,8 @@ public:
     iFileSystemInterface(iStorageInterface& storage) :
         m_istorage(storage),
         m_pwd("/"),
-        m_root("/") {
+        m_root("/"),
+        m_home("/") {
     }
 
     /**
@@ -77,7 +78,7 @@ public:
     /**
      * @brief Reads content from a file.
      * @param path The path of the file to read.
-     * @param size The maximum number of bytes to read.
+     * @param size The maximum number of bytes to read in opne loop.
      * @param readbackfn callback function for readback.
      * @return The number of bytes read, or -1 on failure.
      */
@@ -217,25 +218,39 @@ public:
         int j = 0; // Index for newpath
         int lastsepindx = 0; // Index of the last directory separator
 
-        for (int i = 0; i < len; ++i) {
+        for (int i = 0; i < len; ++i) {           
             if (path[i] == FILE_SEPARATOR[0]) {
                 // Handle directory separator
-                if (i + 1 < len && path[i + 1] == '.') {
-                    if (i + 2 < len && path[i + 2] == '.') {
-                        // Handle ".." (parent directory)
-                        // Backtrack to the previous directory separator
-                        while (j > 0 && newpath[j - 1] != FILE_SEPARATOR[0]) {
-                            --j;
-                        }
-                        if (j > 0) {
-                            --j; // Remove the trailing separator
-                        }
-                        i += 2; // Skip ".."
-                    } else {
-                        // Handle "." (current directory)
-                        i += 1; // Skip "."
+
+                int tempi = i+1;
+                int dotcount = 0;
+                // Check for special cases like "." and ".."
+                while (tempi < len) {
+                    if(path[tempi] == '.'){
+                        dotcount++;
+                    }else if(path[tempi] == FILE_SEPARATOR[0]){
+                        break;
+                    }else{
+                        dotcount = 0;
+                        break;
                     }
-                } else {
+                    tempi++;
+                }
+
+                if (1 == dotcount) {
+                    // Handle "." (current directory)
+                    i += 1; // Skip "."
+                }else if(2 == dotcount){
+                    // Handle ".." (parent directory)
+                    // Backtrack to the previous directory separator
+                    while (j > 0 && newpath[j - 1] != FILE_SEPARATOR[0]) {
+                        --j;
+                    }
+                    if (j > 0) {
+                        --j; // Remove the trailing separator
+                    }
+                    i += 2; // Skip ".."
+                }else {
                     // Normal directory separator
                     if (j == 0 || newpath[j - 1] != FILE_SEPARATOR[0]) {
                         newpath[j++] = FILE_SEPARATOR[0];
@@ -278,10 +293,36 @@ public:
         return m_root.c_str();
     }
 
+    /**
+     * @brief Gets the home directory.
+     * @return The home directory.
+     */
+    virtual const char* getHomeDirectory() const {
+        return m_home.c_str();
+    }
+
+    /**
+     * @brief Sets the home directory.
+     * @return status
+     */
+    virtual bool setHomeDirectory(pdiutil::string &homedir) {
+
+        if( isDirectory(homedir.c_str()) ){
+
+            m_home = homedir;
+            if (homedir.c_str()[homedir.size() - 1] != FILE_SEPARATOR[0]) {
+                m_home += FILE_SEPARATOR[0];
+            }
+            return true;          
+        }
+        return false;
+    }
+
 protected:
     iStorageInterface& m_istorage; ///< Reference to the storage interface used for file operations.
     pdiutil::string m_pwd; ///< Current working directory.
     pdiutil::string m_root; ///< Root directory of the file system.
+    pdiutil::string m_home; ///< Home directory of the session.
 };
 
 /**

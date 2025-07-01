@@ -110,6 +110,10 @@ int LittleFSWrapper::createFile(const char* path, const char* content, int64_t s
  */
 int LittleFSWrapper::writeFile(const char *path, const char *content, uint32_t size, bool append)
 {
+    if( size == 0 ){
+        return 0;
+    }
+
     lfs_file_t file;
     int fileOpenOrErr = lfs_file_open(&m_lfs, &file, path, LFS_O_WRONLY | LFS_O_CREAT | (append ? LFS_O_APPEND : LFS_O_TRUNC) );
     if (fileOpenOrErr < 0) {
@@ -123,7 +127,7 @@ int LittleFSWrapper::writeFile(const char *path, const char *content, uint32_t s
 /**
  * @brief Reads content from a file.
  * @param path The path of the file to read.
- * @param size The maximum number of bytes to read.
+ * @param size The maximum number of bytes to read in one loop.
  * @param readbackfn callback function for readback.
  * @return The number of bytes read, or -1 on failure.
  */

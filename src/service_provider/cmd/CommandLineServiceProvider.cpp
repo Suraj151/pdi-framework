@@ -71,6 +71,11 @@ CommandLineServiceProvider::CommandLineServiceProvider() : ServiceProvider(SERVI
 
   SchedulerTaskCommand *schtaskcmd = new SchedulerTaskCommand();
   m_cmdlist.push_back(schtaskcmd);
+
+  #ifdef ENABLE_SSH_SERVICE
+  SSHCommand *sshcmd = new SSHCommand();
+  m_cmdlist.push_back(sshcmd);
+  #endif
 }
 
 /**
@@ -113,11 +118,11 @@ bool CommandLineServiceProvider::initService(void *arg)
  * execute command provided or in list available
  *
  * @param iTerminalInterface* terminal
- * @return None
+ * @return Command result if valid command provided in terminal
  */
-void CommandLineServiceProvider::processTerminalInput(iTerminalInterface *terminal)
+cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface *terminal)
 {
-    if( nullptr == terminal ) return;
+    if( nullptr == terminal ) return CMD_RESULT_TERMINAL_ERR;
 
     cmd_term_inseq_t inseq = CMD_TERM_INSEQ_NONE;
     static uint16_t terminalCursorIndex = 0;
@@ -139,7 +144,9 @@ void CommandLineServiceProvider::processTerminalInput(iTerminalInterface *termin
         inseq = c == '\b' ? CMD_TERM_INSEQ_BACKSPACE_CHAR : CMD_TERM_INSEQ_DELETE_CHAR;
         if (m_termrecvdata.size() > 0 && terminalCursorIndex > 0) {
 
-          terminal->write(c);  // echo
+          // putty can visualize 0x7F but not every terminal like linux.
+          // so sending backspace irespective of incoming char
+          terminal->write('\b');  // echo
 
           pdiutil::string substr = m_termrecvdata.substr(terminalCursorIndex);
           if(substr.size() > 0){
@@ -342,7 +349,7 @@ void CommandLineServiceProvider::processTerminalInput(iTerminalInterface *termin
       inseq != CMD_TERM_INSEQ_CTRL_Z &&
       inseq != CMD_TERM_INSEQ_ESC 
     ){
-      return;
+      return CMD_RESULT_INCOMPLETE;
     }
 
     // check if user trying to exit
@@ -367,6 +374,8 @@ void CommandLineServiceProvider::processTerminalInput(iTerminalInterface *termin
     if( CMD_RESULT_NOT_FOUND != result && CMD_RESULT_MAX != result ){
       terminal->flush();
     }
+
+    return result;
 }
 
 /**
@@ -414,6 +423,14 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
 
     res = CMD_RESULT_MAX;
 
+    // check if user trying to exit
+    if(
+      inseq == CMD_TERM_INSEQ_CTRL_C ||
+      inseq == CMD_TERM_INSEQ_CTRL_Z
+    ){
+      res = CMD_RESULT_TERMINAL_ABORTED;
+    }
+
     // check if any command is waiting for user input
     // if any command is waiting for user input then we are in continue execution mode
     for (int16_t i = 0; i < m_cmdlist.size(); i++){
@@ -424,7 +441,7 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
         res = CMD_RESULT_INCOMPLETE;
 
         /* Perform terminal input actions if any */
-        if( inseq > CMD_TERM_INSEQ_ENTER && inseq < CMD_TERM_INSEQ_MAX ){
+        if( inseq > CMD_TERM_INSEQ_NONE && inseq < CMD_TERM_INSEQ_MAX ){
           res = m_cmdlist[i]->executeCommand((char*)cmd->c_str(), cmd->size(), true, inseq);
         }
 
@@ -433,23 +450,23 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
     }
   }
 
-  #ifdef ENABLE_AUTH_SERVICE
-  bool isWaitingForUser = false;
-  if(!__auth_service.getAuthorized()){
-    cmd_t *logincmd = __cmd_service.getCommandByName(CMD_NAME_LOGIN);
-    if( nullptr != logincmd && logincmd->isWaitingForOption(CMD_OPTION_NAME_U) ){
-      isWaitingForUser = true;
-    }
-  }
-  #endif
+  // #ifdef ENABLE_AUTH_SERVICE
+  // bool isWaitingForUser = false;
+  // if(!__auth_service.getAuthorized()){
+  //   cmd_t *logincmd = __cmd_service.getCommandByName(CMD_NAME_LOGIN);
+  //   if( nullptr != logincmd && logincmd->isWaitingForOption(CMD_OPTION_NAME_U) ){
+  //     isWaitingForUser = true;
+  //   }
+  // }
+  // #endif
 
   if( 
     !is_executing_lastcommand || 
     CMD_RESULT_OK == res || 
     CMD_RESULT_ABORTED == res 
-    #ifdef ENABLE_AUTH_SERVICE
-    || isWaitingForUser
-    #endif
+    // #ifdef ENABLE_AUTH_SERVICE
+    // || isWaitingForUser
+    // #endif
   ){
     // start new interaction
     startInteraction();
@@ -469,7 +486,11 @@ void CommandLineServiceProvider::startInteraction()
     m_terminal->putln();
 
     #ifdef ENABLE_AUTH_SERVICE
+
+    cmd_t *logincmd = __cmd_service.getCommandByName(CMD_NAME_LOGIN);
+    
     if( __auth_service.getAuthorized() ){
+      
       m_terminal->write(__auth_service.getUsername());
 		  m_terminal->write_ro(RODT_ATTR("@"));
       m_terminal->write(__i_dvc_ctrl.getDeviceId());
@@ -480,15 +501,20 @@ void CommandLineServiceProvider::startInteraction()
       #else
 		  m_terminal->write_ro(RODT_ATTR(": "));
       #endif
+
+      if( nullptr != logincmd && logincmd->isWaitingForOption() ){
+        logincmd->setWaitingForOption(nullptr);
+      }
     }else{
+
       m_terminal->write(CMD_NAME_LOGIN);
 		  m_terminal->write_ro(RODT_ATTR(": "));
 
-      cmd_t *logincmd = __cmd_service.getCommandByName(CMD_NAME_LOGIN);
       if( nullptr != logincmd ){
         logincmd->setWaitingForOption(CMD_OPTION_NAME_U);
       }
     }
+
     #else
       m_terminal->write(__i_dvc_ctrl.getDeviceMac().c_str());
 		  m_terminal->write_ro(RODT_ATTR(": "));

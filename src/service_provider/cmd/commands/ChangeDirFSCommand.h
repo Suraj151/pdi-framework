@@ -35,7 +35,7 @@ struct ChangeDirFSCommand : public CommandBase {
 #endif
 
 	/* execute command with provided options */
-	cmd_result_t execute(){
+	cmd_result_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
 		// return in case authentication needed and not authorized yet
@@ -52,10 +52,20 @@ struct ChangeDirFSCommand : public CommandBase {
 			if( nullptr != cmdoptn && nullptr != cmdoptn->optionval && cmdoptn->optionvalsize > 0 ){
 				char *dirname = new char[cmdoptn->optionvalsize+__i_fs.pwd()->size()+2]();
 				if( nullptr != dirname ){
+
 					memset(dirname, 0, cmdoptn->optionvalsize+__i_fs.pwd()->size()+2);
-					memcpy(dirname, __i_fs.pwd()->c_str(), __i_fs.pwd()->size());
-					__i_fs.appendFileSeparator(dirname);
-					strncat(dirname, cmdoptn->optionval, cmdoptn->optionvalsize);
+
+					// Check whether homw directory symbol was provided
+					if( cmdoptn->optionvalsize == 1 && cmdoptn->optionval[0] == '~' ){
+
+						const char* homedir = __i_fs.getHomeDirectory();
+						memcpy(dirname, homedir, strlen(homedir));
+					}else{
+
+						memcpy(dirname, __i_fs.pwd()->c_str(), __i_fs.pwd()->size());
+						__i_fs.appendFileSeparator(dirname);
+						strncat(dirname, cmdoptn->optionval, cmdoptn->optionvalsize);
+					}
 
 					bool bStatus = __i_fs.changeDirectory(dirname);
 					if(!bStatus){

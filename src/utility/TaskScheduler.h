@@ -63,6 +63,18 @@ public:
     int setTimeout(CallBackVoidArgFn _task_fn, uint64_t _duration, uint64_t _now_millis, int _task_priority = DEFAULT_TASK_PRIORITY);
 
     /**
+     * @brief Update a one-time timeout for a task.
+     *
+     * @param _task_id The unique ID of the task to update.
+     * @param _task_fn The callback function to execute after the timeout.
+     * @param _duration The timeout duration in milliseconds.
+     * @param _now_millis The current time in milliseconds.
+     * @param _task_priority The priority of the task (default is DEFAULT_TASK_PRIORITY).
+     * @return The unique ID of the registered task.
+     */
+    int updateTimeout(int _task_id, CallBackVoidArgFn _task_fn, uint64_t _duration, uint64_t _now_millis, int _task_priority = DEFAULT_TASK_PRIORITY);
+
+    /**
      * @brief Sets a recurring interval for a task.
      *
      * @param _task_fn The callback function to execute at each interval.

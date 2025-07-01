@@ -101,6 +101,13 @@ created Date    : 1st June 2019
 #define ENABLE_TELNET_SERVICE
 
 /**
+ * enable/disable ssh
+ */
+#if defined(ENABLE_STORAGE_SERVICE)
+#define ENABLE_SSH_SERVICE
+#endif
+
+/**
  * enable/disable ota feature here
  */
 #define ENABLE_OTA_SERVICE

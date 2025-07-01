@@ -51,8 +51,8 @@ public:
   void restartDevice() override;
 
   // wdt methods
-  void enableWdt(uint8_t mode_if_any=0) override {} // bypassing these methods since not used
-  void disableWdt() override {} // bypassing these methods since not used
+  void enableWdt(uint8_t mode_if_any=0) override;
+  void disableWdt() override;
   void feedWdt() override;
 
   // misc methods

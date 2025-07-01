@@ -27,4 +27,15 @@ Created Date    : 1st June 2019
  */
 bool base64Encode(char input_str[], int len_str, char *res_str);
 
+
+/**
+ * @brief Generates a unique key.
+ *
+ * This function generates a unique key of the specified length.
+ * The key is generated using a combination of random chars
+ *
+ * @param key Pointer to the buffer where the unique key will be stored.
+ * @param len Length of the unique key to be generated.
+ */
+void genUniqueKey(char *key, int len);
 #endif

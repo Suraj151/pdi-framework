@@ -48,6 +48,7 @@ namespace pdiutil {
 // Attribute for read-only data (can be redefined in derived interfaces)
 #define RODT_ATTR(x) x
 #define PROG_RODT_ATTR
+#define PROG_RODT_PTR
 
 // String operations api for read-write-modify string data (can be redefined in derived interfaces)
 // _ro for each of api referes to read-only data region specific api
@@ -65,6 +66,8 @@ namespace pdiutil {
 #define strcmp_ro strcmp
 #define strncmp strncmp
 #define strncmp_ro strncmp
+#define memcpy memcpy
+#define memcpy_ro memcpy
 
 // redefine these in derived interface
 #define LOGBEGIN
@@ -268,6 +271,7 @@ struct task_t {
 typedef enum terminal_types {
     TERMINAL_TYPE_SERIAL = 0,
     TERMINAL_TYPE_TELNET,
+    TERMINAL_TYPE_SSH,
     TERMINAL_TYPE_MAX
 } terminal_types_t;
 

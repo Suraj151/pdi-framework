@@ -318,6 +318,12 @@ public:
    * @brief Flushes the I/O buffer.
    */
   virtual void flush() {};
+
+  /**
+   * @brief Commit IO operations in case if queued.
+   * @return return respective status. depends on operations done inside commit.
+   */
+  virtual int32_t commit() { return 0; };
 };
 
 
@@ -383,6 +389,17 @@ public:
   {
     write_ro(RODT_ATTR(TERMINAL_ESCAPE_SEQ));
     write_ro(RODT_ATTR("H"));
+  }
+
+  /**
+   * @brief Device status report
+   * @param None
+   * @return None
+   */ 
+  void csi_dsr()
+  {
+    write_ro(RODT_ATTR(TERMINAL_ESCAPE_SEQ));
+    write_ro(RODT_ATTR("6n"));
   }
 
   /**

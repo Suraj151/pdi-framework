@@ -32,6 +32,10 @@ created Date    : 1st June 2019
 #include <service_provider/transport/TelnetServiceProvider.h>
 #endif
 
+#ifdef ENABLE_SSH_SERVICE
+#include <service_provider/shell/ssh/SSHServiceprovider.h>
+#endif
+
 #ifdef ENABLE_OTA_SERVICE
 #include <service_provider/device/OtaServiceProvider.h>
 #endif

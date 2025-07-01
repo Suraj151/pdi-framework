@@ -49,6 +49,10 @@ public:
      */
     void close() override;
 
+    /**
+     * @brief Set callback event for when a new client connection is accepted.
+     */
+    void setOnAcceptClientEventCallback(CallBackVoidPointerArgFn callbk, void* arg = nullptr) override;
 private:
 
     /**
@@ -64,6 +68,10 @@ private:
     struct tcp_pcb* m_clientPcb;
     uint32_t m_timeout;
     bool m_hasClient;
+
+    // on client accept callback and its argument
+    CallBackVoidPointerArgFn m_onAcceptCallbk;
+    void* m_onAcceptCallbkArg;
 };
 
 #endif // _TCP_SERVER_INTERFACE_H_
