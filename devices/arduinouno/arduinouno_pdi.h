@@ -24,5 +24,6 @@ created Date    : 1st Jan 2024
 #include "StorageInterface.h"
 #include "FileSystemInterface.h"
 #endif
+#include "InstanceInterface.h"
 
 #endif  // _ARDUINOUNO_PORTABLE_DEVICE_INTERFACE_H_

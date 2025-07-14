@@ -69,6 +69,39 @@ namespace pdiutil {
 #define memcpy memcpy
 #define memcpy_ro memcpy
 
+// define weak functions, so when the device doesn't define them,
+// the linker just sets their address to 0
+namespace rofn{
+
+    // pdiutil::string get_string_ro(const void *rostr) __attribute__((weak));
+    extern char* to_charptr(const void *rostr);
+
+    struct ROPTR{
+
+        // Explicitly delete the default constructor
+        ROPTR() = delete;
+
+        ROPTR(const void *p, bool auto_del = true) : ptr(nullptr), autodelete(auto_del) {
+            ptr = rofn::to_charptr(p);
+        }
+
+        ~ROPTR() {
+            if (ptr && autodelete) {
+                delete[] ptr; // Free the memory allocated for the non read-only string
+                ptr = nullptr;
+            }
+        }
+
+        operator char*() const { return ptr; } ///< Implicit conversion to char*
+        private :
+        char *ptr = nullptr; ///< Pointer to the non read-only string
+        bool autodelete = true; ///< Flag to indicate if the pointer should be deleted
+    };    
+} // namespace rofunctions
+#define ROPTR_TO_CHAR(x) (char*)rofn::ROPTR(RODT_ATTR(x))
+#define ROPTR_TO_CHAR_NEED_DEL(x) (char*)rofn::ROPTR(RODT_ATTR(x), false)
+
+
 // redefine these in derived interface
 #define LOGBEGIN
 

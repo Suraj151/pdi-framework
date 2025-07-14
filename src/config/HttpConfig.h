@@ -40,67 +40,6 @@ typedef enum {
     HTTP_RESP_MAX = 999
 } http_resp_code_t;
 
-/// Get the HTTP status string for a given status code
-static const char* getHttpStatusString(int code) {
-    switch (code) {
-        case HTTP_RESP_OK: return "OK";
-        case HTTP_RESP_MULTIPLE_CHOICES: return "Multiple Choices";
-        case HTTP_RESP_MOVED_PERMANENTLY: return "Moved Permanently";
-        case HTTP_RESP_FOUND: return "Found";
-        case HTTP_RESP_SEE_OTHER: return "See Other";
-        case HTTP_RESP_NOT_MODIFIED: return "Not Modified";
-        case HTTP_RESP_USE_PROXY: return "Use Proxy";
-        case HTTP_RESP_TEMPORARY_REDIRECT: return "Temporary Redirect";
-        case HTTP_RESP_PERMANENT_REDIRECT: return "Permanent Redirect";
-        case HTTP_RESP_BAD_REQUEST: return "Bad Request";
-        case HTTP_RESP_UNAUTHORIZED: return "Unauthorized";
-        case HTTP_RESP_PAYMENT_REQUIRED: return "Payment Required";
-        case HTTP_RESP_FORBIDDEN: return "Forbidden";
-        case HTTP_RESP_NOT_FOUND: return "Not Found";
-        case HTTP_RESP_METHOD_NOT_ALLOWED: return "Method Not Allowed";
-        case HTTP_RESP_REQUEST_TIMEOUT: return "Request Timeout";
-        case HTTP_RESP_INTERNAL_SERVER_ERROR: return "Internal Server Error";
-        case HTTP_RESP_NOT_IMPLEMENTED: return "Not Implemented";
-        case HTTP_RESP_BAD_GATEWAY: return "Bad Gateway";
-        case HTTP_RESP_SERVICE_UNAVAILABLE: return "Service Unavailable";
-        case HTTP_RESP_GATEWAY_TIMEOUT: return "Gateway Timeout";
-        case HTTP_RESP_HTTP_VERSION_NOT_SUPPORTED: return "HTTP Version Not Supported";
-        case HTTP_RESP_VARIANT_ALSO_NEGOTIATES: return "Variant Also Negotiates";
-        default: return "Unknown Status Code";
-    }
-}
-
-/// URL decode a percent-encoded string
-static void urlDecode(pdiutil::string& text){
-
-    pdiutil::string decoded;
-    unsigned int len = text.length();
-    unsigned int i = 0;
-    while (i < len)
-    {
-        char decodedChar;
-        char encodedChar = text[i++];
-        if ((encodedChar == '%') && (i + 1 < len))
-        {
-            // Read two hex digits after '%'
-            char hex[3] = { text[i], text[i+1], '\0' };
-            decodedChar = static_cast<char>(strtol(hex, nullptr, 16));
-            i += 2;
-        }
-        else if (encodedChar == '+')
-        {
-            decodedChar = ' ';
-        }
-        else
-        {
-            decodedChar = encodedChar;  // normal ascii char
-        }
-        decoded += decodedChar;
-    }
-    text = decoded;
-}
-
-
 typedef enum {
     HTTP_ERROR_CONNECTION_FAILED = -1,
     HTTP_ERROR_MAX = -999

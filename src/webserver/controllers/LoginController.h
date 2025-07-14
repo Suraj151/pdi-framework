@@ -162,7 +162,7 @@ class LoginController : public Controller {
       if( _is_posted && !_is_error ){
         this->m_route_handler->send_inactive_session_headers();
       }
-      this->m_web_resource->m_server->send( HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page );
+      this->m_web_resource->m_server->send( HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page );
       delete[] _page;
     }
 
@@ -184,7 +184,7 @@ class LoginController : public Controller {
       char* _page = new char[PAGE_HTML_MAX_SIZE];
       this->build_html( _page, WEB_SERVER_LOGOUT_PAGE );
 
-      this->m_web_resource->m_server->send( HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page );
+      this->m_web_resource->m_server->send( HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page );
       delete[] _page;
     }
 
@@ -224,7 +224,7 @@ class LoginController : public Controller {
       char* _page = new char[PAGE_HTML_MAX_SIZE];
       this->build_html( _page, WEB_SERVER_LOGIN_PAGE, _is_posted, (char*)"Wrong Credentials.", ALERT_DANGER );
 
-      this->m_web_resource->m_server->send( HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page );
+      this->m_web_resource->m_server->send( HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page );
       delete[] _page;
     }
 

@@ -136,7 +136,7 @@ public:
 		char *_page = new char[PAGE_HTML_MAX_SIZE];
 		this->build_ota_server_config_html(_page, _is_posted);
 
-		this->m_web_resource->m_server->send(HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page);
+		this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 		delete[] _page;
 	}
 };

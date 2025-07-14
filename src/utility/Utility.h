@@ -24,6 +24,7 @@ Created Date    : 1st June 2019
 #endif
 
 #include "iUtilityInterface.h"
+#include "iInstanceInterface.h"
 #include "EventUtil.h"
 #include "DataTypeConversions.h"
 #include "StringOperations.h"

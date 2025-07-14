@@ -27,4 +27,26 @@ created Date    : 1st Jan 2024
 #include "StorageInterface.cpp"
 #include "FileSystemInterface.cpp"
 #endif
+#include "InstanceInterface.cpp"
 
+// This function converts a read-only string (PGM_P) to a dynamically allocated char pointer.
+// The caller is responsible for deleting the allocated memory to avoid memory leaks.
+// It reads the string from program memory and copies it to a new char array, which is
+// then returned as a null-terminated string.
+char* rofn::to_charptr(const void *rostr){
+    if( rostr == nullptr ){
+        return nullptr;
+    }
+
+    PGM_P p = reinterpret_cast<PGM_P>(rostr);
+    auto len = strlen_P(p);
+
+    char *buff = new char[len + 1]; // +1 for null terminator
+    memcpy_P(buff, p, len);
+    buff[len] = '\0'; // Null terminate the string
+
+    // Return the pointer to the newly allocated string
+    // Note: The caller is responsible for deleting this memory
+    // to avoid memory leaks.
+    return buff;
+}

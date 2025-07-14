@@ -93,7 +93,7 @@ public:
   virtual void setStoragePath(const pdiutil::string &storagepath) {}
   virtual bool handleStaticFileRequest() { return false; }
   
-  virtual void send(int code, const char *content_type = nullptr, const char *content = nullptr) = 0;
+  virtual void send(int code, mimetype_t content_type = MIME_TYPE_MAX, const char *content = nullptr) = 0;
 };
 
 /// derived class must define this

@@ -104,7 +104,7 @@ class DashboardController : public Controller {
 			_response += "}";
 
 			this->m_web_resource->m_server->addHeader("Cache-Control", "no-cache");
-			this->m_web_resource->m_server->send(HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _response.c_str());
+			this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _response.c_str());
 		}
 #endif		
 
@@ -124,7 +124,7 @@ class DashboardController : public Controller {
 			strcat_ro(_page, WEB_SERVER_DASHBOARD_PAGE);
 			strcat_ro(_page, WEB_SERVER_FOOTER_WITH_DASHBOARD_MONITOR_HTML);
 
-			this->m_web_resource->m_server->send(HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page);
+			this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 			delete[] _page;
 		}
 };

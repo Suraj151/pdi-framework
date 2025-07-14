@@ -105,7 +105,7 @@ public:
 	  char *_page = new char[PAGE_HTML_MAX_SIZE];
 	  this->build_html(_page, WEB_SERVER_404_PAGE);
 
-	  this->m_web_resource->m_server->send(HTTP_RESP_NOT_FOUND, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page);
+	  this->m_web_resource->m_server->send(HTTP_RESP_NOT_FOUND, MIME_TYPE_TEXT_HTML, _page);
 	  delete[] _page;
 	}
 
@@ -161,7 +161,7 @@ public:
 
 		strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
 
-		this->m_web_resource->m_server->send(HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page);
+		this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 		delete[] _page;
 	}
 };

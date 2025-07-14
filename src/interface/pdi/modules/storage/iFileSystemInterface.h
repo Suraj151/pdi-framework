@@ -16,6 +16,7 @@ Created Date    : 6th Apr 2025
 
 #include <interface/interface_includes.h>
 #include "iStorageInterface.h" ///< Include the iStorageInterface header
+#include <helpers/StorageHelper.h>
 
 
 // forward declaration of derived class for this interface
