@@ -104,15 +104,15 @@ public:
 			pdiutil::string _response = "";
 			__device_iot_service.handleRegistrationOtpRequest(&_device_iot_configs, _response);
 
-			this->m_web_resource->m_server->sendHeader("Cache-Control", "no-cache");
-			this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _response.c_str());
+			this->m_web_resource->m_server->addHeader("Cache-Control", "no-cache");
+			this->m_web_resource->m_server->send(HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _response.c_str());
 		}
 		else
 		{
 			char *_page = new char[PAGE_HTML_MAX_SIZE];
 			this->build_device_register_config_html(_page);
 
-			this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
+			this->m_web_resource->m_server->send(HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page);
 			delete[] _page;
 		}
 	}

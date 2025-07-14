@@ -23,7 +23,7 @@ created Date    : 1st Jan 2024
 #ifdef ENABLE_WIFI_SERVICE
 #include "WiFiInterface.cpp"
 #include "WiFiClientInterface.cpp"
-#include "WiFiServerInterface.cpp"
+#include "HttpServerInterface.cpp"
 #endif
 #ifdef ENABLE_NETWORK_SERVICE
 #include "NtpInterface.cpp"

@@ -70,7 +70,7 @@ class TestController : public Controller {
       /**
        * finally send response and deallocate page
   		 */
-      this->m_web_resource->m_server->send( HTTP_OK, TEXT_HTML_CONTENT, _page );
+      this->m_web_resource->m_server->send( HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page );
       delete[] _page;
     }
 };

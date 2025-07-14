@@ -400,6 +400,13 @@ void TcpClientInterface::setTimeout(uint32_t timeout) {
 }
 
 /**
+ * @brief Check whether available for write
+ */
+bool TcpClientInterface::availableforwrite() {
+    return m_isConnected && m_isLastWriteAcked;
+}
+
+/**
  * @brief Flush the buffer.
  */
 void TcpClientInterface::flush() {

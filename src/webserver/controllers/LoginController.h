@@ -162,7 +162,7 @@ class LoginController : public Controller {
       if( _is_posted && !_is_error ){
         this->m_route_handler->send_inactive_session_headers();
       }
-      this->m_web_resource->m_server->send( HTTP_OK, TEXT_HTML_CONTENT, _page );
+      this->m_web_resource->m_server->send( HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page );
       delete[] _page;
     }
 
@@ -184,7 +184,7 @@ class LoginController : public Controller {
       char* _page = new char[PAGE_HTML_MAX_SIZE];
       this->build_html( _page, WEB_SERVER_LOGOUT_PAGE );
 
-      this->m_web_resource->m_server->send( HTTP_OK, TEXT_HTML_CONTENT, _page );
+      this->m_web_resource->m_server->send( HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page );
       delete[] _page;
     }
 
@@ -212,10 +212,10 @@ class LoginController : public Controller {
         char _session_cookie[EW_COOKIE_BUFF_MAX_SIZE];
         this->m_route_handler->build_session_cookie( _session_cookie, true, EW_COOKIE_BUFF_MAX_SIZE, true, this->login_credentials.cookie_max_age );
 
-        this->m_web_resource->m_server->sendHeader("Location", WEB_SERVER_HOME_ROUTE);
-        this->m_web_resource->m_server->sendHeader("Cache-Control", "no-cache");
-        this->m_web_resource->m_server->sendHeader("Set-Cookie", _session_cookie);
-        this->m_web_resource->m_server->send(HTTP_REDIRECT);
+        this->m_web_resource->m_server->addHeader("Location", WEB_SERVER_HOME_ROUTE);
+        this->m_web_resource->m_server->addHeader("Cache-Control", "no-cache");
+        this->m_web_resource->m_server->addHeader("Set-Cookie", _session_cookie);
+        this->m_web_resource->m_server->send(HTTP_RESP_MOVED_PERMANENTLY);
 
         LogS("Log in Successful\n");
         return;
@@ -224,7 +224,7 @@ class LoginController : public Controller {
       char* _page = new char[PAGE_HTML_MAX_SIZE];
       this->build_html( _page, WEB_SERVER_LOGIN_PAGE, _is_posted, (char*)"Wrong Credentials.", ALERT_DANGER );
 
-      this->m_web_resource->m_server->send( HTTP_OK, TEXT_HTML_CONTENT, _page );
+      this->m_web_resource->m_server->send( HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page );
       delete[] _page;
     }
 

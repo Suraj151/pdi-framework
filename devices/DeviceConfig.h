@@ -86,7 +86,7 @@ created Date    : 1st June 2019
 #ifdef ENABLE_NETWORK_SERVICE
 
 /**
- * enable/disable mqtt feature here
+ * enable/disable mqtt here
  */
 #define ENABLE_MQTT_SERVICE
 

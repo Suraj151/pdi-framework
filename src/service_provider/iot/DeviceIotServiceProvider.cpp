@@ -237,7 +237,7 @@ void DeviceIotServiceProvider::configureMQTT(){
   memset( &_mqtt_lwt_configs, 0, sizeof(mqtt_lwt_config_table));
 
   // parse the host from iot host config
-  httt_req_t httpreq; httpreq.init(this->m_device_iot_configs.device_iot_host);
+  http_req_t httpreq; httpreq.init(this->m_device_iot_configs.device_iot_host);
 
   memcpy( _mqtt_general_configs.host, httpreq.host, strlen( httpreq.host ) );
   _mqtt_general_configs.port = DEVICE_IOT_MQTT_DATA_PORT;

@@ -20,7 +20,7 @@ created Date    : 1st June 2019
 bool connectToServer( iClientInterface *client, char *host, uint16_t port, uint16_t timeout=500 );
 bool disconnect( iClientInterface *client );
 bool isConnected( iClientInterface *client );
-bool sendPacket( iClientInterface *client, uint8_t *buffer, uint16_t len );
+bool sendPacket( iClientInterface *client, uint8_t *buffer, uint16_t len, uint16_t max_bytes_in_one_write=250 );
 uint16_t readPacket( iClientInterface *client, uint8_t *buffer, uint16_t maxlen, int32_t timeout, uint8_t readUntilChar=0 );
 
 #endif

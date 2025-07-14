@@ -131,8 +131,8 @@ public:
 
 			this->_last_monitor_point.x = x2;
 			this->_last_monitor_point.y = y2;
-			this->m_web_resource->m_server->sendHeader("Cache-Control", "no-cache");
-			this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _response->c_str());
+			this->m_web_resource->m_server->addHeader("Cache-Control", "no-cache");
+			this->m_web_resource->m_server->send(HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _response->c_str());
 
 			delete _response;
 		}
@@ -166,7 +166,7 @@ public:
 		strcat_ro(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_BOTTOM);
 		strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
 
-		this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
+		this->m_web_resource->m_server->send(HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page);
 		delete[] _page;
 	}
 
@@ -242,7 +242,7 @@ public:
 
 		this->_last_monitor_point.x = 0;
 		this->_last_monitor_point.y = GPIO_MAX_GRAPH_HEIGHT - GPIO_GRAPH_BOTTOM_MARGIN;
-		this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
+		this->m_web_resource->m_server->send(HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page);
 		delete[] _page;
 	}
 
@@ -314,7 +314,7 @@ public:
 		char *_page = new char[PAGE_HTML_MAX_SIZE];
 		this->build_gpio_server_config_html(_page, _is_posted);
 
-		this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
+		this->m_web_resource->m_server->send(HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page);
 		delete[] _page;
 		if (_is_posted)
 		{
@@ -440,7 +440,7 @@ public:
 		char *_page = new char[PAGE_HTML_MAX_SIZE];
 		this->build_gpio_mode_config_html(_page, _is_posted);
 
-		this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
+		this->m_web_resource->m_server->send(HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page);
 		delete[] _page;
 		if (_is_posted)
 		{
@@ -558,7 +558,7 @@ public:
 		char *_page = new char[PAGE_HTML_MAX_SIZE];
 		this->build_gpio_write_config_html(_page, _is_posted);
 
-		this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
+		this->m_web_resource->m_server->send(HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page);
 		delete[] _page;
 		if (_is_posted)
 		{
@@ -734,7 +734,7 @@ public:
 		char *_page = new char[PAGE_HTML_MAX_SIZE];
 		this->build_gpio_alert_config_html(_page, _is_posted);
 
-		this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
+		this->m_web_resource->m_server->send(HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page);
 		delete[] _page;
 		if (_is_posted)
 		{

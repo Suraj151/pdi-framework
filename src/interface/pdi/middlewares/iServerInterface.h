@@ -15,6 +15,7 @@ created Date    : 1st June 2019
 
 // forward declaration
 class iClientInterface;
+class HttpServerInterface;
 
 /**
  * iServerInterface class
@@ -74,23 +75,28 @@ public:
    */
   virtual ~iHttpServerInterface() {}
 
-  virtual void begin() = 0;
-  virtual void begin(uint16_t port) = 0;
+  virtual void begin(uint16_t port=80) = 0;
   virtual void handleClient() = 0;
   virtual void close() = 0;
 
   virtual void on(const pdiutil::string &uri, CallBackVoidArgFn handler) = 0;
   virtual void onNotFound(CallBackVoidArgFn fn) = 0;   // called when handler is not assigned
-  virtual void onFileUpload(CallBackVoidArgFn fn) = 0; // handle file uploads
 
-  virtual pdiutil::string arg(const pdiutil::string &name) = 0;                                    // get request argument value by name
-  virtual bool hasArg(const pdiutil::string &name) const = 0;                                  // check if argument exists
-  virtual void collectHeaders(const char *headerKeys[], const size_t headerKeysCount) = 0; // set the request headers to collect
-  virtual pdiutil::string header(const pdiutil::string &name) = 0;                                 // get request header value by name
-  virtual bool hasHeader(const pdiutil::string &name) const = 0;                               // check if header exists
+  virtual pdiutil::string arg(const pdiutil::string &name) const = 0;                       // get request argument value by name
+  virtual bool hasArg(const pdiutil::string &name) const = 0;                               // check if argument exists
 
+  virtual void collectHeaders(const char *headerKeys[], const size_t headerKeysCount) = 0;  // set the request headers to collect
+  virtual pdiutil::string header(const pdiutil::string &name) const = 0;                    // get request header value by name
+  virtual bool hasHeader(const pdiutil::string &name) const = 0;                            // check if header exists
+  virtual void addHeader(const pdiutil::string &name, const pdiutil::string &value) = 0;
+
+  virtual void setStoragePath(const pdiutil::string &storagepath) {}
+  virtual bool handleStaticFileRequest() { return false; }
+  
   virtual void send(int code, const char *content_type = nullptr, const char *content = nullptr) = 0;
-  virtual void sendHeader(const pdiutil::string &name, const pdiutil::string &value, bool first = false) = 0;
 };
+
+/// derived class must define this
+extern HttpServerInterface __i_http_server;
 
 #endif

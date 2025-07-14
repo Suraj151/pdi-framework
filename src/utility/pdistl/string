@@ -374,6 +374,20 @@ public:
 	_UCXXEXPORT basic_string& replace(size_type pos, size_type n1, size_type n2, Ch c){
 		return replace(pos,n1,basic_string<Ch, Tr, A>(n2,c));
 	}
+
+	_UCXXEXPORT basic_string& replace(const Ch* s, const Ch* r){
+
+		basic_string<Ch,Tr,A> searchstr(s);
+		basic_string<Ch,Tr,A> replacestr(r);
+		size_type pos = find(searchstr);
+		while (pos != npos) {
+			replace(pos, searchstr.length(), replacestr);
+			pos = find(searchstr, pos + replacestr.length()); // Continue search after the replacement
+		}
+		return *this;
+	}
+
+
 //	_UCXXEXPORT basic_string& replace(iterator i1, iterator i2, const basic_string& str);
 //	_UCXXEXPORT basic_string& replace(iterator i1, iterator i2, const Ch* s, size_type n);
 //	_UCXXEXPORT basic_string& replace(iterator i1, iterator i2, const Ch* s);

@@ -89,7 +89,7 @@ public:
     strcat_ro(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_BOTTOM);
     strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
 
-    this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
+    this->m_web_resource->m_server->send(HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page);
     delete[] _page;
   }
 
@@ -210,7 +210,7 @@ public:
     char *_page = new char[PAGE_HTML_MAX_SIZE];
     this->build_mqtt_general_config_html(_page, _is_posted);
 
-    this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
+    this->m_web_resource->m_server->send(HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page);
     delete[] _page;
     if (_is_posted)
     {
@@ -316,7 +316,7 @@ public:
     char *_page = new char[PAGE_HTML_MAX_SIZE];
     this->build_mqtt_lwt_config_html(_page, _is_posted);
 
-    this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
+    this->m_web_resource->m_server->send(HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page);
     delete[] _page;
     if (_is_posted)
     {
@@ -520,7 +520,7 @@ public:
     char *_page = new char[PAGE_HTML_MAX_SIZE];
     this->build_mqtt_pubsub_config_html(_page, _is_posted);
 
-    this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
+    this->m_web_resource->m_server->send(HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page);
     delete[] _page;
     if (_is_posted)
     {

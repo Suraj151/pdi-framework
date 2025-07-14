@@ -20,7 +20,7 @@ PDIStack::PDIStack()
 #ifdef ENABLE_WIFI_SERVICE
   :
   m_client(&__i_wifi_client),
-  m_server(&__i_wifi_http_server)
+  m_server(&__i_http_server)
 #endif
 {
   __utl_event.begin(&__i_dvc_ctrl);

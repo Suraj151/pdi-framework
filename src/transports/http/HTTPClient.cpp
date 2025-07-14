@@ -14,64 +14,12 @@ created Date    : 1st Jan 2024
 
 #include "HTTPClient.h"
 
-/**
- * http request header structure
- */
-// Constructor
-httt_header_t::httt_header_t() : key(nullptr),
-                                 value(nullptr)
-{
-}
-
-// Copy Constructor
-httt_header_t::httt_header_t(const httt_header_t &obj)
-{
-    if (nullptr != obj.key && nullptr != obj.value)
-    {
-        uint16_t _len = strlen(obj.key);
-        key = new char[_len + 1];
-        if (nullptr != key)
-        {
-            memset(key, 0, _len + 1);
-            strcpy(key, obj.key);
-        }
-
-        _len = strlen(obj.value);
-        value = new char[_len + 1];
-        if (nullptr != value)
-        {
-            memset(value, 0, _len + 1);
-            strcpy(value, obj.value);
-        }
-    }
-}
-
-// Destructor
-httt_header_t::~httt_header_t()
-{
-    clear();
-}
-
-// clear request resources and set to defaults
-void httt_header_t::clear()
-{
-    if (nullptr != key)
-    {
-        delete[] key;
-        key = nullptr;
-    }
-    if (nullptr != value)
-    {
-        delete[] value;
-        value = nullptr;
-    }
-}
 
 /**
  * http request structure
  */
 // Constructor
-httt_req_t::httt_req_t() : host(nullptr),
+http_req_t::http_req_t() : host(nullptr),
                            port(HTTP_DEFAULT_PORT),
                            reuse(false),
                            timeout(HTTP_HOST_CONNECT_TIMEOUT),
@@ -83,13 +31,13 @@ httt_req_t::httt_req_t() : host(nullptr),
 }
 
 // Destructor
-httt_req_t::~httt_req_t()
+http_req_t::~http_req_t()
 {
     clear();
 }
 
 // clear request resources and set to defaults
-void httt_req_t::clear(bool keep_headers)
+void http_req_t::clear(bool keep_headers)
 {
     if (nullptr != host)
     {
@@ -113,7 +61,7 @@ void httt_req_t::clear(bool keep_headers)
 }
 
 // init the http request
-bool httt_req_t::init(const char *url)
+bool http_req_t::init(const char *url)
 {
     bool bStatus = false;
     char *_url = (char *)url;
@@ -191,7 +139,7 @@ bool httt_req_t::init(const char *url)
 }
 
 // set http version
-void httt_req_t::setHttpVersion(http_version_t ver)
+void http_req_t::setHttpVersion(http_version_t ver)
 {
     http_version = ver;
 }
@@ -200,7 +148,7 @@ void httt_req_t::setHttpVersion(http_version_t ver)
  * http response structure
  */
 // Constructor
-httt_resp_t::httt_resp_t() : response(nullptr),
+http_resp_t::http_resp_t() : response(nullptr),
                              status_code(HTTP_RESP_MAX),
                              resp_length(0),
                              max_resp_length(HTTP_CLIENT_BUF_SIZE),
@@ -211,13 +159,13 @@ httt_resp_t::httt_resp_t() : response(nullptr),
 }
 
 // Destructor
-httt_resp_t::~httt_resp_t()
+http_resp_t::~http_resp_t()
 {
     clear();
 }
 
 // clear request resources and set to defaults
-void httt_resp_t::clear()
+void http_resp_t::clear()
 {
     if (nullptr != response)
     {
@@ -426,7 +374,7 @@ bool Http_Client::SetBasicAuthorization(const char *user, const char *pass)
                 strcpy(base64_encoded_auth, RODT_ATTR("Basic "));
                 base64Encode( auth, strlen(auth), base64_encoded_auth+6 );
 
-                bStatus = AddReqHeader(HTTP_HEADER_KEY_AUTHERIZATION, base64_encoded_auth);
+                bStatus = AddReqHeader(HTTP_HEADER_KEY_AUTHORIZATION, base64_encoded_auth);
                 delete []base64_encoded_auth;
             }
 
@@ -716,7 +664,7 @@ void Http_Client::AddHeader(const char *name, const char *value, bool inReqHeade
 {
     if (nullptr != name && nullptr != value)
     {
-        httt_header_t header;
+        http_header_t header;
 
         uint16_t _len = strlen(name);
         header.key = new char[_len + 1];
@@ -776,7 +724,7 @@ int16_t Http_Client::handleResponse()
 {
     uint8_t space = ' ';
 
-    int32_t max_timeout = HTTP_CLIENT_MAX_READ_RESPONSE_MS;
+    int32_t max_timeout = HTTP_CLIENT_MAX_READ_MS;
     uint32_t start = __i_dvc_ctrl.millis_now();
     uint32_t now = start;
     bool header_ends = false;

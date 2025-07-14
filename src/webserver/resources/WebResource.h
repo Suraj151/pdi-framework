@@ -25,10 +25,6 @@ Created Date    : 1st June 2019
 #include <webserver/pages/NotFound.h>
 #include <webserver/helpers/DynamicPageBuildHelper.h>
 
-/**
- * @brief MIME type for HTML content.
- */
-static const char TEXT_HTML_CONTENT[] PROG_RODT_ATTR = "text/html";
 
 /**
  * @define PAGE_HTML_MAX_SIZE
@@ -41,18 +37,6 @@ static const char TEXT_HTML_CONTENT[] PROG_RODT_ATTR = "text/html";
  * @brief Defines the minimum accepted size for arguments in HTTP requests.
  */
 #define MIN_ACCEPTED_ARG_SIZE 3
-
-/**
- * @enum HTTP_RETURN_CODE
- * @brief Defines HTTP response codes used by the web server.
- */
-enum HTTP_RETURN_CODE
-{
-  HTTP_OK = 200,              ///< HTTP 200 OK: Request succeeded.
-  HTTP_UNAUTHORIZED = 401,    ///< HTTP 401 Unauthorized: Authentication required.
-  HTTP_NOT_FOUND = 404,       ///< HTTP 404 Not Found: Resource not found.
-  HTTP_REDIRECT = 301         ///< HTTP 301 Redirect: Resource moved permanently.
-};
 
 /**
  * @class WebResourceProvider

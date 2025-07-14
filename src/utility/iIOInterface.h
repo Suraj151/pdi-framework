@@ -301,6 +301,54 @@ public:
    * @return Number of bytes available.
    */
   virtual int32_t available() = 0;
+  virtual bool availableforwrite() { return true; }
+
+  /**
+   * @brief Reads until provided char not get.
+   * @param _outstr Reference to the string to store the accumulated data.
+   * @param _delimiter The character to read until.
+   * @param _yield Optional callback function to yield control during reading.
+   * This function reads bytes from the input until it encounters the specified delimiter character.
+   * If the delimiter is found, it stops reading and returns the accumulated string.
+   * If the delimiter is not found, it continues reading until no more bytes are available.
+   * If a null byte (0) is encountered, it also stops reading.
+   * @return The accumulated string.
+   */
+  virtual void readStringUntil(pdiutil::string &_outstr, char _delimiter, CallBackVoidArgFn _yield = nullptr, uint32_t _maxlen = 0) {
+
+    uint8_t c = 0;
+    uint32_t len = 0;
+
+    while (available() > 0) {
+      // Read a byte from the input
+      c = read();
+      if (_delimiter!=0 && (c == _delimiter || c == 0)) {
+        break;
+      }
+      _outstr += c;
+      if(_yield != nullptr) {
+        _yield();
+      }
+      len++;
+      if (_maxlen > 0 && len >= _maxlen) {
+        break; // Stop reading if max length is reached
+      }
+    }
+  }
+
+  /**
+   * @brief Reads a line of text until a newline character is encountered.
+   * @param _outstr Reference to the string to store the line.
+   * @param _yield Optional callback function to yield control during reading.
+   * This function reads bytes from the input until it encounters a newline character ('\n').
+   * It accumulates the read characters into the provided string.
+   * If a null byte (0) is encountered, it stops reading.
+   */
+  virtual void readLine(pdiutil::string &_outstr, CallBackVoidArgFn _yield = nullptr, uint32_t _maxlen = 0){
+    _outstr.clear();
+    readStringUntil(_outstr, '\r', _yield, _maxlen);
+    readStringUntil(_outstr, '\n', _yield, 0);
+  }
 
   /**
    * @brief Checks if the connection is active.

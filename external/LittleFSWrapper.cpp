@@ -171,7 +171,32 @@ int LittleFSWrapper::readFile(const char* path, uint64_t size, pdiutil::function
  * @return 0 on success, or a negative error code on failure.
  */
 int LittleFSWrapper::createDirectory(const char* path) {
-    return lfs_mkdir(&m_lfs, path);
+    if (!path || path[0] == '\0') return LFS_ERR_INVAL;
+
+    char temp[LFS_NAME_MAX*2]; // Adjust size as needed
+    size_t len = strlen(path);
+    if (len >= sizeof(temp)) return LFS_ERR_NAMETOOLONG;
+
+    int res = 0;
+    size_t i = 0;
+    size_t last = 0;
+
+    // Skip leading slash
+    if (path[0] == '/') last = 1;
+
+    while (i <= len) {
+        if (path[i] == '/' || path[i] == '\0') {
+            if (i > last) {
+                memcpy(temp, path, i);
+                temp[i] = '\0';
+                res = lfs_mkdir(&m_lfs, temp);
+                if (res != 0 && res != LFS_ERR_EXIST) return res;
+            }
+            last = i + 1;
+        }
+        i++;
+    }
+    return 0;
 }
 
 /**

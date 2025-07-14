@@ -63,8 +63,8 @@ public:
 
     if (nullptr != __web_resource.m_server)
     {
-      __web_resource.m_server->sendHeader("Cache-Control", "no-cache");
-      __web_resource.m_server->sendHeader("Set-Cookie", _session_cookie);
+      __web_resource.m_server->addHeader("Cache-Control", "no-cache");
+      __web_resource.m_server->addHeader("Set-Cookie", _session_cookie);
     }
   }
 

@@ -251,7 +251,7 @@ public:
     {
       this->m_route_handler->send_inactive_session_headers();
     }
-    this->m_web_resource->m_server->send(HTTP_OK, TEXT_HTML_CONTENT, _page);
+    this->m_web_resource->m_server->send(HTTP_RESP_OK, getMimeTypeString(MIME_TYPE_TEXT_HTML), _page);
     delete[] _page;
     if (_is_posted && !_is_error)
     {

@@ -21,6 +21,14 @@ created Date    : 1st June 2019
 #include "ServerConfig.h"
 #endif
 
+#if defined(ENABLE_HTTP_SERVER) || defined(ENABLE_HTTP_CLIENT)
+#include "HttpConfig.h"
+#endif
+
+#ifdef ENABLE_STORAGE_SERVICE
+#include "StorageConfig.h"
+#endif
+
 #ifdef ENABLE_OTA_SERVICE
 #include "OtaConfig.h"
 #endif

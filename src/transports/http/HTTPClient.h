@@ -13,94 +13,10 @@ created Date    : 1st Jan 2024
 #include <interface/pdi.h>
 #include <helpers/ClientHelper.h>
 
-/* Http defs */
-typedef enum {
-    HTTP_RESP_OK = 200,
-    HTTP_RESP_MULTIPLE_CHOICES = 300,
-    HTTP_RESP_MOVED_PERMANENTLY = 301,
-    HTTP_RESP_FOUND = 302,
-    HTTP_RESP_SEE_OTHER = 303,
-    HTTP_RESP_NOT_MODIFIED = 304,
-    HTTP_RESP_USE_PROXY = 305,
-    HTTP_RESP_TEMPORARY_REDIRECT = 307,
-    HTTP_RESP_PERMANENT_REDIRECT = 308,
-    HTTP_RESP_BAD_REQUEST = 400,
-    HTTP_RESP_UNAUTHORIZED = 401,
-    HTTP_RESP_PAYMENT_REQUIRED = 402,
-    HTTP_RESP_FORBIDDEN = 403,
-    HTTP_RESP_NOT_FOUND = 404,
-    HTTP_RESP_METHOD_NOT_ALLOWED = 405,
-    HTTP_RESP_REQUEST_TIMEOUT = 408,
-    HTTP_RESP_INTERNAL_SERVER_ERROR = 500,
-    HTTP_RESP_NOT_IMPLEMENTED = 501,
-    HTTP_RESP_BAD_GATEWAY = 502,
-    HTTP_RESP_SERVICE_UNAVAILABLE = 503,
-    HTTP_RESP_GATEWAY_TIMEOUT = 504,
-    HTTP_RESP_HTTP_VERSION_NOT_SUPPORTED = 505,
-    HTTP_RESP_VARIANT_ALSO_NEGOTIATES = 506,
-    HTTP_RESP_MAX = 999
-} http_resp_code_t;
-
-typedef enum {
-    HTTP_ERROR_CONNECTION_FAILED = -1,
-    HTTP_ERROR_MAX = -999
-} http_err_code_t;
-
-typedef enum {
-    HTTP_VERSION_1_0,
-    HTTP_VERSION_1_1,
-    HTTP_VERSION_2,
-    HTTP_VERSION_3,
-    HTTP_VERSION_MAX
-} http_version_t;
-
-
-#ifndef HTTP_HOST_CONNECT_TIMEOUT
-#define HTTP_HOST_CONNECT_TIMEOUT 2500
-#endif
-
-#ifndef HTTP_DEFAULT_PORT
-#define HTTP_DEFAULT_PORT 80
-#endif
-
-#ifndef HTTP_DEFAULT_VERSION
-#define HTTP_DEFAULT_VERSION HTTP_VERSION_1_1
-#endif
-
-#define HTTP_CLIENT_BUF_SIZE 640
-#define HTTP_CLIENT_READINTERVAL_MS 10
-#define HTTP_CLIENT_MAX_READ_RESPONSE_MS 1500
-
-#define HTTP_HEADER_KEY_USER_AGENT "User-Agent"
-#define HTTP_HEADER_KEY_ACCEPT_ENCODING "Accept-Encoding"
-#define HTTP_HEADER_KEY_CONNECTION "Connection"
-#define HTTP_HEADER_KEY_LOCATION "Location"
-#define HTTP_HEADER_KEY_AUTHERIZATION "Authorization"
-#define HTTP_HEADER_KEY_CONTENT_TYPE "Content-Type"
-#define HTTP_HEADER_KEY_CONTENT_LENGTH "Content-Length"
-
-/**
- * http request header structure
- */
-struct httt_header_t
-{
-	char *key;
-	char *value;
-	// Constructor
-	httt_header_t();
-	// Copy Constructor
-	httt_header_t(const httt_header_t &obj);
-	// Destructor
-	~httt_header_t();
-
-	// clear request resources and set to defaults
-	void clear();
-};
-
 /**
  * http request structure
  */
-struct httt_req_t
+struct http_req_t
 {
 	char *host;
 	uint16_t port;
@@ -109,12 +25,12 @@ struct httt_req_t
 	char *uri;
 	bool isHttps;
 	http_version_t http_version;
-	pdiutil::vector<httt_header_t> headers;
+	pdiutil::vector<http_header_t> headers;
 
 	// Constructor
-	httt_req_t();
+	http_req_t();
 	// Destructor
-	~httt_req_t();
+	~http_req_t();
 
 	// clear request resources and set to defaults
 	void clear(bool keep_headers = false);
@@ -125,16 +41,16 @@ struct httt_req_t
 
 	void print()
 	{
-		LogFmtI("httt_req_t host : %s\r\n", host);
-		LogFmtI("httt_req_t port : %d\r\n", port);
-		LogFmtI("httt_req_t timeout : %d\r\n", timeout);
-		LogFmtI("httt_req_t uri : %s\r\n", uri);
-		LogFmtI("httt_req_t isHttps : %d\r\n", isHttps);
+		LogFmtI("http_req_t host : %s\r\n", host);
+		LogFmtI("http_req_t port : %d\r\n", port);
+		LogFmtI("http_req_t timeout : %d\r\n", timeout);
+		LogFmtI("http_req_t uri : %s\r\n", uri);
+		LogFmtI("http_req_t isHttps : %d\r\n", isHttps);
 		for (size_t i = 0; i < headers.size(); i++)
 		{
 			if (nullptr != headers[i].key && nullptr != headers[i].value)
 			{
-				LogFmtI("httt_req_t header[%s] : %s\r\n", headers[i].key, headers[i].value);
+				LogFmtI("http_req_t header[%s] : %s\r\n", headers[i].key, headers[i].value);
 			}
 		}
 	}
@@ -143,35 +59,35 @@ struct httt_req_t
 /**
  * http response structure
  */
-struct httt_resp_t
+struct http_resp_t
 {
 	char *response;
 	int16_t status_code;
 	uint16_t resp_length;
 	uint16_t max_resp_length;
-	pdiutil::vector<httt_header_t> headers;
+	pdiutil::vector<http_header_t> headers;
 	bool follow_redirects;
 	uint8_t redirect_limit;
 
 	// Constructor
-	httt_resp_t();
+	http_resp_t();
 	// Destructor
-	~httt_resp_t();
+	~http_resp_t();
 
 	// clear request resources and set to defaults
 	void clear();
 
 	void print()
 	{
-		LogFmtI("httt_resp_t response : %s\r\n", response);
-		LogFmtI("httt_resp_t status_code : %d\r\n", status_code);
-		LogFmtI("httt_resp_t resp_length : %d\r\n", resp_length);
-		LogFmtI("httt_resp_t max_resp_length : %d\r\n", max_resp_length);
+		LogFmtI("http_resp_t response : %s\r\n", response);
+		LogFmtI("http_resp_t status_code : %d\r\n", status_code);
+		LogFmtI("http_resp_t resp_length : %d\r\n", resp_length);
+		LogFmtI("http_resp_t max_resp_length : %d\r\n", max_resp_length);
 		for (size_t i = 0; i < headers.size(); i++)
 		{
 			if (nullptr != headers[i].key && nullptr != headers[i].value)
 			{
-				LogFmtI("httt_resp_t header[%s] : %s\r\n", headers[i].key, headers[i].value);
+				LogFmtI("http_resp_t header[%s] : %s\r\n", headers[i].key, headers[i].value);
 			}
 		}
 	}
@@ -228,8 +144,8 @@ protected:
 	int16_t handleResponse();
 
 	iClientInterface *m_client;
-	httt_req_t m_request;
-	httt_resp_t m_response;
+	http_req_t m_request;
+	http_resp_t m_response;
 };
 
 #endif

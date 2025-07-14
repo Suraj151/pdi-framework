@@ -47,7 +47,7 @@ public:
    * @brief Waits for a specified timeout in milliseconds.
    * @param timeoutms The timeout duration in milliseconds.
    */
-  virtual void wait(uint64_t timeoutms) = 0;
+  virtual void wait(double timeoutms) = 0;
 
   /**
    * @brief Gets the current time in milliseconds since the system started.

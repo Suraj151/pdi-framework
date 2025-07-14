@@ -102,7 +102,6 @@ typedef uint8_t pdi_wifi_mode_t;
 typedef uint8_t sleep_mode_t;
 typedef conn_status_t wifi_status_t;
 typedef uint8_t follow_redirects_t;
-typedef uint16_t http_method_t;
 
 /**
  * Callback function typedefs

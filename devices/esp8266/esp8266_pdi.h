@@ -19,7 +19,7 @@ created Date    : 1st Jan 2024
 #ifdef ENABLE_WIFI_SERVICE
 #include "WiFiInterface.h"
 #include "WiFiClientInterface.h"
-#include "WiFiServerInterface.h"
+#include "HttpServerInterface.h"
 #endif
 #ifdef ENABLE_NETWORK_SERVICE
 #include "NtpInterface.h"

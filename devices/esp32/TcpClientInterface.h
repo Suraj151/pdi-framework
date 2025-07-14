@@ -167,6 +167,11 @@ public:
      */
     void setTimeout(uint32_t timeout) override;
 
+    /**
+     * @brief Check whether available for write
+     */
+    bool availableforwrite() override;
+
     /** 
      * @brief Flush the output buffer.
      */

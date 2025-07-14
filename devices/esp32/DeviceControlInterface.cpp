@@ -300,9 +300,13 @@ iTerminalInterface * DeviceControlInterface::getTerminal(terminal_types_t termin
 /**
  * keep hold on current execution
  */
-void DeviceControlInterface::wait(uint64_t timeoutms)
+void DeviceControlInterface::wait(double timeoutms)
 {
-    delay(timeoutms);
+    uint32_t _timeoutms = (uint32_t)timeoutms;
+    uint32_t _remainingtimeoutus = (uint32_t)((timeoutms - _timeoutms) * 1000.0); // convert to microseconds
+    delay(_timeoutms); // delay in milliseconds
+    if( _remainingtimeoutus > 0 )
+        delayMicroseconds(_remainingtimeoutus); // delay in microseconds
 }
 
 /**
@@ -332,6 +336,7 @@ void DeviceControlInterface::yield()
     // run_scheduled_recurrent_functions();
     // esp_schedule();
     vPortYield();
+    optimistic_yield(1000);
     delay(0);
 }
 

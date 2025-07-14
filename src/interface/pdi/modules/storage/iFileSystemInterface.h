@@ -41,7 +41,8 @@ public:
         m_istorage(storage),
         m_pwd("/"),
         m_root("/"),
-        m_home("/") {
+        m_home("/"),
+        m_temp("/temp/") {
     }
 
     /**
@@ -302,6 +303,14 @@ public:
     }
 
     /**
+     * @brief Gets the temp directory.
+     * @return The temp directory.
+     */
+    virtual const char* getTempDirectory() const {
+        return m_temp.c_str();
+    }
+
+    /**
      * @brief Sets the home directory.
      * @return status
      */
@@ -318,11 +327,62 @@ public:
         return false;
     }
 
+    /**
+     * @brief Get file mime type based on file extension.
+     * @param path The path of the file.
+     * @return status
+     */
+    virtual mimetype_t getFileMimeType(const pdiutil::string &path) {
+
+        mimetype_t type = MIME_TYPE_MAX;
+
+        // currently we are checking only for file extension
+        // if the file exists and has an extension, we will try to find the mime type
+        // if the file does not have an extension, we will return MIME_TYPE_MAX
+        // if the file does not exist, we will return MIME_TYPE_MAX
+        if( isFileExist(path.c_str()) && path.find_last_of('.') != pdiutil::string::npos ) {
+
+            pdiutil::string ext = path.substr(path.find_last_of('.'));
+
+            for (int t = 0; t < MIME_TYPE_MAX; t++){
+
+                mimetype_t tt = static_cast<mimetype_t>(t);
+                if (pdiutil::string(getMimeTypeExtension(tt)) == ext) {
+                    type = tt;
+                    break;
+                }
+            }            
+        }
+
+        return type;
+    }
+
+    /**
+     * @brief Gets the file/dir name from the path.
+     * @param path The path of the file/dir.
+     * @return The file/dir name.
+     */
+    virtual pdiutil::string basename(const char* path) {
+        if (!path || strlen(path) == 0) {
+            return pdiutil::string();
+        }
+
+        pdiutil::string pathStr(path);
+        size_t lastSlash = pathStr.find_last_of(FILE_SEPARATOR);
+
+        if (lastSlash == pdiutil::string::npos) {
+            return pathStr; // No directory separator found, return the whole path
+        }
+
+        return pathStr.substr(lastSlash + 1); // Return the substring after the last separator
+    }
+
 protected:
     iStorageInterface& m_istorage; ///< Reference to the storage interface used for file operations.
     pdiutil::string m_pwd; ///< Current working directory.
     pdiutil::string m_root; ///< Root directory of the file system.
     pdiutil::string m_home; ///< Home directory of the session.
+    pdiutil::string m_temp; ///< Temporary directory for file operations.
 };
 
 /**

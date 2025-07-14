@@ -72,7 +72,7 @@ public:
   iTerminalInterface* getTerminal(terminal_types_t terminal=TERMINAL_TYPE_SERIAL) override;
 
   // util methods
-  void wait(uint64_t timeoutms) override;
+  void wait(double timeoutms) override;
   uint32_t millis_now() override;
   void log(logger_type_t log_type, const char *content) override;
   void yield() override;

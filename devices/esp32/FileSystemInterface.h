@@ -51,7 +51,15 @@ public:
         lfscfg.cache_size = 64; // Cache size (adjust as needed)
         lfscfg.lookahead_size = 64; // Lookahead buffer size (adjust as needed)
         lfscfg.block_cycles = 100; // Number of erase cycles before wear leveling    
-        return initLFSConfig(&lfscfg);
+        int status = initLFSConfig(&lfscfg);
+
+        if(status == LFS_ERR_OK) {
+            // Create home and temp directories if they do not exist
+            // createDirectory(m_home.c_str());
+            createDirectory(m_temp.c_str());
+        }
+        
+        return status;
     }
     
     /**

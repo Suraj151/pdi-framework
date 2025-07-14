@@ -43,22 +43,22 @@ bool disconnect(iClientInterface *client)
   return isConnected(client) ? client->disconnect() : true;
 }
 
-bool sendPacket(iClientInterface *client, uint8_t *buffer, uint16_t len)
+bool sendPacket(iClientInterface *client, uint8_t *buffer, uint16_t len, uint16_t max_bytes_in_one_write)
 {
   bool status = false;
 
   if (isConnected(client) && nullptr != buffer)
   {
-    uint16_t sentBytes = 0;
-    uint16_t _buf_len = len; // strlen((char*)buffer);
+    int32_t sentBytes = 0;
+    int32_t _buf_len = len; // strlen((char*)buffer);
     // len = _buf_len < len ? _buf_len : len;
     status = true;
 
     while (len > 0)
     {
-      uint16_t sendlen = len > 250 ? 250 : len;
+      int32_t sendlen = len > max_bytes_in_one_write ? max_bytes_in_one_write : len;
       uint8_t *_buff_pointer = buffer + sentBytes;
-      uint16_t _sent = client->write(_buff_pointer, sendlen);
+      int32_t _sent = client->write(_buff_pointer, sendlen);
       sentBytes += _sent;
       len -= _sent;
 
@@ -82,6 +82,10 @@ bool sendPacket(iClientInterface *client, uint8_t *buffer, uint16_t len)
         break;
       }
 
+      while (!client->availableforwrite()){
+        __i_dvc_ctrl.yield();
+      }
+      
       __i_dvc_ctrl.wait(0);
     }
   }
