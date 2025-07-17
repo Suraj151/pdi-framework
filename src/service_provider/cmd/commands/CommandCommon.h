@@ -56,6 +56,7 @@ created Date    : 1st June 2019
 #define CMD_NAME_MKF 				"mkf"
 #define CMD_NAME_RM 				"rm"
 #define CMD_NAME_MOVE 			    "mv"
+#define CMD_NAME_COPY 			    "cp"
 #define CMD_NAME_FILE_READ 			"fread"
 #define CMD_NAME_FILE_WRITE 		"fwrite"
 #define CMD_NAME_CLS 			    "cls"

@@ -52,14 +52,14 @@ struct MoveFSCommand : public CommandBase {
 			CommandOption *cmdoptn2 = &m_options[1];
 			if( nullptr != cmdoptn1 && nullptr != cmdoptn1->optionval && cmdoptn1->optionvalsize > 0 &&
 				nullptr != cmdoptn2 && nullptr != cmdoptn2->optionval && cmdoptn2->optionvalsize > 0){
-				char *oldname = new char[cmdoptn1->optionvalsize+__i_fs.pwd()->size()+2]();
-				char *newname = new char[cmdoptn2->optionvalsize+__i_fs.pwd()->size()+2]();
+				char *oldname = new char[cmdoptn1->optionvalsize+__i_fs.getPWD().size()+2]();
+				char *newname = new char[cmdoptn2->optionvalsize+__i_fs.getPWD().size()+2]();
 				if( nullptr != oldname && nullptr != newname ){
-					memset(oldname, 0, cmdoptn1->optionvalsize+__i_fs.pwd()->size()+2);
-					memset(newname, 0, cmdoptn2->optionvalsize+__i_fs.pwd()->size()+2);
+					memset(oldname, 0, cmdoptn1->optionvalsize+__i_fs.getPWD().size()+2);
+					memset(newname, 0, cmdoptn2->optionvalsize+__i_fs.getPWD().size()+2);
 
-					memcpy(oldname, __i_fs.pwd()->c_str(), __i_fs.pwd()->size());
-					memcpy(newname, __i_fs.pwd()->c_str(), __i_fs.pwd()->size());
+					memcpy(oldname, __i_fs.getPWD().c_str(), __i_fs.getPWD().size());
+					memcpy(newname, __i_fs.getPWD().c_str(), __i_fs.getPWD().size());
 
 					__i_fs.appendFileSeparator(oldname);
 					__i_fs.appendFileSeparator(newname);

@@ -181,10 +181,22 @@ public:
     virtual uint64_t getFreeSize() = 0;
 
     /**
-     * @brief Gets the current working directory.
-     * @return The current working directory.
+     * @brief Gets the present working directory.
+     * @return The present working directory.
      */
-    virtual pdiutil::string* pwd() = 0;
+    virtual pdiutil::string getPWD() const = 0;
+
+    /**
+     * @brief Sets the present working directory.
+     * @param The present working directory.
+     */
+    virtual bool setPWD(const char* path) = 0;
+
+    /**
+     * @brief Gets the last present working directory.
+     * @return The last present working directory.
+     */
+    virtual pdiutil::string getLastPWD() const = 0;
 
     /**
      * @brief Appends a file separator to the provided path if it doesn't already end with one.

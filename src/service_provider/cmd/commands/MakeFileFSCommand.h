@@ -49,10 +49,10 @@ struct MakeFileFSCommand : public CommandBase {
 			// Get first option which must be the path
 			CommandOption *cmdoptn = &m_options[0];
 			if( nullptr != cmdoptn && nullptr != cmdoptn->optionval && cmdoptn->optionvalsize > 0 ){
-				char *filename = new char[cmdoptn->optionvalsize+__i_fs.pwd()->size()+2]();
+				char *filename = new char[cmdoptn->optionvalsize+__i_fs.getPWD().size()+2]();
 				if( nullptr != filename ){
-					memset(filename, 0, cmdoptn->optionvalsize+__i_fs.pwd()->size()+2);
-					memcpy(filename, __i_fs.pwd()->c_str(), __i_fs.pwd()->size());
+					memset(filename, 0, cmdoptn->optionvalsize+__i_fs.getPWD().size()+2);
+					memcpy(filename, __i_fs.getPWD().c_str(), __i_fs.getPWD().size());
 					__i_fs.appendFileSeparator(filename);
 					strncat(filename, cmdoptn->optionval, cmdoptn->optionvalsize);
 					int bStatus = __i_fs.createFile(filename, "");

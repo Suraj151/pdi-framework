@@ -107,7 +107,7 @@ struct LogoutCommand : public CommandBase {
 		__auth_service.setAuthorized(false);
 
 		#ifdef ENABLE_STORAGE_SERVICE
-		*(__i_fs.pwd()) = __i_fs.getHomeDirectory();
+		__i_fs.setPWD(__i_fs.getHomeDirectory());
 		#endif
 		
 		return result;

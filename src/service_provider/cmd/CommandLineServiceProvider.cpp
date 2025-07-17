@@ -59,6 +59,9 @@ CommandLineServiceProvider::CommandLineServiceProvider() : ServiceProvider(SERVI
   MoveFSCommand *movefscmd = new MoveFSCommand();
   m_cmdlist.push_back(movefscmd);
 
+  CopyFSCommand *copyfscmd = new CopyFSCommand();
+  m_cmdlist.push_back(copyfscmd);
+
   FileReadCommand *fileReadcmd = new FileReadCommand();
   m_cmdlist.push_back(fileReadcmd);
 
@@ -496,7 +499,7 @@ void CommandLineServiceProvider::startInteraction()
       m_terminal->write(__i_dvc_ctrl.getDeviceId());
       #ifdef ENABLE_STORAGE_SERVICE
 		  m_terminal->write_ro(RODT_ATTR(":("));
-      m_terminal->write(__i_fs.pwd()->c_str());
+      m_terminal->write(__i_fs.getPWD().c_str());
 		  m_terminal->write_ro(RODT_ATTR("): "));
       #else
 		  m_terminal->write_ro(RODT_ATTR(": "));

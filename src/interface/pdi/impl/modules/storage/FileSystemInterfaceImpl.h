@@ -33,9 +33,10 @@ public:
      * @param storage Reference to an iStorageInterface implementation.
      */
     FileSystemInterfaceImpl(iStorageInterface& storage, bool defaultConfig) : 
-        m_pwd("/"),
-        m_root("/"),
-        m_home("/"),
+        m_pwd(FILE_SEPARATOR),
+        m_lastpwd(FILE_SEPARATOR),
+        m_root(FILE_SEPARATOR),
+        m_home(FILE_SEPARATOR),
         m_temp("/temp/"),
         LittleFSWrapper(storage, defaultConfig) {
     }
@@ -63,7 +64,19 @@ public:
      * @brief Gets the current working directory.
      * @return The current working directory.
      */
-    virtual pdiutil::string* pwd() override;
+    virtual pdiutil::string getPWD() const override;
+
+    /**
+     * @brief Sets the present working directory.
+     * @param The present working directory.
+     */
+    virtual bool setPWD(const char* path) override;
+
+    /**
+     * @brief Gets the last present working directory.
+     * @return The last present working directory.
+     */
+    virtual pdiutil::string getLastPWD() const override;
 
     /**
      * @brief Appends a file separator to the provided path if it doesn't already end with one.
@@ -110,7 +123,8 @@ public:
     virtual pdiutil::string basename(const char* path) override;
 
 protected:
-    pdiutil::string m_pwd; ///< Current working directory.
+    pdiutil::string m_pwd; ///< Present working directory.
+    pdiutil::string m_lastpwd; ///< Last Present working directory.
     pdiutil::string m_root; ///< Root directory of the file system.
     pdiutil::string m_home; ///< Home directory of the session.
     pdiutil::string m_temp; ///< Temporary directory for file operations.

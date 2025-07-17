@@ -48,7 +48,7 @@ struct ListFSCommand : public CommandBase {
 		if(nullptr != m_terminal){
 
 			pdiutil::vector<file_info_t> itemlist;
-			int resultCode = __i_fs.getDirFileList(__i_fs.pwd()->c_str(), itemlist);
+			int resultCode = __i_fs.getDirFileList(__i_fs.getPWD().c_str(), itemlist);
 			
 			if(resultCode < 0){
 				result = CMD_RESULT_FAILED;

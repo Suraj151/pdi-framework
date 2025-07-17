@@ -50,19 +50,23 @@ struct ChangeDirFSCommand : public CommandBase {
 			// Get first option which must be the path
 			CommandOption *cmdoptn = &m_options[0];
 			if( nullptr != cmdoptn && nullptr != cmdoptn->optionval && cmdoptn->optionvalsize > 0 ){
-				char *dirname = new char[cmdoptn->optionvalsize+__i_fs.pwd()->size()+2]();
+				char *dirname = new char[cmdoptn->optionvalsize+200]();
 				if( nullptr != dirname ){
 
-					memset(dirname, 0, cmdoptn->optionvalsize+__i_fs.pwd()->size()+2);
+					memset(dirname, 0, cmdoptn->optionvalsize+200);
 
-					// Check whether homw directory symbol was provided
+					// Check whether symbol was provided
 					if( cmdoptn->optionvalsize == 1 && cmdoptn->optionval[0] == '~' ){
 
 						const char* homedir = __i_fs.getHomeDirectory();
 						memcpy(dirname, homedir, strlen(homedir));
+					}else if( cmdoptn->optionvalsize == 1 && cmdoptn->optionval[0] == '-' ){
+
+						pdiutil::string lastpwd = __i_fs.getLastPWD();
+						memcpy(dirname, lastpwd.c_str(), lastpwd.length());
 					}else{
 
-						memcpy(dirname, __i_fs.pwd()->c_str(), __i_fs.pwd()->size());
+						memcpy(dirname, __i_fs.getPWD().c_str(), __i_fs.getPWD().size());
 						__i_fs.appendFileSeparator(dirname);
 						strncat(dirname, cmdoptn->optionval, cmdoptn->optionvalsize);
 					}

@@ -75,11 +75,37 @@ mimetype_t FileSystemInterfaceImpl::getFileMimeType(const pdiutil::string &path)
 }
 
 /**
- * @brief Gets the current working directory.
- * @return The current working directory.
+ * @brief Gets the present working directory.
+ * @return The present working directory.
  */
-pdiutil::string* FileSystemInterfaceImpl::pwd() {
-    return &m_pwd;
+pdiutil::string FileSystemInterfaceImpl::getPWD() const{
+    return m_pwd;
+}
+
+/**
+ * @brief Sets the present working directory.
+ * @param The present working directory.
+ */
+bool FileSystemInterfaceImpl::setPWD(const char* path) {
+
+    if( isDirectory(path) ){
+
+        m_lastpwd = m_pwd;
+        m_pwd = path;
+        if (path[strlen(path) - 1] != FILE_SEPARATOR[0]) {
+            m_pwd += FILE_SEPARATOR[0];
+        }
+        return true;          
+    }
+    return false;
+}
+
+/**
+ * @brief Gets the last present working directory.
+ * @return The last present working directory.
+ */
+pdiutil::string FileSystemInterfaceImpl::getLastPWD() const{
+    return m_lastpwd;
 }
 
 /**
