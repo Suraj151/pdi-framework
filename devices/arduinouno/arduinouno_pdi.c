@@ -7,10 +7,3 @@ warranty.
 Author          : Suraj I.
 created Date    : 1st Jan 2024
 ******************************************************************************/
-
-#include "../../devices/DeviceConfig.h"
-
-#ifdef ENABLE_STORAGE_SERVICE
-#include "../../external/LittleFSWrapper.c"
-#endif
-

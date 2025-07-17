@@ -29,7 +29,7 @@ HttpServerInterfaceImpl::HttpServerInterfaceImpl() :
     m_clientRequest.clear();
     m_uriHandlerMap.clear();
     m_responseHeaders.clear();
-    m_storagePath = ROPTR_TO_CHAR("/var/www/static/"); // Default storage path for static files
+    m_storagePath = CHARPTR_WRAP("/var/www/static/"); // Default storage path for static files
 }
 
 /**
@@ -335,19 +335,13 @@ void HttpServerInterfaceImpl::parseRequest(){
 
             if( key == HTTP_HEADER_KEY_CONTENT_TYPE ){
 
-                const char *urlencodedtypestr = getMimeTypeString(MIME_TYPE_APPLICATION_X_WWW_FORM_URLENCODED);
-                
-                if( value.find(urlencodedtypestr) != pdiutil::string::npos ){
+                if( value.find(getMimeTypeString(MIME_TYPE_APPLICATION_X_WWW_FORM_URLENCODED)) != pdiutil::string::npos ){
                     isForm = false;
                     isEncoded = true;
-                } else if( value.find("multipart/") != pdiutil::string::npos ){
+                } else if( value.find(ROPTR_WRAP("multipart/")) != pdiutil::string::npos ){
                     isForm = true;
                     boundaryStr = value.substr(value.find('=') + 1);
                     boundaryStr.replace("\"","");
-                }
-
-                if (urlencodedtypestr) {
-                    delete[] urlencodedtypestr; // Free the memory allocated for the status string
                 }
             }else if( key == HTTP_HEADER_KEY_CONTENT_LENGTH ){
                 contentLength = StringToUint32(value.c_str());
@@ -450,25 +444,19 @@ void HttpServerInterfaceImpl::parseRequest(){
                 // Start of a new part
             } else {
                 // Process Content-Disposition header
-                if (part.find("Content-Disposition") != pdiutil::string::npos) {
-
-                    const char *plaintypestr = getMimeTypeString(MIME_TYPE_TEXT_PLAIN);
+                if (part.find(ROPTR_WRAP("Content-Disposition")) != pdiutil::string::npos) {
 
                     pdiutil::string argname;
                     pdiutil::string argfilename;
                     pdiutil::string argvalue;
-                    pdiutil::string argtype = plaintypestr;
-
-                    if (plaintypestr) {
-                        delete[] plaintypestr; // Free the memory allocated for the status string
-                    }
+                    pdiutil::string argtype = (char*)getMimeTypeString(MIME_TYPE_TEXT_PLAIN);
 
                     pdiutil::string::size_type nameStart = part.find("=\"");
                     if (nameStart != pdiutil::string::npos) {
                         pdiutil::string::size_type nameEnd = part.find("\"", nameStart + 2);
                         argname = part.substr(nameStart + 2, nameEnd - nameStart - 3);
 
-                        pdiutil::string::size_type filenameStart = part.find("filename=\"", nameEnd + 1);
+                        pdiutil::string::size_type filenameStart = part.find(ROPTR_WRAP("filename=\""), nameEnd + 1);
                         if (filenameStart != pdiutil::string::npos) {
                             pdiutil::string::size_type filenameEnd = part.find("\"", filenameStart + 10);
                             argfilename = part.substr(filenameStart + 10, filenameEnd - filenameStart - 11);
@@ -479,7 +467,7 @@ void HttpServerInterfaceImpl::parseRequest(){
                     while (true){
                         m_client->readLine(part, readLineYield); // Read the next line after Content-Disposition
                         if (!part.empty()) {
-                            pdiutil::string::size_type argtypeStart = part.find("Content-Type: ");
+                            pdiutil::string::size_type argtypeStart = part.find(ROPTR_WRAP("Content-Type: "));
                             if (argtypeStart != pdiutil::string::npos) {
                                 argtype = part.substr(argtypeStart + 14);
                             }
@@ -578,18 +566,12 @@ void HttpServerInterfaceImpl::prepareResponseHeader(pdiutil::string& _header, in
 
     _header.clear();
 
-    char *httpsstatusstr = (char*)getHttpStatusString(code);
-
     _header += m_clientRequest.version;
     _header += ' ';
     _header += pdiutil::to_string(code);
     _header += ' ';
-    _header += httpsstatusstr;
+    _header += getHttpStatusString(code);
     _header += "\r\n";
-
-    if (httpsstatusstr) {
-        delete[] httpsstatusstr; // Free the memory allocated for the status string
-    }
 
     addHeader(HTTP_HEADER_KEY_CONTENT_TYPE, content_type);
     addHeader(HTTP_HEADER_KEY_CONTENT_LENGTH, pdiutil::to_string(content_length));
@@ -598,8 +580,8 @@ void HttpServerInterfaceImpl::prepareResponseHeader(pdiutil::string& _header, in
     if (keepalive.empty() || keepalive == "close") {
         addHeader(HTTP_HEADER_KEY_CONNECTION, "close");
     } else {
-        addHeader(HTTP_HEADER_KEY_CONNECTION, "keep-alive");
-        addHeader(HTTP_HEADER_KEY_KEEP_ALIVE, "timeout=30 max=100");
+        addHeader(HTTP_HEADER_KEY_CONNECTION, CHARPTR_WRAP("keep-alive"));
+        addHeader(HTTP_HEADER_KEY_KEEP_ALIVE, CHARPTR_WRAP("timeout=30 max=100"));
     }
 
     addHeader(HTTP_HEADER_KEY_ACCESS_CONTROL_ALLOW_ORIGIN, "*"); // Allow CORS
@@ -618,14 +600,8 @@ void HttpServerInterfaceImpl::sendResponse(int code, mimetype_t content_type, co
         return; // Client not initialized
     }
 
-    const char *contenttypestr = getMimeTypeString(content_type);
-
     pdiutil::string response;
-    prepareResponseHeader(response, code, contenttypestr, strlen(content));
-
-    if (contenttypestr) {
-        delete[] contenttypestr; // Free the memory allocated for the status string
-    }
+    prepareResponseHeader(response, code, getMimeTypeString(content_type), strlen(content));
 
     // Send the response headers
     sendPacket(m_client, (uint8_t *)response.c_str(), response.length());
@@ -661,19 +637,13 @@ bool HttpServerInterfaceImpl::handleStaticFileRequest(){
             }
 
             // Set the content type based on the file type
-            const char *contenttypestr = getMimeTypeString(filetype);
-
             // Add Content-Disposition header to force download
             m_responseHeaders.clear();
-            pdiutil::string content_disposition_value = "attachment; filename=\"" + __i_instance.getFileSystemInstance().basename(filePath.c_str()) + "\"";
+            pdiutil::string content_disposition_value = CHARPTR_WRAP("attachment; filename=\"") + __i_instance.getFileSystemInstance().basename(filePath.c_str()) + "\"";
             addHeader(HTTP_HEADER_KEY_CONTENT_DISPOSITION, content_disposition_value);
 
             pdiutil::string response;
-            prepareResponseHeader(response, HTTP_RESP_OK, contenttypestr, __i_instance.getFileSystemInstance().getFileSize(filePath.c_str()));
-
-            if (contenttypestr) {
-                delete[] contenttypestr; // Free the memory allocated for the status string
-            }
+            prepareResponseHeader(response, HTTP_RESP_OK, getMimeTypeString(filetype), __i_instance.getFileSystemInstance().getFileSize(filePath.c_str()));
 
             // Send the response headers
             sendPacket(m_client, (uint8_t *)response.c_str(), response.length());

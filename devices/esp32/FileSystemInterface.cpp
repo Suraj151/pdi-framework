@@ -11,7 +11,6 @@ Author          : Suraj I.
 Created Date    : 6th Apr 2025
 ******************************************************************************/
 
-#include "../../external/LittleFSWrapper.cpp"
 #include "FileSystemInterface.h"
 
 

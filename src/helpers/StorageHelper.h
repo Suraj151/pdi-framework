@@ -19,24 +19,24 @@ created Date    : 1st June 2019
 
 // Returns the MIME type string associated with a MIME type
 // Returns nullptr if the MIME type is not recognized
-static const char* getMimeTypeString(mimetype_t type) {
+static rofn::ROPTR getMimeTypeString(mimetype_t type) {
     switch (type) {
-        case MIME_TYPE_TEXT_PLAIN: return ROPTR_TO_CHAR_NEED_DEL("text/plain");
-        case MIME_TYPE_TEXT_HTML: return ROPTR_TO_CHAR_NEED_DEL("text/html");
-        case MIME_TYPE_TEXT_CSS: return ROPTR_TO_CHAR_NEED_DEL("text/css");
-        case MIME_TYPE_TEXT_JAVASCRIPT: return ROPTR_TO_CHAR_NEED_DEL("text/javascript");
-        case MIME_TYPE_TEXT_CSV: return ROPTR_TO_CHAR_NEED_DEL("text/csv");
-        case MIME_TYPE_APPLICATION_JSON: return ROPTR_TO_CHAR_NEED_DEL("application/json");
-        case MIME_TYPE_APPLICATION_XML: return ROPTR_TO_CHAR_NEED_DEL("application/xml");
-        case MIME_TYPE_APPLICATION_OCTET_STREAM: return ROPTR_TO_CHAR_NEED_DEL("application/octet-stream");
-        case MIME_TYPE_APPLICATION_PDF: return ROPTR_TO_CHAR_NEED_DEL("application/pdf");
-        case MIME_TYPE_APPLICATION_ZIP: return ROPTR_TO_CHAR_NEED_DEL("application/zip");
-        case MIME_TYPE_APPLICATION_GZIP: return ROPTR_TO_CHAR_NEED_DEL("application/gzip");
-        case MIME_TYPE_APPLICATION_X_WWW_FORM_URLENCODED: return ROPTR_TO_CHAR_NEED_DEL("application/x-www-form-urlencoded");
-        case MIME_TYPE_IMAGE_GIF: return ROPTR_TO_CHAR_NEED_DEL("image/gif");
-        case MIME_TYPE_IMAGE_JPEG: return ROPTR_TO_CHAR_NEED_DEL("image/jpeg");
-        case MIME_TYPE_IMAGE_PNG: return ROPTR_TO_CHAR_NEED_DEL("image/png");
-        default: return nullptr;
+        case MIME_TYPE_TEXT_PLAIN: return ROPTR_WRAP("text/plain");
+        case MIME_TYPE_TEXT_HTML: return ROPTR_WRAP("text/html");
+        case MIME_TYPE_TEXT_CSS: return ROPTR_WRAP("text/css");
+        case MIME_TYPE_TEXT_JAVASCRIPT: return ROPTR_WRAP("text/javascript");
+        case MIME_TYPE_TEXT_CSV: return ROPTR_WRAP("text/csv");
+        case MIME_TYPE_APPLICATION_JSON: return ROPTR_WRAP("application/json");
+        case MIME_TYPE_APPLICATION_XML: return ROPTR_WRAP("application/xml");
+        case MIME_TYPE_APPLICATION_OCTET_STREAM: return ROPTR_WRAP("application/octet-stream");
+        case MIME_TYPE_APPLICATION_PDF: return ROPTR_WRAP("application/pdf");
+        case MIME_TYPE_APPLICATION_ZIP: return ROPTR_WRAP("application/zip");
+        case MIME_TYPE_APPLICATION_GZIP: return ROPTR_WRAP("application/gzip");
+        case MIME_TYPE_APPLICATION_X_WWW_FORM_URLENCODED: return ROPTR_WRAP("application/x-www-form-urlencoded");
+        case MIME_TYPE_IMAGE_GIF: return ROPTR_WRAP("image/gif");
+        case MIME_TYPE_IMAGE_JPEG: return ROPTR_WRAP("image/jpeg");
+        case MIME_TYPE_IMAGE_PNG: return ROPTR_WRAP("image/png");
+        default: return ROPTR_WRAP("text/plain");
     }
 }
 

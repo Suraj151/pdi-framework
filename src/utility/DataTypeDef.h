@@ -78,28 +78,56 @@ namespace rofn{
 
     struct ROPTR{
 
-        // Explicitly delete the default constructor
-        ROPTR() = delete;
+        ROPTR() : ptr(nullptr), autodelete(true) {}
 
         ROPTR(const void *p, bool auto_del = true) : ptr(nullptr), autodelete(auto_del) {
             ptr = rofn::to_charptr(p);
         }
 
-        ~ROPTR() {
-            if (ptr && autodelete) {
-                delete[] ptr; // Free the memory allocated for the non read-only string
-                ptr = nullptr;
+        ROPTR(const ROPTR &obj) : ptr(nullptr), autodelete(obj.autodelete) {
+            if( nullptr != obj.ptr ){
+                ((ROPTR &)obj).setAutoDelete(false); // Prevent deletion of the original pointer
+                ptr = obj.ptr;
             }
         }
 
+        ROPTR(ROPTR &&obj) : ptr(obj.ptr), autodelete(obj.autodelete) {
+            if( nullptr != obj.ptr ){
+                obj.setAutoDelete(false); // Prevent deletion of the original pointer
+            }
+        }
+
+        ROPTR& operator=(const ROPTR &obj) {
+            if (this != &obj) {
+
+                if( nullptr != ptr )
+                    delete[] ptr;
+
+                autodelete = obj.autodelete;
+                if( nullptr != obj.ptr ){
+                    ((ROPTR &)obj).setAutoDelete(false); // Prevent deletion of the original pointer
+                    ptr = obj.ptr;
+                }
+            }
+            return *this;
+        }
+
+        ~ROPTR() {
+            if (ptr && autodelete) {
+                delete[] ptr; // Free the memory allocated for the non read-only string
+            }
+            ptr = nullptr;
+        }
+
+        void setAutoDelete(bool auto_del=true) { autodelete = auto_del; } ///< Modify autodelete
         operator char*() const { return ptr; } ///< Implicit conversion to char*
         private :
         char *ptr = nullptr; ///< Pointer to the non read-only string
         bool autodelete = true; ///< Flag to indicate if the pointer should be deleted
     };    
 } // namespace rofunctions
-#define ROPTR_TO_CHAR(x) (char*)rofn::ROPTR(RODT_ATTR(x))
-#define ROPTR_TO_CHAR_NEED_DEL(x) (char*)rofn::ROPTR(RODT_ATTR(x), false)
+#define ROPTR_WRAP(x) rofn::ROPTR(RODT_ATTR(x))
+#define CHARPTR_WRAP(x) (char*)rofn::ROPTR(RODT_ATTR(x))
 
 
 // redefine these in derived interface

@@ -16,7 +16,6 @@ Created Date    : 6th Apr 2025
 
 #include <interface/interface_includes.h>
 #include "iStorageInterface.h" ///< Include the iStorageInterface header
-#include <helpers/StorageHelper.h>
 
 
 // forward declaration of derived class for this interface
@@ -39,11 +38,7 @@ public:
      * @param storage Reference to an iStorageInterface implementation.
      */
     iFileSystemInterface(iStorageInterface& storage) :
-        m_istorage(storage),
-        m_pwd("/"),
-        m_root("/"),
-        m_home("/"),
-        m_temp("/temp/") {
+        m_istorage(storage){
     }
 
     /**
@@ -189,201 +184,61 @@ public:
      * @brief Gets the current working directory.
      * @return The current working directory.
      */
-    virtual pdiutil::string* pwd() {
-        return &m_pwd;
-    }
+    virtual pdiutil::string* pwd() = 0;
 
     /**
      * @brief Appends a file separator to the provided path if it doesn't already end with one.
      * @param path The path to which the file separator will be appended.
      */
-    virtual void appendFileSeparator(char *path) {
-        if (nullptr != path && path[strlen(path) - 1] != FILE_SEPARATOR[0]) {
-            strncat(path, FILE_SEPARATOR, 1);
-        }
-    }
+    virtual void appendFileSeparator(char *path) = 0;
 
     /**
      * @brief Changes the current working directory to the specified path.
      * @param path The new path to change to.
      * @return True if the directory change was successful, false otherwise.
      */
-    virtual bool changeDirectory(const char* path) {
-        if (!path || !isDirectory(path)) {
-            return false; // Invalid path or not a directory
-        }
-
-        const int len = strlen(path);
-        char newpath[len + 1]; // Buffer for the resulting path
-        memset(newpath, 0, sizeof(newpath));
-
-        int j = 0; // Index for newpath
-        int lastsepindx = 0; // Index of the last directory separator
-
-        for (int i = 0; i < len; ++i) {           
-            if (path[i] == FILE_SEPARATOR[0]) {
-                // Handle directory separator
-
-                int tempi = i+1;
-                int dotcount = 0;
-                // Check for special cases like "." and ".."
-                while (tempi < len) {
-                    if(path[tempi] == '.'){
-                        dotcount++;
-                    }else if(path[tempi] == FILE_SEPARATOR[0]){
-                        break;
-                    }else{
-                        dotcount = 0;
-                        break;
-                    }
-                    tempi++;
-                }
-
-                if (1 == dotcount) {
-                    // Handle "." (current directory)
-                    i += 1; // Skip "."
-                }else if(2 == dotcount){
-                    // Handle ".." (parent directory)
-                    // Backtrack to the previous directory separator
-                    while (j > 0 && newpath[j - 1] != FILE_SEPARATOR[0]) {
-                        --j;
-                    }
-                    if (j > 0) {
-                        --j; // Remove the trailing separator
-                    }
-                    i += 2; // Skip ".."
-                }else {
-                    // Normal directory separator
-                    if (j == 0 || newpath[j - 1] != FILE_SEPARATOR[0]) {
-                        newpath[j++] = FILE_SEPARATOR[0];
-                    }
-                }
-                lastsepindx = j;
-            } else {
-                // Copy normal characters
-                newpath[j++] = path[i];
-            }
-        }
-
-        // Remove trailing separator if it's not the root directory
-        if (j > 1 && newpath[j - 1] == FILE_SEPARATOR[0]) {
-            newpath[--j] = '\0';
-        } else {
-            newpath[j] = '\0';
-        }
-
-        // Handle the case where the path is empty or only contains separators
-        if (j == 0) {
-            newpath[0] = FILE_SEPARATOR[0];
-            newpath[1] = '\0';
-        }
-    
-        // Validate the resulting path
-        if (isDirectory(newpath)) {
-            m_pwd = newpath; // Update the current working directory
-            return true;
-        }
-
-        return false; // Invalid resulting path
-    }
+    virtual bool changeDirectory(const char* path) = 0;
 
     /**
      * @brief Gets the root directory.
      * @return The root directory.
      */
-    virtual const char* getRootDirectory() const {
-        return m_root.c_str();
-    }
+    virtual const char* getRootDirectory() const = 0;
 
     /**
      * @brief Gets the home directory.
      * @return The home directory.
      */
-    virtual const char* getHomeDirectory() const {
-        return m_home.c_str();
-    }
+    virtual const char* getHomeDirectory() const = 0;
 
     /**
      * @brief Gets the temp directory.
      * @return The temp directory.
      */
-    virtual const char* getTempDirectory() const {
-        return m_temp.c_str();
-    }
+    virtual const char* getTempDirectory() const = 0;
 
     /**
      * @brief Sets the home directory.
      * @return status
      */
-    virtual bool setHomeDirectory(pdiutil::string &homedir) {
-
-        if( isDirectory(homedir.c_str()) ){
-
-            m_home = homedir;
-            if (homedir.c_str()[homedir.size() - 1] != FILE_SEPARATOR[0]) {
-                m_home += FILE_SEPARATOR[0];
-            }
-            return true;          
-        }
-        return false;
-    }
+    virtual bool setHomeDirectory(pdiutil::string &homedir) = 0;
 
     /**
      * @brief Get file mime type based on file extension.
      * @param path The path of the file.
      * @return status
      */
-    virtual mimetype_t getFileMimeType(const pdiutil::string &path) {
-
-        mimetype_t type = MIME_TYPE_MAX;
-
-        // currently we are checking only for file extension
-        // if the file exists and has an extension, we will try to find the mime type
-        // if the file does not have an extension, we will return MIME_TYPE_MAX
-        // if the file does not exist, we will return MIME_TYPE_MAX
-        if( isFileExist(path.c_str()) && path.find_last_of('.') != pdiutil::string::npos ) {
-
-            pdiutil::string ext = path.substr(path.find_last_of('.'));
-
-            for (int t = 0; t < MIME_TYPE_MAX; t++){
-
-                mimetype_t tt = static_cast<mimetype_t>(t);
-                if (pdiutil::string(getMimeTypeExtension(tt)) == ext) {
-                    type = tt;
-                    break;
-                }
-            }            
-        }
-
-        return type;
-    }
+    virtual mimetype_t getFileMimeType(const pdiutil::string &path) = 0;
 
     /**
      * @brief Gets the file/dir name from the path.
      * @param path The path of the file/dir.
      * @return The file/dir name.
      */
-    virtual pdiutil::string basename(const char* path) {
-        if (!path || strlen(path) == 0) {
-            return pdiutil::string();
-        }
-
-        pdiutil::string pathStr(path);
-        size_t lastSlash = pathStr.find_last_of(FILE_SEPARATOR);
-
-        if (lastSlash == pdiutil::string::npos) {
-            return pathStr; // No directory separator found, return the whole path
-        }
-
-        return pathStr.substr(lastSlash + 1); // Return the substring after the last separator
-    }
+    virtual pdiutil::string basename(const char* path) = 0;
 
 protected:
     iStorageInterface& m_istorage; ///< Reference to the storage interface used for file operations.
-    pdiutil::string m_pwd; ///< Current working directory.
-    pdiutil::string m_root; ///< Root directory of the file system.
-    pdiutil::string m_home; ///< Home directory of the session.
-    pdiutil::string m_temp; ///< Temporary directory for file operations.
 };
 
 /**

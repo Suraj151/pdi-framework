@@ -11,13 +11,11 @@ Author          : Suraj I.
 Created Date    : 6th Apr 2025
 ******************************************************************************/
 
-#ifndef _FILESYSTEM_INTERFACE_H
-#define _FILESYSTEM_INTERFACE_H
+#ifndef _ESP8266_FILE_SYSTEM_INTERFACE_H
+#define _ESP8266_FILE_SYSTEM_INTERFACE_H
 
 #include "esp8266.h"
-// will use implementation of littlefs external library
-#include "../../external/LittleFSWrapper.h"
-#include "LoggerInterface.h"
+#include <interface/pdi/impl/modules/storage/FileSystemInterfaceImpl.h>
 
 /**
  * @class FileSystemInterface
@@ -27,39 +25,14 @@ Created Date    : 6th Apr 2025
  * files or directories. Implementations of this interface must provide
  * concrete definitions for these methods.
  */
-class FileSystemInterface : public LittleFSWrapper {
+class FileSystemInterface : public FileSystemInterfaceImpl {
 
 public:
     /**
      * @brief Constructor to initialize the FileSystemInterface.
      * @param storage Reference to an iStorageInterface implementation.
      */
-    FileSystemInterface() : LittleFSWrapper(__i_storage, false) {
-    }
-
-    /**
-     * @brief Initializes the file system interface.
-     * @return 0 on success, or a negative error code on failure.
-     */
-    int init() override{ 
-
-        // Initialize the file system
-        lfs_config lfscfg; 
-        lfscfg.read_size = 64; // Minimum read size (adjust as needed)
-        lfscfg.prog_size = 64; // Minimum program size (adjust as needed)
-        lfscfg.block_size = FS_PHYS_BLOCK; // Block size (adjust as needed)
-        lfscfg.cache_size = 64; // Cache size (adjust as needed)
-        lfscfg.lookahead_size = 64; // Lookahead buffer size (adjust as needed)
-        lfscfg.block_cycles = 100; // Number of erase cycles before wear leveling    
-        int status = initLFSConfig(&lfscfg);
-
-        if(status == LFS_ERR_OK) {
-            // Create home and temp directories if they do not exist
-            // createDirectory(m_home.c_str());
-            createDirectory(m_temp.c_str());
-        }
-
-        return status;
+    FileSystemInterface() : FileSystemInterfaceImpl(__i_storage, false) {
     }
 
     /**
@@ -67,6 +40,31 @@ public:
      */
     virtual ~FileSystemInterface() {
     }
+
+    /**
+     * @brief Initializes the file system interface.
+     * @return 0 on success, or a negative error code on failure.
+     */
+    // int init() override{ 
+
+    //     // Initialize the file system
+    //     lfs_config lfscfg; 
+    //     lfscfg.read_size = 64; // Minimum read size (adjust as needed)
+    //     lfscfg.prog_size = 64; // Minimum program size (adjust as needed)
+    //     lfscfg.block_size = FS_PHYS_BLOCK; // Block size (adjust as needed)
+    //     lfscfg.cache_size = 64; // Cache size (adjust as needed)
+    //     lfscfg.lookahead_size = 64; // Lookahead buffer size (adjust as needed)
+    //     lfscfg.block_cycles = 100; // Number of erase cycles before wear leveling    
+    //     int status = initLFSConfig(&lfscfg);
+
+    //     if(status == LFS_ERR_OK) {
+    //         // Create home and temp directories if they do not exist
+    //         // createDirectory(m_home.c_str());
+    //         createDirectory(m_temp.c_str());
+    //     }
+
+    //     return status;
+    // }
 };
 
-#endif // _FILESYSTEM_INTERFACE_H
+#endif // _ESP8266_FILE_SYSTEM_INTERFACE_H
