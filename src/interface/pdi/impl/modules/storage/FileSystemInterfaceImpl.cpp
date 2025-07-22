@@ -119,18 +119,29 @@ void FileSystemInterfaceImpl::appendFileSeparator(char *path) {
 }
 
 /**
- * @brief Changes the current working directory to the specified path.
- * @param path The new path to change to.
- * @return True if the directory change was successful, false otherwise.
+ * @brief Appends a file separator to the provided path if it doesn't already end with one.
+ * @param path The path to which the file separator will be appended.
  */
-bool FileSystemInterfaceImpl::changeDirectory(const char* path) {
+void FileSystemInterfaceImpl::appendFileSeparator(pdiutil::string &path) {
+    if (path[path.length() - 1] != FILE_SEPARATOR[0]) {
+        path += FILE_SEPARATOR;
+    }
+}
+
+/**
+ * @brief Get path without . and .. notations.
+ * @param path The path to update.
+ * @return True if the update was successful, false otherwise.
+ */
+bool FileSystemInterfaceImpl::updatePathNotations(const char* path, pdiutil::string &updatedpath){
+
     if (!path || !isDirectory(path)) {
         return false; // Invalid path or not a directory
     }
 
     const int len = strlen(path);
     char newpath[len + 1]; // Buffer for the resulting path
-    memset(newpath, 0, sizeof(newpath));
+    memset(newpath, 0, len + 1);
 
     int j = 0; // Index for newpath
     int lastsepindx = 0; // Index of the last directory separator
@@ -195,11 +206,20 @@ bool FileSystemInterfaceImpl::changeDirectory(const char* path) {
 
     // Validate the resulting path
     if (isDirectory(newpath)) {
-        m_pwd = newpath; // Update the current working directory
+        updatedpath = newpath; // Update the current working directory
         return true;
     }
 
     return false; // Invalid resulting path
+}
+
+/**
+ * @brief Changes the current working directory to the specified path.
+ * @param path The new path to change to.
+ * @return True if the directory change was successful, false otherwise.
+ */
+bool FileSystemInterfaceImpl::changeDirectory(const char* path) {
+    return updatePathNotations(path, m_pwd);
 }
 
 /**
@@ -261,6 +281,29 @@ pdiutil::string FileSystemInterfaceImpl::basename(const char* path) {
     }
 
     return pathStr.substr(lastSlash + 1); // Return the substring after the last separator
+}
+
+/**
+ * @brief Apply file size limit on filename.
+ * @param name The name of the file/dir.
+ */
+void FileSystemInterfaceImpl::applyFileSizeLimit(pdiutil::string &name, uint32_t sizelimit){
+
+    if(name.length() > sizelimit){
+
+        pdiutil::string fileformat;
+        pdiutil::string::size_type lastDot = name.find_last_of('.');
+        uint32_t keepsize = sizelimit - 1;
+
+        if (lastDot == pdiutil::string::npos) {
+        }else{
+            fileformat = name.substr(lastDot);
+            keepsize -= fileformat.length();
+        }
+
+        name = name.substr(0, keepsize);
+        name += fileformat;
+    }
 }
 
 #endif

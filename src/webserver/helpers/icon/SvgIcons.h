@@ -137,4 +137,22 @@ static const char SVG_ICON48_PATH_SETTINGS[] PROG_RODT_ATTR = "\
 static const char SVG_ICON48_PATH_NOTIFICATION[] PROG_RODT_ATTR = "\
 <path d='M24 44c2.21 0 4-1.79 4-4h-8c0 2.21 1.79 4 4 4zm12-12V22c0-6.15-3.27-11.28-9-12.64V8c0-1.66-1.34-3-3-3s-3 1.34-3 3v1.36c-5.73 1.36-9 6.49-9 12.64v10l-4 4v2h32v-2l-4-4z'/>";
 
+/**
+ * @brief SVG path data for the "File" icon.
+ */
+static const char SVG_ICON48_1216_PATH_FILE[] PROG_RODT_ATTR = "\
+<path d='M6 5H2V4h4v1zM2 8h7V7H2v1zm0 2h7V9H2v1zm0 2h7v-1H2v1zm10-7.5V14c0 .55-.45 1-1 1H1c-.55 0-1-.45-1-1V2c0-.55.45-1 1-1h7.5L12 4.5zM11 5L8 2H1v12h10V5z'/>";
+
+/**
+ * @brief SVG path data for the "Folder" icon.
+ */
+static const char SVG_ICON48_1416_PATH_FOLDER[] PROG_RODT_ATTR = "\
+<path d='M13 4H7V3c0-.66-.31-1-1-1H1c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1V5c0-.55-.45-1-1-1zM6 4H1V3h5v1z'/>";
+
+/**
+ * @brief SVG path data for the "trash" icon.
+ */
+static const char SVG_ICON48_1616_PATH_TRASH[] PROG_RODT_ATTR = "\
+<path d='M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z'/>";
+
 #endif

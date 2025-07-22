@@ -43,6 +43,9 @@ static const char WEB_SERVER_HOME_MENU_TITLE_DEVICE_REGISTER[] PROG_RODT_ATTR = 
 #endif
 static const char WEB_SERVER_HOME_MENU_TITLE_DASHBOARD[] PROG_RODT_ATTR = "dashboard";
 static const char WEB_SERVER_HOME_MENU_TITLE_LOGOUT[] PROG_RODT_ATTR = "logout";
+#ifdef ENABLE_STORAGE_SERVICE
+static const char WEB_SERVER_HOME_MENU_TITLE_STORAGE[] PROG_RODT_ATTR = "storage";
+#endif
 
 /**
  * @brief HTML content for the home page.

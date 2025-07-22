@@ -205,6 +205,41 @@ int LittleFSWrapper::createDirectory(const char* path) {
  * @return 0 on success, or a negative error code on failure.
  */
 int LittleFSWrapper::deleteDirectory(const char* path) {
+    lfs_dir_t dir;
+    lfs_info info;
+
+    int dirOpenOrErr = lfs_dir_open(&m_lfs, &dir, path);
+    if (dirOpenOrErr < 0) {
+        return dirOpenOrErr; // Failed to open directory
+    }
+
+    while (lfs_dir_read(&m_lfs, &dir, &info) > 0) {
+        // Skip "." and ".."
+        if (strcmp(info.name, ".") == 0 || strcmp(info.name, "..") == 0) continue;
+
+        // Build full child path
+        char childPath[256];
+        snprintf(childPath, sizeof(childPath), "%s/%s", path, info.name);
+
+        if (info.type == LFS_TYPE_DIR) {
+            // Recursively delete subdirectory
+            int res = deleteDirectory(childPath);
+            if (res < 0) {
+                lfs_dir_close(&m_lfs, &dir);
+                return res;
+            }
+        } else {
+            // Delete file
+            int res = lfs_remove(&m_lfs, childPath);
+            if (res < 0) {
+                lfs_dir_close(&m_lfs, &dir);
+                return res;
+            }
+        }
+    }
+    lfs_dir_close(&m_lfs, &dir);
+
+    // Now delete the (now empty) directory itself
     return lfs_remove(&m_lfs, path);
 }
 

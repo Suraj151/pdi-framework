@@ -75,6 +75,7 @@ static const char HTML_WIDTH_ATTR         []PROG_RODT_ATTR = " width=";
 static const char HTML_HEIGHT_ATTR        []PROG_RODT_ATTR = " height=";
 static const char HTML_FILL_ATTR          []PROG_RODT_ATTR = " fill=";
 static const char HTML_HREF_ATTR          []PROG_RODT_ATTR = " href=";
+static const char HTML_VIEWBOX_ATTR       []PROG_RODT_ATTR = " viewBox=";
 
 /**
  * @section Flash Messages
@@ -88,6 +89,7 @@ static const char HTML_EMAIL_SUCCESS_FLASH[]PROG_RODT_ATTR = "Config saved & tes
  * Defines constants for input tag types and default configurations.
  */
 #define HTML_INPUT_TEXT_TAG_TYPE              "text"
+#define HTML_INPUT_FILE_TAG_TYPE              "file"
 #define HTML_INPUT_RANGE_TAG_TYPE             "range"
 #define HTML_INPUT_CHECKBOX_TAG_TYPE          "checkbox"
 #define HTML_INPUT_TAG_DEFAULT_MAXLENGTH      20

@@ -128,6 +128,7 @@ namespace rofn{
 } // namespace rofunctions
 #define ROPTR_WRAP(x) rofn::ROPTR(RODT_ATTR(x))
 #define CHARPTR_WRAP(x) (char*)rofn::ROPTR(RODT_ATTR(x))
+#define CHARPTR_WRAP_RO(x) (char*)rofn::ROPTR(x)
 
 
 // redefine these in derived interface

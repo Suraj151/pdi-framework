@@ -654,7 +654,7 @@ void concat_graph_axis_title_div( char *_page, char *_title, char *_style ){
  * @param _height The height of the SVG element (default: HTML_SVG_DEFAULT_HEIGHT).
  * @param _fill The fill color of the SVG element (default: HTML_SVG_DEFAULT_FILL).
  */
-void concat_svg_tag( char *_page, const char *_path, int _width, int _height, char *_fill ){
+void concat_svg_tag( char *_page, const char *_path, const char *_style, const char *_viewbox, int _width, int _height, char *_fill ){
 
   char _widthbuff[7]; memset(_widthbuff, 0, 7);
   itoa( _width, _widthbuff, 10 );
@@ -662,18 +662,32 @@ void concat_svg_tag( char *_page, const char *_path, int _width, int _height, ch
   itoa( _height, _heightbuff, 10 );
 
   strcat_ro( _page, HTML_SVG_OPEN_TAG );
+  concat_style_attribute( _page, _style);
+
   strcat_ro( _page, HTML_WIDTH_ATTR );
   strcat( _page, "'" );
   strcat( _page, _widthbuff );
   strcat( _page, "'" );
+
   strcat_ro( _page, HTML_HEIGHT_ATTR );
   strcat( _page, "'" );
   strcat( _page, _heightbuff );
   strcat( _page, "'" );
+
+  if( _viewbox != nullptr ){
+    strcat_ro( _page, HTML_VIEWBOX_ATTR );
+    strcat( _page, "'" );
+    strcat_ro( _page, _viewbox );
+    strcat( _page, "'" );
+  }
+
   strcat_ro( _page, HTML_FILL_ATTR );
   strcat( _page, "'" );
   strcat( _page, _fill );
-  strcat( _page, "'>" );
+  strcat( _page, "'" );
+
+  strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
+  
   strcat_ro( _page, _path );
   strcat_ro( _page, HTML_SVG_CLOSE_TAG );
 }
@@ -758,7 +772,7 @@ void concat_table_heading_row( char *_page, char** _headings, int _size, const c
  * @param _data_class The class attribute for the table data cells (optional).
  * @param _data_style The style attribute for the table data cells (optional).
  */
-void concat_table_data_row( char *_page, char** _data_items, int _size, const char *_row_class, const char *_row_style, const char *_data_class, const char *_data_style ){
+void concat_table_data_row( char *_page, char** _data_items, int _size, const char *_row_class, const char *_row_style, const char *_data_class, const char *_data_style, const char **_td_colspan_attr ){
 
   strcat_ro( _page, HTML_TR_OPEN_TAG );
   concat_class_attribute( _page, _row_class );
@@ -769,12 +783,42 @@ void concat_table_data_row( char *_page, char** _data_items, int _size, const ch
     strcat_ro( _page, HTML_TD_OPEN_TAG );
     concat_class_attribute( _page, _data_class );
     concat_style_attribute( _page, _data_style );
+    if( nullptr != _td_colspan_attr && nullptr != _td_colspan_attr[i] )
+      concat_colspan_attribute( _page, _td_colspan_attr[i] );
     strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
     strcat( _page, _data_items[i] );
     strcat_ro( _page, HTML_TD_CLOSE_TAG );
   }
 
   strcat_ro( _page, HTML_TR_CLOSE_TAG );
+}
+
+/**
+ * @brief Appends an HTML link element to the provided buffer.
+ *
+ * Generates an HTML link element with the specified attributes and appends
+ * it to the provided buffer.
+ *
+ * @param _page The buffer to which the link element is appended.
+ * @param _href The href attribute for the link.
+ * @param _innerhtml The innerhtml part of link.
+ * @param _class The class attribute for the link(optional).
+ * @param _style The style attribute for the link(optional).
+ */
+void concat_link_element(char *_page, const char *_href, const char *_innerhtml, const char *_class, const char *_style ){
+  strcat_ro( _page, HTML_LINK_OPEN_TAG );
+
+  strcat_ro( _page, HTML_HREF_ATTR );
+  strcat( _page, "'" );
+  strcat_ro( _page, _href );
+  strcat( _page, "'" );
+
+  concat_class_attribute( _page, _class );
+  concat_style_attribute( _page, _style );
+
+  strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
+  strcat( _page, _innerhtml );
+  strcat_ro( _page, HTML_LINK_CLOSE_TAG );
 }
 
 #endif

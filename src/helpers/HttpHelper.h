@@ -15,6 +15,14 @@ created Date    : 1st June 2019
 #include <config/Config.h>
 #include <utility/Utility.h>
 
+
+/**
+ * @section HTTP constants
+ * Defines constants for HTTP.
+ */
+static const char HTTP_SERVER_DEFAULT_STATIC_PATH   []PROG_RODT_ATTR = "/var/www/static/";
+
+
 /* HTTP support functions */
 
 // Get the HTTP status string for a given status code

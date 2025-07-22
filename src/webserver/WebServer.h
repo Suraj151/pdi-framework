@@ -38,6 +38,9 @@ Created Date    : 1st June 2019
 #ifdef ENABLE_DEVICE_IOT
 #include <webserver/controllers/DeviceIotController.h>
 #endif
+#ifdef ENABLE_STORAGE_SERVICE
+#include <webserver/controllers/StorageController.h>
+#endif
 
 /**
  * @class HttpServer
@@ -156,6 +159,14 @@ class HttpServer : public ServiceProvider{
      * @brief Controller for handling IoT device-related routes.
      */
     DeviceIotController m_device_iot_controller;
+    #endif
+
+    #ifdef ENABLE_STORAGE_SERVICE
+    /**
+     * @var StorageController m_storage_controller
+     * @brief Controller for handling storage related routes.
+     */
+    StorageController m_storage_controller;
     #endif
 };
 

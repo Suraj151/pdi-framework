@@ -29,7 +29,7 @@ HttpServerInterfaceImpl::HttpServerInterfaceImpl() :
     m_clientRequest.clear();
     m_uriHandlerMap.clear();
     m_responseHeaders.clear();
-    m_storagePath = CHARPTR_WRAP("/var/www/static/"); // Default storage path for static files
+    m_storagePath = CHARPTR_WRAP_RO(HTTP_SERVER_DEFAULT_STATIC_PATH); // Default storage path for static files
 }
 
 /**
@@ -243,11 +243,9 @@ void HttpServerInterfaceImpl::addHeader(const pdiutil::string &name, const pdiut
  * set storage path for static files
  */
 void HttpServerInterfaceImpl::setStoragePath(const pdiutil::string &storagepath) {
-    m_storagePath = storagepath;
-    if (m_storagePath[m_storagePath.length() - 1] != FILE_SEPARATOR[0]) {
-        m_storagePath += FILE_SEPARATOR;
-    }
     #ifdef ENABLE_STORAGE_SERVICE
+    m_storagePath = storagepath.length() > 0 ? storagepath : CHARPTR_WRAP_RO(HTTP_SERVER_DEFAULT_STATIC_PATH);
+    __i_instance.getFileSystemInstance().appendFileSeparator(m_storagePath);
     __i_instance.getFileSystemInstance().createDirectory(m_storagePath.c_str());
     #endif
 }
@@ -425,12 +423,20 @@ void HttpServerInterfaceImpl::parseRequest(){
         pdiutil::string boundary = "--" + boundaryStr;
         pdiutil::string end_boundary = boundary + "--";
         pdiutil::string part;
+        bool parthaslastread = false;
         bool found_end = false;
 
         // Read until the end boundary is found
         while (1) {
 
-            m_client->readLine(part, readLineYield);
+            pdiutil::string line;
+            m_client->readLine(line, readLineYield);
+            if(parthaslastread){
+                part += line;
+                parthaslastread = false;
+            }else{
+                part = line;
+            }
 
             if( part == end_boundary ){
                 found_end = true;
@@ -454,12 +460,15 @@ void HttpServerInterfaceImpl::parseRequest(){
                     pdiutil::string::size_type nameStart = part.find("=\"");
                     if (nameStart != pdiutil::string::npos) {
                         pdiutil::string::size_type nameEnd = part.find("\"", nameStart + 2);
-                        argname = part.substr(nameStart + 2, nameEnd - nameStart - 3);
+                        argname = part.substr(nameStart + 2, nameEnd - nameStart - 2);
 
                         pdiutil::string::size_type filenameStart = part.find(ROPTR_WRAP("filename=\""), nameEnd + 1);
                         if (filenameStart != pdiutil::string::npos) {
                             pdiutil::string::size_type filenameEnd = part.find("\"", filenameStart + 10);
-                            argfilename = part.substr(filenameStart + 10, filenameEnd - filenameStart - 11);
+                            argfilename = part.substr(filenameStart + 10, filenameEnd - filenameStart - 10);
+                            #ifdef ENABLE_STORAGE_SERVICE
+                            __i_instance.getFileSystemInstance().applyFileSizeLimit(argfilename);
+                            #endif
                         }
                     }
 
@@ -508,14 +517,36 @@ void HttpServerInterfaceImpl::parseRequest(){
 
                             lastread += part;
 
-                            if(lastread.find(end_boundary) != pdiutil::string::npos){
-                                lastread = lastread.substr(0, lastread.find(end_boundary));
+                            pdiutil::string::size_type _endboundaryfound = lastread.find(end_boundary);
+                            if(_endboundaryfound != pdiutil::string::npos){
+                                lastread = lastread.substr(0, _endboundaryfound);
                                 found_end = true;
+
+                                // check for last write
+                                if( filewritecounter == 0 && _endboundaryfound > 64 ){
+                                    lastread = lastread.substr(64);
+                                    filewritecounter = 1;
+                                }
                             }
-                                
-                            if(lastread.find(boundary) != pdiutil::string::npos){
-                                lastread = lastread.substr(0, lastread.find(boundary));
+                            
+                            pdiutil::string::size_type _boundaryfound = lastread.find(boundary);
+                            if(_boundaryfound != pdiutil::string::npos){
+                                part = lastread.substr(_boundaryfound + boundary.length() + 2);
+                                lastread = lastread.substr(0, _boundaryfound);
                                 found_boundary = true;
+                                parthaslastread = true;
+
+                                // check for last write
+                                if( filewritecounter == 0 && _boundaryfound > 64 ){
+                                    lastread = lastread.substr(64);
+                                    filewritecounter = 1;
+                                }
+                            }
+
+                            if (found_boundary || found_end) {
+                                if( lastread.length() >= 2 && lastread[lastread.length() - 2] == '\r' && lastread[lastread.length() - 1] == '\n'){
+                                    lastread.pop_back(); lastread.pop_back();
+                                }
                             }
 
                             #ifdef ENABLE_STORAGE_SERVICE
@@ -527,18 +558,18 @@ void HttpServerInterfaceImpl::parseRequest(){
                             }
                             #else
                             // without file system support
-                            if(argvalue.length() < 500){
-                                argvalue += part;
+                            if(argvalue.length() < 500 && ++filewritecounter == 2){
+                                argvalue += lastread;
                             }
                             #endif
-
-                            lastread = part; // Store the last read part
-                            part.clear();
 
                             // If we found a boundary, we can stop reading further
                             if (found_boundary || found_end) {
                                 break;
                             }
+
+                            lastread = part; // Store the last read part
+                            part.clear();
                         }
 
                         // Store the file data in the request

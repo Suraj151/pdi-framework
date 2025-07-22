@@ -53,7 +53,7 @@ int LWSSH::parse_received_packet(LWSSHSession* session, ssh_packet &packet){
     uint32_t payload_length = packet_length - padding_length - 1;
     for (uint32_t i = 0; i < payload_length && session->m_client->available() > 0; ++i) {
         packet.payload.push_back(session->m_client->read());
-        __i_dvc_ctrl.wait(1);
+        __i_dvc_ctrl.yield();
     }
 
     // Read and discard the padding bytes
@@ -89,7 +89,7 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
     pdiutil::vector<uint8_t> header;
     for (uint32_t i = 0; i < 4; ++i) {
         header.push_back(session->m_client->read());
-        __i_dvc_ctrl.wait(1);
+        __i_dvc_ctrl.yield();
     }
     pdiutil::vector<uint8_t> packetvec;
     for (uint32_t i = 0; i < 4; ++i) {
@@ -108,7 +108,7 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
     // take next packet_len bytes + 20 byte MAC part to form complete packet
     for (uint32_t i = 0; i < packet_length + 20; ++i) {
         packetvec.push_back(session->m_client->read());
-        __i_dvc_ctrl.wait(1);
+        __i_dvc_ctrl.yield();
     }
 
     // seperate out MAC data
@@ -792,7 +792,7 @@ void LWSSH::derive_key(
         // (not needed for AES-128-CTR or HMAC-SHA1)
     }
 
-    __i_dvc_ctrl.wait(1);
+    __i_dvc_ctrl.yield();
 }
 
 /**

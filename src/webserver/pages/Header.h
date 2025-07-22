@@ -47,6 +47,7 @@ padding:15px;\
 }\
 a{\
 text-decoration:none;\
+color:#121212;\
 }\
 input, select{\
 padding:4px;\

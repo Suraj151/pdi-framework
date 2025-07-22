@@ -45,6 +45,12 @@ Created Date    : 1st June 2019
 // IoT device-related routes
 #define WEB_SERVER_DEVICE_REGISTER_CONFIG_ROUTE "/device-register-config" ///< Route for IoT device registration.
 
+// Storage related routes
+#define WEB_SERVER_STORAGE_LIST_ROUTE "/storage" ///< Route for storage list page.
+#define WEB_SERVER_STORAGE_FILE_UPLOAD_ROUTE "/storage-fileupload" ///< Route for storage file upload.
+#define WEB_SERVER_STORAGE_FILE_LIST_ROUTE "/storage-filelist" ///< Route for get storage file list.
+#define WEB_SERVER_STORAGE_FILE_DELETE_ROUTE "/storage-filedel" ///< Route for delete storage file.
+
 #endif
 
 // var _sv=document.getElementById('svga0');

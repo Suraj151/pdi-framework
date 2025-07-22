@@ -85,6 +85,19 @@ public:
     virtual void appendFileSeparator(char *path) override;
 
     /**
+     * @brief Appends a file separator to the provided path if it doesn't already end with one.
+     * @param path The path to which the file separator will be appended.
+     */
+    virtual void appendFileSeparator(pdiutil::string &path) override;
+
+    /**
+     * @brief Get path without . and .. notations.
+     * @param path The path to update.
+     * @return True if the update was successful, false otherwise.
+     */
+    virtual bool updatePathNotations(const char* path, pdiutil::string &updatedpath) override;
+
+    /**
      * @brief Changes the current working directory to the specified path.
      * @param path The new path to change to.
      * @return True if the directory change was successful, false otherwise.
@@ -121,6 +134,12 @@ public:
      * @return The file/dir name.
      */
     virtual pdiutil::string basename(const char* path) override;
+
+    /**
+     * @brief Apply file size limit on filename.
+     * @param name The name of the file/dir.
+     */
+    virtual void applyFileSizeLimit(pdiutil::string &name, uint32_t sizelimit = FILE_NAME_MAX_SIZE);
 
 protected:
     pdiutil::string m_pwd; ///< Present working directory.

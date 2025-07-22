@@ -353,6 +353,8 @@ void concat_graph_axis_title_div(char *_page, char *_title, char *_style = "");
 void concat_svg_tag(
   char *_page,
   const char *_path,
+  const char *_style = nullptr,
+  const char *_viewbox = nullptr,
   int _width = HTML_SVG_DEFAULT_WIDTH,
   int _height = HTML_SVG_DEFAULT_HEIGHT,
   char *_fill = HTML_SVG_DEFAULT_FILL
@@ -421,7 +423,28 @@ void concat_table_data_row(
   const char *_row_class,
   const char *_row_style,
   const char *_data_class,
-  const char *_data_style
+  const char *_data_style,
+  const char **_td_colspan_attr = nullptr
+);
+
+/**
+ * @brief Appends an HTML link element to the provided buffer.
+ *
+ * Generates an HTML link element with the specified attributes and appends
+ * it to the provided buffer.
+ *
+ * @param _page The buffer to which the link element is appended.
+ * @param _href The href attribute for the link.
+ * @param _innerhtml The innerhtml part of link.
+ * @param _class The class attribute for the link(optional).
+ * @param _style The style attribute for the link(optional).
+ */
+void concat_link_element(
+  char *_page,
+  const char *_href,
+  const char *_innerhtml,
+  const char *_class = nullptr,
+  const char *_style = nullptr
 );
 
 #endif

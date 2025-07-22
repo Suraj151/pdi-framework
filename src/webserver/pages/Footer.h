@@ -28,8 +28,13 @@ static const char WEB_SERVER_FOOTER_HTML[] PROG_RODT_ATTR = "\
 </div>\
 <script>\
 setTimeout(function(){\
-document.getElementsByClassName('msg')[0].style.display='none';\
-},4000);\
+let msgelm=document.getElementsByClassName('msg');\
+if(msgelm[0])msgelm[0].style.display='none';\
+let nfl=document.querySelector('#nfl');\
+if(nfl)nfl.value=(location.pathname+location.search);\
+let ndl=document.querySelector('#ndl');\
+if(ndl)ndl.value=(location.pathname+location.search);\
+},3000);\
 </script>\
 </body>\
 </html>";
