@@ -196,6 +196,9 @@ int32_t TcpClientInterface::read(uint8_t* buffer, uint32_t size) {
     memmove(m_rxBuffer, m_rxBuffer + bytesToRead, m_rxBufferSize - bytesToRead);
     m_rxBufferSize -= bytesToRead;
 
+    if(m_pcb != nullptr)
+        tcp_recved(m_pcb, bytesToRead); // Notify the TCP stack that data has been read
+
     return bytesToRead;
 }
 
@@ -251,7 +254,6 @@ err_t TcpClientInterface::onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf
         client->m_rxBuffer = newBuffer;
         client->m_rxBufferSize = newSize;
     
-        tcp_recved(tpcb, p->tot_len); // Notify the TCP stack that data has been read
         pbuf_free(p); // Free the pbuf
     }
 
@@ -395,6 +397,8 @@ bool TcpClientInterface::availableforwrite() {
  */
 void TcpClientInterface::flush() {
     if (m_rxBuffer) {
+        if(nullptr != m_pcb && m_rxBufferSize > 0)
+            tcp_recved(m_pcb, m_rxBufferSize); // Notify the TCP stack that data has been read
         delete[] m_rxBuffer;
         m_rxBuffer = nullptr;
         m_rxBufferSize = 0;

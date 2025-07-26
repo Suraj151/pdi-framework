@@ -140,7 +140,7 @@ int LittleFSWrapper::readFile(const char* path, uint64_t size, pdiutil::function
 
     // Buffer to store file content
     char buffer[size];
-    memset(buffer, 0, sizeof(buffer));
+    memset(buffer, 0, size);
     int bytesReadOrErr = 0;
     
     if (nullptr != readbackfn) {

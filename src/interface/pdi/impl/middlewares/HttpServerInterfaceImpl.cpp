@@ -511,9 +511,11 @@ void HttpServerInterfaceImpl::parseRequest(){
                         part.clear();
                         argvalue.clear();
                         pdiutil::string lastread;
+                        uint32_t maxreadinonecall = 256;
                         while (1) {
 
-                            m_client->readStringUntil(part, 0, readLineYield, 64);
+                            m_client->readStringUntil(part, '\r', true, readLineYield, maxreadinonecall);
+                            m_client->readStringUntil(part, '\n', true, readLineYield, maxreadinonecall);
 
                             lastread += part;
 
@@ -523,8 +525,8 @@ void HttpServerInterfaceImpl::parseRequest(){
                                 found_end = true;
 
                                 // check for last write
-                                if( filewritecounter == 0 && _endboundaryfound > 64 ){
-                                    lastread = lastread.substr(64);
+                                if( filewritecounter == 0 && _endboundaryfound > maxreadinonecall ){
+                                    lastread = lastread.substr(maxreadinonecall);
                                     filewritecounter = 1;
                                 }
                             }
@@ -537,8 +539,8 @@ void HttpServerInterfaceImpl::parseRequest(){
                                 parthaslastread = true;
 
                                 // check for last write
-                                if( filewritecounter == 0 && _boundaryfound > 64 ){
-                                    lastread = lastread.substr(64);
+                                if( filewritecounter == 0 && _boundaryfound > maxreadinonecall ){
+                                    lastread = lastread.substr(maxreadinonecall);
                                     filewritecounter = 1;
                                 }
                             }
@@ -641,9 +643,10 @@ void HttpServerInterfaceImpl::sendResponse(int code, mimetype_t content_type, co
     sendPacket(m_client, (uint8_t *)content, strlen(content), 400);
 
     // Make sure data has been sent
-    __task_scheduler.setTimeout( [&]() {
-        m_client->write((const uint8_t*)"", 0);
-    }, 1, __i_instance.getUtilityInstance().millis_now());
+    m_client->write((const uint8_t*)"", 0);
+    while (!m_client->availableforwrite()){
+        __i_dvc_ctrl.yield();
+    }
 }
 
 /**
@@ -687,9 +690,10 @@ bool HttpServerInterfaceImpl::handleStaticFileRequest(){
             });
 
             // Make sure data has been sent
-            __task_scheduler.setTimeout( [&]() {
-                m_client->write((const uint8_t*)"", 0);
-            }, 1, __i_instance.getUtilityInstance().millis_now());
+            m_client->write((const uint8_t*)"", 0);
+            while (!m_client->availableforwrite()){
+                __i_dvc_ctrl.yield();
+            }
 
             bStatus = true;
         }

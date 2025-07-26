@@ -314,15 +314,21 @@ public:
    * If a null byte (0) is encountered, it also stops reading.
    * @return The accumulated string.
    */
-  virtual void readStringUntil(pdiutil::string &_outstr, char _delimiter, CallBackVoidArgFn _yield = nullptr, uint32_t _maxlen = 0) {
+  virtual void readStringUntil(pdiutil::string &_outstr, char _delimiter, bool _keepdelimiterinstr = false, CallBackVoidArgFn _yield = nullptr, uint32_t _maxlen = 0) {
 
     uint8_t c = 0;
     uint32_t len = 0;
+
+    if(_yield != nullptr) {
+      _yield();
+    }
 
     while (available() > 0) {
       // Read a byte from the input
       c = read();
       if (_delimiter!=0 && (c == _delimiter || c == 0)) {
+        if(_keepdelimiterinstr)
+          _outstr += c;
         break;
       }
       _outstr += c;
@@ -346,8 +352,8 @@ public:
    */
   virtual void readLine(pdiutil::string &_outstr, CallBackVoidArgFn _yield = nullptr, uint32_t _maxlen = 0){
     _outstr.clear();
-    readStringUntil(_outstr, '\r', _yield, _maxlen);
-    readStringUntil(_outstr, '\n', _yield, 0);
+    readStringUntil(_outstr, '\r', false, _yield, _maxlen);
+    readStringUntil(_outstr, '\n', false, _yield, 0);
   }
 
   /**

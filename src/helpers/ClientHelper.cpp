@@ -56,6 +56,10 @@ bool sendPacket(iClientInterface *client, uint8_t *buffer, uint16_t len, uint16_
 
     while (len > 0)
     {
+      while (!client->availableforwrite()){
+        __i_dvc_ctrl.yield();
+      }
+      
       int32_t sendlen = len > max_bytes_in_one_write ? max_bytes_in_one_write : len;
       uint8_t *_buff_pointer = buffer + sentBytes;
       int32_t _sent = client->write(_buff_pointer, sendlen);
@@ -82,10 +86,6 @@ bool sendPacket(iClientInterface *client, uint8_t *buffer, uint16_t len, uint16_
         break;
       }
 
-      while (!client->availableforwrite()){
-        __i_dvc_ctrl.yield();
-      }
-      
       __i_dvc_ctrl.wait(0);
     }
   }
