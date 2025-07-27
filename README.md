@@ -72,9 +72,26 @@ Restart the arduino ide and navigate to File->Examples->pdi-framework->PdiStack 
 * now you will able to see below menu options
 
 <p align="center">
-  <img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/portal_home_menu.jpg">
+  <img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/portal_home_menu.png">
 </p>
 
+
+* Below are few more examples as you navigate inside
+
+
+<p align="center">
+  <img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/gpio-control-menu.png">
+</p>
+
+
+<p align="center">
+  <img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/mqtt-submenu.png">
+</p>
+
+
+<p align="center">
+  <img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/storage-home.png">
+</p>
 
 you can play with all settings. you can modify configs by making changes in files of src/config folder. Go to wifi settings and change the default station ssid, password to connect to your station. you can also change ssid and password for access point. device will reset once after you submit wifi settings, i.e. you have to reconnect device.
 
@@ -94,13 +111,18 @@ Once flashed open serial port on putty with default baud rate of 115200. It will
 </p>
 
 
+<p align="center">
+  <img width="500" src="https://github.com/Suraj151/pdi-framework/blob/master/doc/ssh-telnet-terminal.png">
+</p>
+
 
 | Command                                  | Options                             | Brief                                                                                                                                                                                                                                                                                                                                                                                                                       |
 |------------------------------------------|-------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | ls                                       |                                     | List the file's or dir's in current directory                                                                                                                                                                                                                                                                                                                                                                               |
 | mkd \<directory_name>                     |                                     | Make directory with name provided in terminal. space are not allowed in name                                                                                                                                                                                                                                                                                                                                                |
 | mkf \<file_name>                          |                                     | Make file with name provided in terminal. space are not allowed in name                                                                                                                                                                                                                                                                                                                                                     |
-| move \<old_path_name> \<new_path_name>     |                                     | Move/Rename the file/dir. space not allowed in name                                                                                                                                                                                                                                                                                                                                                                         |
+| mv \<old_path_name> \<new_path_name>     |                                     | Move/Rename the file/dir. space not allowed in name                                                                                                                                                                                                                                                                                                                                                                         |
+| cp \<old_path_name> \<new_path_name>     |                                     | Copy the file.                                                                                                                                                                                                                                                                                                                                                                         |
 | pwd                                      |                                     | It will print present working directory path                                                                                                                                                                                                                                                                                                                                                                                |
 | rm \<file_or_dir_name>                    |                                     | Remove the file or directory provided                                                                                                                                                                                                                                                                                                                                                                                       |
 | fread \<filename>                           |                                     | Read and Print the file content of given filename over terminal                                                                                                                                                                                                                                                                                                                                                             |
@@ -269,4 +291,4 @@ you can modify them as per requirements
 by default this service is disabled. to enable, just uncomment ENABLE_DEVICE_IOT in **devices/DeviceConfig.h** file
 
 # Detailed Documentation
-Detailed documentation is ongoing..., please visit [wiki page](https://github.com/Suraj151/pdi-framework/wiki)....
+Detailed old documentation is pending for updation here [wiki page](https://github.com/Suraj151/pdi-framework/wiki)....

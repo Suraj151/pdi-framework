@@ -58,12 +58,13 @@ margin:0px 0px 3px 15px;\
 input{max-width:185px;}\
 .btn{min-width:100px;}\
 </style>\
-<form action='/storage-fileupload' enctype='multipart/form-data' method='POST'>\
+<form id='frm1' action='/storage-fileupload' enctype='multipart/form-data' method='POST'>\
 <input name='nf' type='file'>\
 <input id='nfl' name='loc' type='text' style='display:none'>\
 <button class='btn' type='submit'>\
 Upload File\
 </button>\
+<progress id='pBr' value='0' max='100' style='display:none'></progress>\
 </form>\
 <form action='/storage-fileupload' enctype='multipart/form-data' method='POST'>\
 <input name='nd' type='text' placeholder='Enter folder name'>\
@@ -72,6 +73,28 @@ Upload File\
 Create Folder\
 </button>\
 </form>\
+<script>\
+document.getElementById('frm1').addEventListener('submit',function(e1){\
+e1.preventDefault();\
+var frq=new XMLHttpRequest();\
+var fDt=new FormData(document.getElementById('frm1'));\
+frq.upload.addEventListener('progress',function(e2){\
+if(e2.lengthComputable){\
+var prc=(e2.loaded/e2.total)*100;\
+let pelm=document.getElementById('pBr');\
+pelm.value=prc;\
+pelm.style.display='block';\
+}\
+});\
+frq.open('POST','/storage-fileupload');\
+frq.send(fDt);\
+frq.onload=function(){\
+if(frq.responseURL){\
+location.href=frq.responseURL;\
+}\
+};\
+});\
+</script>\
 ";
 
 #endif
