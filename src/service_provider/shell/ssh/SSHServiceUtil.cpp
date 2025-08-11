@@ -13,6 +13,7 @@ created Date    : 6th Apr 2025
 #if defined(ENABLE_SSH_SERVICE)
 
 #include "SSHServiceUtil.h"
+#include <helpers/ClientHelper.h>
 #include <utility/crypto/asymmetric/curve25519/curve25519.h>
 #include <utility/crypto/hash/sha256.h>
 #include <utility/crypto/hmac/hmac_sha1.h>
@@ -375,7 +376,7 @@ bool LWSSH::send_server_ssh_packet(LWSSHSession* session, pdiutil::vector<uint8_
         prepare_ssh_packet(payload, 16);
         encrypt_ssh_payload(session, payload);
         
-        if(session->m_client->write(payload.data(), payload.size()) != payload.size()) return false;
+        if(!sendPacket(session->m_client, payload.data(), payload.size())) return false;
     }else{
 
         // --- SSH packet wrapper ---
