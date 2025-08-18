@@ -40,7 +40,7 @@ SSHServer::~SSHServer() {
  */
 bool SSHServer::start(uint16_t port) {
     if (!m_server) {
-        m_server = new TcpServerInterface();
+        m_server = __i_instance.getNewTcpServerInstance();
     }
 
     if (m_server->begin(port) == 0) {

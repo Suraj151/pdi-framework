@@ -52,7 +52,17 @@ void HttpServerInterfaceImpl::begin(uint16_t port){
     }
 
     if( nullptr != m_server ){
-        m_server->begin(port);
+        if (m_server->begin(port) == 0) {
+
+            m_server->setOnAcceptClientEventCallback([](void* arg){
+                HttpServerInterfaceImpl *ihttpserver = reinterpret_cast<HttpServerInterfaceImpl*>(arg);
+
+                if(ihttpserver){
+
+                    ihttpserver->handleClient();
+                }
+            }, this);
+        }
     }
 
     #ifdef ENABLE_STORAGE_SERVICE
@@ -614,7 +624,9 @@ void HttpServerInterfaceImpl::prepareResponseHeader(pdiutil::string& _header, in
         addHeader(HTTP_HEADER_KEY_CONNECTION, "close");
     } else {
         addHeader(HTTP_HEADER_KEY_CONNECTION, CHARPTR_WRAP("keep-alive"));
-        addHeader(HTTP_HEADER_KEY_KEEP_ALIVE, CHARPTR_WRAP("timeout=30 max=100"));
+        addHeader(HTTP_HEADER_KEY_KEEP_ALIVE, CHARPTR_WRAP("timeout=30 max=20"));
+
+        (static_cast<iTcpClientInterface*>(m_client))->setKeepAlive(30, 10, 3); // Enable keep-alive for the client
     }
 
     addHeader(HTTP_HEADER_KEY_ACCESS_CONTROL_ALLOW_ORIGIN, "*"); // Allow CORS
