@@ -264,10 +264,10 @@ void SSHClientInterface::setTimeout(uint32_t timeout){
  * @brief Flush the output buffer.
  */
 void SSHClientInterface::flush(){
-    if(m_tcpClient){
-        m_tcpClient->flush();
+    // if(m_tcpClient){
+    //     m_tcpClient->flush();
         m_received_data.clear();
-    }
+    // }
 }
 
 /** 
@@ -276,7 +276,7 @@ void SSHClientInterface::flush(){
 int32_t SSHClientInterface::commit(){
 
     int32_t datasize = m_written_data.size();
-    if( datasize > 0 ){
+    if( datasize > 0 && m_client_session ){
 
         if(send_channel_data(m_client_session, (const char*)m_written_data.data(), datasize)){
         }

@@ -107,7 +107,7 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
     }
 
     // take next packet_len bytes + 20 byte MAC part to form complete packet
-    for (uint32_t i = 0; i < packet_length + 20; ++i) {
+    for (uint32_t i = 0; session->m_client->available() && i < packet_length + 20; ++i) {
         packetvec.push_back(session->m_client->read());
         __i_dvc_ctrl.yield();
     }
