@@ -67,6 +67,9 @@ private:
     void handleKeyExchange();
     void handleAuthentication();
     void handleChannelRequest();
+    void handleChannelSubsystemRequest(pdiutil::vector<uint8_t>& data);
+    void handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t>& data, bool expectReply = true);
+    bool handleChannelSftpBolusChunks(pdiutil::vector<uint8_t>& boluschunk);
 };
 
 }

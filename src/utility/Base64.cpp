@@ -113,6 +113,6 @@ void genUniqueKey(char *key, int len){
 
   for (int i = 0; i < len; i++){
 
-    key[i] = char_set[rand() % (sizeof(char_set) - 1)];
+    key[i] = char_set[rand() % (sizeof(char_set) - 3)];
   }
 }

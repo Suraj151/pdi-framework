@@ -554,6 +554,8 @@ void LWSSH::SSHServer::handleChannelRequest(){
 
                 if(bstatus){
 
+                    m_session->current_channel.req_type = recvreqst.request_type;
+
                     if( recvreqst.request_type == "pty-req" ){
 
                         // parse the pty-req channel request type specific data
@@ -562,10 +564,34 @@ void LWSSH::SSHServer::handleChannelRequest(){
 
                     }else if( recvreqst.request_type == "env" ){
 
+                    // todo: update section when environment variables are supported
+                    }else if( recvreqst.request_type == "subsystem" ){
+
+                        int32_t offset = 0;
+                        if (offset + 4 > recvreqst.request_specific_data.size()){
+
+                            m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+                        }else{
+
+                            int32_t vallen = (recvreqst.request_specific_data[offset] << 24) | (recvreqst.request_specific_data[offset+1] << 16) | (recvreqst.request_specific_data[offset+2] << 8) | recvreqst.request_specific_data[offset+3];
+                            offset += 4;
+
+                            if ((offset + vallen) > recvreqst.request_specific_data.size()){
+
+                                m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+                            }else{
+
+                                pdiutil::string val(reinterpret_cast<const char*>(recvreqst.request_specific_data.data() + offset), vallen);
+                                m_session->current_channel.subsystem_req.subsystem = val;
+                            }
+                        }
                     }
 
                     // send reply if want
-                    if (recvreqst.want_reply && (recvreqst.request_type == "shell" || recvreqst.request_type == "pty-req")) {
+                    if (recvreqst.want_reply && (recvreqst.request_type == "shell" || 
+                        recvreqst.request_type == "pty-req" ||
+                        recvreqst.request_type == "subsystem"
+                    )) {
                         pdiutil::vector<uint8_t> reply;
                         reply.push_back(SSH2_MSG_CHANNEL_SUCCESS); // 99
                         // recipient channel (client's channel id)
@@ -592,41 +618,104 @@ void LWSSH::SSHServer::handleChannelRequest(){
 
                 if( bstatus ){
 
-                    if( m_session->m_sshclient ){
-                        m_session->m_sshclient->setReceivedChannelData(chdata.data);
+                    if( m_session->current_channel.req_type == "shell" ||
+                        m_session->current_channel.req_type == "pty-req"
+                    ){
+                        if( m_session->m_sshclient ){
+                            m_session->m_sshclient->setReceivedChannelData(chdata.data);
 
-                        #ifdef ENABLE_CMD_SERVICE
+                            #ifdef ENABLE_CMD_SERVICE
 
-                        // __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write_ro(RODT_ATTR("data from ssh client ("));
-                        // __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write((int32_t)chdata.data.size());
-                        // __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write_ro(RODT_ATTR(") : "));
-                        // for (size_t i = 0; i < chdata.data.size(); i++)
-                        // {
-                        //     __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write(chdata.data[i]);
-                        // }
-                        // __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write_ro(RODT_ATTR(" : "));
-                        // for (size_t i = 0; i < chdata.data.size(); i++)
-                        // {
-                        //     __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write_ro(RODT_ATTR("0x"));
-                        //     __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write((uint32_t)chdata.data[i], true, true);
-                        //     __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write_ro(RODT_ATTR(", "));
-                        // }
-                        // __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln();
+                            cmd_result_t res = __cmd_service.processTerminalInput(m_session->m_sshclient);
 
-                        cmd_result_t res = __cmd_service.processTerminalInput(m_session->m_sshclient);
-
-                        // __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write_ro(RODT_ATTR("cmd res : "));
-                        // __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln((int32_t)res);
-                        // __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln();
-
-                        if( res == CMD_RESULT_ABORTED ||
-                            res == CMD_RESULT_TERMINAL_ABORTED
-                        ){
-                            m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+                            if( res == CMD_RESULT_ABORTED ||
+                                res == CMD_RESULT_TERMINAL_ABORTED
+                            ){
+                                m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+                            }
+                            #endif
                         }
-                        #endif
+                    }else if( m_session->current_channel.req_type == "exec" ){
+
+                    }else if( m_session->current_channel.req_type == "subsystem" ){
+                        handleChannelSubsystemRequest(chdata.data);
                     }
                 }
+            }else if(msg_type == SSH2_MSG_CHANNEL_EOF){
+
+                pdiutil::vector<uint8_t> reply;
+                reply.push_back(SSH2_MSG_CHANNEL_EOF); // 96
+                // recipient channel (client's channel id)
+                reply.push_back((m_session->current_channel.client_channel_id >> 24) & 0xFF);
+                reply.push_back((m_session->current_channel.client_channel_id >> 16) & 0xFF);
+                reply.push_back((m_session->current_channel.client_channel_id >> 8) & 0xFF);
+                reply.push_back(m_session->current_channel.client_channel_id & 0xFF);
+
+                if(send_server_ssh_packet(m_session, reply, true)){
+
+                    __i_dvc_ctrl.wait(10); // Wait for a moment to ensure the client receives the EOF
+                    // After sending EOF, we can send exit status and close the channel
+                    // Send exit status before closing the channel
+                    reply.clear();
+                    reply.push_back(SSH2_MSG_CHANNEL_REQUEST); // 98
+                    // recipient channel (client's channel id)
+                    reply.push_back((m_session->current_channel.client_channel_id >> 24) & 0xFF);
+                    reply.push_back((m_session->current_channel.client_channel_id >> 16) & 0xFF);
+                    reply.push_back((m_session->current_channel.client_channel_id >> 8) & 0xFF);
+                    reply.push_back(m_session->current_channel.client_channel_id & 0xFF);
+                    // append equest type "exit-status"
+                    const char* reqtype = "exit-status";
+                    append_ssh_string(reply, reqtype, strlen(reqtype));
+                    // append want reply flag
+                    reply.push_back(0); // false, we don't want reply for exit-status
+                    // append exit status
+                    uint32_t exit_status = 0; // Set exit status as needed
+                    reply.push_back((exit_status >> 24) & 0xFF);
+                    reply.push_back((exit_status >> 16) & 0xFF);
+                    reply.push_back((exit_status >> 8) & 0xFF);
+                    reply.push_back(exit_status & 0xFF);
+                    send_server_ssh_packet(m_session, reply, true);
+
+                    // Schedule task in queue to send channel closure request
+                    // if client not send close channel request within timeout
+                    __task_scheduler.setTimeout( [&]() {
+
+                        if( nullptr != m_session && m_session->current_channel.ischannelreqsuccess >= 0 ){
+
+                            pdiutil::vector<uint8_t> chclose;
+                            chclose.push_back(SSH2_MSG_CHANNEL_CLOSE); // 97
+                            // recipient channel (client's channel id)
+                            chclose.push_back((m_session->current_channel.client_channel_id >> 24) & 0xFF);
+                            chclose.push_back((m_session->current_channel.client_channel_id >> 16) & 0xFF);
+                            chclose.push_back((m_session->current_channel.client_channel_id >> 8) & 0xFF);
+                            chclose.push_back(m_session->current_channel.client_channel_id & 0xFF);
+
+                            if(send_server_ssh_packet(m_session, chclose, true)){
+                                m_session->current_channel.ischannelreqsuccess = -1;
+                            }else{
+                                m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+                            }
+                        }
+                    }, 500, __i_dvc_ctrl.millis_now() );
+                }else{
+                    m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+                }
+            }else if(msg_type == SSH2_MSG_CHANNEL_CLOSE){
+
+                if( m_session->current_channel.ischannelreqsuccess >= 0 ){
+
+                    pdiutil::vector<uint8_t> reply;
+                    reply.push_back(SSH2_MSG_CHANNEL_CLOSE); // 97
+                    // recipient channel (client's channel id)
+                    reply.push_back((m_session->current_channel.client_channel_id >> 24) & 0xFF);
+                    reply.push_back((m_session->current_channel.client_channel_id >> 16) & 0xFF);
+                    reply.push_back((m_session->current_channel.client_channel_id >> 8) & 0xFF);
+                    reply.push_back(m_session->current_channel.client_channel_id & 0xFF);
+
+                    send_server_ssh_packet(m_session, reply, true);
+                    m_session->current_channel.ischannelreqsuccess = -1;
+                }
+                m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
             }else{
                 __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln();
                 __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write_ro(RODT_ATTR("SSH Client channel req else : "));
@@ -647,11 +736,621 @@ void LWSSH::SSHServer::handleChannelRequest(){
         if( m_session->m_sshclient && m_session->current_channel.ischannelreqsuccess == 1 ){
 
             m_session->current_channel.ischannelreqsuccess = 2;
-            #ifdef ENABLE_CMD_SERVICE
-            __cmd_service.useTerminal(m_session->m_sshclient);
-            #endif
+
+            if( m_session->current_channel.req_type == "shell" ||
+                m_session->current_channel.req_type == "pty-req"
+            ){
+                #ifdef ENABLE_CMD_SERVICE
+                __cmd_service.useTerminal(m_session->m_sshclient);
+                #endif
+            }
         }
     }
+}
+
+
+/**
+ * @brief Handle channel subsystem requests from client
+ */
+void LWSSH::SSHServer::handleChannelSubsystemRequest(pdiutil::vector<uint8_t>& data){
+
+    // Parse the exec request packet
+    if (m_session->current_channel.subsystem_req.subsystem.find("sftp") == 0) {
+
+        int32_t payloadoffset = 0;
+        bool datahandled = false;
+
+        do{
+
+            data.erase(data.begin(), data.begin() + payloadoffset);
+            payloadoffset = 0; // Reset offset for the next iteration
+
+            if (payloadoffset + 4 > data.size()){
+
+                m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+                datahandled = true; // Data not handled, close session
+            }else{
+
+                int32_t packetlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                payloadoffset += 4;
+
+                if ( (payloadoffset + packetlen) > data.size() ){
+
+                    m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+                    datahandled = true;
+                }else if( (payloadoffset + packetlen) < data.size() ){
+
+                    handleChannelSubsystemSftpRequest(data);
+                }else{
+
+                    handleChannelSubsystemSftpRequest(data);
+                    datahandled = true; // Data handled successfully
+                }
+
+                payloadoffset += packetlen; // Move the offset to the next packet
+            }
+        } while (!datahandled);            
+    }
+}
+
+/**
+ * @brief Handle channel subsystem sftp requests from client
+ */
+void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t>& data, bool expectReply){
+
+    // Parse the exec request packet
+    if (m_session->current_channel.subsystem_req.subsystem.find("sftp") == 0) {
+
+        // __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln();
+        // __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write_ro(RODT_ATTR("SSH Client channel sftp req : "));
+        // for (size_t i = 0; i < data.size(); i++)
+        // {
+        //     __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write_ro(RODT_ATTR("0x"));
+        //     __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write((uint32_t)data[i], true, true);
+        //     __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write_ro(RODT_ATTR(", "));
+        // }
+        // __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln();
+
+        int32_t payloadoffset = 0;
+        if (payloadoffset + 4 > data.size()){
+
+            m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+        }else{
+
+            int32_t packetlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+            payloadoffset += 4;
+
+            if ( (payloadoffset + packetlen) > data.size() ){
+
+                m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+            }else{
+
+                uint8_t packettype = data[payloadoffset];
+                payloadoffset += 1;
+                pdiutil::vector<uint8_t> sftp_reply;
+                int32_t errcode = -1;
+
+                // Parse request-id
+                uint32_t request_id = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                payloadoffset += 4;
+
+                if (packettype == SSH_FXP_INIT) {
+
+                    // version field will be 4 byte uint32 type
+                    uint32_t sftpversion = request_id;
+
+                    sftp_reply.push_back(0); // placeholder for length
+                    sftp_reply.push_back(0); // placeholder for length
+                    sftp_reply.push_back(0); // placeholder for length
+                    sftp_reply.push_back(5); // length = 1 (type) + 4 (version) = 5
+                    sftp_reply.push_back(SSH_FXP_VERSION); // type = 2
+                    sftp_reply.push_back(0); // version = 3 (big-endian)
+                    sftp_reply.push_back(0);
+                    sftp_reply.push_back(0);
+                    sftp_reply.push_back(3); // version = 3
+                }else if (packettype == SSH_FXP_STAT || packettype == SSH_FXP_LSTAT){ // treat both same until symlinks not supported by FS
+
+                    // Parse filename length
+                    uint32_t fnamelen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                    payloadoffset += 4;
+
+                    // Parse filename
+                    pdiutil::string filename(reinterpret_cast<const char*>(&data[payloadoffset]), fnamelen);
+                    payloadoffset += fnamelen;
+
+                    // (Optional: parse flags if present, for LSTAT usually not needed)
+
+                    // Check if dir/file exists and get attributes 
+                    bool file_exists = __i_fs.isFileExist(filename.c_str());
+                    bool dir_exists = __i_fs.isDirExist(filename.c_str());
+
+                    if (file_exists || dir_exists) {
+                        // Prepare SSH_FXP_ATTRS reply (type 105)
+                        // For demo: only size and permissions, fill as needed for your FS
+                        uint32_t reply_len = 1 + 4 + 4 + 8 + 4; // type + reqid + flags + size + permissions
+                        sftp_reply.push_back((reply_len >> 24) & 0xFF);
+                        sftp_reply.push_back((reply_len >> 16) & 0xFF);
+                        sftp_reply.push_back((reply_len >> 8) & 0xFF);
+                        sftp_reply.push_back(reply_len & 0xFF);
+
+                        // SSH_FXP_ATTRS reply
+                        sftp_reply.push_back(SSH_FXP_ATTRS); // type 105
+
+                        // Request ID
+                        sftp_reply.push_back((request_id >> 24) & 0xFF);
+                        sftp_reply.push_back((request_id >> 16) & 0xFF);
+                        sftp_reply.push_back((request_id >> 8) & 0xFF);
+                        sftp_reply.push_back(request_id & 0xFF);
+
+                        // Flags: SSH_FILEXFER_ATTR_SIZE | SSH_FILEXFER_ATTR_PERMISSIONS
+                        uint32_t flags = SSH_FILEXFER_ATTR_SIZE | SSH_FILEXFER_ATTR_PERMISSIONS;
+                        sftp_reply.push_back((flags >> 24) & 0xFF);
+                        sftp_reply.push_back((flags >> 16) & 0xFF);
+                        sftp_reply.push_back((flags >> 8) & 0xFF);
+                        sftp_reply.push_back(flags & 0xFF);
+
+                        // File size
+                        uint64_t filesize = dir_exists ? 0 : __i_fs.getFileSize(filename.c_str());
+                        sftp_reply.push_back((filesize >> 56) & 0xFF);
+                        sftp_reply.push_back((filesize >> 48) & 0xFF);
+                        sftp_reply.push_back((filesize >> 40) & 0xFF);
+                        sftp_reply.push_back((filesize >> 32) & 0xFF);
+                        sftp_reply.push_back((filesize >> 24) & 0xFF);
+                        sftp_reply.push_back((filesize >> 16) & 0xFF);
+                        sftp_reply.push_back((filesize >> 8) & 0xFF);
+                        sftp_reply.push_back(filesize & 0xFF);
+
+                        // Permissions (S_IFREG | 0644) OR (S_IFDIR | 0755); S_IFREG = 0100000, S_IFDIR = 0040000
+                        // todo: for now end general permissions until we dont support permissions in file system
+                        uint32_t perms = dir_exists ? 0040755 : 0100644;
+                        sftp_reply.push_back((perms >> 24) & 0xFF);
+                        sftp_reply.push_back((perms >> 16) & 0xFF);
+                        sftp_reply.push_back((perms >> 8) & 0xFF);
+                        sftp_reply.push_back(perms & 0xFF);
+                    } else {
+                        // Status code: SSH_FX_NO_SUCH_FILE (2)
+                        errcode = SSH_FX_NO_SUCH_FILE;
+                    }
+                }else if (packettype == SSH_FXP_OPEN || packettype == SSH_FXP_OPENDIR){ 
+                    
+                    // Parse filename length
+                    uint32_t fnamelen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                    payloadoffset += 4;
+
+                    // Parse filename
+                    pdiutil::string filename(reinterpret_cast<const char*>(&data[payloadoffset]), fnamelen);
+                    payloadoffset += fnamelen;
+
+                    // Parse flags if present
+                    uint32_t flags = 0;
+                    if (payloadoffset + 4 <= data.size()) {
+                        flags = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                        payloadoffset += 4;
+                    }
+
+                    // parse attrs if present (for SSH_FXP_OPEN)
+                    // currently not using until dont support attributes
+
+                    // Check if dir/file exists and get attributes 
+                    bool file_exists = __i_fs.isFileExist(filename.c_str());
+                    bool dir_exists = __i_fs.isDirExist(filename.c_str());
+
+                    if( packettype == SSH_FXP_OPEN && (flags & SSH_FXF_READ) && !(flags & SSH_FXF_WRITE) ){
+
+                        if (file_exists || dir_exists) {
+                            // Prepare SSH_FXP_HANDLE reply
+                        }else{
+                            // Status code: SSH_FX_NO_SUCH_FILE (2)
+                            errcode = SSH_FX_NO_SUCH_FILE;
+                        }
+                    } else if( packettype == SSH_FXP_OPEN && (flags & SSH_FXF_CREAT) ) {
+
+                        bool createit = false;
+
+                        if( flags & SSH_FXF_EXCL ){
+
+                            // If SSH_FXF_CREAT and SSH_FXF_EXCL are set, we should not open existing files
+                            if( file_exists || dir_exists ){
+                                errcode = SSH_FX_FILE_ALREADY_EXISTS; // Status code: SSH_FX_FILE_ALREADY_EXISTS (4)
+                            }else{
+                                createit = true; // Create the file if it does not exist
+                            }
+                        }else if( flags & SSH_FXF_TRUNC ){
+
+                            if( file_exists ){
+                                __i_fs.deleteFile(filename.c_str()); // If it exists, delete it first
+                                file_exists = false; // Reset file_exists to false after deletion
+                            }else if( dir_exists ){
+                                __i_fs.deleteDirectory(filename.c_str()); // If it's a directory, delete it first
+                                dir_exists = false; // Reset dir_exists to false after deletion
+                            }
+                            createit = true;
+                        }else if( flags & SSH_FXF_WRITE ){
+
+                            // Currently we will support append operation if file alread exists for write operation
+                            createit = true;
+                        }
+
+                        if( createit ){
+
+                            int istatus = 0;
+                            if( !file_exists ){
+
+                                istatus = __i_fs.createFile(filename.c_str(), ""); // If it does not exist, create it
+                            }
+                            
+                            if( istatus < 0 ){
+                                errcode = SSH_FX_NO_SUCH_PATH;
+                            }else{
+                                // This will be used to handle bolus chunks in the future which may receive from client
+                                // along with SSH_FXP_WRITE paket. Reason to handle them in encryption layer is to avoid
+                                // OOM on small devies having memory constraints.
+                                m_session->current_channel.doHandleBolusChannelDataChunksCb = [&](pdiutil::vector<uint8_t> &boluschunk)->bool{
+                                    return handleChannelSftpBolusChunks(boluschunk);
+                                };
+                            }
+                        }
+                    }
+
+                    // If we have a valid handle, prepare the SSH_FXP_HANDLE reply
+                    if( errcode == -1 ){
+
+                        uint8_t handlesize = 3;
+                        char handle[handlesize + 1]; memset(handle, 0, handlesize + 1); genUniqueKey(handle, handlesize); // Generate a unique handle for this open file
+                        m_session->current_channel.subsystem_req.sftp.filepath = filename;
+                        m_session->current_channel.subsystem_req.sftp.handle = handle;
+
+                        uint32_t reply_len = 1 + 4 + 4 + handlesize; // type + reqid + handle size + handle bytes
+                        sftp_reply.push_back((reply_len >> 24) & 0xFF);
+                        sftp_reply.push_back((reply_len >> 16) & 0xFF);
+                        sftp_reply.push_back((reply_len >> 8) & 0xFF);
+                        sftp_reply.push_back(reply_len & 0xFF);
+
+                        sftp_reply.push_back(SSH_FXP_HANDLE);
+
+                        sftp_reply.push_back((request_id >> 24) & 0xFF);
+                        sftp_reply.push_back((request_id >> 16) & 0xFF);
+                        sftp_reply.push_back((request_id >> 8) & 0xFF); 
+                        sftp_reply.push_back(request_id & 0xFF);
+
+                        sftp_reply.push_back(0x00); sftp_reply.push_back(0x00); sftp_reply.push_back(0x00); sftp_reply.push_back(handlesize); // handle length
+                        sftp_reply.insert(sftp_reply.end(), handle, handle+handlesize);
+                    }
+
+                }else if (packettype == SSH_FXP_READ){
+
+                    // Parse handle length
+                    uint32_t handlelen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                    payloadoffset += 4;
+
+                    // Parse handle
+                    if (handlelen > 0 && payloadoffset + handlelen <= data.size()) {
+                        pdiutil::string handle(reinterpret_cast<const char*>(&data[payloadoffset]), handlelen);
+                        payloadoffset += handlelen;
+
+                        if( m_session->current_channel.subsystem_req.sftp.handle == handle ){
+                            // Parse offset
+                            uint64_t fileoffset = ((uint64_t)data[payloadoffset] << 56) | ((uint64_t)data[payloadoffset+1] << 48) |
+                                            ((uint64_t)data[payloadoffset+2] << 40) | ((uint64_t)data[payloadoffset+3] << 32) |
+                                            ((uint64_t)data[payloadoffset+4] << 24) | ((uint64_t)data[payloadoffset+5] << 16) |
+                                            ((uint64_t)data[payloadoffset+6] << 8) | (uint64_t)data[payloadoffset+7];
+                            payloadoffset += 8;
+
+                            // Parse length
+                            uint32_t length = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                            payloadoffset += 4;
+
+                            // Check if the file exists and read data
+                            if (__i_fs.isFileExist(m_session->current_channel.subsystem_req.sftp.filepath.c_str())) {
+
+                                uint64_t file_size = __i_fs.getFileSize(m_session->current_channel.subsystem_req.sftp.filepath.c_str());
+                                
+                                if (fileoffset >= file_size && length > 0) {
+
+                                    errcode = SSH_FX_EOF; // EOF if offset is beyond file size and length is greater than zero
+                                }else if(file_size > 0 && length == 0){
+
+                                    errcode = SSH_FX_EOF; // end of file if accepted length is zero
+                                }else{
+                                    
+                                    bool startsending = false;
+                                    uint64_t totalskip = 0;
+
+                                    int iStatus = __i_fs.readFile(m_session->current_channel.subsystem_req.sftp.filepath.c_str(), 1024, [&](char* data, uint32_t size)->bool{
+                                        
+                                        if( !startsending ){
+
+                                            if( fileoffset == 0 ){
+
+                                                startsending = true; // Start sending data from the beginning
+                                            }else{
+
+                                                if( totalskip < fileoffset ){
+
+                                                    uint32_t skip = fileoffset - totalskip;
+                                                    
+                                                    if( skip >= size ){
+                                                        totalskip += size;
+                                                        return true; // Skip this chunk, continue reading
+                                                    }else{
+                                                        data += skip; // Skip the initial bytes
+                                                        size -= skip; // Reduce the size to send
+                                                        totalskip += skip; // Update total skip
+                                                        startsending = true;
+                                                    }
+                                                }else{
+                                                    startsending = true;
+                                                }
+                                            }
+                                        }
+
+                                        if( startsending ){
+                                            // Prepare SSH_FXP_DATA reply (type 103)
+                                            uint32_t reply_len = 1 + 4 + 4 + size; // type + reqid + data length + data
+                                            sftp_reply.push_back((reply_len >> 24) & 0xFF);
+                                            sftp_reply.push_back((reply_len >> 16) & 0xFF);
+                                            sftp_reply.push_back((reply_len >> 8) & 0xFF);
+                                            sftp_reply.push_back(reply_len & 0xFF);
+
+                                            sftp_reply.push_back(SSH_FXP_DATA); // type 103
+
+                                            sftp_reply.push_back((request_id >> 24) & 0xFF);
+                                            sftp_reply.push_back((request_id >> 16) & 0xFF);
+                                            sftp_reply.push_back((request_id >> 8) & 0xFF);
+                                            sftp_reply.push_back(request_id & 0xFF);
+
+                                            sftp_reply.push_back((size >> 24) & 0xFF);
+                                            sftp_reply.push_back((size >> 16) & 0xFF);
+                                            sftp_reply.push_back((size >> 8) & 0xFF);
+                                            sftp_reply.push_back(size & 0xFF);
+
+                                            sftp_reply.insert(sftp_reply.end(), data, data + size);
+                                        }
+
+                                        // return false to stop continue reading as we collected the chunk we need to send
+                                        return false;
+                                    });
+
+                                    if( iStatus < 0 ){
+                                        
+                                        errcode = SSH_FX_FAILURE; // Failure if read operation failed
+                                    }
+                                }
+                            }else{
+                                errcode = SSH_FX_NO_SUCH_PATH;
+                            }
+                        }else{
+                            errcode = SSH_FX_INVALID_HANDLE;
+                        }
+                    }else{
+                        errcode = SSH_FX_BAD_MESSAGE;
+                    }
+                }else if (packettype == SSH_FXP_WRITE){
+
+                    // Parse handle length
+                    uint32_t handlelen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                    payloadoffset += 4;
+
+                    // Parse handle
+                    if (handlelen > 0 && payloadoffset + handlelen <= data.size()) {
+                        pdiutil::string handle(reinterpret_cast<const char*>(&data[payloadoffset]), handlelen);
+                        payloadoffset += handlelen;
+
+                        if( m_session->current_channel.subsystem_req.sftp.handle == handle ){
+                            // Parse offset
+                            uint64_t fileoffset = ((uint64_t)data[payloadoffset] << 56) | ((uint64_t)data[payloadoffset+1] << 48) |
+                                            ((uint64_t)data[payloadoffset+2] << 40) | ((uint64_t)data[payloadoffset+3] << 32) |
+                                            ((uint64_t)data[payloadoffset+4] << 24) | ((uint64_t)data[payloadoffset+5] << 16) |
+                                            ((uint64_t)data[payloadoffset+6] << 8) | (uint64_t)data[payloadoffset+7];
+                            payloadoffset += 8;
+
+                            // Parse length
+                            uint32_t length = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                            payloadoffset += 4;
+
+                            int iStatus = __i_fs.editFile(  m_session->current_channel.subsystem_req.sftp.filepath.c_str(), 
+                                                            fileoffset,
+                                                            (const char*)&data[payloadoffset], 
+                                                            length);
+                            if( iStatus < 0 ){
+                                errcode = SSH_FX_FAILURE; // Failure if write operation failed
+                            }else{
+                                errcode = SSH_FX_OK; // SSH_FX_OK (0) for successful write
+                            }
+                        }else{
+                            errcode = SSH_FX_INVALID_HANDLE;
+                        }
+                    }else{
+                        errcode = SSH_FX_BAD_MESSAGE;
+                    }
+                }else if (packettype == SSH_FXP_FSETSTAT){ 
+
+                    // Parse handle length
+                    uint32_t handlelen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                    payloadoffset += 4;
+
+                    // Parse handle
+                    if (handlelen > 0 && payloadoffset + handlelen <= data.size()) {
+                        pdiutil::string handle(reinterpret_cast<const char*>(&data[payloadoffset]), handlelen);
+                        payloadoffset += handlelen;
+
+                        if( m_session->current_channel.subsystem_req.sftp.handle == handle ){
+
+                            // too: parse the attributes if present
+                            // currently not using until dont support attributes
+                            errcode = SSH_FX_OK;
+
+                            m_session->current_channel.doHandleBolusChannelDataChunksCb = nullptr; // reset the bolus chunk handler if any
+                        }else{
+                            errcode = SSH_FX_INVALID_HANDLE;
+                        }
+                    }else{
+                        errcode = SSH_FX_BAD_MESSAGE;
+                    }
+                }else if (packettype == SSH_FXP_CLOSE){ 
+
+                    // Parse handle length
+                    uint32_t handlelen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                    payloadoffset += 4;
+
+                    // Parse handle
+                    if (handlelen > 0 && payloadoffset + handlelen <= data.size()) {
+                        pdiutil::string handle(reinterpret_cast<const char*>(&data[payloadoffset]), handlelen);
+                        payloadoffset += handlelen;
+
+                        if( m_session->current_channel.subsystem_req.sftp.handle == handle ){
+                            // Successfully closed the file, send success reply
+                            errcode = SSH_FX_OK; // SSH_FX_OK (0) for successful close
+
+                            m_session->current_channel.doHandleBolusChannelDataChunksCb = nullptr; // reset the bolus chunk handler if any
+                        }else{
+                            errcode = SSH_FX_INVALID_HANDLE;
+                        }
+                    }else{
+                        errcode = SSH_FX_BAD_MESSAGE;
+                    }
+                }
+
+                if(errcode != -1){
+                    // Prepare SSH_FXP_STATUS reply (type 101)
+                    uint32_t reply_len = 1 + 4 + 4 + 4 + 4; // type + reqid + code + msglen + lang-tag len
+                    sftp_reply.clear();
+                    sftp_reply.push_back((reply_len >> 24) & 0xFF);
+                    sftp_reply.push_back((reply_len >> 16) & 0xFF);
+                    sftp_reply.push_back((reply_len >> 8) & 0xFF);
+                    sftp_reply.push_back(reply_len & 0xFF);
+
+                    sftp_reply.push_back(SSH_FXP_STATUS); // type 101
+                    
+                    sftp_reply.push_back((request_id >> 24) & 0xFF);
+                    sftp_reply.push_back((request_id >> 16) & 0xFF);
+                    sftp_reply.push_back((request_id >> 8) & 0xFF);
+                    sftp_reply.push_back(request_id & 0xFF);
+
+                    uint32_t code = errcode;
+                    sftp_reply.push_back((code >> 24) & 0xFF);
+                    sftp_reply.push_back((code >> 16) & 0xFF);
+                    sftp_reply.push_back((code >> 8) & 0xFF);
+                    sftp_reply.push_back(code & 0xFF);
+
+                    // Empty error message (length 0)
+                    sftp_reply.push_back(0x00); sftp_reply.push_back(0x00); sftp_reply.push_back(0x00); sftp_reply.push_back(0x00);
+
+                    // Empty language tag (length 0)
+                    sftp_reply.push_back(0x00); sftp_reply.push_back(0x00); sftp_reply.push_back(0x00); sftp_reply.push_back(0x00);
+                }
+
+                // Send the SFTP reply back to the client
+                if( sftp_reply.size() > 0 && expectReply ){
+                    if (send_channel_data(m_session, (const char*)sftp_reply.data(), sftp_reply.size())) {
+                        // __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write_ro(RODT_ATTR("SSH SFTP subsystem rply sent : "));
+                        // for (size_t i = 0; i < sftp_reply.size(); i++)
+                        // {
+                        //     __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write_ro(RODT_ATTR("0x"));
+                        //     __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write((uint32_t)sftp_reply[i], true, true);
+                        //     __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write_ro(RODT_ATTR(", "));
+                        // }
+                        // __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln();
+                    } else {
+                        __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln_ro(RODT_ATTR("Failed to send SFTP subsystem reply."));
+                        // m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+                    }
+                }
+            }
+        }
+    }        
+}
+
+bool LWSSH::SSHServer::handleChannelSftpBolusChunks(pdiutil::vector<uint8_t> &boluschunk){
+
+    static uint8_t sftpheader[28] = {0};
+    static uint64_t sftpheaderoffset = 0;
+    uint32_t &expectedDataLen = m_session->current_channel.subsystem_req.sftp.fxp_write_expectedrecvlen;
+    uint32_t &totalreceived = m_session->current_channel.subsystem_req.sftp.fxp_write_totalrecvd;
+    bool continueReceiving = true;
+
+    // initial chunk
+    if( totalreceived == 0 ){
+
+        memset(sftpheader, 0, sizeof(sftpheader));
+
+        // If the first chunk is not SSH_FXP_WRITE, handle it normally and stop further chunk receiving
+        if( boluschunk[4] != SSH_FXP_WRITE ){
+
+            m_session->current_channel.doHandleBolusChannelDataChunksCb = nullptr; // reset the callback
+            handleChannelSubsystemSftpRequest(boluschunk);
+            boluschunk.clear();
+            return false; // stop receiving further chunks
+        }
+
+        // Prepare SFTP header for SSH_FXP_WRITE from received first chunk
+        memcpy(sftpheader, boluschunk.data(), 28);
+
+        boluschunk.erase(boluschunk.begin(), boluschunk.begin() + 28);
+
+        sftpheaderoffset = ((uint64_t)sftpheader[16] << 56) | ((uint64_t)sftpheader[17] << 48) |
+                        ((uint64_t)sftpheader[18] << 40) | ((uint64_t)sftpheader[19] << 32) |
+                        ((uint64_t)sftpheader[20] << 24) | ((uint64_t)sftpheader[21] << 16) |
+                        ((uint64_t)sftpheader[22] << 8) | (uint64_t)sftpheader[23];
+
+        // note the initial total packet length to be received in contineous chunks
+        expectedDataLen  =  (sftpheader[24] << 24) | 
+                            (sftpheader[25] << 16) | 
+                            (sftpheader[26] << 8) | 
+                            sftpheader[27];
+
+        totalreceived = 0;                                    
+    }
+
+    // modify the length field in header as we get the data in chunks
+    uint32_t chunksize = pdistd::min( (uint32_t)(expectedDataLen - totalreceived), (uint32_t)boluschunk.size());
+    uint32_t newlen = 1 + 4 + 4 + 3 + 8 + 4 + chunksize; // type + reqid + handle length + we know handle + offset + data length + data bytes size
+    sftpheader[0] = (newlen >> 24) & 0xFF;
+    sftpheader[1] = (newlen >> 16) & 0xFF;
+    sftpheader[2] = (newlen >> 8) & 0xFF;
+    sftpheader[3] = newlen & 0xFF;
+
+    // Modify file offset in header as we get the data in chunks
+    uint64_t sftpfileoffset = sftpheaderoffset + totalreceived;
+    sftpheader[16] = ((sftpfileoffset) >> 56) & 0xFF;
+    sftpheader[17] = ((sftpfileoffset) >> 48) & 0xFF;
+    sftpheader[18] = ((sftpfileoffset) >> 40) & 0xFF;
+    sftpheader[19] = ((sftpfileoffset) >> 32) & 0xFF;
+    sftpheader[20] = ((sftpfileoffset) >> 24) & 0xFF;
+    sftpheader[21] = ((sftpfileoffset) >> 16) & 0xFF;
+    sftpheader[22] = ((sftpfileoffset) >> 8) & 0xFF;
+    sftpheader[23] = (sftpfileoffset) & 0xFF;
+
+    // modify the data len bytes in header as we get the data in chunks
+    sftpheader[24] = (chunksize >> 24) & 0xFF;
+    sftpheader[25] = (chunksize >> 16) & 0xFF;
+    sftpheader[26] = (chunksize >> 8) & 0xFF;
+    sftpheader[27] = chunksize & 0xFF;
+
+    // Insert the modified header and chunk data to file
+    boluschunk.insert(boluschunk.begin(), sftpheader, sftpheader + 28);
+
+    // Update the total received data bytes
+    totalreceived += chunksize;
+
+    // Check whether we received total expected data length
+    if( totalreceived == expectedDataLen ){
+        // todo: currently handling callback reset in close message
+        continueReceiving = false; // indicate all data received
+        totalreceived = 0;
+        expectedDataLen = 0;
+    }
+
+    // Handle and Continue to receive bolus chunks
+    if( chunksize < (boluschunk.size() - 28) ){
+        pdiutil::vector<uint8_t> temp(boluschunk.begin(), boluschunk.begin() + 28 + chunksize);
+        boluschunk.erase(boluschunk.begin(), boluschunk.begin() + 28 + chunksize);
+        handleChannelSubsystemSftpRequest(temp, !continueReceiving);
+    }else{
+        handleChannelSubsystemSftpRequest(boluschunk, !continueReceiving);
+        boluschunk.clear();
+    }
+    return true;
 }
 
 SSHServer __sshserver_service;

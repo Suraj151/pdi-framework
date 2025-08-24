@@ -101,6 +101,63 @@ int LittleFSWrapper::createFile(const char* path, const char* content, int64_t s
 }
 
 /**
+ * @brief Edit content to a file.
+ * @param path The path of the file to write to.
+ * @param offset Offset from where to modify the file content.
+ * @param content The content to write at offset.
+ * @param size The size of the content to write.
+ * @return The number of bytes written, or -1 on failure.
+ */
+int LittleFSWrapper::editFile(const char* path, uint64_t offset, const char* content, uint32_t size) {
+
+    if( size == 0 ){
+        return 0; // Nothing to write
+    }
+
+    lfs_file_t file;
+    int fileOpenOrErr = lfs_file_open(&m_lfs, &file, path, LFS_O_WRONLY);
+    if (fileOpenOrErr < 0) {
+        return fileOpenOrErr; // Failed to open file
+    }
+
+    int64_t filesize = lfs_file_size(&m_lfs, &file);
+
+    if (offset > (uint64_t)filesize) {
+        // Move to end of file
+        lfs_file_seek(&m_lfs, &file, 0, LFS_SEEK_END);
+
+        uint8_t pad_buf[64]; // small buffer
+        memset(pad_buf, 0, sizeof(pad_buf)); // fill with zeros
+
+        uint64_t gap = offset - filesize;
+        while (gap > 0) {
+            uint32_t chunk = (gap > sizeof(pad_buf)) ? sizeof(pad_buf) : gap;
+            int written = lfs_file_write(&m_lfs, &file, pad_buf, chunk);
+            if (written <= 0) { // error or no progress
+                lfs_file_close(&m_lfs, &file);
+                return (written == 0) ? -3 : written;
+            }
+            gap -= written;
+        }
+    }
+
+    // Move to the specified offset
+    if (lfs_file_seek(&m_lfs, &file, offset, LFS_SEEK_SET) < 0) {
+        lfs_file_close(&m_lfs, &file);
+        return -1; // Failed to seek to offset
+    }
+
+    int bytesWrittenOrErr = lfs_file_write(&m_lfs, &file, content, size);
+    lfs_file_close(&m_lfs, &file);
+
+    if (bytesWrittenOrErr > 0 && (uint32_t)bytesWrittenOrErr != size) {
+        return -2; // Partial write
+    }
+    
+    return bytesWrittenOrErr;
+}
+
+/**
  * @brief Writes content to a file.
  * @param path The path of the file to write to.
  * @param content The content to write to the file.
@@ -108,8 +165,7 @@ int LittleFSWrapper::createFile(const char* path, const char* content, int64_t s
  * @param append Whether to append to the file or overwrite it. Default is false (overwrite).
  * @return The number of bytes written, or -1 on failure.
  */
-int LittleFSWrapper::writeFile(const char *path, const char *content, uint32_t size, bool append)
-{
+int LittleFSWrapper::writeFile(const char *path, const char *content, uint32_t size, bool append){
     if( size == 0 ){
         return 0;
     }

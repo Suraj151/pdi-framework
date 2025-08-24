@@ -52,6 +52,16 @@ struct SSHPtyReq {
     uint32_t height_pixels = 0;
     pdiutil::vector<uint8_t> terminal_modes;
 };
+struct SSHSubsystemRequest {
+    pdiutil::string subsystem;     // The subsystem protocol to use (e.g., "sftp", "shell")
+
+    struct Sftp{
+        pdiutil::string filepath;
+        pdiutil::string handle; // Handle for the sftp, if needed. currently supporting 1 only at a time
+        uint32_t fxp_write_totalrecvd = 0; // Total bytes received for current write operation
+        uint32_t fxp_write_expectedrecvlen = 0; // Expected total length for current
+    } sftp;
+};
 struct SSHChannelData {
     uint32_t recipient_channel;
     pdiutil::vector<uint8_t> data; // raw data, can be text or binary
@@ -64,8 +74,11 @@ struct SSHChannel {
     uint32_t max_packet_size = 0;
     // Add more fields as needed (state, pty info, etc.)
     // e.g., bool shell_started, std::string pty_type, etc.
+    pdiutil::string req_type;
     SSHPtyReq pty_req;
+    SSHSubsystemRequest subsystem_req;
     int ischannelreqsuccess = -1;
+    pdiutil::function<bool(pdiutil::vector<uint8_t> &)> doHandleBolusChannelDataChunksCb = nullptr; // If provided, handle client bolus chunks
 };
 
 // SSH key exchange initialization fields

@@ -77,6 +77,16 @@ public:
     int createFile(const char* path, const char* content, int64_t size=-1) override;
 
     /**
+     * @brief Edit content to a file.
+     * @param path The path of the file to write to.
+     * @param offset Offset from where to modify the file content.
+     * @param content The content to write at offset.
+     * @param size The size of the content to write.
+     * @return The number of bytes written, or -1 on failure.
+     */
+    int editFile(const char* path, uint64_t offset, const char* content, uint32_t size) override;
+
+    /**
      * @brief Writes content to a file.
      * @param path The path of the file to write to.
      * @param content The content to write to the file.

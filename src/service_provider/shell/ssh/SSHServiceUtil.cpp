@@ -82,7 +82,7 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
     }
     
     // check whether it has minimum length as per hmac-sha1 MAC + payload
-    if (session->m_client->available() < (4 + 16 + 20)) {
+    if (session->m_client->available() < (4 + 20)) {
         return 1; // Not enough data available for a valid packet
     }
 
@@ -99,11 +99,153 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
     AES_ctx temp = session->aes_ctx_ctos;
     AES_CTR_xcrypt_buffer(&temp, packetvec.data(), packetvec.size());
     uint32_t packet_length = (packetvec[0] << 24) | (packetvec[1] << 16) | (packetvec[2] << 8) | packetvec[3];
-    
+
     // Once decrypt packet length reset the header part as it was received
     packetvec.clear();
     for (uint32_t i = 0; i < 4; ++i) {
         packetvec.push_back(header[i]);
+    }
+
+    // Handle if more size channel data packets received while provided blous chunk handler
+    // Here we will not verify the packet as we will be considering it is 
+    // intentionally processed for bolus chunks to support in
+    // minimum sftp packet size of 32768 bytes which might be difficult to handle
+    // in single packet read. So to avoid OOM we will be considering that whenever sftp layer 
+    // adding this callback it is intentionally to handle bolus chunks.
+    if(session->current_channel.doHandleBolusChannelDataChunksCb){
+
+        bool _continue = true;
+        bool _handlerContinue = true;
+        bool _parsedInitialSSHHeader = false;
+        uint32_t _totalBytesRead = 0;
+        uint8_t padding_length = 0;
+        uint32_t now = __i_dvc_ctrl.millis_now();
+
+        do{
+            bool islastchunk = false;
+
+            // read next chunk of data. max 512 bytes
+            for (uint32_t i = 0; i < 512 && 0 < session->m_client->available(); ++i) {
+
+                if( _totalBytesRead < (packet_length + 20) ){
+
+                    packetvec.push_back(session->m_client->read());
+                    __i_dvc_ctrl.yield();
+                    _totalBytesRead++;
+                }
+            }
+
+            islastchunk = _totalBytesRead == (packet_length + 20);
+
+            uint32_t bytes_remaining = (packet_length + 20) - _totalBytesRead;
+            if( bytes_remaining > 0 && bytes_remaining <= (padding_length + 20) ){
+                __i_dvc_ctrl.yield();
+                continue;
+            }
+
+            // check whether last chunk
+            if( islastchunk ){
+
+                // seperate out MAC data
+                pdiutil::vector<uint8_t> recv_mac(20);
+                for (int32_t i = 20; i > 0; i--) {
+                    recv_mac[i-1] = packetvec.back();
+                    packetvec.pop_back();
+                }
+
+                // decrypt received payload seperated from MAC
+                AES_CTR_xcrypt_buffer(&session->aes_ctx_ctos, packetvec.data(), packetvec.size(), true);
+
+                // Prepare sequence number (big-endian)
+                uint8_t _packetseqbuf[4];
+                _packetseqbuf[0] = (session->packets_seq_num_ctos >> 24) & 0xFF;
+                _packetseqbuf[1] = (session->packets_seq_num_ctos >> 16) & 0xFF;
+                _packetseqbuf[2] = (session->packets_seq_num_ctos >> 8) & 0xFF;
+                _packetseqbuf[3] = (session->packets_seq_num_ctos) & 0xFF;
+
+                // Prepare MAC input: [packet sequence][encrypted header][encrypted rest]
+                pdiutil::vector<uint8_t> _mac_input;
+                _mac_input.insert(_mac_input.end(), _packetseqbuf, _packetseqbuf + 4);
+                _mac_input.insert(_mac_input.end(), packetvec.begin(), packetvec.end());
+
+                uint8_t _computed_mac[20];
+                hmac_sha1(session->derived_mac_key_ctos, 20, _mac_input.data(), _mac_input.size(), _computed_mac);
+
+                // Intentionally considering MAC verification succeeded. 
+                // as we are unable to provide big bolus data to MAC calculation
+                session->packets_seq_num_ctos++;
+
+                // Get initial padding length byte
+                if( !_parsedInitialSSHHeader ){
+                    padding_length = packetvec[4];
+                }
+
+                // seperate out pading length bytes
+                for (int32_t i = 0; i < padding_length; i++) {
+                    packetvec.pop_back();
+                }
+
+                _continue = false;
+            }else{
+
+                // decrypt received payload seperated from MAC
+                AES_CTR_xcrypt_buffer(&session->aes_ctx_ctos, packetvec.data(), packetvec.size(), false);
+            }
+
+            if( !_parsedInitialSSHHeader && packetvec[5] == SSH2_MSG_CHANNEL_DATA ){
+
+                // Skip initial headers
+                size_t sshoffset = 4;
+
+                // Skip padding length byte
+                padding_length = packetvec[sshoffset];
+                sshoffset += 1;
+
+                // Skip message type (already checked == 94)
+                sshoffset += 1;
+
+                // Parse recipient channel (uint32)
+                sshoffset += 4;
+
+                // Parse data len(SSH string)
+                uint32_t data_len = (packetvec[sshoffset] << 24) | (packetvec[sshoffset+1] << 16) |
+                                    (packetvec[sshoffset+2] << 8) | packetvec[sshoffset+3];
+                sshoffset += 4;
+
+                // Remove headers from string from first initial paylod chunk
+                packetvec.erase(packetvec.begin(), packetvec.begin() + sshoffset);
+                _parsedInitialSSHHeader = true;
+            }
+
+            if( !_parsedInitialSSHHeader ){
+                _continue = false; // not intended to process further
+            }
+
+            while (packetvec.size()){
+                _handlerContinue = session->current_channel.doHandleBolusChannelDataChunksCb(packetvec);
+            }
+            
+            if( !_handlerContinue ){
+                _continue = false;
+            }
+
+            // Update and check time when data is not received
+            if( session->m_client->available() > 0 ){
+                now = __i_dvc_ctrl.millis_now();
+            }else{
+                if( (__i_dvc_ctrl.millis_now() - now) > 3000 ){
+                    // timeout of 3 seconds
+                    _continue = false;
+                    _handlerContinue = false;
+                }
+            }
+            __i_dvc_ctrl.yield();
+        } while (_continue);
+
+        if( !_handlerContinue ){
+            session->current_channel.doHandleBolusChannelDataChunksCb = nullptr; // Reset the callback after handling bolus chunks
+        }
+        return 1; // Bolus chunks handled, no need to parse further
     }
 
     // take next packet_len bytes + 20 byte MAC part to form complete packet

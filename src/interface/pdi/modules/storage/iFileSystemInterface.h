@@ -63,6 +63,16 @@ public:
     virtual int createFile(const char* path, const char* content, int64_t size=-1) = 0;
 
     /**
+     * @brief Edit content to a file.
+     * @param path The path of the file to write to.
+     * @param offset Offset from where to modify the file content.
+     * @param content The content to write at offset.
+     * @param size The size of the content to write.
+     * @return The number of bytes written, or -1 on failure.
+     */
+    virtual int editFile(const char* path, uint64_t offset, const char* content, uint32_t size) = 0;
+
+    /**
      * @brief Writes content to a file.
      * @param path The path of the file to write to.
      * @param content The content to write to the file.
