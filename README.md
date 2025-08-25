@@ -20,13 +20,11 @@ PDI framework sits on the top of service layers which internally uses the portab
 
 # Installation
 
-**install from arduino ide**
-
-Goto Tools->Manage Libraries... then in library manager window type pdi-framework in search bar then from results find pdi-framework by Suraj I., select latest version and click on install.
-
 **install manually**
 
-To install manually, clone or download source of this repo and copy root folder to devices libraries path. for example with Esp8266 device it will be copied in esp8266 libraries path ( in windows 10 generally path is like ==> C:\Users\suraj\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\x.x.x\libraries...).
+To install manually, clone this repo to devices libraries path. for example with Esp8266 device it will be copied in esp8266 libraries path 
+( in windows 10 generally path is like ==> C:\Users\suraj\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\x.x.x\libraries...).
+( in Ubuntu generally path is like ==> ~/Arduino/libraries).
 
 **install external dependency**
 
