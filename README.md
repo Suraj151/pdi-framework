@@ -31,7 +31,7 @@ To install manually, clone this repo to devices libraries path. for example with
 Currently for some devices, this library is using external dependencies which are added in git submodule config. To install this submodule, open a terminal in this framework library root directory path and execute command ``git submodule update --init --recursive`` 
 
 
-### AutoGen Script
+**AutoGen Script**
 
 Before start compiling for the specific device make sure that device specific auto gen source files has been generated and device has been selected in device config file (mentioned in below note). Currently database table source files are auto generated.
 
