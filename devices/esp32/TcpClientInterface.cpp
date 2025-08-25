@@ -266,12 +266,13 @@ err_t TcpClientInterface::onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf
 void TcpClientInterface::onError(void* arg, err_t err) {
     TcpClientInterface* client = static_cast<TcpClientInterface*>(arg);
     if (client) {
-        tcp_arg(client->m_pcb, NULL); // Updated to use client->m_pcb
-        tcp_sent(client->m_pcb, NULL);
-        tcp_recv(client->m_pcb, NULL);
-        tcp_err(client->m_pcb, NULL);
-        client->m_pcb = nullptr;
-        client->disconnect();
+        client->close(); // Close the connection on error
+        // tcp_arg(client->m_pcb, NULL); // Updated to use client->m_pcb
+        // tcp_sent(client->m_pcb, NULL);
+        // tcp_recv(client->m_pcb, NULL);
+        // tcp_err(client->m_pcb, NULL);
+        // client->m_pcb = nullptr;
+        // client->disconnect();
     }
 }
 

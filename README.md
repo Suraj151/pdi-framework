@@ -3,7 +3,7 @@
 PDIStack Framework covers all essential things to build IoT applications easily.
 Basically it is designed on the top of portable interface layers that any device can create their interface from. esp*-arduino examples provided to make things easy to understand for developers.
 
-PDI Framework is a modular C++ stack for embedded and IoT systems, supporting services like WiFi, HTTP client & server, MQTT client, SSH server, Telnet server, OTA, GPIO, Serial, Terminal over serial/telnet/ssh, SMTP client and much more.  
+PDI Framework is a modular C++ stack for embedded and IoT systems, supporting services like WiFi, HTTP client & server, MQTT client, SSH server, Telnet server, OTA, GPIO, Serial, Terminal over serial/telnet/ssh, SFTP, SMTP client and much more.  
 **Features:** Secure communication, device management, command-line/web interfaces, scheduler, and cross-platform support.
 
 **PDI Framework Structure**
@@ -99,11 +99,28 @@ you can play with all settings. you can modify configs by making changes in file
 
 **Note** not all devices having wifi/network feature to run web server on device as mentioned in above esp8266 example. e.g. arduino uno device wont have the web server enabled due to lack of network feature.
 
-### Terminal
+# Terminal
 
 Once flashed open serial port on putty with default baud rate of 115200. It will prompt for login where you can enter default(in case not modified) user & password ( user: **pdiStack**, pass: **pdiStack@123** ). Once login success you can use below available commands in terminal.
 
 **Terminal can be accessed over telnet/ssh running on port 23/22 respectively**. It will provide way to access device remotely. Just open telnet/ssh session on putty/terminal with device ip, you will be able to access terminal.
+
+#### SSH file transfer
+Framework also support file transfer over SSH tunnel. Currently is supports file upload and download over SSH using scp command with sftp protocol under the hood.
+
+For example if we want to upload the test.txt file to esp* device sorage (having pdiStack user) from our desktop over ssh. then use below command.
+
+```
+scp -s <desktop-path-to-test.txt> pdiStack@<device-ip>:<dest-path-to-store-test.txt>
+```
+
+Similarely, if we want to download the test.txt file from esp* device sorage (having pdiStack user) to our desktop over ssh. then use below command.
+
+```
+scp -s pdiStack@<device-ip>:<dest-path-to-test.txt> <desktop-path-to-store-test.txt>
+```
+
+**Note** that framework handles the ssh chunks in smaller size which can make the file transfer little bit slower. on top if we are overwriting existing file then it can adds the file edit overhead as well. So speed can be as slow as 0.2kbps and as fast as 1kbps.
 
 
 <p align="center">
