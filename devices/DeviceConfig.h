@@ -10,18 +10,12 @@ created Date    : 1st June 2019
 #ifndef _DEVICES_COMMON_CONFIG_H_
 #define _DEVICES_COMMON_CONFIG_H_
 
+#include "DeviceSetup.h"
+
 /**
  * @define task scheduler which makes use of timers
  */
 // #define ENABLE_TIMER_TASK_SCHEDULER
-
-/**
- * enable/disable devices. enable one from below list to get it compiled
- */
-// #define MOCK_DEVICE_TEST
-#define DEVICE_ESP8266
-// #define DEVICE_ESP32
-// #define DEVICE_ARDUINOUNO
 
 /**
  * enable/disable gpio service here

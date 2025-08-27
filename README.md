@@ -35,28 +35,27 @@ Currently for some devices, this library is using external dependencies which ar
 
 Before start compiling for the specific device make sure that device specific auto gen source files has been generated and device has been selected in device config file (mentioned in below note). Currently database table source files are auto generated.
 
-Open terminal and navigate to `scripts` directory in this library and then run below device specific script.
+Open terminal and navigate to `scripts` directory in this library and then run below device setup specific script.
 
-`` python3 CreateDBSourceFromJson.py -s ../devices/{DEVICENAME}/config/DBTableSchema.json
+`` python3 DeviceSetup.py -d {DEVICENAME}
 ``
 
-replace DEVICENAME in above command with specific device folder name for which build has to be done. for example if we want to build for arduino uno then command will be
+replace DEVICENAME in above command with specific device folder name for which build has to be done. 
 
-`` python3 CreateDBSourceFromJson.py -s ../devices/arduinouno/config/DBTableSchema.json
+For example if we want to build for arduino uno then command will be
+
+`` python3 DeviceSetup.py -d arduinouno
 ``
 
-**Note :** Also make sure that you have selected correct device/board in arduino ide and in `devices/DeviceConfig.h` file as below
-```
-/**
- * enable/disable devices. enable/uncomment one from below list to get it compiled
- */
-// #define MOCK_DEVICE_TEST
-#define DEVICE_ESP8266
-// #define DEVICE_ESP32
-// #define DEVICE_ARDUINOUNO
-```
+**Note :** Above script will create DeviceSetup.h file in devices folder contains the device macro in uppercase format prepended with DEVICE_ word. for example if we are using arduinouno as per mentioned in above command then it will generate DEVICE_ARDUINOUNO macro which has been used in framework to enable or disable device specific features.
 
-for example we selected esp8266 device to compile and flash as above.
+Currently below devices has been supported
+
+* arduinouno
+* esp8266
+* esp32
+
+
 
 # Usage
 

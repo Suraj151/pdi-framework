@@ -10,6 +10,7 @@ import json
 import os
 import sys
 import re
+import Util
 
 
 # consts
@@ -147,40 +148,10 @@ class_variable_template = """
     %PREVARDECLR%%CLASSVARTYPE% %CLASSVARNAME%%POSTVARDECLR%;
 """
 
-def build_classname(name, isAllUpperCase=False):
-
-    if isAllUpperCase:
-        return name.capitalize()
-    else:
-        return name[0].capitalize() + name[1:]
-
-def clean_template(template, reformat=False):
-
-    if reformat:
-        template = re.sub(r'\n\s*\n', '\n\n', template)
-    template = template.strip(os.linesep)
-    template = template + os.linesep
-    
-    return template
-
-def expand_token(template, token, tokenvalue, endl=False):
-
-    template = template.replace(token, tokenvalue.strip(os.linesep))
-    if endl:
-        template = template + os.linesep
-    return template
-
-def format_file(formatter, filepath):
-
-    if formatter == "clang":
-        # Format the file with clang-formatter
-        clangCmd = "clang-format --style=Microsoft -i " + filepath
-        os.system(clangCmd)
-
 def build_file_header_template(definition, fileext):
 
-    template = expand_token(file_header_template, '%CLASSNAME%', build_classname(definition["name"]))
-    template = expand_token(template, '%FILEEXT%', fileext)
+    template = Util.expand_token(file_header_template, '%CLASSNAME%', Util.build_classname(definition["name"]))
+    template = Util.expand_token(template, '%FILEEXT%', fileext)
     return template
 
 def build_class_includes_template(definition):
@@ -189,7 +160,7 @@ def build_class_includes_template(definition):
 
     if "includes" in definition:
         for include in definition["includes"]:
-            template = expand_token(class_includes_template, '%CLASSINCLUDES%', include, True)
+            template = Util.expand_token(class_includes_template, '%CLASSINCLUDES%', include, True)
     
     return template
 
@@ -221,15 +192,15 @@ def build_parentclass_declaration_template(definition):
 def build_class_var_template(definition, member):
 
     template = class_variable_template + os.linesep
-    template = expand_token(template, '%CLASSVARTYPE%', member["type"])
-    template = expand_token(template, '%CLASSVARNAME%', member["name"])
-    template = expand_token(template, '%PREVARDECLR%', member["preprop"] if "preprop" in member else "")
-    template = expand_token(template, '%POSTVARDECLR%', member["postprop"] if "postprop" in member else "")
+    template = Util.expand_token(template, '%CLASSVARTYPE%', member["type"])
+    template = Util.expand_token(template, '%CLASSVARNAME%', member["name"])
+    template = Util.expand_token(template, '%PREVARDECLR%', member["preprop"] if "preprop" in member else "")
+    template = Util.expand_token(template, '%POSTVARDECLR%', member["postprop"] if "postprop" in member else "")
     return template
 
 def build_class_method_template(definition, member, isCppFile):
 
-    class_mthd_template = clean_template(class_method_def_template if (definition["onlyHeader"] or isCppFile) else class_method_declr_template)
+    class_mthd_template = Util.clean_template(class_method_def_template if (definition["onlyHeader"] or isCppFile) else class_method_declr_template)
     
     method_name = definition["name"]
     method_args = ""
@@ -252,16 +223,16 @@ def build_class_method_template(definition, member, isCppFile):
 
     template = class_mthd_template + os.linesep
 
-    template = expand_token(template, '%METHODNAME%', method_name)
-    template = expand_token(template, '%METHODDESC%', member["description"] if "description" in member else member["name"])
-    template = expand_token(template, '%METHODARGS%', method_args)
-    template = expand_token(template, METHODRETURNTYPETOKEN, member["returnType"] if "returnType" in member else "")
-    template = expand_token(template, '%PREMETHODDECLR%', build_premethod_declaration_template(definition, member))
-    template = expand_token(template, '%POSTMETHODDECLR%', build_postmethod_declaration_template(definition, member))
+    template = Util.expand_token(template, '%METHODNAME%', method_name)
+    template = Util.expand_token(template, '%METHODDESC%', member["description"] if "description" in member else member["name"])
+    template = Util.expand_token(template, '%METHODARGS%', method_args)
+    template = Util.expand_token(template, METHODRETURNTYPETOKEN, member["returnType"] if "returnType" in member else "")
+    template = Util.expand_token(template, '%PREMETHODDECLR%', build_premethod_declaration_template(definition, member))
+    template = Util.expand_token(template, '%POSTMETHODDECLR%', build_postmethod_declaration_template(definition, member))
 
     if definition["onlyHeader"] or isCppFile:
-        template = expand_token(template, '%METHODBODY%', member["body"] if "body" in member else "")
-        template = expand_token(template, '%SCOPE%', definition["name"]+"::" if isCppFile else "")
+        template = Util.expand_token(template, '%METHODBODY%', member["body"] if "body" in member else "")
+        template = Util.expand_token(template, '%SCOPE%', definition["name"]+"::" if isCppFile else "")
 
 
     return template
@@ -278,7 +249,7 @@ def build_preclass_declaration_template(definition):
     if "macrodefines" in definition:
         for macrodef in definition["macrodefines"]:
             if "macroDefine" in macrodef:
-                template += expand_token(class_header_macrodefine_template, '%MACRODEFINE%', macrodef["macroDefine"])
+                template += Util.expand_token(class_header_macrodefine_template, '%MACRODEFINE%', macrodef["macroDefine"])
 
     return template
 
@@ -319,36 +290,36 @@ def build_class_members_template(template, definition, isCppFile):
         if "type" in member and ( member["type"] != "constructor" and member["type"] != "destructor" and member["type"] != "method" ):
             access_based_vars_template[mthd_access] += build_class_var_template(definition, member)
 
-    template = expand_token(template, '%CLASSCONSTRUCTORPUBLIC%', access_based_ctor_template["public"])
-    template = expand_token(template, '%CLASSCONSTRUCTORPRIVATE%', access_based_ctor_template["private"])
-    template = expand_token(template, '%CLASSCONSTRUCTORPROTECTED%', access_based_ctor_template["protected"])
+    template = Util.expand_token(template, '%CLASSCONSTRUCTORPUBLIC%', access_based_ctor_template["public"])
+    template = Util.expand_token(template, '%CLASSCONSTRUCTORPRIVATE%', access_based_ctor_template["private"])
+    template = Util.expand_token(template, '%CLASSCONSTRUCTORPROTECTED%', access_based_ctor_template["protected"])
 
-    template = expand_token(template, '%CLASSDESTRUCTORPUBLIC%', access_based_dtor_template["public"])
-    template = expand_token(template, '%CLASSDESTRUCTORPRIVATE%', access_based_dtor_template["private"])
-    template = expand_token(template, '%CLASSDESTRUCTORPROTECTED%', access_based_dtor_template["protected"])
+    template = Util.expand_token(template, '%CLASSDESTRUCTORPUBLIC%', access_based_dtor_template["public"])
+    template = Util.expand_token(template, '%CLASSDESTRUCTORPRIVATE%', access_based_dtor_template["private"])
+    template = Util.expand_token(template, '%CLASSDESTRUCTORPROTECTED%', access_based_dtor_template["protected"])
 
-    template = expand_token(template, '%CLASSMETHODSPUBLIC%', access_based_mthd_template["public"])
-    template = expand_token(template, '%CLASSMETHODSPRIVATE%', access_based_mthd_template["private"])
-    template = expand_token(template, '%CLASSMETHODSPROTECTED%', access_based_mthd_template["protected"])
+    template = Util.expand_token(template, '%CLASSMETHODSPUBLIC%', access_based_mthd_template["public"])
+    template = Util.expand_token(template, '%CLASSMETHODSPRIVATE%', access_based_mthd_template["private"])
+    template = Util.expand_token(template, '%CLASSMETHODSPROTECTED%', access_based_mthd_template["protected"])
 
-    template = expand_token(template, '%CLASSVARSPUBLIC%', access_based_vars_template["public"])
-    template = expand_token(template, '%CLASSVARSPRIVATE%', access_based_vars_template["private"])
-    template = expand_token(template, '%CLASSVARSPROTECTED%', access_based_vars_template["protected"])
+    template = Util.expand_token(template, '%CLASSVARSPUBLIC%', access_based_vars_template["public"])
+    template = Util.expand_token(template, '%CLASSVARSPRIVATE%', access_based_vars_template["private"])
+    template = Util.expand_token(template, '%CLASSVARSPROTECTED%', access_based_vars_template["protected"])
 
     return template
 
 def build_class_declaration_template(definition):
 
-    template = clean_template(class_declaration_template)  
-    template = expand_token(template, '%CLASSNAME%', definition["name"])
-    template = expand_token(template, '%CLASSDESC%', definition["description"])
-    template = expand_token(template, '%PARENTCLASSDECLARATION%', build_parentclass_declaration_template(definition))
+    template = Util.clean_template(class_declaration_template)  
+    template = Util.expand_token(template, '%CLASSNAME%', definition["name"])
+    template = Util.expand_token(template, '%CLASSDESC%', definition["description"])
+    template = Util.expand_token(template, '%PARENTCLASSDECLARATION%', build_parentclass_declaration_template(definition))
     template = build_class_members_template(template, definition, False)
     return template
 
 def build_class_definition_template(definition):
 
-    template = clean_template(class_definition_template)  
+    template = Util.clean_template(class_definition_template)  
     template = build_class_members_template(template, definition, True)
     return template
 
@@ -356,41 +327,41 @@ def generate_header(schema, id, desc, definition, outpath):
 
     print("Generating %s.h file" % definition["name"])
 
-    template = clean_template(class_header_template)
-    template = expand_token(template, '%UPPERNAME%', definition["name"].upper())
-    template = expand_token(template, '%FILEHEADER%', build_file_header_template(definition, "h"))
-    template = expand_token(template, '%HEADERINCLUDE%', build_class_includes_template(definition))
-    template = expand_token(template, '%PRECLASSDECLARATION%', build_preclass_declaration_template(definition))
-    template = expand_token(template, '%CLASSDECLARATION%', build_class_declaration_template(definition))
-    template = expand_token(template, '%POSTCLASSDECLARATION%', build_postclass_declaration_template(definition))
-    template = clean_template(template, True)
+    template = Util.clean_template(class_header_template)
+    template = Util.expand_token(template, '%UPPERNAME%', definition["name"].upper())
+    template = Util.expand_token(template, '%FILEHEADER%', build_file_header_template(definition, "h"))
+    template = Util.expand_token(template, '%HEADERINCLUDE%', build_class_includes_template(definition))
+    template = Util.expand_token(template, '%PRECLASSDECLARATION%', build_preclass_declaration_template(definition))
+    template = Util.expand_token(template, '%CLASSDECLARATION%', build_class_declaration_template(definition))
+    template = Util.expand_token(template, '%POSTCLASSDECLARATION%', build_postclass_declaration_template(definition))
+    template = Util.clean_template(template, True)
 
-    outfile = outpath + build_classname(definition["name"]) + ".h"
+    outfile = outpath + Util.build_classname(definition["name"]) + ".h"
     with open(outfile, mode="w", encoding="ascii", newline=os.linesep) as file:
         file.write(template) 
     
     # Format the generated file with clang-formatter
-    format_file("clang", outfile)
+    Util.format_file("clang", outfile)
 
 def generate_source(schema, id, desc, definition, outpath):
 
     print("Generating %s.cpp file" % definition["name"])
 
-    template = clean_template(class_cpp_template)
-    cppincld = expand_token(class_includes_template, '%CLASSINCLUDES%', "\""+build_classname(definition["name"])+".h\"", True)
-    template = expand_token(template, '%FILEHEADER%', build_file_header_template(definition, "cpp"))
-    template = expand_token(template, '%CPPINCLUDES%', cppincld)
-    template = expand_token(template, '%PRECLASSDEFINITION%', build_preclass_definition_template(definition))
-    template = expand_token(template, '%CLASSDEFINITION%', build_class_definition_template(definition))
-    template = expand_token(template, '%POSTCLASSDEFINITION%', build_postclass_definition_template(definition))
-    template = clean_template(template, True)
+    template = Util.clean_template(class_cpp_template)
+    cppincld = Util.expand_token(class_includes_template, '%CLASSINCLUDES%', "\""+Util.build_classname(definition["name"])+".h\"", True)
+    template = Util.expand_token(template, '%FILEHEADER%', build_file_header_template(definition, "cpp"))
+    template = Util.expand_token(template, '%CPPINCLUDES%', cppincld)
+    template = Util.expand_token(template, '%PRECLASSDEFINITION%', build_preclass_definition_template(definition))
+    template = Util.expand_token(template, '%CLASSDEFINITION%', build_class_definition_template(definition))
+    template = Util.expand_token(template, '%POSTCLASSDEFINITION%', build_postclass_definition_template(definition))
+    template = Util.clean_template(template, True)
 
-    outfile = outpath + build_classname(definition["name"]) + ".cpp"
+    outfile = outpath + Util.build_classname(definition["name"]) + ".cpp"
     with open(outfile, mode="w", encoding="ascii", newline=os.linesep) as file:
         file.write(template) 
     
     # Format the generated file with clang-formatter
-    format_file("clang", outfile)
+    Util.format_file("clang", outfile)
 
 def generate_definitionItem(schema, id, desc, definition):
 
