@@ -79,6 +79,14 @@ CommandLineServiceProvider::CommandLineServiceProvider() : ServiceProvider(SERVI
   SSHCommand *sshcmd = new SSHCommand();
   m_cmdlist.push_back(sshcmd);
   #endif
+
+  RebootCommand *rebootcmd = new RebootCommand();
+  m_cmdlist.push_back(rebootcmd);
+
+  #ifdef ENABLE_NETWORK_SERVICE
+  NetworkCommand *networkcmd = new NetworkCommand();
+  m_cmdlist.push_back(networkcmd);
+  #endif
 }
 
 /**

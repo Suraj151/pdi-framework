@@ -440,15 +440,34 @@ void WiFiServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
  */
 void WiFiServiceProvider::printStatusToTerminal(iTerminalInterface *terminal){
 
-  terminal->writeln();
-  terminal->write_ro((RODT_ATTR("connect :")));
-  terminal->writeln((int32_t)__status_wifi.wifi_connected);
-  terminal->write_ro((RODT_ATTR("gw :")));
-  terminal->write(((pdiutil::string)this->m_wifi->gatewayIP()).c_str());
-  terminal->write_ro((RODT_ATTR(", st :")));
-  terminal->write(((pdiutil::string)this->m_wifi->localIP()).c_str());
-  terminal->write_ro((RODT_ATTR(", ap :")));
-  terminal->writeln(((pdiutil::string)this->m_wifi->softAPIP()).c_str());
+  if( nullptr != terminal ){
+
+    pdiutil::string stname = "NA";
+    pdiutil::string apname = "NA";
+
+    terminal->writeln();
+
+    wifi_config_table _table;
+    __database_service.get_wifi_config_table(&_table);
+    apname = _table.ap_ssid;
+
+    if( __status_wifi.wifi_connected ){
+      
+      stname = _table.sta_ssid;
+
+      terminal->write_ro((RODT_ATTR("gateway ip : ")));
+      terminal->writeln(((pdiutil::string)this->m_wifi->gatewayIP()).c_str());
+      terminal->write_ro((RODT_ATTR("station : ")));
+      terminal->write(stname.c_str());
+      terminal->write_ro((RODT_ATTR(", ip : ")));
+      terminal->writeln(((pdiutil::string)this->m_wifi->localIP()).c_str());
+    }
+
+    terminal->write_ro((RODT_ATTR("accespoint : ")));
+    terminal->write(apname.c_str());
+    terminal->write_ro((RODT_ATTR(", ip : ")));
+    terminal->writeln(((pdiutil::string)this->m_wifi->softAPIP()).c_str());
+  }
 }
 
 

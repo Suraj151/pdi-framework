@@ -29,6 +29,8 @@ created Date    : 1st June 2019
 #include "commands/ClearScreenCommand.h"
 #include "commands/SchedulerTaskCommand.h"
 #include "commands/SSHCommand.h"
+#include "commands/RebootCommand.h"
+#include "commands/NetworkCommand.h"
 
 /**
  * CommandLineServiceProvider class
