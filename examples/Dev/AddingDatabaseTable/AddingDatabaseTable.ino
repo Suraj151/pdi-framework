@@ -6,8 +6,6 @@
 #include <PdiStack.h>
 
 
-#if defined(ENABLE_HTTP_SERVER)
-
 // be carefull about table address or else table will not register.
 // it should be on minimum distant from last added table address + last added table size
 // keep safe distance between table addresses accordings their size
@@ -17,7 +15,11 @@
 
 #define MAX_STUDENTS			5
 #define STUDENT_NAME_MAX_SIZE	20
+#if defined(DEVICE_ARDUINOUNO)
+#define STUDENT_TABLE_ADDRESS	800
+#else
 #define STUDENT_TABLE_ADDRESS	2500
+#endif
 
 enum sex{ MALE,	FEMALE };
 
@@ -43,9 +45,6 @@ class StudentTable : public DatabaseTable<STUDENT_TABLE_ADDRESS, student_table> 
  * this should be defined before framework initialization
  */
 StudentTable __student_table;
-#else
-  #error "HTTP server is disabled ( in config/Common.h of framework library ). please enable(uncomment) it for this example"
-#endif
 
 
 void setup() {

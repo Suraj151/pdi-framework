@@ -12,7 +12,7 @@ created Date    : 1st June 2019
 #include <PdiStack.h>
 
 #ifndef ENABLE_DEVICE_IOT
-  #error "device iot service is disabled ( in config/Common.h of ewings esp framework library ). please enable(uncomment ENABLE_DEVICE_IOT) it for this example"
+  #error "device iot service is disabled ( in devices/DeviceConfig.h of ewings esp framework library ). please enable(uncomment ENABLE_DEVICE_IOT) it for this example"
 #endif
 
 #define DEVICE_IOT_SENSOR_TYPE  "sensor_t"

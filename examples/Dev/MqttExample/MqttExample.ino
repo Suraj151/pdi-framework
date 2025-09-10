@@ -23,7 +23,7 @@
 #define MQTT_WILL_MESSAGE     "[mac] is disconnected" // [mac] will get replaced internally with actual mac id
 #define MQTT_WILL_QOS         0
 
-#if defined(ENABLE_HTTP_SERVER)
+#if defined(ENABLE_MQTT_SERVICE)
 
 
 // mqtt service will call this function whenever it initiate publish process to set user data for publish in payload
@@ -104,7 +104,7 @@ void configure_mqtt(){
 
 
 #else
-  #error "Mqtt portal service is disabled ( in config/Common.h of framework library ). please enable(uncomment ENABLE_HTTP_SERVER) it for this example"
+  #error "Mqtt portal service is disabled ( in devices/DeviceConfig.h of framework library ). please enable(uncomment ENABLE_MQTT_SERVICE) it for this example"
 #endif
 
 void setup() {

@@ -80,7 +80,7 @@ class TestController : public Controller {
  */
 TestController test_controller;
 #else
-  #error "HTTP server is disabled ( in config/Common.h of framework library ). please enable(uncomment) it for this example"
+  #error "HTTP server is disabled ( in devices/DeviceConfig.h of framework library ). please enable(uncomment) it for this example"
 #endif
 
 

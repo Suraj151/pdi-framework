@@ -130,7 +130,7 @@ void TelnetServiceProvider::handle() {
             // Inform serial terminal about the new telnet client session
             if(__i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)){
                 __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln();
-                __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln_ro(RODT_ATTR("Telnet Client Session starting."));
+                __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln_ro(RODT_ATTR("Telnet Client Session started."));
             }
 
             iTerminalInterface *current_terminal = __cmd_service.getTerminal();
