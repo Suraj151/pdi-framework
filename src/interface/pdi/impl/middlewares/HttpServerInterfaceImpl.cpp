@@ -24,7 +24,8 @@ CallBackVoidArgFn HttpServerInterfaceImpl::UriToHandlerMap::notFoundHandler = nu
  */
 HttpServerInterfaceImpl::HttpServerInterfaceImpl() :
     m_server(nullptr),
-    m_client(nullptr)
+    m_client(nullptr),
+    m_currentclient_lastactivity_timestamp(0)
 {
     m_clientRequest.clear();
     m_uriHandlerMap.clear();
@@ -57,9 +58,12 @@ void HttpServerInterfaceImpl::begin(uint16_t port){
             m_server->setOnAcceptClientEventCallback([](void* arg){
                 HttpServerInterfaceImpl *ihttpserver = reinterpret_cast<HttpServerInterfaceImpl*>(arg);
 
-                if(ihttpserver){
+                static bool handlingclientfromcb = false;
+                if(!handlingclientfromcb && ihttpserver){
 
+                    handlingclientfromcb = true;
                     ihttpserver->handleClient();
+                    handlingclientfromcb = false;
                 }
             }, this);
         }
@@ -118,6 +122,16 @@ void HttpServerInterfaceImpl::handleClient(){
             
             // Flush the client buffer
             m_client->flush();
+
+            // Update current client liast activity timestamp
+            m_currentclient_lastactivity_timestamp = __i_instance.getUtilityInstance().millis_now();
+        }
+
+        // Check for keep-alive timeout
+        if( m_currentclient_lastactivity_timestamp != 0 &&
+            (__i_instance.getUtilityInstance().millis_now() - m_currentclient_lastactivity_timestamp) > HTTP_DEFAULT_KEEP_ALIVE_MS ){
+            closeClient();
+            m_currentclient_lastactivity_timestamp = 0;
         }
     } else if (m_client && !m_client->connected()) {
         closeClient();
@@ -325,7 +339,7 @@ void HttpServerInterfaceImpl::parseRequest(){
 
     while (1) {
 
-        m_client->readLine(header_line, readLineYield);
+        m_client->readLine(header_line, readLineYield, 256);
         if(header_line.empty()) break; // Exit if no more headers
 
         // Split header line into key and value
@@ -621,12 +635,14 @@ void HttpServerInterfaceImpl::prepareResponseHeader(pdiutil::string& _header, in
 
     pdiutil::string keepalive = header(HTTP_HEADER_KEY_CONNECTION);
     if (keepalive.empty() || keepalive == "close") {
-        addHeader(HTTP_HEADER_KEY_CONNECTION, "close");
+        addHeader(HTTP_HEADER_KEY_CONNECTION, CHARPTR_WRAP("close"));
     } else {
         addHeader(HTTP_HEADER_KEY_CONNECTION, CHARPTR_WRAP("keep-alive"));
-        addHeader(HTTP_HEADER_KEY_KEEP_ALIVE, CHARPTR_WRAP("timeout=30 max=20"));
 
-        (static_cast<iTcpClientInterface*>(m_client))->setKeepAlive(30, 10, 3); // Enable keep-alive for the client
+        keepalive = CHARPTR_WRAP("timeout=");
+        keepalive += pdiutil::to_string((int)(HTTP_DEFAULT_KEEP_ALIVE_MS/1000));
+        addHeader(HTTP_HEADER_KEY_KEEP_ALIVE, keepalive);
+        // (static_cast<iTcpClientInterface*>(m_client))->setKeepAlive((HTTP_DEFAULT_KEEP_ALIVE_MS/1000), 10, 3); // Enable keep-alive for the client
     }
 
     addHeader(HTTP_HEADER_KEY_ACCESS_CONTROL_ALLOW_ORIGIN, "*"); // Allow CORS
@@ -656,9 +672,6 @@ void HttpServerInterfaceImpl::sendResponse(int code, mimetype_t content_type, co
 
     // Make sure data has been sent
     m_client->write((const uint8_t*)"", 0);
-    while (!m_client->availableforwrite()){
-        __i_dvc_ctrl.yield();
-    }
 }
 
 /**
@@ -703,9 +716,6 @@ bool HttpServerInterfaceImpl::handleStaticFileRequest(){
 
             // Make sure data has been sent
             m_client->write((const uint8_t*)"", 0);
-            while (!m_client->availableforwrite()){
-                __i_dvc_ctrl.yield();
-            }
 
             bStatus = true;
         }

@@ -52,6 +52,7 @@ protected:
 
   iTcpServerInterface* m_server;
   iClientInterface* m_client;
+  uint64_t m_currentclient_lastactivity_timestamp;
 
   struct UriToHandlerMap{
     pdiutil::string uri;

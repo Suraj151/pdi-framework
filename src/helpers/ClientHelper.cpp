@@ -43,7 +43,7 @@ bool disconnect(iClientInterface *client)
   return isConnected(client) ? client->disconnect() : true;
 }
 
-bool sendPacket(iClientInterface *client, uint8_t *buffer, uint16_t len, uint16_t max_bytes_in_one_write)
+bool sendPacket(iClientInterface *client, uint8_t *buffer, uint16_t len, uint16_t max_bytes_in_one_write, uint32_t timeout)
 {
   bool status = false;
 
@@ -53,11 +53,22 @@ bool sendPacket(iClientInterface *client, uint8_t *buffer, uint16_t len, uint16_
     int32_t _buf_len = len; // strlen((char*)buffer);
     // len = _buf_len < len ? _buf_len : len;
     status = true;
+    uint32_t now = __i_dvc_ctrl.millis_now();
 
     while (len > 0)
     {
       while (!client->availableforwrite()){
         __i_dvc_ctrl.yield();
+        if ((__i_dvc_ctrl.millis_now() - now) > timeout)
+        {
+          status = false;
+          break;
+        }
+      }
+      if (!status)
+      {
+        LogE("Client: send packet - timeout on availableforwrite\n");
+        break;
       }
       
       int32_t sendlen = len > max_bytes_in_one_write ? max_bytes_in_one_write : len;

@@ -164,7 +164,7 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
         }
     }
 
-    m_isLastWriteAcked = false;
+    m_isLastWriteAcked = !(size > 0);
 
     __i_dvc_ctrl.yield();
 

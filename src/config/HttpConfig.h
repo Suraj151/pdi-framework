@@ -77,6 +77,10 @@ typedef enum {
 #define HTTP_DEFAULT_VERSION HTTP_VERSION_1_1
 #endif
 
+#ifndef HTTP_DEFAULT_KEEP_ALIVE_MS
+#define HTTP_DEFAULT_KEEP_ALIVE_MS 30000
+#endif
+
 // Client specific defines
 #define HTTP_CLIENT_BUF_SIZE 640
 #define HTTP_CLIENT_READINTERVAL_MS 10
