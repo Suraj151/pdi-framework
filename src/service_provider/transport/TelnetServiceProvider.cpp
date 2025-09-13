@@ -160,6 +160,7 @@ void TelnetServiceProvider::handle() {
             if( res == CMD_RESULT_ABORTED ||
                 res == CMD_RESULT_TERMINAL_ABORTED
             ){
+                __auth_service.setAuthorized(false);
                 m_client->disconnect();
             }
             #endif
