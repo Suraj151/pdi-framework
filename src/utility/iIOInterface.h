@@ -499,6 +499,32 @@ public:
     write_ro(RODT_ATTR("C"));
   }
 
+  /** 
+   * @brief Moves the cursor up by a specified number of steps.
+   * @param steps The number of steps to move up (default is 1).
+   * @return None
+   */
+  void csi_cursor_move_up(int32_t steps=1)
+  {
+    if(steps <= 0) return;
+    write_ro(RODT_ATTR(TERMINAL_ESCAPE_SEQ));
+    write(steps);
+    write_ro(RODT_ATTR("A"));
+  }
+
+  /**
+   * @brief Moves the cursor down by a specified number of steps.
+   * @param steps The number of steps to move down (default is 1).
+   * @return None
+   */
+  void csi_cursor_move_down(int32_t steps=1)
+  {
+    if(steps <= 0) return;
+    write_ro(RODT_ATTR(TERMINAL_ESCAPE_SEQ));
+    write(steps);
+    write_ro(RODT_ATTR("B"));
+  }
+  
   /**
    * @brief Set the text color using ANSI escape codes.
    * @param color The color code (0-255) for the text.

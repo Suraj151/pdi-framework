@@ -18,7 +18,11 @@ created Date    : 1st June 2019
 /**
  * CommandLineServiceProvider constructor
  */
-CommandLineServiceProvider::CommandLineServiceProvider() : ServiceProvider(SERVICE_CMD, RODT_ATTR("CMD"))
+CommandLineServiceProvider::CommandLineServiceProvider() : 
+  m_terminalCursorIndex(0),
+  m_cmdHistoryIndex(-1),
+  m_cmdAutoCompleteIndex(-1),
+  ServiceProvider(SERVICE_CMD, RODT_ATTR("CMD"))
 {
   // Add commands in list  
   #ifdef ENABLE_AUTH_SERVICE
@@ -67,6 +71,8 @@ CommandLineServiceProvider::CommandLineServiceProvider() : ServiceProvider(SERVI
 
   FileWriteCommand *fileWritecmd = new FileWriteCommand();
   m_cmdlist.push_back(fileWritecmd);
+
+  m_termhistoryfile = CHARPTR_WRAP_RO(CMD_TERMINAL_HISTORY_STATIC_FILEPATH);
   #endif
 
   ClearScreenCommand *clearscreencmd = new ClearScreenCommand();
@@ -136,7 +142,6 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
     if( nullptr == terminal ) return CMD_RESULT_TERMINAL_ERR;
 
     cmd_term_inseq_t inseq = CMD_TERM_INSEQ_NONE;
-    static uint16_t terminalCursorIndex = 0;
 
     while (terminal->available())
     {
@@ -153,26 +158,29 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
 
         // remove cursor position char from string
         inseq = c == '\b' ? CMD_TERM_INSEQ_BACKSPACE_CHAR : CMD_TERM_INSEQ_DELETE_CHAR;
-        if (m_termrecvdata.size() > 0 && terminalCursorIndex > 0) {
+        if (m_termrecvdata.size() > 0 && m_terminalCursorIndex > 0) {
 
           // putty can visualize 0x7F but not every terminal like linux.
           // so sending backspace irespective of incoming char
           terminal->write('\b');  // echo
 
-          pdiutil::string substr = m_termrecvdata.substr(terminalCursorIndex);
+          pdiutil::string substr = m_termrecvdata.substr(m_terminalCursorIndex);
           if(substr.size() > 0){
-            m_termrecvdata = m_termrecvdata.substr(0, terminalCursorIndex-1) + substr;
+            m_termrecvdata = m_termrecvdata.substr(0, m_terminalCursorIndex-1) + substr;
           }else{
             m_termrecvdata.pop_back();
           }
 
-          terminalCursorIndex--;
+          m_terminalCursorIndex--;
 
           terminal->csi_erase_in_line(0);
-          terminal->csi_cursor_move_left(terminalCursorIndex);
+          terminal->csi_cursor_move_left(m_terminalCursorIndex);
           terminal->write(m_termrecvdata.c_str());
-          terminal->csi_cursor_move_left(m_termrecvdata.size() - terminalCursorIndex);  
+          terminal->csi_cursor_move_left(m_termrecvdata.size() - m_terminalCursorIndex);  
         }
+      }else if (c == '\t') {
+        // ctrl+c
+        inseq = CMD_TERM_INSEQ_TAB;
       }else if (c == 0x03) {
         // ctrl+c
         inseq = CMD_TERM_INSEQ_CTRL_C;
@@ -227,27 +235,27 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
             }else if (escseq[2] == 'C') {
               // right arrow
               inseq = CMD_TERM_INSEQ_RIGHT_ARROW;
-              if( terminalCursorIndex < m_termrecvdata.size() ){
-                terminalCursorIndex++;
+              if( m_terminalCursorIndex < m_termrecvdata.size() ){
+                m_terminalCursorIndex++;
               }else{
                 shouldEcho = false; // skip echo as of now
               }
             }else if (escseq[2] == 'D') {
               // left arrow
               inseq = CMD_TERM_INSEQ_LEFT_ARROW;
-              if( terminalCursorIndex > 0 ){
-                terminalCursorIndex--;
+              if( m_terminalCursorIndex > 0 ){
+                m_terminalCursorIndex--;
               }else{
                 shouldEcho = false; // skip echo as of now
               }
             }else if (escseq[2] == 'H') {
               // home
               inseq = CMD_TERM_INSEQ_HOME;
-              terminalCursorIndex = 0;
+              m_terminalCursorIndex = 0;
             }else if (escseq[2] == 'F') {
               // end
               inseq = CMD_TERM_INSEQ_END;
-              terminalCursorIndex = m_termrecvdata.size();
+              m_terminalCursorIndex = m_termrecvdata.size();
             }else if (terminal->available()){
 
               escseq[seqlen++] = terminal->read();
@@ -258,32 +266,32 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
                 if (escseq[2] == '1' || escseq[2] == '7') {
                   // home
                   inseq = CMD_TERM_INSEQ_HOME;
-                  terminalCursorIndex = 0;
+                  m_terminalCursorIndex = 0;
                 }else if (escseq[2] == '3') {
                   // delete
                   inseq = CMD_TERM_INSEQ_DELETE;
 
                   // remove char at cursor position
-                  if (m_termrecvdata.size() > 0 && terminalCursorIndex < m_termrecvdata.size()) {
+                  if (m_termrecvdata.size() > 0 && m_terminalCursorIndex < m_termrecvdata.size()) {
 
-                    pdiutil::string substr = m_termrecvdata.substr(terminalCursorIndex+1);
+                    pdiutil::string substr = m_termrecvdata.substr(m_terminalCursorIndex+1);
                     if(substr.size() > 0){
-                      m_termrecvdata = m_termrecvdata.substr(0, terminalCursorIndex) + substr;
+                      m_termrecvdata = m_termrecvdata.substr(0, m_terminalCursorIndex) + substr;
                     }else{
-                      m_termrecvdata = m_termrecvdata.substr(0, terminalCursorIndex);
+                      m_termrecvdata = m_termrecvdata.substr(0, m_terminalCursorIndex);
                     }
                     
                     terminal->csi_erase_in_line(0);
-                    terminal->csi_cursor_move_left(terminalCursorIndex);
+                    terminal->csi_cursor_move_left(m_terminalCursorIndex);
                     terminal->write(m_termrecvdata.c_str());
-                    terminal->csi_cursor_move_left(m_termrecvdata.size() - terminalCursorIndex);  
+                    terminal->csi_cursor_move_left(m_termrecvdata.size() - m_terminalCursorIndex);  
 
                     shouldEcho = false; // skip echo as of now                              
                   }          
                 }else if (escseq[2] == '4' || escseq[2] == '8') {
                   // end
                   inseq = CMD_TERM_INSEQ_END;
-                  terminalCursorIndex = m_termrecvdata.size();
+                  m_terminalCursorIndex = m_termrecvdata.size();
                 }else if (escseq[2] == '5') {
                   // page up
                   inseq = CMD_TERM_INSEQ_PAGE_UP;
@@ -326,31 +334,31 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
 
         //terminal->write(c);  // echo
 
-        pdiutil::string substr = m_termrecvdata.substr(terminalCursorIndex);
+        pdiutil::string substr = m_termrecvdata.substr(m_terminalCursorIndex);
         if(substr.size() > 0){
-          m_termrecvdata = m_termrecvdata.substr(0, terminalCursorIndex) + c + substr;
+          m_termrecvdata = m_termrecvdata.substr(0, m_terminalCursorIndex) + c + substr;
         }else{
           m_termrecvdata += c;
         }
-        terminalCursorIndex++;
+        m_terminalCursorIndex++;
 
-        terminal->csi_cursor_move_left(terminalCursorIndex-1);
+        terminal->csi_cursor_move_left(m_terminalCursorIndex-1);
         terminal->write(m_termrecvdata.c_str());
-        terminal->csi_cursor_move_left(m_termrecvdata.size() - terminalCursorIndex);
+        terminal->csi_cursor_move_left(m_termrecvdata.size() - m_terminalCursorIndex);
       }
 
       __i_dvc_ctrl.wait(1);
     }
 
-    // terminal->write_ro(RODT_ATTR(","));
+    // terminal->write_ro(RODT_ATTR("\n[termdbg : "));
     // terminal->write(m_termrecvdata.c_str());
     // terminal->write_ro(RODT_ATTR(":"));
     // terminal->write(m_termrecvdata.size());
     // terminal->write_ro(RODT_ATTR(":"));
     // terminal->write((int32_t)inseq);
     // terminal->write_ro(RODT_ATTR(":"));
-    // terminal->write((int32_t)terminalCursorIndex);
-    // terminal->write_ro(RODT_ATTR(":\r\n"));
+    // terminal->write((int32_t)m_terminalCursorIndex);
+    // terminal->write_ro(RODT_ATTR("]\r\n"));
 
     // check if line ending is entered
     if( 
@@ -358,8 +366,13 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
       inseq != CMD_TERM_INSEQ_ENTER &&
       inseq != CMD_TERM_INSEQ_CTRL_C &&
       inseq != CMD_TERM_INSEQ_CTRL_Z &&
-      inseq != CMD_TERM_INSEQ_ESC 
+      inseq != CMD_TERM_INSEQ_ESC &&
+      inseq != CMD_TERM_INSEQ_UP_ARROW &&
+      inseq != CMD_TERM_INSEQ_DOWN_ARROW &&
+      inseq != CMD_TERM_INSEQ_TAB
     ){
+      m_cmdHistoryIndex = -1;
+      m_cmdAutoCompleteIndex = -1;
       return CMD_RESULT_INCOMPLETE;
     }
 
@@ -371,15 +384,20 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
       // clear stored string
       m_termrecvdata.clear();
       m_termrecvdata = "";
-      terminalCursorIndex = 0;
+      m_terminalCursorIndex = 0;
     }
 
     cmd_result_t result = executeCommand(&m_termrecvdata, inseq);
 
     // flush stored string
-    m_termrecvdata.clear();
-    m_termrecvdata = "";
-    terminalCursorIndex = 0;
+    if( result == CMD_RESULT_TERMINAL_HOLD_BUFFER ){
+
+    }else{
+
+      m_termrecvdata.clear();
+      m_termrecvdata = "";
+      m_terminalCursorIndex = 0;
+    }
 
     // flush terminal if command has been processed
     if( CMD_RESULT_NOT_FOUND != result && CMD_RESULT_MAX != result ){
@@ -398,20 +416,167 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
  */
 cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cmd_term_inseq_t inseq)
 {
+  if( nullptr == m_terminal ){
+    return CMD_RESULT_TERMINAL_ERR;
+  }
+
   cmd_result_t res = CMD_RESULT_NOT_FOUND;
-  bool is_executing_lastcommand = false;
+  int16_t waitingCmdIndex = isCommandWaitingForUserInput();
+  bool is_executing_lastcommand = (waitingCmdIndex != -1);
+
+  // process the known inseq 
+  // no command is waiting for user input
+  if(!is_executing_lastcommand){
+
+    if( inseq == CMD_TERM_INSEQ_UP_ARROW || inseq == CMD_TERM_INSEQ_DOWN_ARROW ){
+      #ifdef ENABLE_STORAGE_SERVICE
+      // fetch command from history
+      pdiutil::string cmdExec;
+
+      if( inseq == CMD_TERM_INSEQ_UP_ARROW ){
+        // up arrow
+        m_cmdHistoryIndex++;
+      }else if( inseq == CMD_TERM_INSEQ_DOWN_ARROW ){
+        // down arrow
+        m_cmdHistoryIndex--;
+      }
+
+      // check for the limit
+      pdiutil::vector<uint32_t> historyEntries;
+      int16_t indexlimit = __i_instance.getFileSystemInstance().getLineNumbersInFile(m_termhistoryfile.c_str(), historyEntries) - 1;
+      m_cmdHistoryIndex = m_cmdHistoryIndex > indexlimit ? indexlimit : m_cmdHistoryIndex;
+
+      if( getCommandExecutedFromHistory(cmdExec, m_cmdHistoryIndex) ){
+
+        // clear current line
+        m_terminal->csi_cursor_move_left(m_termrecvdata.size());
+        m_terminal->csi_erase_in_line(0);
+
+        // copy command to terminal buffer
+        m_termrecvdata = cmdExec;
+        m_terminalCursorIndex = m_termrecvdata.size();
+        
+        m_terminal->write(m_termrecvdata.c_str());
+      }else{
+        // reset history index as no command found
+        m_cmdHistoryIndex = -1;
+      }
+      #endif
+
+      return CMD_RESULT_TERMINAL_HOLD_BUFFER;
+    }else{
+
+      // auto complete command
+      if( inseq == CMD_TERM_INSEQ_TAB && m_termrecvdata.size() > 0 ){
+
+        static int16_t prevCmdSize = m_termrecvdata.size();
+        static int16_t prevArgSize = 0;
+        pdiutil::string _cmdtosearch = m_termrecvdata;
+        pdiutil::vector<pdiutil::string> matchedCmds;
+        pdiutil::string::size_type argStartIndex = m_termrecvdata.find(CMD_OPTION_SEPERATOR_SPACE);
+
+        if( m_cmdAutoCompleteIndex == -1 ){
+          prevCmdSize = m_termrecvdata.size();
+        }
+
+        if( argStartIndex != pdiutil::string::npos ){
+          prevCmdSize = argStartIndex;
+        }
+
+        if( prevCmdSize != m_termrecvdata.size() ){
+          _cmdtosearch = m_termrecvdata.substr(0, prevCmdSize);
+        }
+
+        for (int16_t i = 0; i < m_cmdlist.size(); i++){
+
+          if(nullptr != m_cmdlist[i] && m_cmdlist[i]->isValidCommand((char*)_cmdtosearch.c_str(), true)){
+
+            matchedCmds.push_back(pdiutil::string(m_cmdlist[i]->m_cmd));
+          }
+        }
+
+        if( matchedCmds.size() > 0 ){
+
+          if( argStartIndex == pdiutil::string::npos ){
+
+            m_cmdAutoCompleteIndex = (m_cmdAutoCompleteIndex + 1) % (matchedCmds.size());
+
+            // clear current line
+            m_terminal->csi_cursor_move_left(m_termrecvdata.size());
+            m_terminal->csi_erase_in_line(0);
+
+            // copy command to terminal buffer
+            m_termrecvdata = matchedCmds[m_cmdAutoCompleteIndex];
+            m_terminalCursorIndex = m_termrecvdata.size();
+            
+            m_terminal->write(m_termrecvdata.c_str());
+          }else{
+
+            #ifdef ENABLE_STORAGE_SERVICE
+            pdiutil::string _matchcmd = m_termrecvdata.substr(0, argStartIndex);
+            pdiutil::string _argtosearch = m_termrecvdata.substr(argStartIndex);
+            _argtosearch.erase(0, _argtosearch.find_first_not_of(' '));
+            if( m_cmdAutoCompleteIndex == -1 ){
+              prevArgSize = _argtosearch.size();
+            }
+            _argtosearch = _argtosearch.substr(0, prevArgSize);
+            pdiutil::vector<file_info_t> itemlist;
+            int resultCode = __i_fs.getDirFileList(__i_fs.getPWD().c_str(), itemlist, _argtosearch.c_str());
+            
+            if(resultCode >= 0 && itemlist.size() > 0){
+
+              m_cmdAutoCompleteIndex = (m_cmdAutoCompleteIndex + 1) % (itemlist.size());
+
+              // clear current line
+              m_terminal->csi_cursor_move_left(m_termrecvdata.size());
+              m_terminal->csi_erase_in_line(0);
+
+              // copy command to terminal buffer
+              m_termrecvdata = _matchcmd + CMD_OPTION_SEPERATOR_SPACE + pdiutil::string(itemlist[m_cmdAutoCompleteIndex].name);
+              m_terminalCursorIndex = m_termrecvdata.size();
+              
+              m_terminal->write(m_termrecvdata.c_str());
+
+              for (file_info_t item : itemlist) {
+                // deallocates memory for items
+                delete[] item.name;
+              }
+              itemlist.clear();
+            }else{
+
+              m_cmdAutoCompleteIndex = -1;
+            }
+            #else
+            m_cmdAutoCompleteIndex = -1;  
+            #endif
+          }
+
+          return CMD_RESULT_TERMINAL_HOLD_BUFFER;
+        }else{
+
+          m_cmdAutoCompleteIndex = -1;
+        }
+      }else{
+
+        m_cmdAutoCompleteIndex = -1;
+      }
+      
+      // reset index as we are in middle of command execution
+      m_cmdHistoryIndex = -1;
+    }
+  }else{
+    // reset index as we are in middle of command execution
+    m_cmdHistoryIndex = -1;
+    m_cmdAutoCompleteIndex = -1;
+  }
+
 
   if( nullptr != cmd && cmd->size() ){
 
     // first check whether any last command is incomplete and waiting for user input
-    for (int16_t i = 0; i < m_cmdlist.size(); i++){
+    if(is_executing_lastcommand){
 
-      if(nullptr != m_cmdlist[i] && m_cmdlist[i]->isWaitingForOption()){
-
-        is_executing_lastcommand = true;
-        res = m_cmdlist[i]->executeCommand((char*)cmd->c_str(), cmd->size(), true, inseq);
-        break;
-      }
+      res = m_cmdlist[waitingCmdIndex]->executeCommand((char*)cmd->c_str(), cmd->size(), true, inseq);
     }
 
     for (int16_t i = 0; !is_executing_lastcommand && i < m_cmdlist.size(); i++){
@@ -425,6 +590,48 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
         // }
       }
     }
+
+    // store command in history
+    #ifdef ENABLE_STORAGE_SERVICE
+    if( __i_instance.getFileSystemInstance().isFileExist(m_termhistoryfile.c_str()) == false ){
+      __i_instance.getFileSystemInstance().createFile(m_termhistoryfile.c_str(), "", 0);
+    }
+
+    if( !is_executing_lastcommand && 
+        cmd->size() < 1024
+      ){
+
+        // keep only last CMD_TERMINAL_HISTORY_MAX_LINES lines in history
+        pdiutil::vector<uint32_t> newlineindices;
+        __i_instance.getFileSystemInstance().findInFile(m_termhistoryfile.c_str(), "\r\n", newlineindices, [&](void){
+          // yield function to avoid watchdog reset
+          __i_dvc_ctrl.yield();
+        });
+        if(newlineindices.size() > CMD_TERMINAL_HISTORY_MAX_LINES){
+          uint32_t remove_upto_index = newlineindices[newlineindices.size() - CMD_TERMINAL_HISTORY_MAX_LINES - 1];
+
+          const char *tempdir = __i_instance.getFileSystemInstance().getTempDirectory();
+          pdiutil::string tempFilePath = pdiutil::string(tempdir) + __i_instance.getFileSystemInstance().basename(m_termhistoryfile.c_str());
+          if(__i_instance.getFileSystemInstance().isFileExist(tempFilePath.c_str())){
+              __i_instance.getFileSystemInstance().deleteFile(tempFilePath.c_str());
+          }
+          
+          int iStatus = __i_instance.getFileSystemInstance().readFile(m_termhistoryfile.c_str(), 100, [&](char* data, uint32_t size)->bool{
+            __i_instance.getFileSystemInstance().writeFile(tempFilePath.c_str(), data, size, true);
+            return true;
+          }, remove_upto_index+1);
+
+          if( iStatus >= 0 ){
+            __i_instance.getFileSystemInstance().deleteFile(m_termhistoryfile.c_str());
+            __i_instance.getFileSystemInstance().moveFile(tempFilePath.c_str(), m_termhistoryfile.c_str());
+          }
+        }
+
+        // append command to history file
+        __i_instance.getFileSystemInstance().writeFile(m_termhistoryfile.c_str(), (char*)cmd->c_str(), cmd->size(), true);
+        __i_instance.getFileSystemInstance().writeFile(m_termhistoryfile.c_str(), (char*)"\r\n", 2, true);
+    }
+    #endif
 
     // if command is incomplete then we are in continue execution mode
     if (CMD_RESULT_INCOMPLETE == res){
@@ -444,40 +651,35 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
 
     // check if any command is waiting for user input
     // if any command is waiting for user input then we are in continue execution mode
-    for (int16_t i = 0; i < m_cmdlist.size(); i++){
+    if(is_executing_lastcommand){
 
-      if(nullptr != m_cmdlist[i] && m_cmdlist[i]->isWaitingForOption()){
+      res = CMD_RESULT_INCOMPLETE;
 
-        is_executing_lastcommand = true;
-        res = CMD_RESULT_INCOMPLETE;
-
-        /* Perform terminal input actions if any */
-        if( inseq > CMD_TERM_INSEQ_NONE && inseq < CMD_TERM_INSEQ_MAX ){
-          res = m_cmdlist[i]->executeCommand((char*)cmd->c_str(), cmd->size(), true, inseq);
-        }
-
-        break;
+      /* Perform terminal input actions if any */
+      if( inseq > CMD_TERM_INSEQ_NONE && inseq < CMD_TERM_INSEQ_MAX ){
+        res = m_cmdlist[waitingCmdIndex]->executeCommand((char*)cmd->c_str(), cmd->size(), true, inseq);
       }
     }
   }
 
-  // #ifdef ENABLE_AUTH_SERVICE
-  // bool isWaitingForUser = false;
-  // if(!__auth_service.getAuthorized()){
-  //   cmd_t *logincmd = __cmd_service.getCommandByName(CMD_NAME_LOGIN);
-  //   if( nullptr != logincmd && logincmd->isWaitingForOption(CMD_OPTION_NAME_U) ){
-  //     isWaitingForUser = true;
-  //   }
-  // }
-  // #endif
+  #ifdef ENABLE_AUTH_SERVICE
+  bool isWaitingForUserAuth = false;
+  if(!__auth_service.getAuthorized()){
+    cmd_t *logincmd = __cmd_service.getCommandByName(CMD_NAME_LOGIN);
+    if( nullptr != logincmd && logincmd->isWaitingForOption(CMD_OPTION_NAME_U) ){
+      isWaitingForUserAuth = true;
+    }
+  }
+  #endif
 
   if( 
     !is_executing_lastcommand || 
     CMD_RESULT_OK == res || 
-    CMD_RESULT_ABORTED == res 
-    // #ifdef ENABLE_AUTH_SERVICE
-    // || isWaitingForUser
-    // #endif
+    CMD_RESULT_ABORTED == res ||
+    CMD_RESULT_FAILED == res
+    #ifdef ENABLE_AUTH_SERVICE
+    || (isWaitingForUserAuth && res == CMD_RESULT_WRONG_CREDENTIAL)
+    #endif
   ){
     // start new interaction
     startInteraction();
@@ -570,6 +772,46 @@ void CommandLineServiceProvider::useTerminal(iTerminalInterface *terminal)
     // start interaction
     startInteraction();
   }
+}
+
+/**
+ * @brief Get command executed from history by index
+ * @param cmdExec pdiutil::string &cmdExec
+ * @param index int16_t index
+ * @return true if command found otherwise false
+ */
+bool CommandLineServiceProvider::getCommandExecutedFromHistory(pdiutil::string &cmdExec, int16_t index){
+
+  #ifdef ENABLE_STORAGE_SERVICE
+  if( index >= 0 && __i_instance.getFileSystemInstance().isFileExist(m_termhistoryfile.c_str()) ){
+
+    int32_t linenumber = (index + 1) * -1;
+    int iStatus = __i_instance.getFileSystemInstance().readLineInFile(m_termhistoryfile.c_str(), linenumber, cmdExec, [&](void){
+      // yield function to avoid watchdog reset
+      __i_dvc_ctrl.yield();
+    });
+
+    if( iStatus >= 0 ){
+      return true;
+    }
+  }
+  #endif
+
+  return false;
+}
+
+/**
+ * @brief Check if any command is waiting for user input
+ * @return index if any command is executing and waiting otherwise -1
+ */
+int16_t CommandLineServiceProvider::isCommandWaitingForUserInput(){
+  for (int16_t i = 0; i < m_cmdlist.size(); i++){
+
+    if(nullptr != m_cmdlist[i] && m_cmdlist[i]->isWaitingForOption()){
+      return i;
+    }
+  }
+  return -1;
 }
 
 CommandLineServiceProvider __cmd_service;

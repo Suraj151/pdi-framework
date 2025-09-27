@@ -356,6 +356,7 @@ enum cmd_term_inseq_t {
     CMD_TERM_INSEQ_END,
     CMD_TERM_INSEQ_PAGE_UP,
     CMD_TERM_INSEQ_PAGE_DOWN,
+    CMD_TERM_INSEQ_TAB,
     CMD_TERM_INSEQ_MAX
 };
 

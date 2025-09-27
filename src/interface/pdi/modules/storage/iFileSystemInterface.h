@@ -85,11 +85,43 @@ public:
     /**
      * @brief Reads content from a file.
      * @param path The path of the file to read.
-     * @param size The maximum number of bytes to read in opne loop.
+     * @param size The maximum number of bytes to read in one loop.
      * @param readbackfn callback function for readback.
+     * @param offset Offset from where to read the file content.
+     * @param readUntilMatchStr Pointer to the sring match to read until. Match will not include in the readbackfn callback.
+     * @param didmatchfound Optional pointer to a boolean that will be set to true if the match string was found.
      * @return The number of bytes read, or -1 on failure.
      */
-    virtual int readFile(const char* path, uint64_t size, pdiutil::function<bool(char *, uint32_t)> readbackfn) = 0;
+    virtual int readFile(const char* path, uint64_t size, pdiutil::function<bool(char *, uint32_t)> readbackfn, uint64_t offset = 0, const char* readUntilMatchStr=nullptr, bool *didmatchfound=nullptr) = 0;
+
+    /**
+     * @brief Find the string in file.
+     * @param path The path of the file to find in.
+     * @param findStr Pointer to the find sring.
+     * @param findindices A vector to store the indices of found occurrences.
+     * @param yield Optional callback function to yield control during long operations.
+     * @return The number of finding, or -1 on failure.
+     */
+    virtual int findInFile(const char* path, const char* findStr, pdiutil::vector<uint32_t> &findindices, CallBackVoidArgFn yield = nullptr) = 0;
+
+    /**
+     * @brief Get the number of lines in file.
+     * @param path The path of the file.
+     * @param linenumbers A vector to store the line numbers found.
+     * @param yield Optional callback function to yield control during long operations.
+     * @return The number of line found, or -1 on failure.
+     */
+    virtual int getLineNumbersInFile(const char* path, pdiutil::vector<uint32_t> &linenumbers, CallBackVoidArgFn yield = nullptr) = 0;
+
+    /**
+     * @brief Read the line in file.
+     * @param path The path of the file.
+     * @param linenumber A line number to read.
+     * @param linedata A string to store the line data found.
+     * @param yield Optional callback function to yield control during long operations.
+     * @return number of bytes read, or -1 on failure.
+     */
+    virtual int readLineInFile(const char* path, int32_t linenumber, pdiutil::string &linedata, CallBackVoidArgFn yield = nullptr) = 0;
 
     /**
      * @brief Creates a directory.
@@ -147,9 +179,10 @@ public:
      * @brief Get the list of files in a provided path.
      * @param path The path of the directory to list.
      * @param items A vector to store the file information.
+     * @param pattern Optional pattern to filter files.
      * @return 0 on success, or negative on failure.
      */
-    virtual int getDirFileList(const char* path, pdiutil::vector<file_info_t>& items) = 0;
+    virtual int getDirFileList(const char* path, pdiutil::vector<file_info_t>& items, const char* pattern = nullptr) = 0;
 
     /**
      * @brief Checks if a file exists at the specified path.

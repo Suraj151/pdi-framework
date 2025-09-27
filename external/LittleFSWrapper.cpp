@@ -185,41 +185,240 @@ int LittleFSWrapper::writeFile(const char *path, const char *content, uint32_t s
  * @param path The path of the file to read.
  * @param size The maximum number of bytes to read in one loop.
  * @param readbackfn callback function for readback.
+ * @param offset Offset from where to read the file content.
+ * @param readUntilMatchStr Pointer to the sring match to read until. Match will not include in the readbackfn callback.
+ * @param didmatchfound Optional pointer to a boolean that will be set to true if the match string was found.
  * @return The number of bytes read, or -1 on failure.
  */
-int LittleFSWrapper::readFile(const char* path, uint64_t size, pdiutil::function<bool(char *, uint32_t)> readbackfn) {
+int LittleFSWrapper::readFile(const char* path, uint64_t size, pdiutil::function<bool(char *, uint32_t)> readbackfn, uint64_t offset, const char* readUntilMatchStr, bool *didmatchfound) {
     lfs_file_t file;
-    int okOrErr = lfs_file_open(&m_lfs, &file, path, LFS_O_RDONLY);
+    int32_t okOrErr = lfs_file_open(&m_lfs, &file, path, LFS_O_RDONLY);
     if (okOrErr < 0) {
         return okOrErr; // Failed to open file
     }
+
+    char *matchstrtempbuffer = nullptr;
+    uint16_t matchstrlen = 0;
+    if( nullptr != readUntilMatchStr ) {
+
+        matchstrlen = strlen(readUntilMatchStr);
+
+        if( matchstrlen > 0 ){
+            
+            matchstrtempbuffer = new char[matchstrlen + 1];
+            memset(matchstrtempbuffer, 0, matchstrlen + 1);
+        }
+    }    
 
     // Buffer to store file content
     char buffer[size];
     memset(buffer, 0, size);
     int bytesReadOrErr = 0;
-    
+
     if (nullptr != readbackfn) {
 
-        lfs_size_t filesize = lfs_file_size(&m_lfs, &file); 
+        lfs_size_t filesize = lfs_file_size(&m_lfs, &file);
+        if( offset < filesize ){
+            filesize -= offset;
+            lfs_file_seek(&m_lfs, &file, offset, LFS_SEEK_SET); 
+        } else {
+            filesize = 0;
+        }
+
         for (lfs_size_t i = 0; i < filesize; i += size) {
+
             lfs_size_t chunk = lfs_min(size, filesize - i);
+            
             okOrErr = lfs_file_read(&m_lfs, &file, buffer, chunk);
             if (okOrErr < 0) {
                 bytesReadOrErr = okOrErr; // Failed to read file
                 break; // Failed to read file
             }
 
-            bytesReadOrErr += okOrErr;
+            chunk = okOrErr;
+            
+            bool matchfound = false;
+            if( nullptr != matchstrtempbuffer ) {
+
+                
+                for (uint16_t j = 0; j < chunk; j++){
+
+                    // Shift left by 1
+                    memmove(matchstrtempbuffer, matchstrtempbuffer + 1, matchstrlen - 1);
+                    matchstrtempbuffer[matchstrlen - 1] = buffer[j];
+
+                    // Check if the read data contains the match string
+                    int matchPos = __strstr(matchstrtempbuffer, readUntilMatchStr, matchstrlen);
+                    if (matchPos != -1) {
+                        // Found the match string, adjust chunk size to exclude it
+                        chunk = matchPos > 0 ? matchPos - 1 : matchPos;
+                        chunk += j;
+                        // Call the readback function with the data up to the match
+                        if(chunk > 0) {
+                            readbackfn(buffer, chunk);
+                        }
+                        // Stop reading further
+                        matchfound = true;
+                        break;
+                    }
+                }
+            }
+
+            bytesReadOrErr += chunk;
+
+            if( matchfound == true ){
+                if( nullptr != didmatchfound ){
+                    *didmatchfound = true;
+                }
+                break; // exit the for loop
+            }
+
             // Call the readback function with the read data. break if callback returns false
             if(readbackfn(buffer, chunk) == false) {
                 break;
             }
         }
     }
+
+    if( nullptr != matchstrtempbuffer ){
+        delete[] matchstrtempbuffer;
+        matchstrtempbuffer = nullptr;
+    }
+
     lfs_file_close(&m_lfs, &file);
     return bytesReadOrErr;
 }
+
+/**
+ * @brief Find the string in file.
+ * @param path The path of the file to find in.
+ * @param findStr Pointer to the find sring.
+ * @param findindices A vector to store the indices of found occurrences.
+ * @param yield Optional callback function to yield control during long operations.
+ * @return The number of finding, or -1 on failure.
+ */
+int LittleFSWrapper::findInFile(const char* path, const char* findStr, pdiutil::vector<uint32_t> &findindices, CallBackVoidArgFn yield){
+
+    findindices.clear();
+
+    if( nullptr != findStr ){
+
+        int bytesReadOrErr = 0;
+        int offset = 0;
+        int findstrlen = strlen(findStr);
+        int filesize = getFileSize(path);
+        bool didmatchfound = false;
+
+        do{
+
+            bytesReadOrErr = readFile(path, 100, [&](char *data, uint32_t size) -> bool {
+                // Continue reading
+                return true;
+            }, offset, findStr, &didmatchfound);
+
+            if( bytesReadOrErr < 0 ){
+                return bytesReadOrErr; // error
+            }
+
+            if( didmatchfound ){
+                offset += bytesReadOrErr + findstrlen; // move to next char to continue search
+                findindices.push_back(offset - findstrlen); // store the index where found
+                didmatchfound = false; // reset for next read
+            }else{
+                offset += bytesReadOrErr + 1;
+            }
+
+            if( yield ){
+                yield();
+            }
+        }while( offset < filesize );
+    }else{
+        return -99;
+    }
+
+    return findindices.size();
+}
+
+/**
+ * @brief Find the number of lines in file.
+ * @param path The path of the file to find in.
+ * @param linenumbers A vector to store the line numbers found.
+ * @param yield Optional callback function to yield control during long operations.
+ * @return The number of line found, or -1 on failure.
+ */
+int LittleFSWrapper::getLineNumbersInFile(const char* path, pdiutil::vector<uint32_t> &linenumbers, CallBackVoidArgFn yield){
+
+    linenumbers.clear();
+    int status = findInFile(path, "\n", linenumbers, [&](void){
+        // yield function to avoid watchdog reset
+        if( yield ){
+            yield();
+        }
+    });
+
+    if( status < 0 ){
+        return status; // error
+    }
+
+    if( linenumbers.size() > 0 ){
+
+        int64_t filesize = getFileSize(path);
+        linenumbers.insert(linenumbers.begin(), 0); // add start of file as first line index
+
+        for (size_t i = 1; i < linenumbers.size(); i++){
+            linenumbers[i] = linenumbers[i] + 1; // move to next char after \n
+        }  
+
+        if( (linenumbers.back() + 1) > (uint32_t)filesize ){
+            linenumbers.pop_back(); // remove last index if it exceeds file size
+        }
+    }
+
+    return linenumbers.size();
+}
+
+/**
+ * @brief Read the line in file.
+ * @param path The path of the file.
+ * @param linenumber A line number to read. line number starts from 0. Supports negative line number to read from end.
+ * @param linedata A string to store the line data found.
+ * @param yield Optional callback function to yield control during long operations.
+ * @return number of bytes read, or -1 on failure.
+ */
+int LittleFSWrapper::readLineInFile(const char* path, int32_t linenumber, pdiutil::string &linedata, CallBackVoidArgFn yield){
+
+    linedata.clear();
+    pdiutil::vector<uint32_t> linenumbersvec;
+    int bytesReadedOrError = getLineNumbersInFile(path, linenumbersvec, yield);
+
+    if( linenumber < 0 ){
+        linenumber = linenumbersvec.size() + linenumber; // support negative index
+    }
+
+    if( bytesReadedOrError > 0 ){
+
+        if( linenumber < linenumbersvec.size() ){
+
+            uint32_t offset = linenumbersvec[linenumber];
+            bytesReadedOrError = readFile(path, 100, [&](char *data, uint32_t size) -> bool {
+                linedata += pdiutil::string(data, size);
+                // Continue reading
+                return true;
+            }, offset, "\n");
+            
+            if( linedata.back() == '\r' ){
+                linedata.pop_back(); // remove \r if present
+                bytesReadedOrError--;
+            }
+        }else{
+
+            bytesReadedOrError = -99;
+        }
+    }
+
+    return bytesReadedOrError;
+}
+
 
 /**
  * @brief Creates a directory.
@@ -387,9 +586,10 @@ int64_t LittleFSWrapper::getFileSize(const char *path) {
  *        Please deallocate dirs & files char* after use.
  * @param path The path of the directory to list.
  * @param items A vector to store the file information.
+ * @param pattern Optional pattern to filter files.
  * @return 0 on success, or negative on failure.
  */
-int LittleFSWrapper::getDirFileList(const char *path, pdiutil::vector<file_info_t>& items)
+int LittleFSWrapper::getDirFileList(const char *path, pdiutil::vector<file_info_t>& items, const char* pattern)
 {
     lfs_dir_t dir;
     lfs_info info;
@@ -404,6 +604,15 @@ int LittleFSWrapper::getDirFileList(const char *path, pdiutil::vector<file_info_
         char *name = new char[strlen(info.name) + 1];
         memset(name, 0, strlen(info.name) + 1);
         strcpy(name, info.name);
+
+        if( nullptr != pattern && strlen(pattern) > 0 ){
+            if( strlen(pattern) > strlen(name) || 
+                __are_arrays_equal(name, (char*)pattern, strlen(pattern)) == false ){
+                delete[] name;
+                continue; // pattern not matched, skip this file
+            }
+        }
+
         items.push_back({info.type==LFS_TYPE_DIR?FILE_TYPE_DIR:FILE_TYPE_REG, info.size, name});
     }
 

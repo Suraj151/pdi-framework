@@ -40,6 +40,7 @@ typedef enum {
     CMD_RESULT_ABORTED,              ///< Command execution was aborted.
     CMD_RESULT_TERMINAL_ERR,         ///< Terminal is not available.
     CMD_RESULT_TERMINAL_ABORTED,     ///< Terminal was aborted.
+    CMD_RESULT_TERMINAL_HOLD_BUFFER, ///< Terminal is about to hold buffer.
     CMD_RESULT_MAX                   ///< Unknown or unhandled result.
 } cmd_result_t;
 
@@ -192,9 +193,10 @@ typedef struct CommandBase {
     /**
      * @brief Checks if the passed argument matches the current command.
      * @param _cmd The command to validate.
+     * @param _partialmatch If true, allows partial matching of the command.
      * @return True if the command matches, false otherwise.
      */
-    bool isValidCommand(char *_cmd){
+    bool isValidCommand(char *_cmd, bool _partialmatch = false){
 
         if( nullptr == _cmd ){
             return false;
@@ -212,7 +214,10 @@ typedef struct CommandBase {
             char argcmd[CMD_SIZE_MAX];
             memset(argcmd, 0, CMD_SIZE_MAX);
             memcpy(argcmd, _cmd + cmd_start_indx, pdistd::min((int)CMD_SIZE_MAX, (int)abs(cmd_end_indx - cmd_start_indx)));
-    
+            
+            if( _partialmatch ){
+                return __are_arrays_equal(m_cmd, argcmd, pdistd::min((int)CMD_SIZE_MAX, (int)abs(cmd_end_indx - cmd_start_indx)));
+            }
             return __are_str_equals(m_cmd, argcmd, pdistd::min((int)CMD_SIZE_MAX, (int)abs(cmd_end_indx - cmd_start_indx)));
         }
         return false;

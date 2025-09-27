@@ -59,7 +59,7 @@ struct FileReadCommand : public CommandBase {
 					strncat(filename, cmdoptn->optionval, cmdoptn->optionvalsize);
 
 					m_terminal->putln();
-					int iStatus = __i_fs.readFile(filename, 5, [&](char* data, uint32_t size)->bool{
+					int iStatus = __i_fs.readFile(filename, 10, [&](char* data, uint32_t size)->bool{
 						m_terminal->write(data, size);
 						// return true to continue reading
 						return true;
@@ -250,7 +250,10 @@ struct FileWriteCommand : public CommandBase {
 				iStatus = __i_fs.rename(tempfilename, filename);
 			} else if(0 <= findCancelQuit){
 
-				iStatus = __i_fs.deleteFile(tempfilename);
+				if(__i_fs.isFileExist(tempfilename)){
+
+					iStatus = __i_fs.deleteFile(tempfilename);
+				}
 			}
 
 			// clear the local buffer data if found quite

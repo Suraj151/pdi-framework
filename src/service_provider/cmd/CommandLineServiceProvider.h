@@ -32,6 +32,17 @@ created Date    : 1st June 2019
 #include "commands/RebootCommand.h"
 #include "commands/NetworkCommand.h"
 
+
+#ifdef ENABLE_STORAGE_SERVICE
+/**
+ * Defines constants for cmd history file path.
+ */
+static const char 		CMD_TERMINAL_HISTORY_STATIC_FILEPATH   []PROG_RODT_ATTR = "/.term_history";
+static const uint16_t 	CMD_TERMINAL_HISTORY_MAX_LINES     = 25;
+
+#endif
+
+
 /**
  * CommandLineServiceProvider class
  */
@@ -59,7 +70,7 @@ public:
 	static void startInteraction();
 	cmd_t* getCommandByName(char* _cmd);
     void useTerminal(iTerminalInterface *terminal);
-
+	bool getCommandExecutedFromHistory(pdiutil::string &cmdExec, int16_t index);
 
 private:
 
@@ -72,6 +83,30 @@ private:
 	 * @var	pdiutil::string	m_termrecvdata
 	 */
     pdiutil::string m_termrecvdata;
+
+	/**
+	 * @var	uint16_t	m_terminalCursorIndex
+	 */
+    uint16_t m_terminalCursorIndex;
+
+	#ifdef ENABLE_STORAGE_SERVICE
+	/**
+	 * @var	pdiutil::string	m_termhistoryfile
+	 */
+	pdiutil::string m_termhistoryfile;
+
+	/**
+	 * @var	int16_t	m_cmdHistoryIndex
+	 */
+    int16_t m_cmdHistoryIndex;
+	#endif
+
+	/**
+	 * @var	int16_t	m_cmdAutoCompleteIndex
+	 */
+    int16_t m_cmdAutoCompleteIndex;
+
+	int16_t isCommandWaitingForUserInput();
 };
 
 extern CommandLineServiceProvider __cmd_service;
