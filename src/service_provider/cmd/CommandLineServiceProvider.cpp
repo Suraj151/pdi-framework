@@ -142,7 +142,18 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
     if( nullptr == terminal ) return CMD_RESULT_TERMINAL_ERR;
 
     cmd_term_inseq_t inseq = CMD_TERM_INSEQ_NONE;
+    bool dontecho = false;
+    bool isCommandWaitingForInput = getCommandWaitingForUserInput() != -1;
 
+    #ifdef ENABLE_AUTH_SERVICE
+    if(!__auth_service.getAuthorized()){
+      cmd_t *logincmd = getCommandByName(CMD_NAME_LOGIN);
+      if( nullptr != logincmd && logincmd->isWaitingForOption(CMD_OPTION_NAME_P) ){
+        dontecho = true;
+      }
+    }
+    #endif
+    
     while (terminal->available())
     {
       char c = terminal->read();
@@ -342,9 +353,11 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
         }
         m_terminalCursorIndex++;
 
+        if(!dontecho){
         terminal->csi_cursor_move_left(m_terminalCursorIndex-1);
         terminal->write(m_termrecvdata.c_str());
         terminal->csi_cursor_move_left(m_termrecvdata.size() - m_terminalCursorIndex);
+        }
       }
 
       __i_dvc_ctrl.wait(1);
@@ -361,16 +374,20 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
     // terminal->write_ro(RODT_ATTR("]\r\n"));
 
     // check if line ending is entered
-    if( 
-      // true 
-      inseq != CMD_TERM_INSEQ_ENTER &&
-      inseq != CMD_TERM_INSEQ_CTRL_C &&
-      inseq != CMD_TERM_INSEQ_CTRL_Z &&
-      inseq != CMD_TERM_INSEQ_ESC &&
-      inseq != CMD_TERM_INSEQ_UP_ARROW &&
-      inseq != CMD_TERM_INSEQ_DOWN_ARROW &&
-      inseq != CMD_TERM_INSEQ_TAB
-    ){
+    if( ( 
+        dontecho && 
+        inseq != CMD_TERM_INSEQ_ENTER &&
+        inseq != CMD_TERM_INSEQ_CTRL_C &&
+        inseq != CMD_TERM_INSEQ_CTRL_Z 
+      ) || (
+        inseq != CMD_TERM_INSEQ_ENTER &&
+        inseq != CMD_TERM_INSEQ_CTRL_C &&
+        inseq != CMD_TERM_INSEQ_CTRL_Z &&
+        inseq != CMD_TERM_INSEQ_ESC &&
+        inseq != CMD_TERM_INSEQ_UP_ARROW &&
+        inseq != CMD_TERM_INSEQ_DOWN_ARROW &&
+        inseq != CMD_TERM_INSEQ_TAB
+    )){
       m_cmdHistoryIndex = -1;
       m_cmdAutoCompleteIndex = -1;
       return CMD_RESULT_INCOMPLETE;
@@ -378,9 +395,10 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
 
     // check if user trying to exit
     if(
+      !isCommandWaitingForInput && (
       inseq == CMD_TERM_INSEQ_CTRL_C ||
       inseq == CMD_TERM_INSEQ_CTRL_Z
-    ){
+    )){
       // clear stored string
       m_termrecvdata.clear();
       m_termrecvdata = "";
@@ -421,7 +439,7 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
   }
 
   cmd_result_t res = CMD_RESULT_NOT_FOUND;
-  int16_t waitingCmdIndex = isCommandWaitingForUserInput();
+  int16_t waitingCmdIndex = getCommandWaitingForUserInput();
   bool is_executing_lastcommand = (waitingCmdIndex != -1);
 
   // process the known inseq 
@@ -804,7 +822,7 @@ bool CommandLineServiceProvider::getCommandExecutedFromHistory(pdiutil::string &
  * @brief Check if any command is waiting for user input
  * @return index if any command is executing and waiting otherwise -1
  */
-int16_t CommandLineServiceProvider::isCommandWaitingForUserInput(){
+int16_t CommandLineServiceProvider::getCommandWaitingForUserInput(){
   for (int16_t i = 0; i < m_cmdlist.size(); i++){
 
     if(nullptr != m_cmdlist[i] && m_cmdlist[i]->isWaitingForOption()){

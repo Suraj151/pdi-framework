@@ -106,7 +106,7 @@ private:
 	 */
     int16_t m_cmdAutoCompleteIndex;
 
-	int16_t isCommandWaitingForUserInput();
+	int16_t getCommandWaitingForUserInput();
 };
 
 extern CommandLineServiceProvider __cmd_service;

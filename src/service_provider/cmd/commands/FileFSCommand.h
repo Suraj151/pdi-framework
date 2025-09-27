@@ -122,7 +122,10 @@ struct FileWriteCommand : public CommandBase {
 		bool isFilenameProvided = ( nullptr != filenamecmdoptn && nullptr != filenamecmdoptn->optionval && filenamecmdoptn->optionvalsize );
 		m_fscmd_esc_attempted = false;
 
-        if( terminputaction == CMD_TERM_INSEQ_ESC ){
+        if( terminputaction == CMD_TERM_INSEQ_ESC ||
+			terminputaction == CMD_TERM_INSEQ_CTRL_C ||
+			terminputaction == CMD_TERM_INSEQ_CTRL_Z 
+		){
 
 			if( nullptr != m_terminal ){
 				m_terminal->putln();
@@ -132,13 +135,21 @@ struct FileWriteCommand : public CommandBase {
 			m_fscmd_esc_attempted = true;
 			return m_result;
 
-		}else if( m_result == CMD_RESULT_INCOMPLETE && terminputaction == CMD_TERM_INSEQ_ENTER ){
+		}else if( m_result == CMD_RESULT_INCOMPLETE && (
+			terminputaction == CMD_TERM_INSEQ_ENTER ||
+			terminputaction == CMD_TERM_INSEQ_TAB
+		)){
 
 			cmd_result_t result = CMD_RESULT_OK;
 			if(isFilenameProvided){
-				result = updateFile(filenamecmdoptn, "\r\n", 2);
 
-				if( nullptr != m_terminal ){
+				if( terminputaction == CMD_TERM_INSEQ_TAB ){
+
+					result = updateFile(filenamecmdoptn, "  ", 2);
+					m_terminal->write("  ");
+				}else if( terminputaction == CMD_TERM_INSEQ_ENTER ){
+
+					result = updateFile(filenamecmdoptn, "\r\n", 2);
 					m_terminal->putln();
 				}
 			}

@@ -67,6 +67,13 @@ struct LoginCommand : public CommandBase {
 			if( isPasswordProvided ){
 				memcpy(_password, passwordcmdoptn->optionval, passwordcmdoptn->optionvalsize);
 			}else{
+
+				if( terminputaction == CMD_TERM_INSEQ_CTRL_C ||
+					terminputaction == CMD_TERM_INSEQ_CTRL_Z ){
+					setWaitingForOption(CMD_OPTION_NAME_U);
+					return CMD_RESULT_ABORTED;
+				}
+				
 				setWaitingForOption(CMD_OPTION_NAME_P);
 				if( nullptr != m_terminal ){
 					m_terminal->write_ro(RODT_ATTR("\nPass : "));
