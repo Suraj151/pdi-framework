@@ -186,7 +186,7 @@ int LittleFSWrapper::writeFile(const char *path, const char *content, uint32_t s
  * @param size The maximum number of bytes to read in one loop.
  * @param readbackfn callback function for readback.
  * @param offset Offset from where to read the file content.
- * @param readUntilMatchStr Pointer to the sring match to read until. Match will not include in the readbackfn callback.
+ * @param readUntilMatchStr Pointer to the sring match to read until.
  * @param didmatchfound Optional pointer to a boolean that will be set to true if the match string was found.
  * @return The number of bytes read, or -1 on failure.
  */
@@ -320,12 +320,10 @@ int LittleFSWrapper::findInFile(const char* path, const char* findStr, pdiutil::
                 return bytesReadOrErr; // error
             }
 
+            offset += bytesReadOrErr + 1; // move to next char to continue search
             if( didmatchfound ){
-                offset += bytesReadOrErr + findstrlen; // move to next char to continue search
                 findindices.push_back(offset - findstrlen); // store the index where found
                 didmatchfound = false; // reset for next read
-            }else{
-                offset += bytesReadOrErr + 1;
             }
 
             if( yield ){
@@ -348,13 +346,7 @@ int LittleFSWrapper::findInFile(const char* path, const char* findStr, pdiutil::
  */
 int LittleFSWrapper::getLineNumbersInFile(const char* path, pdiutil::vector<uint32_t> &linenumbers, CallBackVoidArgFn yield){
 
-    linenumbers.clear();
-    int status = findInFile(path, "\n", linenumbers, [&](void){
-        // yield function to avoid watchdog reset
-        if( yield ){
-            yield();
-        }
-    });
+    int status = findInFile(path, "\n", linenumbers, yield);
 
     if( status < 0 ){
         return status; // error
@@ -382,14 +374,47 @@ int LittleFSWrapper::getLineNumbersInFile(const char* path, pdiutil::vector<uint
  * @param path The path of the file.
  * @param linenumber A line number to read. line number starts from 0. Supports negative line number to read from end.
  * @param linedata A string to store the line data found.
+ * @param pattern Optional pattern to match in the line.
  * @param yield Optional callback function to yield control during long operations.
  * @return number of bytes read, or -1 on failure.
  */
-int LittleFSWrapper::readLineInFile(const char* path, int32_t linenumber, pdiutil::string &linedata, CallBackVoidArgFn yield){
+int LittleFSWrapper::readLineInFile(const char* path, int32_t linenumber, pdiutil::string &linedata, const char* pattern, CallBackVoidArgFn yield){
 
     linedata.clear();
     pdiutil::vector<uint32_t> linenumbersvec;
     int bytesReadedOrError = getLineNumbersInFile(path, linenumbersvec, yield);
+
+    if( pattern != nullptr && bytesReadedOrError > 0 ){
+
+        pdiutil::vector<uint32_t> patternindices;
+        int status = findInFile(path, pattern, patternindices, yield);
+
+        if( status < 0 ){
+            return status; // error
+        }
+
+        pdiutil::vector<uint32_t> filteredlinenumbersvec;
+
+        if( patternindices.size() > 0 ){
+
+            for (size_t i = 0; i < linenumbersvec.size(); i++){
+
+                for (size_t j = 0; j < patternindices.size(); j++){
+
+                    if( linenumbersvec[i] == patternindices[j] ){
+
+                        filteredlinenumbersvec.push_back(linenumbersvec[i]);
+                        break;
+                    }
+                }
+            }
+        }
+
+        if( filteredlinenumbersvec.size() > 0 ){
+            linenumbersvec = filteredlinenumbersvec;
+            bytesReadedOrError = linenumbersvec.size();
+        }
+    }
 
     if( linenumber < 0 ){
         linenumber = linenumbersvec.size() + linenumber; // support negative index

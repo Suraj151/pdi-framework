@@ -70,7 +70,7 @@ public:
 	static void startInteraction();
 	cmd_t* getCommandByName(char* _cmd);
     void useTerminal(iTerminalInterface *terminal);
-	bool getCommandExecutedFromHistory(pdiutil::string &cmdExec, int16_t index);
+	bool getCommandExecutedFromHistory(pdiutil::string &cmdExec, int16_t index, const char* pattern = nullptr);
 
 private:
 

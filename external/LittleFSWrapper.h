@@ -102,7 +102,7 @@ public:
      * @param size The maximum number of bytes to read.
      * @param readbackfn callback function for readback.
      * @param offset Offset from where to read the file content.
-     * @param readUntilMatchStr Pointer to the sring match to read until. Match will not include in the readbackfn callback.
+     * @param readUntilMatchStr Pointer to the sring match to read until.
      * @param didmatchfound Optional pointer to a boolean that will be set to true if the match string was found.
      * @return The number of bytes read, or -1 on failure.
      */
@@ -132,10 +132,11 @@ public:
      * @param path The path of the file.
      * @param linenumber A line number to read.
      * @param linedata A string to store the line data found.
+     * @param pattern Optional pattern to match in the line.
      * @param yield Optional callback function to yield control during long operations.
      * @return number of bytes read, or -1 on failure.
      */
-    int readLineInFile(const char* path, int32_t linenumber, pdiutil::string &linedata, CallBackVoidArgFn yield = nullptr) override;
+    int readLineInFile(const char* path, int32_t linenumber, pdiutil::string &linedata, const char* pattern = nullptr, CallBackVoidArgFn yield = nullptr) override;
 
     /**
      * @brief Creates a directory.

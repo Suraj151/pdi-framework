@@ -450,6 +450,16 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
       #ifdef ENABLE_STORAGE_SERVICE
       // fetch command from history
       pdiutil::string cmdExec;
+      static int16_t prevHistorySize = m_termrecvdata.size();
+      pdiutil::string _patterntosearch = m_termrecvdata;
+
+      if( m_cmdHistoryIndex == -1 ){
+        prevHistorySize = m_termrecvdata.size();
+      }
+
+      if( prevHistorySize != m_termrecvdata.size() ){
+        _patterntosearch = prevHistorySize > 0 ? m_termrecvdata.substr(0, prevHistorySize) : "";
+      }
 
       if( inseq == CMD_TERM_INSEQ_UP_ARROW ){
         // up arrow
@@ -462,9 +472,10 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
       // check for the limit
       pdiutil::vector<uint32_t> historyEntries;
       int16_t indexlimit = __i_instance.getFileSystemInstance().getLineNumbersInFile(m_termhistoryfile.c_str(), historyEntries) - 1;
-      m_cmdHistoryIndex = m_cmdHistoryIndex > indexlimit ? indexlimit : m_cmdHistoryIndex;
+      m_cmdHistoryIndex = m_cmdHistoryIndex > indexlimit ? indexlimit : 
+      m_cmdHistoryIndex < 0 ? 0 : m_cmdHistoryIndex;
 
-      if( getCommandExecutedFromHistory(cmdExec, m_cmdHistoryIndex) ){
+      if( getCommandExecutedFromHistory(cmdExec, m_cmdHistoryIndex, _patterntosearch.size() > 0 ? _patterntosearch.c_str() : nullptr) ){
 
         // clear current line
         m_terminal->csi_cursor_move_left(m_termrecvdata.size());
@@ -477,7 +488,7 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
         m_terminal->write(m_termrecvdata.c_str());
       }else{
         // reset history index as no command found
-        m_cmdHistoryIndex = -1;
+        m_cmdHistoryIndex = m_cmdHistoryIndex > 0 ? m_cmdHistoryIndex - 1 : -1;
       }
       #endif
 
@@ -798,13 +809,13 @@ void CommandLineServiceProvider::useTerminal(iTerminalInterface *terminal)
  * @param index int16_t index
  * @return true if command found otherwise false
  */
-bool CommandLineServiceProvider::getCommandExecutedFromHistory(pdiutil::string &cmdExec, int16_t index){
+bool CommandLineServiceProvider::getCommandExecutedFromHistory(pdiutil::string &cmdExec, int16_t index, const char* pattern){
 
   #ifdef ENABLE_STORAGE_SERVICE
   if( index >= 0 && __i_instance.getFileSystemInstance().isFileExist(m_termhistoryfile.c_str()) ){
 
     int32_t linenumber = (index + 1) * -1;
-    int iStatus = __i_instance.getFileSystemInstance().readLineInFile(m_termhistoryfile.c_str(), linenumber, cmdExec, [&](void){
+    int iStatus = __i_instance.getFileSystemInstance().readLineInFile(m_termhistoryfile.c_str(), linenumber, cmdExec, pattern, [&](void){
       // yield function to avoid watchdog reset
       __i_dvc_ctrl.yield();
     });
