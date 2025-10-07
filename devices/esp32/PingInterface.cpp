@@ -55,26 +55,36 @@ void PingInterface::init_ping( iWiFiInterface* _wifi ){
   this->m_wifi = _wifi;
 }
 
+/**
+ * Ping the host
+ */
 bool PingInterface::ping(){
 
   ipaddress_t _ip;
-  this->m_wifi->hostByName(_pinghostname, _ip, 0); // third param will be unused in esp32
+  int res = 1;//this->m_wifi->hostByName(_pinghostname, _ip, 0); // third param will be unused in esp32
+  // LogFmtI("\nPing hostByName: %s : %s : %d\n", _pinghostname, ((pdiutil::string)_ip).c_str(), res);
 
-  uint32_t ping_count = DEFAULT_PING_MAX_COUNT;  //how many pings per report
-  uint32_t ping_timeout = PING_TIMEOUT_MS; //mS till we consider it timed out
-  uint32_t ping_delay = PING_COARSE; //mS between pings
-  uint32_t ping_target = _ip;
-  void* respFunction = reinterpret_cast<void*>(pingResults);
+  if( res == 1 ){
 
-  //return _ip!=INADDR_NONE ? ping_start(&this->_opt) : false;
-  esp_ping_set_target(PING_TARGET_IP_ADDRESS_COUNT, &ping_count, sizeof(uint32_t));
-  esp_ping_set_target(PING_TARGET_RCV_TIMEO, &ping_timeout, sizeof(uint32_t));
-  esp_ping_set_target(PING_TARGET_DELAY_TIME, &ping_delay, sizeof(uint32_t));
-  esp_ping_set_target(PING_TARGET_IP_ADDRESS, &_pinghostip, sizeof(uint32_t));
-  esp_ping_set_target(PING_TARGET_RES_FN, respFunction, sizeof(respFunction));
+    _ip = _pinghostip; // override with static ip
 
-  int res = ping_init();
-  LogFmtI("\nPinging ip: %s : %d\n", ((pdiutil::string)_ip).c_str(), res);
+    uint32_t ping_count = DEFAULT_PING_MAX_COUNT;  //how many pings per report
+    uint32_t ping_timeout = PING_TIMEOUT_MS; //mS till we consider it timed out
+    uint32_t ping_delay = PING_COARSE; //mS between pings
+    pdiutil::string ping_target = _ip;
+    void* respFunction = reinterpret_cast<void*>(pingResults);
+
+    //return _ip!=INADDR_NONE ? ping_start(&this->_opt) : false;
+    esp_ping_set_target(PING_TARGET_IP_ADDRESS_COUNT, &ping_count, sizeof(uint32_t));
+    esp_ping_set_target(PING_TARGET_RCV_TIMEO, &ping_timeout, sizeof(uint32_t));
+    esp_ping_set_target(PING_TARGET_DELAY_TIME, &ping_delay, sizeof(uint32_t));
+    esp_ping_set_target(PING_TARGET_IP_ADDRESS, (void *)ping_target.c_str(), (uint32_t)ping_target.size());
+    esp_ping_set_target(PING_TARGET_RES_FN, respFunction, sizeof(respFunction));
+
+    res = ping_init();
+  }
+
+  LogFmtI("Pinging ip: %s : %d\n", ((pdiutil::string)_ip).c_str(), res);
 
   return (0 == res);
 }

@@ -132,6 +132,7 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
   __database_service.get_device_iot_config_table(&this->m_device_iot_configs);
 
   pdiutil::string configurl = this->m_device_iot_configs.device_iot_host;
+  bool valid_host = ( configurl.size() > 5 && pdiutil::string::npos != configurl.find("http") );
   configurl += DEVICE_IOT_CONFIG_REQ_URL;
 
   size_t mac_index = configurl.find("[mac]");
@@ -142,7 +143,7 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
 
   LogFmtI("Handling device iot config Request : %s\n", configurl.c_str());
 
-  if( configurl.size() > 5 && nullptr != this->m_http_client ){
+  if( valid_host && nullptr != this->m_http_client ){
 
     this->m_http_client->Begin();
     this->m_http_client->SetUserAgent("pdistack");
