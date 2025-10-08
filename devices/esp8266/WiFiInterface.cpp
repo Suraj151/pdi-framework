@@ -26,10 +26,10 @@ extern "C" void preinit() {
   WiFiInterface::preinitWiFiOff();
 #endif
   __i_dvc_ctrl.eraseConfig();
-	uint8_t sta_mac[6];
-  wifi_get_macaddr(STATION_IF, sta_mac);
-  sta_mac[0] +=2;
-	wifi_set_macaddr(SOFTAP_IF, sta_mac);
+	// uint8_t sta_mac[6];
+  // wifi_get_macaddr(STATION_IF, sta_mac);
+  // sta_mac[0] +=2;
+	// wifi_set_macaddr(SOFTAP_IF, sta_mac);
 }
 
 /**
@@ -327,6 +327,25 @@ pdiutil::string WiFiInterface::macAddress()
 }
 
 /**
+ * macAddress
+ */
+void WiFiInterface::macAddress(uint8_t *mac)
+{
+  if (nullptr != this->m_wifi)
+  {
+    this->m_wifi->macAddress(mac);
+  }
+}
+
+/**
+ * Set STA macAddress
+ */
+void WiFiInterface::setSTAmacAddress(uint8_t *mac)
+{
+  wifi_set_macaddr(STATION_IF, mac);
+}
+
+/**
  * subnetMask
  */
 ipaddress_t WiFiInterface::subnetMask()
@@ -471,6 +490,38 @@ ipaddress_t WiFiInterface::softAPIP()
 }
 
 /**
+ * Soft AP macAddress
+ */
+pdiutil::string WiFiInterface::softAPmacAddress()
+{
+  pdiutil::string mac;
+  if (nullptr != this->m_wifi)
+  {
+    mac = this->m_wifi->softAPmacAddress().c_str();
+  }
+  return mac;
+}
+
+/**
+ * Soft AP macAddress
+ */
+void WiFiInterface::softAPmacAddress(uint8_t *mac)
+{
+  if (nullptr != this->m_wifi)
+  {
+    this->m_wifi->softAPmacAddress(mac);
+  }
+}
+
+/**
+ * Set AP macAddress
+ */
+void WiFiInterface::setSoftAPmacAddress(uint8_t *mac)
+{
+  wifi_set_macaddr(SOFTAP_IF, mac);
+}
+
+/**
  * scanNetworks
  */
 int8_t WiFiInterface::scanNetworks(bool _async, bool _show_hidden, uint8_t _channel, uint8_t *ssid)
@@ -551,7 +602,7 @@ bool WiFiInterface::get_bssid_within_scanned_nw_ignoring_connected_stations(char
     return false;
   }
 
-  LogI("Scanning stations\n");
+  LogI("Scanning stations while ignoring connected stations !\n");
 
   int n = _scanCount;
   // int indices[n];
@@ -668,9 +719,14 @@ void WiFiInterface::enableNAPT(bool enable)
   // Initialize the NAT feature
   ip_napt_init(IP_NAPT_MAX, IP_PORTMAP_MAX);
   // Enable NAT on the AP interface
-  ip_napt_enable_no(1, 1);
+  ip_napt_enable_no(1, enable);
   // Set the DNS server for clients of the AP to the one we also use for the STA interface
-  IPAddress _ip((uint32_t)__i_wifi.dnsIP());
+  // IPAddress _ip((uint32_t)__i_wifi.dnsIP());
+
+  // OR use default dns static ip
+  ipaddress_t dns(DEFAULT_DNS_IP[0], DEFAULT_DNS_IP[1], DEFAULT_DNS_IP[2], DEFAULT_DNS_IP[3]);
+  IPAddress _ip((uint32_t)dns);
+
   dhcps_set_DNS(_ip);
   LogFmtS("NAPT(lwip %d) initialization done\n", (int)LWIP_VERSION_MAJOR);
 #elif defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
@@ -678,11 +734,16 @@ void WiFiInterface::enableNAPT(bool enable)
   err_t ret = ip_napt_init(IP_NAPT_MAX, IP_PORTMAP_MAX);
   if (ret == ERR_OK) {
     // Enable NAT on the AP interface
-    ret = ip_napt_enable_no(SOFTAP_IF, 1);
+    ret = ip_napt_enable_no(SOFTAP_IF, enable);
     if (ret == ERR_OK) {
       LogFmtS("NAPT(lwip %d) initialization done\n", (int)LWIP_VERSION_MAJOR);
       // Set the DNS server for clients of the AP to the one we also use for the STA interface
-      IPAddress _ip((uint32_t)__i_wifi.dnsIP(0));
+      // IPAddress _ip((uint32_t)__i_wifi.dnsIP(0));
+
+      // OR use default dns static ip
+      ipaddress_t dns(DEFAULT_DNS_IP[0], DEFAULT_DNS_IP[1], DEFAULT_DNS_IP[2], DEFAULT_DNS_IP[3]);
+      IPAddress _ip((uint32_t)dns);
+
       getNonOSDhcpServer().setDns(_ip);
       //dhcpSoftAP.dhcps_set_dns(1, __i_wifi.dnsIP(1));
     }

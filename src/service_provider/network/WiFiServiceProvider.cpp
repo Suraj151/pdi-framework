@@ -71,6 +71,12 @@ bool WiFiServiceProvider::initService( void *arg ){
     this->m_wifi->disconnect(true);
   });
 
+  // set AP MAC address which can be customized and recognizable easily
+  uint8_t sta_mac[6];
+	this->m_wifi->macAddress(sta_mac);
+  sta_mac[0] +=2;
+  this->m_wifi->setSoftAPmacAddress(sta_mac);
+
   return ServiceProvider::initService(arg);
 }
 
@@ -91,12 +97,29 @@ void WiFiServiceProvider::handleInternetConnectivity(){
 
     bool ping_ret = __i_ping.ping();
     bool ping_resp = __i_ping.isHostRespondingToPing();
+    bool ping_success = ping_ret && ping_resp;
 
-    if( ping_ret && ping_resp ){
+    if( ping_success ){
 
       __status_wifi.last_internet_millis = __i_dvc_ctrl.millis_now();
+
+      if( !__status_wifi.internet_available ){
+
+        __utl_event.execute_event(EVENT_WIFI_INTERNET_UP);
+        LogI("WiFi Internet Up\n");
+        __task_scheduler.setTimeout( [&]() { this->m_wifi->enableNAPT(true); }, NAPT_INIT_DURATION_AFTER_WIFI_CONNECT, __i_dvc_ctrl.millis_now() );
+      }  
+    }else{
+
+      if( __status_wifi.internet_available ){
+
+        __utl_event.execute_event(EVENT_WIFI_INTERNET_DOWN);
+        LogI("WiFi Internet Down\n");
+        __task_scheduler.setTimeout( [&]() { this->m_wifi->enableNAPT(false); }, MILLISECOND_DURATION_1000, __i_dvc_ctrl.millis_now() );
+      }  
     }
-    __status_wifi.internet_available = ping_ret && ping_resp;
+
+    __status_wifi.internet_available = ping_success;
 
     #ifdef ENABLE_INTERNET_BASED_CONNECTIONS
     if( !__status_wifi.internet_available && (__i_dvc_ctrl.millis_now()-__status_wifi.last_internet_millis) >= SWITCHING_DURATION_FOR_NO_INTERNET_CONNECTION ){
@@ -114,7 +137,7 @@ void WiFiServiceProvider::handleInternetConnectivity(){
       #endif
 
       __task_scheduler.setTimeout( [&]() {
-        LogI("\nhandle station reconnecting...\n");
+        LogI("\nHandle station reconnecting...\n");
         memset( __status_wifi.ignore_bssid, 0, 6 );
         if( !this->m_wifi->localIP().isSet() || !this->m_wifi->isConnected() ){
           wifi_config_table _wifi_credentials;
@@ -350,6 +373,8 @@ bool WiFiServiceProvider::configure_wifi_access_point( wifi_config_table* _wifi_
  */
 void WiFiServiceProvider::scan_aps_and_configure_wifi_station_async( int _scanCount ){
 
+  LogFmtI("Scanning AP's and configuring stations. stations count is %d\n", _scanCount);
+
   wifi_config_table _wifi_credentials;
   __database_service.get_wifi_config_table(&_wifi_credentials);
   if( this->m_wifi->get_bssid_within_scanned_nw_ignoring_connected_stations( _wifi_credentials.sta_ssid, this->m_temp_mac, __status_wifi.ignore_bssid, _scanCount ) ) {
@@ -377,14 +402,14 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
 
   if( !this->m_wifi->localIP().isSet() || !this->m_wifi->isConnected() ){
 
-    LogFmtI("Handeling WiFi Reconnect Manually : %s\n", ((pdiutil::string)this->m_wifi->softAPIP()).c_str());
-
     #ifdef IGNORE_FREE_RELAY_CONNECTIONS
     this->m_wifi->reconnect();
     #else
 
     pdiutil::vector<wifi_station_info_t> stations;
     this->m_wifi->getApsConnectedStations(stations);
+
+    LogFmtI("Handeling WiFi Reconnect Manually : %s : Connected Stations Count : %d\n", ((pdiutil::string)this->m_wifi->softAPIP()).c_str(), stations.size());
 
     if( stations.size() > 0 ){
       this->m_wifi->scanNetworksAsync( [&](int _scanCount) {
@@ -416,7 +441,7 @@ void WiFiServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
     char _ip[20];
 
     terminal->writeln();
-    terminal->writeln_ro(RODT_ATTR("WiFi Configs :"));
+    terminal->writeln_ro(RODT_ATTR("Station Configs :"));
     terminal->write(_table.sta_ssid); terminal->write_ro(RODT_ATTR("\t"));
     terminal->write(_table.sta_password); terminal->write_ro(RODT_ATTR("\t"));
 
@@ -432,6 +457,14 @@ void WiFiServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
     __int_ip_to_str( _ip, _table.ap_local_ip, 20 ); terminal->write(_ip); terminal->write_ro(RODT_ATTR("\t"));
     __int_ip_to_str( _ip, _table.ap_gateway, 20 ); terminal->write(_ip); terminal->write_ro(RODT_ATTR("\t"));
     __int_ip_to_str( _ip, _table.ap_subnet, 20 ); terminal->writeln(_ip);
+
+    terminal->writeln();
+    terminal->write_ro(RODT_ATTR("STA MAC :"));
+    terminal->writeln(this->m_wifi->macAddress().c_str());
+
+    terminal->writeln();
+    terminal->write_ro(RODT_ATTR("AP MAC :"));
+    terminal->writeln(this->m_wifi->softAPmacAddress().c_str());
   }
 }
 

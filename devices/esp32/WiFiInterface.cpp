@@ -12,17 +12,13 @@ created Date    : 1st June 2019
 #include "LoggerInterface.h"
 #include "DeviceControlInterface.h"
 
-extern "C" void preinit() {
-  __i_dvc_ctrl.eraseConfig();
-	uint8_t sta_mac[6];
-  esp_wifi_get_mac(WIFI_IF_STA, sta_mac);
-  // esp_efuse_mac_get_default(sta_mac);
-  // wifi_get_macaddr(STATION_IF, sta_mac);
-  sta_mac[0] +=2;
-  esp_wifi_set_mac(WIFI_IF_AP, sta_mac);
-  // esp_iface_mac_addr_set(sta_mac, ESP_MAC_WIFI_SOFTAP);
-	// wifi_set_macaddr(SOFTAP_IF, sta_mac);
-}
+// extern "C" void preinit() {
+//   __i_dvc_ctrl.eraseConfig();
+// 	uint8_t sta_mac[6];
+//   esp_wifi_get_mac(WIFI_IF_STA, sta_mac);
+//   sta_mac[0] +=2;
+//   esp_wifi_set_mac(WIFI_IF_AP, sta_mac);
+// }
 
 /**
  * begin wifi interface
@@ -317,6 +313,31 @@ pdiutil::string WiFiInterface::macAddress()
 }
 
 /**
+ * macAddress
+ */
+void WiFiInterface::macAddress(uint8_t *mac)
+{
+  if (nullptr != this->m_wifi)
+  {
+    this->m_wifi->macAddress(mac);
+  }
+}
+
+/**
+ * Set STA macAddress
+ */
+void WiFiInterface::setSTAmacAddress(uint8_t *mac)
+{
+  esp_wifi_set_mac(WIFI_IF_STA, mac);
+  // if (nullptr != this->m_wifi)
+  // {
+  //   esp_err_t err = esp_netif_set_mac(this->m_wifi->STA.netif(), mac);
+  //   if (err != ESP_OK) {
+  //   }
+  // }
+}
+
+/**
  * subnetMask
  */
 ipaddress_t WiFiInterface::subnetMask()
@@ -431,8 +452,12 @@ bool WiFiInterface::softAPConfig(ipaddress_t _local_ip, ipaddress_t _gateway, ip
   {
     // start lease from gateway onwards
     ipaddress_t lease_start(_gateway[0], _gateway[1], _gateway[2], _gateway[3]+1);
+    
     // Set the DNS server for clients of the AP to the one we also use for the STA interface
-    ipaddress_t dns((uint32_t)this->m_wifi->dnsIP());
+    // ipaddress_t dns((uint32_t)this->m_wifi->dnsIP());
+    
+    // OR use default dns static ip
+    ipaddress_t dns(DEFAULT_DNS_IP[0], DEFAULT_DNS_IP[1], DEFAULT_DNS_IP[2], DEFAULT_DNS_IP[3]);
     status = this->m_wifi->softAPConfig((uint32_t)_local_ip, (uint32_t)_gateway, (uint32_t)_subnet, (uint32_t)lease_start, (uint32_t)dns);
   }
   return status;
@@ -465,6 +490,44 @@ ipaddress_t WiFiInterface::softAPIP()
 }
 
 /**
+ * Soft AP macAddress
+ */
+pdiutil::string WiFiInterface::softAPmacAddress()
+{
+  pdiutil::string mac;
+  if (nullptr != this->m_wifi)
+  {
+    mac = this->m_wifi->softAPmacAddress().c_str();
+  }
+  return mac;
+}
+
+/**
+ * Soft AP macAddress
+ */
+void WiFiInterface::softAPmacAddress(uint8_t *mac)
+{
+  if (nullptr != this->m_wifi)
+  {
+    this->m_wifi->softAPmacAddress(mac);
+  }
+}
+
+/**
+ * Set AP macAddress
+ */
+void WiFiInterface::setSoftAPmacAddress(uint8_t *mac)
+{
+  esp_wifi_set_mac(WIFI_IF_AP, mac);
+  // if (nullptr != this->m_wifi)
+  // {
+  //   esp_err_t err = esp_netif_set_mac(this->m_wifi->AP.netif(), mac);
+  //   if (err != ESP_OK) {
+  //   }
+  // }
+}
+
+/**
  * scanNetworks
  */
 int8_t WiFiInterface::scanNetworks(bool _async, bool _show_hidden, uint8_t _channel, uint8_t *ssid)
@@ -485,13 +548,16 @@ void WiFiInterface::scanNetworksAsync(pdiutil::function<void(int)> _onComplete, 
   if (nullptr != this->m_wifi)
   {
     static int asyncScanTaskId = -1;
+    static pdiutil::function<void(int)> _onCompleteFunc = nullptr;
 
     // check whether scan task is already running and return
-    if( asyncScanTaskId == -1 ){
+    if( asyncScanTaskId != -1 || _onComplete == nullptr){
       return;
     }else{  // start scanning for network with async true. 
       this->scanNetworks(true);
     }
+
+    _onCompleteFunc = _onComplete;
 
     // scan every 500ms for scanning done
     asyncScanTaskId = __task_scheduler.updateInterval( asyncScanTaskId, [&]() {
@@ -509,7 +575,7 @@ void WiFiInterface::scanNetworksAsync(pdiutil::function<void(int)> _onComplete, 
       } else {
 
         // callback on Found Zero or more Wireless Networks
-        _onComplete(WiFiScanStatus);
+        _onCompleteFunc(WiFiScanStatus);
 
         // clear scan task interval once scan complete
         __task_scheduler.clearInterval(asyncScanTaskId);
@@ -576,7 +642,7 @@ bool WiFiInterface::get_bssid_within_scanned_nw_ignoring_connected_stations(char
     return false;
   }
 
-  LogI("Scanning stations\n");
+  LogI("Scanning stations while ignoring connected stations !\n");
 
   int n = _scanCount;
   // int indices[n];
@@ -610,14 +676,14 @@ bool WiFiInterface::get_bssid_within_scanned_nw_ignoring_connected_stations(char
 
       bool _found = false;
 
-      for (int i = 0; i < wifi_sta_list.num; i++) {
+      for (int j = 0; j < wifi_sta_list.num; j++) {
 
-		    wifi_sta_info_t sta_info = wifi_sta_list.sta[i];
+		    wifi_sta_info_t sta_info = wifi_sta_list.sta[j];
 
         memcpy(bssid, sta_info.mac, 6);
         bssid[0] +=2;
 
-        if( __are_arrays_equal( (char*)bssid, (char*)this->m_wifi->BSSID(i), 6 ) ){
+        if( __are_arrays_equal( (char*)bssid, (char*)this->BSSID(i), 6 ) ){
 
           _found = true;
           break;

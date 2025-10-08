@@ -58,6 +58,8 @@ public:
   // STA network info
   virtual ipaddress_t localIP() = 0;
   virtual pdiutil::string macAddress() = 0;
+  virtual void macAddress(uint8_t *mac) = 0;
+  virtual void setSTAmacAddress(uint8_t *mac) = 0;
   virtual ipaddress_t subnetMask() = 0;
   virtual ipaddress_t gatewayIP() = 0;
   virtual ipaddress_t dnsIP(uint8_t _dns_no = 0) = 0;
@@ -73,6 +75,9 @@ public:
   virtual bool softAPConfig(ipaddress_t _local_ip, ipaddress_t _gateway, ipaddress_t _subnet) = 0;
   virtual bool softAPdisconnect(bool _wifioff = false) = 0;
   virtual ipaddress_t softAPIP() = 0;
+  virtual pdiutil::string softAPmacAddress() = 0;
+  virtual void softAPmacAddress(uint8_t *mac) = 0;
+  virtual void setSoftAPmacAddress(uint8_t *mac) = 0;
 
   // n/w scan api's
   virtual int8_t scanNetworks(bool _async = false, bool _show_hidden = false, uint8_t _channel = 0, uint8_t *ssid = nullptr) = 0;

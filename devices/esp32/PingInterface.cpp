@@ -12,7 +12,6 @@ created Date    : 1st June 2019
 #include "LoggerInterface.h"
 
 volatile bool _host_resp = false;
-uint32_t _pinghostip = 0x08080808;
 static const char _pinghostname[] = "google.com";
 // IPAddress PING_TARGET(8,8,8,8);
 
@@ -66,7 +65,7 @@ bool PingInterface::ping(){
 
   if( res == 1 ){
 
-    _ip = _pinghostip; // override with static ip
+    _ip = ipaddress_t(DEFAULT_DNS_IP[0], DEFAULT_DNS_IP[1], DEFAULT_DNS_IP[2], DEFAULT_DNS_IP[3]); // override with default dns static ip
 
     uint32_t ping_count = DEFAULT_PING_MAX_COUNT;  //how many pings per report
     uint32_t ping_timeout = PING_TIMEOUT_MS; //mS till we consider it timed out

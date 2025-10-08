@@ -12,7 +12,6 @@ created Date    : 1st June 2019
 #include "LoggerInterface.h"
 
 volatile bool _host_resp = false;
-const uint32_t _pinghostip = 0x08080808;
 static const char _pinghostname[] = "google.com";
 // IPAddress PING_TARGET(8,8,8,8);
 
@@ -62,10 +61,11 @@ PingInterface::~PingInterface(){
 
 void PingInterface::init_ping( iWiFiInterface* _wifi ){
 
+  ipaddress_t defaultdns(DEFAULT_DNS_IP[0], DEFAULT_DNS_IP[1], DEFAULT_DNS_IP[2], DEFAULT_DNS_IP[3]); 
   this->m_wifi = _wifi;
   memset(&this->m_opt, 0, sizeof(struct ping_option));
   this->m_opt.count = 1;
-  this->m_opt.ip = _pinghostip;
+  this->m_opt.ip = (uint32_t)defaultdns;// override with default dns static ip
   this->m_opt.coarse_time = 0;
   // m_opt.sent_function = NULL;
   // m_opt.recv_function = NULL;
@@ -78,13 +78,13 @@ void PingInterface::init_ping( iWiFiInterface* _wifi ){
 bool PingInterface::ping(){
 
   IPAddress _ip(this->m_opt.ip);
-  ipaddress_t _ipt((uint32_t)_ip);
+  // ipaddress_t _ipt((uint32_t)_ip);
 
-  if( nullptr != this->m_wifi ){
-    this->m_wifi->hostByName(_pinghostname, _ipt, 1500);
-    _ip = (uint32_t)_ipt;
-    this->m_opt.ip = (uint32_t)_ip;
-  }
+  // if( nullptr != this->m_wifi ){
+  //   this->m_wifi->hostByName(_pinghostname, _ipt, 1500);
+  //   _ip = (uint32_t)_ipt;
+  //   this->m_opt.ip = (uint32_t)_ip;
+  // }
   LogFmtI("\nPing ip: %s\n", _ip.toString().c_str());
   return _ip.isSet() ? ping_start(&this->m_opt) : false;
 }

@@ -56,6 +56,8 @@ public:
   // STA network info
   ipaddress_t localIP() override;
   pdiutil::string macAddress() override;
+  void macAddress(uint8_t *mac) override;
+  void setSTAmacAddress(uint8_t *mac) override;
   ipaddress_t subnetMask() override;
   ipaddress_t gatewayIP() override;
   ipaddress_t dnsIP(uint8_t _dns_no = 0) override;
@@ -71,6 +73,9 @@ public:
   bool softAPConfig(ipaddress_t _local_ip, ipaddress_t _gateway, ipaddress_t _subnet) override;
   bool softAPdisconnect(bool _wifioff = false) override;
   ipaddress_t softAPIP() override;
+  pdiutil::string softAPmacAddress() override;
+  void softAPmacAddress(uint8_t *mac) override;
+  void setSoftAPmacAddress(uint8_t *mac) override;
 
   // n/w scan api's
   int8_t scanNetworks(bool _async = false, bool _show_hidden = false, uint8_t _channel = 0, uint8_t *ssid = nullptr) override;

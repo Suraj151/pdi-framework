@@ -20,6 +20,8 @@ created Date    : 1st June 2019
 #define DEFAULT_SSID         USER
 #define DEFAULT_PASSPHRASE   PASSPHRASE
 
+const uint8_t DEFAULT_DNS_IP   [] = {8, 8, 8, 8};
+
 const uint8_t DEFAULT_STA_LOCAL_IP [] = {0, 0, 0, 0};
 const uint8_t DEFAULT_STA_GATEWAY  [] = {0, 0, 0, 0};
 const uint8_t DEFAULT_STA_SUBNET   [] = {0, 0, 0, 0};
