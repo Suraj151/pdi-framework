@@ -93,6 +93,11 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   NetworkCommand *networkcmd = new NetworkCommand();
   m_cmdlist.push_back(networkcmd);
   #endif
+
+  WatchCommand *watchcmd = new WatchCommand();
+  m_cmdlist.push_back(watchcmd);
+
+  CommandBase::SetCommandExecutionInterface(this);
 }
 
 /**
@@ -688,6 +693,14 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
       if( inseq > CMD_TERM_INSEQ_NONE && inseq < CMD_TERM_INSEQ_MAX ){
         res = m_cmdlist[waitingCmdIndex]->executeCommand((char*)cmd->c_str(), cmd->size(), true, inseq);
       }
+    }
+  }
+
+  // if command aborted then remove watch task if any
+  if( CMD_RESULT_ABORTED == res || CMD_RESULT_TERMINAL_ABORTED == res ){
+    cmd_t *watchcmd = __cmd_service.getCommandByName(CMD_NAME_WATCH);
+    if( nullptr != watchcmd ){
+      __task_scheduler.remove_task(((WatchCommand*)watchcmd)->m_watchtaskid);
     }
   }
 

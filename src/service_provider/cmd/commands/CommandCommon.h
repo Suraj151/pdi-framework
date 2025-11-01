@@ -64,10 +64,12 @@ created Date    : 1st June 2019
 #define CMD_NAME_SSH 				"ssh"
 #define CMD_NAME_REBOOT				"reboot"
 #define CMD_NAME_NETWORK			"net"
+#define CMD_NAME_WATCH  			"watch"
 
 /* command options */
 #define CMD_OPTION_NAME_P			"p"
 #define CMD_OPTION_NAME_M		    "m"
+#define CMD_OPTION_NAME_N		    "n"
 #define CMD_OPTION_NAME_V		    "v"
 #define CMD_OPTION_NAME_U	        "u"
 #define CMD_OPTION_NAME_S	        "s"
@@ -75,6 +77,8 @@ created Date    : 1st June 2019
 #define CMD_OPTION_NAME_F	        "f"
 #define CMD_OPTION_NAME_L	        "l"
 #define CMD_OPTION_NAME_T	        "t"
+#define CMD_OPTION_NAME_C	        "c"
+#define CMD_OPTION_NAME_I	        "i"
 
 
 #endif

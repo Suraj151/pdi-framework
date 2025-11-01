@@ -74,7 +74,7 @@ class ServiceProvider{
     /**
      * ServiceProvider constructor.
      */
-    ServiceProvider(service_t st, const char *_svc_name) : m_service_t(st), m_service_name(_svc_name) {
+    ServiceProvider(service_t st, const char *_svc_name) : m_service_t(st), m_service_name(_svc_name), m_service_routine_task_id(-1) {
       m_services[st] = this;
     }
 
@@ -90,6 +90,20 @@ class ServiceProvider{
     virtual bool initService(void *arg = nullptr){
       if(nullptr != m_terminal){
         m_terminal->with_timestamp()->write_ro(RODT_ATTR(" Starting "));
+        m_terminal->write_ro(m_service_name);
+        m_terminal->writeln_ro(RODT_ATTR(" Service"));
+      }
+      return true;
+    }
+
+    /**
+     * stop service
+     */
+    virtual bool stopService(){
+      __task_scheduler.clearInterval( m_service_routine_task_id );
+      m_service_routine_task_id = -1;
+      if(nullptr != m_terminal){
+        m_terminal->with_timestamp()->write_ro(RODT_ATTR(" Stopping "));
         m_terminal->write_ro(m_service_name);
         m_terminal->writeln_ro(RODT_ATTR(" Service"));
       }
@@ -147,7 +161,8 @@ class ServiceProvider{
   protected:
 
     /**
-     * print service config to terminal
+     * @var service_t m_service_t
+     * @brief Type of the service.
      */
     service_t m_service_t;
 
@@ -156,6 +171,12 @@ class ServiceProvider{
      * @brief Pointer to the terminal interface for output.
      */
     static iTerminalInterface *m_terminal;
+
+    /**
+     * @var int32_t m_service_task_id
+     * @brief Task ID associated with the service.
+     */
+    int32_t m_service_routine_task_id;
 };
 
 #endif

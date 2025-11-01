@@ -61,7 +61,18 @@ typedef enum {
 #define CMD_OPTION_SIZE_MAX         3   ///< Maximum size of an option.
 #define CMD_OPTION_SEPERATOR_COMMA  "," ///< Comma as a Separator for options.
 #define CMD_OPTION_SEPERATOR_SPACE  " " ///< Space as a Separator for options.
+#define CMD_OPTION_SEPERATOR_SEMICOLON  ";" ///< Semicolon as a Separator for options.
 #define CMD_OPTION_ASSIGN_OPERATOR  "=" ///< Assignment operator for options.
+
+/**
+ * CommandExecutionInterface class
+ */
+class CommandExecutionInterface
+{
+public:
+
+	virtual cmd_result_t executeCommand(pdiutil::string *cmd = nullptr, cmd_term_inseq_t inseq = CMD_TERM_INSEQ_ENTER) = 0;
+};
 
 /**
  * @struct CommandBase
@@ -122,6 +133,7 @@ typedef struct CommandBase {
     bool m_acceptArgsOptions;                   ///< Flag to accept argumental options.
     const char* m_optionseparator;               ///< Separator for options.
     uint16_t m_iterations;
+    static CommandExecutionInterface *m_cmdexecinterface;  ///< Interface for command execution.
 
     /**
      * @brief Constructor for the CommandBase structure.
@@ -138,6 +150,14 @@ typedef struct CommandBase {
      */
     void SetTerminal(iTerminalInterface *terminal){
         m_terminal = terminal;
+    }
+
+    /**
+     * @brief Sets the command execution interface.
+     * @param cmdexecinterface Pointer to the command execution interface.
+     */
+    static void SetCommandExecutionInterface(CommandExecutionInterface *cmdexecinterface){
+        m_cmdexecinterface = cmdexecinterface;
     }
 
     /**

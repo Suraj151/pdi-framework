@@ -144,8 +144,8 @@ created Date    : 1st June 2019
 /**
  * @define wifi & internet connectivity check cycle durations
  */
-#define WIFI_STATION_CONNECT_ATTEMPT_TIMEOUT  5  // will try to connect within this seconds
-#define WIFI_CONNECTIVITY_CHECK_DURATION      MILLISECOND_DURATION_10000
+#define WIFI_STATION_CONNECT_ATTEMPT_TIMEOUT  1  // will try to connect within this seconds
+#define WIFI_CONNECTIVITY_CHECK_DURATION      MILLISECOND_DURATION_5000
 #define INTERNET_CONNECTIVITY_CHECK_DURATION  WIFI_CONNECTIVITY_CHECK_DURATION
 
 /**

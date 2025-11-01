@@ -31,6 +31,7 @@ created Date    : 1st June 2019
 #include "commands/SSHCommand.h"
 #include "commands/RebootCommand.h"
 #include "commands/NetworkCommand.h"
+#include "commands/WatchCommand.h"
 
 
 #ifdef ENABLE_STORAGE_SERVICE
@@ -46,7 +47,7 @@ static const uint16_t 	CMD_TERMINAL_HISTORY_MAX_LINES     = 25;
 /**
  * CommandLineServiceProvider class
  */
-class CommandLineServiceProvider : public ServiceProvider
+class CommandLineServiceProvider : public ServiceProvider, public CommandExecutionInterface
 {
 
 public:
@@ -66,7 +67,7 @@ public:
     bool initService(void *arg = nullptr) override;
 
 	cmd_result_t processTerminalInput(iTerminalInterface *terminal);
-	cmd_result_t executeCommand(pdiutil::string *cmd = nullptr, cmd_term_inseq_t inseq = CMD_TERM_INSEQ_NONE);
+	cmd_result_t executeCommand(pdiutil::string *cmd = nullptr, cmd_term_inseq_t inseq = CMD_TERM_INSEQ_NONE) override;
 	static void startInteraction();
 	cmd_t* getCommandByName(char* _cmd);
     void useTerminal(iTerminalInterface *terminal);
