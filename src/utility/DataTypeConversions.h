@@ -33,6 +33,14 @@ uint8_t BcdToUint8(uint8_t val);
 uint8_t Uint8ToBcd(uint8_t val);
 
 /**
+ * @brief Converts a string to an unsigned 64-bit integer.
+ * @param pString The string to convert.
+ * @param _len The maximum length of the string (default is 32).
+ * @return The converted unsigned 64-bit integer.
+ */
+uint64_t StringToUint64(const char *pString, uint8_t _len = 32);
+
+/**
  * @brief Converts a string to an unsigned 32-bit integer.
  * @param pString The string to convert.
  * @param _len The maximum length of the string (default is 32).

@@ -358,6 +358,22 @@ bool Http_Client::SetBasicAuthorization(const char *user, const char *pass)
 
     if (nullptr != user && nullptr != pass)
     {
+        char *base64_encoded_auth = new char[300];
+        if(nullptr != base64_encoded_auth)
+        {
+            Http_Client::BuildBasicAuthorization(user, pass, base64_encoded_auth, 300);
+            bStatus = AddReqHeader(HTTP_HEADER_KEY_AUTHORIZATION, base64_encoded_auth);
+            delete []base64_encoded_auth;
+        }
+    }
+
+    return bStatus;
+}
+
+void Http_Client::BuildBasicAuthorization(const char *user, const char *pass, char*auth_value, int max_size)
+{
+    if (nullptr != user && nullptr != pass)
+    {
         uint16_t _len = strlen(user) + strlen(pass) + 3;
         char *auth = new char[_len];
         if (nullptr != auth)
@@ -367,22 +383,13 @@ bool Http_Client::SetBasicAuthorization(const char *user, const char *pass)
             strcat(auth, ":");
             strcat(auth, pass);
 
-            char *base64_encoded_auth = new char[300];
-            if(nullptr != base64_encoded_auth)
-            {
-                memset(base64_encoded_auth, 0, 300);
-                strcpy(base64_encoded_auth, RODT_ATTR("Basic "));
-                base64Encode( auth, strlen(auth), base64_encoded_auth+6 );
-
-                bStatus = AddReqHeader(HTTP_HEADER_KEY_AUTHORIZATION, base64_encoded_auth);
-                delete []base64_encoded_auth;
-            }
+            memset(auth_value, 0, max_size);
+            strcpy(auth_value, RODT_ATTR("Basic "));
+            base64Encode(auth, strlen(auth), auth_value + 6);
 
             delete []auth;
         }
     }
-
-    return bStatus;
 }
 
 /**

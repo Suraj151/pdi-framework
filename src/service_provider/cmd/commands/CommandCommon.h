@@ -65,6 +65,7 @@ created Date    : 1st June 2019
 #define CMD_NAME_REBOOT				"reboot"
 #define CMD_NAME_NETWORK			"net"
 #define CMD_NAME_WATCH  			"watch"
+#define CMD_NAME_IOT  			    "iot"
 
 /* command options */
 #define CMD_OPTION_NAME_P			"p"

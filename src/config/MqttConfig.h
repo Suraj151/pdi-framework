@@ -17,7 +17,7 @@ created Date    : 1st June 2019
 #define MQTT_DEFAULT_KEEPALIVE  30      /*second*/
 #define MQTT_HOST_CONNECT_TIMEOUT  5    /*second*/
 #define MQTT_DEFAULT_PORT       1883
-#define MQTT_USERNAME_BUF_SIZE  25
+#define MQTT_USERNAME_BUF_SIZE  50
 #define MQTT_PASSWORD_BUF_SIZE  500
 #define MQTT_TOPIC_BUF_SIZE     MQTT_HOST_BUF_SIZE
 #define MQTT_WILL_MSG_BUF_SIZE  80

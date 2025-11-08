@@ -12,7 +12,7 @@
                     "defItemDesc": "Email table handles email service related config load/store operations",
                     "defItemArg": "email_config_table",
                     "defItemAddressKey": "EMAIL_CONFIG_TABLE_ADDRESS",
-                    "defItemAddressValue": "1900",
+                    "defItemAddressValue": "2000",
                     "defItemExtVar": "__email_table"
                 },
                 {
@@ -28,7 +28,7 @@
                     "defItemDesc": "DeviceIot table handles iot configs load/store operations",
                     "defItemArg": "device_iot_config_table",
                     "defItemAddressKey": "DEVICE_IOT_CONFIG_TABLE_ADDRESS",
-                    "defItemAddressValue": "2500",
+                    "defItemAddressValue": "2600",
                     "defItemExtVar": "__device_iot_table"
                 },
                 {
@@ -60,7 +60,7 @@
                     "defItemDesc": "Mqtt Lwt table handles LWT configs load/store operations",
                     "defItemArg": "mqtt_lwt_config_table",
                     "defItemAddressKey": "MQTT_LWT_CONFIG_TABLE_ADDRESS",
-                    "defItemAddressValue": "1400",
+                    "defItemAddressValue": "1500",
                     "defItemExtVar": "__mqtt_lwt_table"
                 },
                 {
@@ -68,7 +68,7 @@
                     "defItemDesc": "Mqtt PubSub table handles publish & subscribe topic configs load/store operations",
                     "defItemArg": "mqtt_pubsub_config_table",
                     "defItemAddressKey": "MQTT_PUBSUB_CONFIG_TABLE_ADDRESS",
-                    "defItemAddressValue": "1600",
+                    "defItemAddressValue": "1700",
                     "defItemExtVar": "__mqtt_pubsub_table"
                 },
                 {

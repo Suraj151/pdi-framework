@@ -32,6 +32,7 @@ created Date    : 1st June 2019
 #include "commands/RebootCommand.h"
 #include "commands/NetworkCommand.h"
 #include "commands/WatchCommand.h"
+#include "commands/DeviceIotCommand.h"
 
 
 #ifdef ENABLE_STORAGE_SERVICE

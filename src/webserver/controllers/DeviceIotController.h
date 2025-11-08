@@ -98,6 +98,7 @@ public:
 
 			device_iot_config_table _device_iot_configs;
 			this->m_web_resource->m_db_conn->get_device_iot_config_table(&_device_iot_configs);
+			memset(_device_iot_configs.device_iot_host, 0, DEVICE_IOT_HOST_BUF_SIZE);
 			strncpy(_device_iot_configs.device_iot_host, _device_iot_host.c_str(), _device_iot_host.size()); 
 			this->m_web_resource->m_db_conn->set_device_iot_config_table(&_device_iot_configs);
 

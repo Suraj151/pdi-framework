@@ -16,7 +16,7 @@ created Date    : 1st June 2019
 
 #define DEVICE_IOT_PACKET_VERSION      "1.0.0"
 
-#define DEVICE_IOT_OTP_REQ_URL         "/api/fordevice/get-otp?mac_id=[mac]"
+#define DEVICE_IOT_OTP_REQ_URL         "/api/fordevice/get-otp?mac_id=[mac]&duid=[duid]"
 #define DEVICE_IOT_HOST_BUF_SIZE       50
 #define DEVICE_IOT_OTP_KEY             "otp"
 #define DEVICE_IOT_OTP_STATUS_KEY      "status"
@@ -30,13 +30,15 @@ created Date    : 1st June 2019
 #define SENSOR_DATA_SAMPLES_PER_PUBLISH_MAX_BUFF	100
 #define SENSOR_DATA_SAMPLES_PER_PUBLISH_MAX_LIMIT	60
 
-#define DEVICE_IOT_CONFIG_REQ_URL             "/api/fordevice/get-config?mac_id=[mac]"
-#define DEVICE_IOT_ALERTS_REQ_URL             "/api/fordevice/get-alerts?mac_id=[mac]"
+#define DEVICE_IOT_CONFIG_REQ_URL             "/api/fordevice/get-config?mac_id=[mac]&duid=[duid]"
+#define DEVICE_IOT_ALERTS_REQ_URL             "/api/fordevice/get-alerts?mac_id=[mac]&duid=[duid]"
 #define DEVICE_IOT_CONFIG_RESP_MAX_SIZE       300
+#define DEVICE_IOT_CONFIG_DEVICEID_KEY        "did"
 #define DEVICE_IOT_CONFIG_TOKEN_KEY           "token"
 #define DEVICE_IOT_CONFIG_TOKEN_MAX_SIZE      DEVICE_IOT_OTP_API_RESP_LENGTH
-#define DEVICE_IOT_CONFIG_TOPIC_KEY           "topic"
-#define DEVICE_IOT_CONFIG_TOPIC_MAX_SIZE      DEVICE_IOT_HOST_BUF_SIZE
+#define DEVICE_IOT_CONFIG_CHANNEL_READ_KEY    "channel_read"
+#define DEVICE_IOT_CONFIG_CHANNEL_WRITE_KEY   "channel_write"
+#define DEVICE_IOT_CONFIG_CHANNEL_MAX_SIZE    DEVICE_IOT_HOST_BUF_SIZE
 #define DEVICE_IOT_CONFIG_DATA_RATE_KEY       "data_rate"
 #define DEVICE_IOT_CONFIG_SAMPLING_RATE_KEY   "sample_rate"
 #define DEVICE_IOT_CONFIG_MQTT_KEEP_ALIVE_KEY "keep_alive"
@@ -46,6 +48,8 @@ created Date    : 1st June 2019
 #define DEVICE_IOT_MQTT_DATA_HOST             "192.168.0.100"
 #define DEVICE_IOT_MQTT_DATA_PORT             1883
 #define DEVICE_IOT_MQTT_WILL_TOPIC            "disconnect"
+
+#define DEVICE_IOT_DUID_MAX_LENGTH            100
 
 struct device_iot_configs {
   
@@ -58,12 +62,16 @@ struct device_iot_configs {
   void clear(){
     memset(device_iot_host, 0, DEVICE_IOT_HOST_BUF_SIZE);
     memset(device_iot_token, 0, DEVICE_IOT_CONFIG_TOKEN_MAX_SIZE);
-    memset(device_iot_topic, 0, DEVICE_IOT_CONFIG_TOPIC_MAX_SIZE);
+    memset(device_iot_channel_read, 0, DEVICE_IOT_CONFIG_CHANNEL_MAX_SIZE);
+    memset(device_iot_channel_write, 0, DEVICE_IOT_CONFIG_CHANNEL_MAX_SIZE);
+    memset(device_iot_duid, 0, DEVICE_IOT_DUID_MAX_LENGTH);
   }
 
   char device_iot_host[DEVICE_IOT_HOST_BUF_SIZE];
   char device_iot_token[DEVICE_IOT_CONFIG_TOKEN_MAX_SIZE];
-  char device_iot_topic[DEVICE_IOT_CONFIG_TOPIC_MAX_SIZE];
+  char device_iot_channel_read[DEVICE_IOT_CONFIG_CHANNEL_MAX_SIZE];
+  char device_iot_channel_write[DEVICE_IOT_CONFIG_CHANNEL_MAX_SIZE];
+  char device_iot_duid[DEVICE_IOT_DUID_MAX_LENGTH];
 };
 
 // const device_iot_configs PROGMEM _device_iot_config_defaults = {

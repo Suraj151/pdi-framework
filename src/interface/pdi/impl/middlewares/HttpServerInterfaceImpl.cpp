@@ -640,7 +640,7 @@ void HttpServerInterfaceImpl::prepareResponseHeader(pdiutil::string& _header, in
         addHeader(HTTP_HEADER_KEY_CONNECTION, CHARPTR_WRAP("keep-alive"));
 
         keepalive = CHARPTR_WRAP("timeout=");
-        keepalive += pdiutil::to_string((int)(HTTP_DEFAULT_KEEP_ALIVE_MS/1000));
+        keepalive += pdiutil::to_string((int)(HTTP_DEFAULT_KEEP_ALIVE_MS));
         addHeader(HTTP_HEADER_KEY_KEEP_ALIVE, keepalive);
         // (static_cast<iTcpClientInterface*>(m_client))->setKeepAlive((HTTP_DEFAULT_KEEP_ALIVE_MS/1000), 10, 3); // Enable keep-alive for the client
     }

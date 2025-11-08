@@ -19,6 +19,7 @@ created Date    : 1st June 2019
 DeviceIotServiceProvider::DeviceIotServiceProvider():
   m_token_validity(false),
   m_smaple_index(0),
+  m_device_id(0),
   m_smaple_per_publish(SENSOR_DATA_SAMPLING_PER_PUBLISH),
   m_sensor_data_publish_freq(SENSOR_DATA_PUBLISH_FREQ),
   m_mqtt_keep_alive(MQTT_DEFAULT_KEEPALIVE),
@@ -84,6 +85,12 @@ void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_t
     {
       otpurl.replace( mac_index, 5, __i_dvc_ctrl.getDeviceMac().c_str() );
     }
+
+    size_t duid_index = otpurl.find("[duid]");
+    if( pdiutil::string::npos != duid_index )
+    {
+      otpurl.replace( duid_index, 6, _device_iot_configs->device_iot_duid );
+    }
   }
 
   LogFmtI("Handling device otp Http Request : %s\n", otpurl.c_str());
@@ -92,7 +99,7 @@ void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_t
 
     this->m_http_client->Begin();
     this->m_http_client->SetUserAgent("pdistack");
-    this->m_http_client->SetBasicAuthorization("iot-otp", __i_dvc_ctrl.getDeviceMac().c_str());
+    this->m_http_client->SetBasicAuthorization("mac", __i_dvc_ctrl.getDeviceMac().c_str());
     this->m_http_client->SetTimeout(2*MILLISECOND_DURATION_1000);
 
     int _httpCode = this->m_http_client->Get(otpurl.c_str());
@@ -109,7 +116,7 @@ void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_t
 
       _response = "{\"status\":false,\"remark\":";
       _response += "\"Device request failed. ErrCode(";
-      _response += _httpCode;
+      _response += pdiutil::to_string(_httpCode);
       _response += ") !\"}";
     }
 
@@ -141,13 +148,19 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
     configurl.replace( mac_index, 5, __i_dvc_ctrl.getDeviceMac().c_str() );
   }
 
+  size_t duid_index = configurl.find("[duid]");
+  if( pdiutil::string::npos != duid_index )
+  {
+    configurl.replace( duid_index, 6, this->m_device_iot_configs.device_iot_duid );
+  }
+
   LogFmtI("Handling device iot config Request : %s\n", configurl.c_str());
 
   if( valid_host && nullptr != this->m_http_client ){
 
     this->m_http_client->Begin();
     this->m_http_client->SetUserAgent("pdistack");
-    this->m_http_client->SetBasicAuthorization("iot-otp", __i_dvc_ctrl.getDeviceMac().c_str());
+    this->m_http_client->SetBasicAuthorization("mac", __i_dvc_ctrl.getDeviceMac().c_str());
     this->m_http_client->SetTimeout(2*MILLISECOND_DURATION_1000);
     int _httpCode = this->m_http_client->Get(configurl.c_str());
 
@@ -162,11 +175,13 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
         if( 0 <= __strstr( http_resp, (char*)DEVICE_IOT_CONFIG_TOKEN_KEY, DEVICE_IOT_CONFIG_RESP_MAX_SIZE - strlen(DEVICE_IOT_CONFIG_TOKEN_KEY) ) ){
 
           bool _json_result = __get_from_json( http_resp, (char*)DEVICE_IOT_CONFIG_TOKEN_KEY, this->m_device_iot_configs.device_iot_token, DEVICE_IOT_CONFIG_TOKEN_MAX_SIZE );
-          _json_result = __get_from_json( http_resp, (char*)DEVICE_IOT_CONFIG_TOPIC_KEY, this->m_device_iot_configs.device_iot_topic, DEVICE_IOT_CONFIG_TOPIC_MAX_SIZE );
-          if(  _json_result && strlen( this->m_device_iot_configs.device_iot_token ) && strlen( this->m_device_iot_configs.device_iot_topic ) ){
+          _json_result = __get_from_json( http_resp, (char*)DEVICE_IOT_CONFIG_CHANNEL_WRITE_KEY, this->m_device_iot_configs.device_iot_channel_write, DEVICE_IOT_CONFIG_CHANNEL_MAX_SIZE )
+          && __get_from_json( http_resp, (char*)DEVICE_IOT_CONFIG_CHANNEL_READ_KEY, this->m_device_iot_configs.device_iot_channel_read, DEVICE_IOT_CONFIG_CHANNEL_MAX_SIZE );
+          if(  _json_result && strlen( this->m_device_iot_configs.device_iot_token ) && (strlen( this->m_device_iot_configs.device_iot_channel_write ) || strlen( this->m_device_iot_configs.device_iot_channel_read )) ){
 
             LogFmtI("Got Token : %s\n", this->m_device_iot_configs.device_iot_token );
-            LogFmtI("Got Topic : %s\n", this->m_device_iot_configs.device_iot_topic );
+            LogFmtI("Got Channel Write : %s\n", this->m_device_iot_configs.device_iot_channel_write );
+            LogFmtI("Got Channel Read : %s\n", this->m_device_iot_configs.device_iot_channel_read );
             __database_service.set_device_iot_config_table( &this->m_device_iot_configs );
 
             this->handleServerConfigurableParameters( http_resp );
@@ -242,26 +257,55 @@ void DeviceIotServiceProvider::configureMQTT(){
 
   memcpy( _mqtt_general_configs.host, httpreq.host, strlen( httpreq.host ) );
   _mqtt_general_configs.port = DEVICE_IOT_MQTT_DATA_PORT;
-  strcpy( _mqtt_general_configs.client_id, RODT_ATTR("[mac]") );
-  strcpy( _mqtt_general_configs.username, RODT_ATTR("[mac]") );
+
+  Http_Client::BuildBasicAuthorization("mac", __i_dvc_ctrl.getDeviceMac().c_str(), _mqtt_general_configs.client_id, MQTT_CLIENT_ID_BUF_SIZE);
+  // strcpy( _mqtt_general_configs.client_id, this->m_device_iot_configs.device_iot_duid );
+  strcpy( _mqtt_general_configs.username, this->m_device_iot_configs.device_iot_duid );
   memcpy( _mqtt_general_configs.password, this->m_device_iot_configs.device_iot_token, DEVICE_IOT_CONFIG_TOKEN_MAX_SIZE );
   _mqtt_general_configs.keepalive = this->m_mqtt_keep_alive;
   _mqtt_general_configs.clean_session = 1;
 
-  strcpy( _mqtt_pubsub_configs.publish_topics[0].topic, this->m_device_iot_configs.device_iot_topic );
-  // _mqtt_pubsub_configs.publish_frequency = this->m_sensor_data_publish_freq;
+  strcpy( _mqtt_pubsub_configs.publish_topics[0].topic, this->m_device_iot_configs.device_iot_channel_write );
+  strcpy( _mqtt_pubsub_configs.subscribe_topics[0].topic, this->m_device_iot_configs.device_iot_channel_read );
+  // _mqtt_pubsub_configs.publish_frequency = this->m_sensor_data_publish_freq; // let this device iot service manage the publish events
 
-  strcpy( _mqtt_lwt_configs.will_topic, this->m_device_iot_configs.device_iot_topic );
+  strcpy( _mqtt_lwt_configs.will_topic, this->m_device_iot_configs.device_iot_channel_read );
   // strcpy_P( _mqtt_lwt_configs.will_topic, DEVICE_IOT_MQTT_WILL_TOPIC );
-  strcpy( _mqtt_lwt_configs.will_message, RODT_ATTR("{\"head\":{\"uid\":\"[mac]\",\"packet_type\":\"disconnect\"},\"payload\":{},\"tail\":{}}") );
+  strcpy( _mqtt_lwt_configs.will_message, RODT_ATTR("{\"duid\":\"[duid]\"}") );
   _mqtt_lwt_configs.will_qos = 1;
   _mqtt_lwt_configs.will_retain = 0;
+  __find_and_replace( _mqtt_lwt_configs.will_message, "[duid]", this->m_device_iot_configs.device_iot_duid, 2 );
 
   __database_service.set_mqtt_general_config_table( &_mqtt_general_configs );
   __database_service.set_mqtt_lwt_config_table( &_mqtt_lwt_configs );
   __database_service.set_mqtt_pubsub_config_table( &_mqtt_pubsub_configs );
 
+  __mqtt_service.setMqttSubscribeDataCallback(DeviceIotServiceProvider::handleSubscribeCallback);
+
   __task_scheduler.setTimeout( [&]() { __mqtt_service.handleMqttConfigChange(); }, 1, __i_dvc_ctrl.millis_now() );
+}
+
+/**
+ * handle mqtt subscribe data callback
+ */
+void DeviceIotServiceProvider::handleSubscribeCallback( uint32_t *args, const char* topic, uint32_t topic_len, const char *data, uint32_t data_len ){
+
+  char *topicBuf = new char[topic_len+1], *dataBuf = new char[data_len+1];
+
+  memcpy(topicBuf, topic, topic_len);
+  topicBuf[topic_len] = 0;
+
+  memcpy(dataBuf, data, data_len);
+  dataBuf[data_len] = 0;
+
+  #if defined( ENABLE_GPIO_SERVICE )
+  __gpio_service.applyGpioJsonPayload( dataBuf, data_len );
+  #endif
+
+  Serial.println(F("\n\nMQTT: user data callback"));
+  Serial.printf("MQTT: user Receive topic: %s, data: %s \n\n", topicBuf, dataBuf);
+
+  delete[] topicBuf; delete[] dataBuf;
 }
 
 #endif
@@ -271,9 +315,9 @@ void DeviceIotServiceProvider::configureMQTT(){
  */
 void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_resp){
 
-  char *_value_buff = new char[10];
+  char *_value_buff = new char[32];
 
-  memset( _value_buff, 0, 10 );
+  memset( _value_buff, 0, 32 );
   bool _json_result = __get_from_json( json_resp, (char*)DEVICE_IOT_CONFIG_DATA_RATE_KEY, _value_buff, 6 );
   uint16_t data_rate = StringToUint16( _value_buff, 6 );
   if( _json_result && SENSOR_DATA_PUBLISH_FREQ_MIN_LIMIT <= data_rate && data_rate <= SENSOR_DATA_PUBLISH_FREQ_MAX_LIMIT ){
@@ -289,13 +333,22 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
     LogFmtI("Got Sample rate : %d\n", sample_rate);
   }
 
-  memset( _value_buff, 0, 10 );
+  memset( _value_buff, 0, 32 );
   _json_result = __get_from_json( json_resp, (char*)DEVICE_IOT_CONFIG_MQTT_KEEP_ALIVE_KEY, _value_buff, 6 );
   uint16_t keep_alive = StringToUint16( _value_buff, 6 );
   if( _json_result && DEVICE_IOT_MQTT_KEEP_ALIVE_MIN <= keep_alive && keep_alive <= DEVICE_IOT_MQTT_KEEP_ALIVE_MAX ){
 
     this->m_mqtt_keep_alive = keep_alive;
     LogFmtI("Got keep alive : %d\n", keep_alive);
+  }
+
+  memset( _value_buff, 0, 32 );
+  _json_result = __get_from_json( json_resp, (char*)DEVICE_IOT_CONFIG_DEVICEID_KEY, _value_buff, 31 );
+  uint64_t device_id = StringToUint64( _value_buff, 31 );
+  if( _json_result && 0 < device_id && device_id <= UINT64_MAX ){
+
+    this->m_device_id = device_id;
+    LogFmtI("Got Device ID : %d\n", (int)this->m_device_id);
   }
 
   this->beginSensorData();
@@ -357,11 +410,23 @@ void DeviceIotServiceProvider::handleSensorData(){
   if( this->m_smaple_index >= this->m_smaple_per_publish-1 ){
 
     this->m_smaple_index = 0;
-    pdiutil::string _payload = "{\"head\":{\"uid\":\"[mac]\",\"packet_type\":\"data\",\"packet_version\":\"";
+    pdiutil::string _payload = "{\"id\":[did],\"duid\":\"[duid]\",\"packet_type\":\"data\",\"packet_version\":\"";
     _payload += DEVICE_IOT_PACKET_VERSION;
-    _payload += "\"},\"payload\":";
+    _payload += "\",\"payload\":";
     this->m_device_iot->dataHook(_payload);
-    _payload += ",\"tail\":{}}";
+    _payload += "}";
+
+    size_t duid_index = _payload.find("[duid]");
+    if( pdiutil::string::npos != duid_index )
+    {
+      _payload.replace( duid_index, 6, this->m_device_iot_configs.device_iot_duid );
+    }
+
+    size_t did_index = _payload.find("[did]");
+    if( pdiutil::string::npos != did_index )
+    {
+      _payload.replace( did_index, 5, pdiutil::to_string(this->m_device_id).c_str() );
+    }
 
 #if defined(ENABLE_MQTT_SERVICE)
     __task_scheduler.setTimeout( [&]() { __mqtt_service.handleMqttPublish(); }, 1, __i_dvc_ctrl.millis_now() );
@@ -378,7 +443,6 @@ void DeviceIotServiceProvider::handleSensorData(){
     this->m_smaple_index++;
   }
 }
-
 
 /**
  * print Device reg configs to terminal

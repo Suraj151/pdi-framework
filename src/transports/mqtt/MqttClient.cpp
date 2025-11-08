@@ -712,6 +712,7 @@ bool MQTTClient::Publish(const char *topic, const char *data, int data_length, i
     return false;
   }
 
+  // LogFmtI("MQTT: publish, topic: %s, data: %s, datalen: %d, qos: %d, retain: %d, pendmsg: %d\r\n", topic, data, data_length, qos, retain, this->m_mqttClient.mqtt_state.pending_msg_id);
   this->m_mqttClient.mqtt_state.outbound_message = mqtt_msg_publish(&this->m_mqttClient.mqtt_state.mqtt_connection,
                                                                     topic, data, data_length,
                                                                     qos, retain,

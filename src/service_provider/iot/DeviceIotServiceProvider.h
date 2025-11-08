@@ -39,12 +39,12 @@ class DeviceIotServiceProvider : public ServiceProvider {
     void handleConnectivityCheck( void );
 #if defined(ENABLE_MQTT_SERVICE)
     void configureMQTT( void );
+    static void handleSubscribeCallback( uint32_t *args, const char* topic, uint32_t topic_len, const char *data, uint32_t data_len );
 #endif
     void handleServerConfigurableParameters(char *json_resp);
     void beginSensorData( void );
     void handleSensorData( void );
     void initDeviceIotSensor( iDeviceIotInterface *_device );
-    void printDeviceIotConfigLogs( void );
     void printConfigToTerminal(iTerminalInterface *terminal) override;
 
 
@@ -55,6 +55,7 @@ class DeviceIotServiceProvider : public ServiceProvider {
     bool      m_token_validity;
 
     uint16_t  m_smaple_index;
+    uint64_t  m_device_id;
     uint16_t  m_smaple_per_publish;
     uint16_t  m_sensor_data_publish_freq;
     uint16_t  m_mqtt_keep_alive;

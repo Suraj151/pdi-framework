@@ -97,6 +97,11 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   WatchCommand *watchcmd = new WatchCommand();
   m_cmdlist.push_back(watchcmd);
 
+  #ifdef ENABLE_DEVICE_IOT
+  DeviceIotCommand *deviceiotcmd = new DeviceIotCommand();
+  m_cmdlist.push_back(deviceiotcmd);
+  #endif
+
   CommandBase::SetCommandExecutionInterface(this);
 }
 

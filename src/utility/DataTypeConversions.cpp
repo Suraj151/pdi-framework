@@ -37,6 +37,41 @@ uint8_t Uint8ToBcd(uint8_t val)
 }
 
 /**
+ * @brief Converts a string to an unsigned 64-bit integer.
+ * 
+ * This function parses a string and converts it into an unsigned 64-bit integer.
+ *
+ * @param pString The string to convert.
+ * @param _len The maximum length of the string to parse (default is 32).
+ * @return The converted unsigned 64-bit integer.
+ */
+uint64_t StringToUint64(const char *pString, uint8_t _len)
+{
+    if (nullptr == pString)
+    {
+        return 0;
+    }
+
+    uint64_t value = 0;
+    uint8_t n = 0;
+
+    while ((*pString == '0' || *pString == ' ' || *pString == '"') && n < _len)
+    {
+        pString++;
+        n++;
+    }
+
+    while ((*pString >= '0' && *pString <= '9') && n < _len)
+    {
+        value *= 10;
+        value += *pString - '0';
+        pString++;
+        n++;
+    }
+    return value;
+}
+
+/**
  * @brief Converts a string to an unsigned 32-bit integer.
  * 
  * This function parses a string and converts it into an unsigned 32-bit integer.

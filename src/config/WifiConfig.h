@@ -12,7 +12,7 @@ created Date    : 1st June 2019
 
 #include "Common.h"
 
-#define WIFI_CONFIGS_BUF_SIZE 25
+#define WIFI_CONFIGS_BUF_SIZE 30
 
 #define DEFAULT_USERNAME     USER
 #define DEFAULT_PASSWORD     PASSPHRASE

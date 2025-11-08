@@ -123,6 +123,7 @@ public:
 	void SetDefaultHeaders(bool set_default = true);
 	bool SetUserAgent(const char *agent);
 	bool SetBasicAuthorization(const char *user, const char *pass);
+	static void BuildBasicAuthorization(const char *user, const char *pass, char*auth_value, int max_size);
 	bool AddReqHeader(const char *name, const char *value, bool overwrite_if_exist = true);
 	bool GetRespHeader(const char *name, char *&value);
 
