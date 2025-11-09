@@ -47,7 +47,13 @@ void DeviceIotSensor::resetSampleHook(){
  */
 void DeviceIotSensor::sampleHook(){
 
-  this->m_sensor_samples[ this->m_sensor_sample_index++ ] = random(0, 100);
+  #if defined( ENABLE_GPIO_SERVICE )
+    // we can read gpio values as sensor data here
+    // GPIO service is already handling gpio operation per seconds
+    // So not doing anything here
+  #else
+    this->m_sensor_samples[ this->m_sensor_sample_index++ ] = random(0, 100);
+  #endif
 }
 
 /**
@@ -59,19 +65,42 @@ void DeviceIotSensor::dataHook( pdiutil::string &_payload ){
 
   LogI("Gathering sensor data samples : ");
 
-  float _total = 0;
-  for (int i = 0; i < this->m_sensor_sample_index; i++) {
-    _total += this->m_sensor_samples[i];
-    LogFmtI("%f ", this->m_sensor_samples[i]);
-  }
 
-  this->m_sensor_sample_value = _total/this->m_sensor_sample_index;
-  this->m_sensor_sample_index = 0;
-  char tembuff[25];  memset(tembuff, 0, 25);  sprintf(tembuff, "%f", this->m_sensor_sample_value);
+  #if defined( ENABLE_GPIO_SERVICE )
 
-  LogFmtI("\nAverage : %f\n", this->m_sensor_sample_value);
+    pdiutil::vector<pdiutil::string> concatenated_v = __device_iot_service.m_server_configurable_interface_read;
+    concatenated_v.insert(concatenated_v.end(), __device_iot_service.m_server_configurable_interface_write.begin(), __device_iot_service.m_server_configurable_interface_write.end());
 
-  _payload += "{\"count\":1,\"value\":[";
-  _payload += tembuff;
-  _payload += "]}";
+    pdiutil::string gpio_payload = "";
+    __gpio_service.appendGpioJsonPayload( gpio_payload, false, &concatenated_v );
+
+    char tembuff[ gpio_payload.size() + 1 ];
+    memset(tembuff, 0, gpio_payload.size() + 1 );
+
+    bool _json_result = __get_from_json( (char*)gpio_payload.c_str(), (char*)GPIO_PAYLOAD_DATA_KEY, tembuff, gpio_payload.size() + 1 );
+
+    if(_json_result){
+
+      _payload += tembuff;
+    }else{
+
+      _payload += gpio_payload;
+    }
+  #else
+    float _total = 0;
+    for (int i = 0; i < this->m_sensor_sample_index; i++) {
+      _total += this->m_sensor_samples[i];
+      LogFmtI("%f ", this->m_sensor_samples[i]);
+    }
+
+    this->m_sensor_sample_value = _total/this->m_sensor_sample_index;
+    this->m_sensor_sample_index = 0;
+    char tembuff[25];  memset(tembuff, 0, 25);  sprintf(tembuff, "%f", this->m_sensor_sample_value);
+
+    LogFmtI("\nAverage : %f\n", this->m_sensor_sample_value);
+
+    _payload += "{\"count\":1,\"value\":[";
+    _payload += tembuff;
+    _payload += "]}";
+  #endif
 }

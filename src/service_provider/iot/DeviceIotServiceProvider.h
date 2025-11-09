@@ -47,18 +47,28 @@ class DeviceIotServiceProvider : public ServiceProvider {
     void initDeviceIotSensor( iDeviceIotInterface *_device );
     void printConfigToTerminal(iTerminalInterface *terminal) override;
 
+    /**
+		 * @var	variables received from server config
+		 */
+    uint64_t  m_server_configurable_device_id;
+    uint16_t  m_server_configurable_mqtt_keep_alive;
+    uint16_t  m_server_configurable_sample_per_publish;
+    uint16_t  m_server_configurable_sensor_data_publish_freq;
+
+    char      m_server_configurable_channel_host[DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE];
+    uint32_t  m_server_configurable_channel_port;
+    char      m_server_configurable_channel_read[DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE];
+    char      m_server_configurable_channel_write[DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE];
+    char      m_server_configurable_channel_token[DEVICE_IOT_CONFIG_CHANNEL_TOKEN_MAX_SIZE];
+
+    pdiutil::vector<pdiutil::string> m_server_configurable_interface_read;
+    pdiutil::vector<pdiutil::string> m_server_configurable_interface_write;
 
   protected:
 
     device_iot_config_table m_device_iot_configs;
-
     bool      m_token_validity;
-
-    uint16_t  m_smaple_index;
-    uint64_t  m_device_id;
-    uint16_t  m_smaple_per_publish;
-    uint16_t  m_sensor_data_publish_freq;
-    uint16_t  m_mqtt_keep_alive;
+    uint16_t  m_sample_index;
 
     int16_t   m_handle_sensor_data_cb_id;
     int16_t   m_mqtt_connection_check_cb_id;

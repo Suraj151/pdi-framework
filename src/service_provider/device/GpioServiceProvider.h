@@ -25,7 +25,7 @@ created Date    : 1st June 2019
 #define GPIO_PAYLOAD_DATA_KEY "data"
 #define GPIO_PAYLOAD_MODE_KEY "mode"
 #define GPIO_PAYLOAD_VALUE_KEY "val"
-#define GPIO_PAYLOAD_MAC_KEY "mac_id"
+#define GPIO_PAYLOAD_MAC_KEY "mac"
 #define GPIO_ALERT_PIN_KEY "alrtkey"
 
 /**
@@ -46,8 +46,9 @@ public:
 
   bool initService(void *arg = nullptr) override;
   void enable_update_gpio_table_from_copy(void);
-  void appendGpioJsonPayload(pdiutil::string &_payload, bool isAlertPost = false);
-  void applyGpioJsonPayload(char *_payload, uint16_t _payload_length);
+  bool isAllowedGpioPin(uint8_t _pin, pdiutil::vector<pdiutil::string> *allowedlist);
+  void appendGpioJsonPayload(pdiutil::string &_payload, bool isAlertPost = false, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);
+  void applyGpioJsonPayload(char *_payload, uint16_t _payload_length, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);
 #ifdef ENABLE_EMAIL_SERVICE
   bool handleGpioEmailAlert(void);
 #endif

@@ -142,7 +142,7 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isAlertPost ){
  *
  * @param pdiutil::string& _payload
  */
-void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool isAlertPost ){
+void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool isAlertPost, pdiutil::vector<pdiutil::string> *allowedlist ){
 
   _payload += "{";
 
@@ -178,9 +178,10 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
   _payload += GPIO_PAYLOAD_DATA_KEY;
   _payload += "\":{";
 
+  bool _remove_comma = false;
   for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS; _pin++) {
 
-    if( !__i_dvc_ctrl.isExceptionalGpio(_pin) ){
+    if( !__i_dvc_ctrl.isExceptionalGpio(_pin) && this->isAllowedGpioPin(_pin, allowedlist) ){
 
       _payload += "\"D";
       _payload += pdiutil::to_string(_pin);
@@ -193,26 +194,33 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
       _payload += "\":";
       _payload += pdiutil::to_string(this->m_gpio_config_copy.gpio_readings[_pin]);
       _payload += "},";
+
+      _remove_comma = true;
     }
   }
 
   for (uint8_t _pin = 0; _pin < MAX_ANALOG_GPIO_PINS; _pin++) {
 
-    _payload += "\"A";
-    _payload += pdiutil::to_string(_pin);
-    _payload += "\":{\"";
-    _payload += GPIO_PAYLOAD_MODE_KEY;
-    _payload += "\":";
-    _payload += pdiutil::to_string(this->m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS+_pin]);
-    _payload += ",\"";
-    _payload += GPIO_PAYLOAD_VALUE_KEY;
-    _payload += "\":";
-    _payload += pdiutil::to_string(this->m_gpio_config_copy.gpio_readings[MAX_DIGITAL_GPIO_PINS+_pin]);
-    _payload += "}";
+    if( this->isAllowedGpioPin(MAX_DIGITAL_GPIO_PINS+_pin, allowedlist) ){
 
-    if( ( MAX_ANALOG_GPIO_PINS - _pin ) > 1 ){
-      _payload += ",";
+      _payload += "\"A";
+      _payload += pdiutil::to_string(_pin);
+      _payload += "\":{\"";
+      _payload += GPIO_PAYLOAD_MODE_KEY;
+      _payload += "\":";
+      _payload += pdiutil::to_string(this->m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS+_pin]);
+      _payload += ",\"";
+      _payload += GPIO_PAYLOAD_VALUE_KEY;
+      _payload += "\":";
+      _payload += pdiutil::to_string(this->m_gpio_config_copy.gpio_readings[MAX_DIGITAL_GPIO_PINS+_pin]);
+      _payload += "},";
+
+      _remove_comma = true;
     }
+  }
+
+  if( _remove_comma ){
+    _payload.pop_back(); // remove last comma
   }
 
   _payload += "}}";
@@ -223,7 +231,7 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
  *
  * @param char* _payload
  */
-void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payload_length ){
+void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payload_length, pdiutil::vector<pdiutil::string> *allowedlist ){
 
   LogFmtI("Applying GPIO from Json Payload : %s\n", _payload);
 
@@ -234,31 +242,57 @@ void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payloa
   ){
 
     int _pin_data_max_len = 30, _pin_values_max_len = 6;
-    char _pin_label[_pin_values_max_len]; //memset( _pin_label, 0, _pin_values_max_len); _pin_label[0] = 'D';
+    char _pin_label_uppercase[_pin_values_max_len]; //memset( _pin_label, 0, _pin_values_max_len); _pin_label[0] = 'D';
+    char _pin_label_lowercase[_pin_values_max_len];
     char _pin_data[_pin_data_max_len], _pin_mode[_pin_values_max_len], _pin_value[_pin_values_max_len];
     // Decode the pin mode and value
     for (uint8_t _pin = 0; _pin < (MAX_GPIO_PINS); _pin++) {
 
       uint8_t _pin_label_n = _pin;
 
-      memset( _pin_label, 0, _pin_values_max_len);
+      memset( _pin_label_uppercase, 0, _pin_values_max_len);
+      memset( _pin_label_lowercase, 0, _pin_values_max_len);
       if( _pin < MAX_DIGITAL_GPIO_PINS ){
 
-        __appendUintToBuff(_pin_label, "D%d", _pin_label_n, _pin_values_max_len-1);
+        __appendUintToBuff(_pin_label_uppercase, "D%d", _pin_label_n, _pin_values_max_len-1);
+        __appendUintToBuff(_pin_label_lowercase, "d%d", _pin_label_n, _pin_values_max_len-1);
       }else{
         _pin_label_n = _pin - MAX_DIGITAL_GPIO_PINS;
 
-        __appendUintToBuff(_pin_label, "A%d", _pin_label_n, _pin_values_max_len-1);
+        __appendUintToBuff(_pin_label_uppercase, "A%d", _pin_label_n, _pin_values_max_len-1);
+        __appendUintToBuff(_pin_label_lowercase, "a%d", _pin_label_n, _pin_values_max_len-1);
       }
 
       memset( _pin_data, 0, _pin_data_max_len);
       memset( _pin_mode, 0, _pin_values_max_len); 
       memset( _pin_value, 0, _pin_values_max_len);
-      if( !__i_dvc_ctrl.isExceptionalGpio(_pin) && __get_from_json( _payload, _pin_label, _pin_data, _pin_data_max_len ) ){
+      if( !__i_dvc_ctrl.isExceptionalGpio(_pin) && (__get_from_json( _payload, _pin_label_uppercase, _pin_data, _pin_data_max_len ) || __get_from_json( _payload, _pin_label_lowercase, _pin_data, _pin_data_max_len )) ){
+
+        if( allowedlist != nullptr ){
+
+          bool _is_allowed = false;
+
+          for( size_t i=0; i < allowedlist->size(); i++ ){
+
+            if( __are_str_equals( allowedlist->at(i).c_str(), _pin_label_uppercase, strlen( _pin_label_uppercase ) ) ||
+                __are_str_equals( allowedlist->at(i).c_str(), _pin_label_lowercase, strlen( _pin_label_lowercase ) ) ){
+
+              _is_allowed = true;
+              break;
+            }
+          }
+
+          if( !_is_allowed ){
+
+            continue;
+          }
+        }
 
         if( __get_from_json( _pin_data, (char*)GPIO_PAYLOAD_MODE_KEY, _pin_mode, _pin_values_max_len ) ){
 
           if( __get_from_json( _pin_data, (char*)GPIO_PAYLOAD_VALUE_KEY, _pin_value, _pin_values_max_len ) ){
+
+            LogFmtI("Applying to : %s, mode : %s, value : %s\n", _pin_label_uppercase, _pin_mode, _pin_value);
 
             uint8_t _mode = StringToUint8( _pin_mode, _pin_values_max_len );
             uint16_t _value = StringToUint16( _pin_value, _pin_values_max_len );
@@ -463,6 +497,50 @@ void GpioServiceProvider::handleGpioModes( int _gpio_config_type ){
   }
 #endif
 
+}
+
+/**
+ * check if gpio pin is allowed in allowedlist
+ *
+ * @param uint8_t _pin
+ * @param pdiutil::vector<pdiutil::string>* allowedlist
+ * @return bool
+ */
+bool GpioServiceProvider::isAllowedGpioPin(uint8_t _pin, pdiutil::vector<pdiutil::string> *allowedlist){
+
+  int _pin_values_max_len = 6;
+  char _pin_label_uppercase[_pin_values_max_len]; //memset( _pin_label, 0, _pin_values_max_len); _pin_label[0] = 'D';
+  char _pin_label_lowercase[_pin_values_max_len];
+  uint8_t _pin_label_n = _pin;
+
+  memset( _pin_label_uppercase, 0, _pin_values_max_len);
+  memset( _pin_label_lowercase, 0, _pin_values_max_len);
+  if( _pin < MAX_DIGITAL_GPIO_PINS ){
+
+    __appendUintToBuff(_pin_label_uppercase, "D%d", _pin_label_n, _pin_values_max_len-1);
+    __appendUintToBuff(_pin_label_lowercase, "d%d", _pin_label_n, _pin_values_max_len-1);
+  }else{
+    _pin_label_n = _pin - MAX_DIGITAL_GPIO_PINS;
+
+    __appendUintToBuff(_pin_label_uppercase, "A%d", _pin_label_n, _pin_values_max_len-1);
+    __appendUintToBuff(_pin_label_lowercase, "a%d", _pin_label_n, _pin_values_max_len-1);
+  }
+
+  if( allowedlist != nullptr ){
+
+    for( size_t i=0; i < allowedlist->size(); i++ ){
+
+      if( __are_str_equals( allowedlist->at(i).c_str(), _pin_label_uppercase, strlen( _pin_label_uppercase ) ) ||
+          __are_str_equals( allowedlist->at(i).c_str(), _pin_label_lowercase, strlen( _pin_label_lowercase ) ) ){
+
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  return true;
 }
 
 /**

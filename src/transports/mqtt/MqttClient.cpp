@@ -506,6 +506,8 @@ void MQTTClient::MQTT_Task()
     {
       LogFmtI("MQTT: Connected to broker %s:%d\r\n", this->m_host, this->m_port);
       this->mqtt_client_connect();
+    }else{
+      LogE("MQTT: Unable to connect to broker\r\n");
     }
     break;
   case MQTT_DISCONNECT_REQ:
@@ -994,6 +996,9 @@ void MQTTClient::mqtt_timer()
       this->m_mqttClient.host_connect_tick = 0;
       LogE("MQTT: host connect error. trying reconnect\n");
       this->m_mqttClient.connState = MQTT_HOST_RECONNECT;
+      this->MQTT_Task();
+    }
+    else if( MQTT_HOST_CONNECTING == this->m_mqttClient.connState && isConnected(this->m_client) ){
       this->MQTT_Task();
     }
   }

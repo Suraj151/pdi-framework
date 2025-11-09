@@ -34,19 +34,23 @@ created Date    : 1st June 2019
 #define DEVICE_IOT_ALERTS_REQ_URL             "/api/fordevice/get-alerts?mac_id=[mac]&duid=[duid]"
 #define DEVICE_IOT_CONFIG_RESP_MAX_SIZE       300
 #define DEVICE_IOT_CONFIG_DEVICEID_KEY        "did"
-#define DEVICE_IOT_CONFIG_TOKEN_KEY           "token"
-#define DEVICE_IOT_CONFIG_TOKEN_MAX_SIZE      DEVICE_IOT_OTP_API_RESP_LENGTH
-#define DEVICE_IOT_CONFIG_CHANNEL_READ_KEY    "channel_read"
-#define DEVICE_IOT_CONFIG_CHANNEL_WRITE_KEY   "channel_write"
-#define DEVICE_IOT_CONFIG_CHANNEL_MAX_SIZE    DEVICE_IOT_HOST_BUF_SIZE
-#define DEVICE_IOT_CONFIG_DATA_RATE_KEY       "data_rate"
-#define DEVICE_IOT_CONFIG_SAMPLING_RATE_KEY   "sample_rate"
-#define DEVICE_IOT_CONFIG_MQTT_KEEP_ALIVE_KEY "keep_alive"
+#define DEVICE_IOT_CONFIG_CHANNEL_TOKEN_KEY   "token"
+#define DEVICE_IOT_CONFIG_CHANNEL_HOST_KEY    "channelhost"
+#define DEVICE_IOT_CONFIG_CHANNEL_PORT_KEY    "channelport"
+#define DEVICE_IOT_CONFIG_CHANNEL_READ_KEY    "channelread"
+#define DEVICE_IOT_CONFIG_CHANNEL_WRITE_KEY   "channelwrite"
+#define DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE       DEVICE_IOT_HOST_BUF_SIZE
+#define DEVICE_IOT_CONFIG_CHANNEL_TOKEN_MAX_SIZE      100
+#define DEVICE_IOT_CONFIG_INTERFACE_READ_KEY  "ifaceread"
+#define DEVICE_IOT_CONFIG_INTERFACE_WRITE_KEY "ifacewrite"
+#define DEVICE_IOT_CONFIG_DATA_RATE_KEY       "datarate"
+#define DEVICE_IOT_CONFIG_SAMPLING_RATE_KEY   "samplerate"
+#define DEVICE_IOT_CONFIG_MQTT_KEEP_ALIVE_KEY "keepalive"
 #define DEVICE_IOT_MQTT_KEEP_ALIVE_MIN        10
 #define DEVICE_IOT_MQTT_KEEP_ALIVE_MAX        600
 
-#define DEVICE_IOT_MQTT_DATA_HOST             "192.168.0.100"
-#define DEVICE_IOT_MQTT_DATA_PORT             1883
+#define DEVICE_IOT_DEFAULT_CHANNEL_DATA_HOST  "192.168.0.100"
+#define DEVICE_IOT_DEFAULT_CHANNEL_DATA_PORT  1883
 #define DEVICE_IOT_MQTT_WILL_TOPIC            "disconnect"
 
 #define DEVICE_IOT_DUID_MAX_LENGTH            100
@@ -61,16 +65,10 @@ struct device_iot_configs {
   // Clear members method
   void clear(){
     memset(device_iot_host, 0, DEVICE_IOT_HOST_BUF_SIZE);
-    memset(device_iot_token, 0, DEVICE_IOT_CONFIG_TOKEN_MAX_SIZE);
-    memset(device_iot_channel_read, 0, DEVICE_IOT_CONFIG_CHANNEL_MAX_SIZE);
-    memset(device_iot_channel_write, 0, DEVICE_IOT_CONFIG_CHANNEL_MAX_SIZE);
     memset(device_iot_duid, 0, DEVICE_IOT_DUID_MAX_LENGTH);
   }
 
   char device_iot_host[DEVICE_IOT_HOST_BUF_SIZE];
-  char device_iot_token[DEVICE_IOT_CONFIG_TOKEN_MAX_SIZE];
-  char device_iot_channel_read[DEVICE_IOT_CONFIG_CHANNEL_MAX_SIZE];
-  char device_iot_channel_write[DEVICE_IOT_CONFIG_CHANNEL_MAX_SIZE];
   char device_iot_duid[DEVICE_IOT_DUID_MAX_LENGTH];
 };
 
