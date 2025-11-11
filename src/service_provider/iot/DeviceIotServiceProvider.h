@@ -64,6 +64,8 @@ class DeviceIotServiceProvider : public ServiceProvider {
     pdiutil::vector<pdiutil::string> m_server_configurable_interface_read;
     pdiutil::vector<pdiutil::string> m_server_configurable_interface_write;
 
+    bool      m_handle_channel_write_asap;
+
   protected:
 
     device_iot_config_table m_device_iot_configs;

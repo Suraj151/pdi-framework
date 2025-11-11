@@ -32,7 +32,7 @@ created Date    : 1st June 2019
 
 #define DEVICE_IOT_CONFIG_REQ_URL             "/api/fordevice/get-config?mac_id=[mac]&duid=[duid]"
 #define DEVICE_IOT_ALERTS_REQ_URL             "/api/fordevice/get-alerts?mac_id=[mac]&duid=[duid]"
-#define DEVICE_IOT_CONFIG_RESP_MAX_SIZE       300
+#define DEVICE_IOT_CONFIG_RESP_MAX_SIZE       500
 #define DEVICE_IOT_CONFIG_DEVICEID_KEY        "did"
 #define DEVICE_IOT_CONFIG_CHANNEL_TOKEN_KEY   "token"
 #define DEVICE_IOT_CONFIG_CHANNEL_HOST_KEY    "channelhost"

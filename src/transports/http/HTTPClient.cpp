@@ -384,8 +384,8 @@ void Http_Client::BuildBasicAuthorization(const char *user, const char *pass, ch
             strcat(auth, pass);
 
             memset(auth_value, 0, max_size);
-            strcpy(auth_value, RODT_ATTR("Basic "));
-            base64Encode(auth, strlen(auth), auth_value + 6);
+            strcpy(auth_value, RODT_ATTR("device@"));
+            base64Encode(auth, strlen(auth), auth_value + 7);
 
             delete []auth;
         }

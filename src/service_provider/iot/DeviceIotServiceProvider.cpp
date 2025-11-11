@@ -24,6 +24,7 @@ DeviceIotServiceProvider::DeviceIotServiceProvider():
   m_server_configurable_sensor_data_publish_freq(SENSOR_DATA_PUBLISH_FREQ),
   m_server_configurable_channel_port(DEVICE_IOT_DEFAULT_CHANNEL_DATA_PORT),
   m_server_configurable_mqtt_keep_alive(MQTT_DEFAULT_KEEPALIVE),
+  m_handle_channel_write_asap(false),
   m_handle_sensor_data_cb_id(0),
   m_mqtt_connection_check_cb_id(0),
   m_device_config_request_cb_id(0),
@@ -307,6 +308,9 @@ void DeviceIotServiceProvider::handleSubscribeCallback( uint32_t *args, const ch
   __gpio_service.applyGpioJsonPayload( dataBuf, data_len, &concatenated_v );
   #endif
 
+  // handle channel write action as soon as possible to reflect applied json payload
+  __device_iot_service.m_handle_channel_write_asap = true;
+
   delete[] topicBuf; delete[] dataBuf;
 }
 
@@ -392,6 +396,21 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
     this->m_server_configurable_interface_read.push_back( pdiutil::string( _value_buff + lastcommaindex, i - lastcommaindex ) );
 
     LogFmtI("Got Read Interface : %s\n", _value_buff);
+
+    for(uint16_t i = 0; i < this->m_server_configurable_interface_read.size(); i++ ){
+      
+      #if defined( ENABLE_GPIO_SERVICE )
+
+      bool isDigital = this->m_server_configurable_interface_read[i][0] == 'D' || this->m_server_configurable_interface_read[i][0] == 'd';
+
+        pdiutil::string gpiopayload = "{\"data\":{\""; 
+        gpiopayload += this->m_server_configurable_interface_read[i];
+        gpiopayload += "\":{\"mode\":";
+        gpiopayload += pdiutil::to_string(isDigital ? DIGITAL_READ : ANALOG_READ);
+        gpiopayload += ",\"val\":0}}}";
+        __gpio_service.applyGpioJsonPayload((char*)gpiopayload.c_str(), gpiopayload.size(), &this->m_server_configurable_interface_read);
+      #endif
+    }
   }
 
   memset( _value_buff, 0, 100 );
@@ -410,6 +429,21 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
     this->m_server_configurable_interface_write.push_back( pdiutil::string( _value_buff + lastcommaindex, i - lastcommaindex ) );
 
     LogFmtI("Got Write Interface : %s\n", _value_buff);
+
+    for(uint16_t i = 0; i < this->m_server_configurable_interface_write.size(); i++ ){
+      
+      #if defined( ENABLE_GPIO_SERVICE )
+
+      bool isDigital = this->m_server_configurable_interface_write[i][0] == 'D' || this->m_server_configurable_interface_write[i][0] == 'd';
+
+        pdiutil::string gpiopayload = "{\"data\":{\""; 
+        gpiopayload += this->m_server_configurable_interface_write[i];
+        gpiopayload += "\":{\"mode\":";
+        gpiopayload += pdiutil::to_string(isDigital ? DIGITAL_WRITE : ANALOG_WRITE);
+        gpiopayload += ",\"val\":0}}}";
+        __gpio_service.applyGpioJsonPayload((char*)gpiopayload.c_str(), gpiopayload.size(), &this->m_server_configurable_interface_write);
+      #endif
+    }
   }
 
   this->beginSensorData();
@@ -468,9 +502,10 @@ void DeviceIotServiceProvider::handleSensorData(){
 
   this->m_device_iot->sampleHook();
 
-  if( this->m_sample_index >= this->m_server_configurable_sample_per_publish-1 ){
+  if( (this->m_sample_index >= this->m_server_configurable_sample_per_publish-1) || this->m_handle_channel_write_asap ){
 
     this->m_sample_index = 0;
+    this->m_handle_channel_write_asap = false;
     pdiutil::string _payload = "{\"id\":[did],\"packet_type\":\"data\",\"packet_version\":\"";
     _payload += DEVICE_IOT_PACKET_VERSION;
     _payload += "\",\"payload\":";
