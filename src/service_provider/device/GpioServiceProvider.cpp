@@ -266,7 +266,7 @@ void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payloa
       memset( _pin_data, 0, _pin_data_max_len);
       memset( _pin_mode, 0, _pin_values_max_len); 
       memset( _pin_value, 0, _pin_values_max_len);
-      if( !__i_dvc_ctrl.isExceptionalGpio(_pin) && (__get_from_json( _payload, _pin_label_uppercase, _pin_data, _pin_data_max_len ) || __get_from_json( _payload, _pin_label_lowercase, _pin_data, _pin_data_max_len )) ){
+      if( !__i_dvc_ctrl.isExceptionalGpio(_pin_label_n) && (__get_from_json( _payload, _pin_label_uppercase, _pin_data, _pin_data_max_len ) || __get_from_json( _payload, _pin_label_lowercase, _pin_data, _pin_data_max_len )) ){
 
         if( allowedlist != nullptr ){
 

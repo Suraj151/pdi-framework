@@ -52,7 +52,7 @@ bool MqttServiceProvider::initService( void *arg ){
   }
 
   // m_client = reinterpret_cast<iClientInterface*>(arg);
-  m_client = new WiFiClientInterface; // Prefer new client instance for mqtt
+  m_client = new TcpClientInterface; // Prefer new client instance for mqtt
 
   this->m_mqtt_payload = new char[ MQTT_PAYLOAD_BUF_SIZE ];
   if( nullptr != this->m_mqtt_payload ){

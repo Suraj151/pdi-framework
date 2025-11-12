@@ -338,12 +338,22 @@ bool __get_from_json(char *_str, char *_key, char *_value, int _max_value_len)
         int no_of_closing_curly_bracket = 0;
         int no_of_opening_square_bracket = 0;
         int no_of_closing_square_bracket = 0;
+        int no_of_double_quote = 0;
+        bool foundsemicolon = false;
 
         while (j < _str_len)
         {
             if (_str[_occur_index + _key_str_len + j] == ',')
             {
                 no_of_commas++;
+            }
+            else if (_str[_occur_index + _key_str_len + j] == ':')
+            {
+                foundsemicolon = true;
+            }
+            else if (foundsemicolon && (_str[_occur_index + _key_str_len + j] == '"'))
+            {
+                no_of_double_quote++;
             }
             else if (_str[_occur_index + _key_str_len + j] == '{')
             {
@@ -362,9 +372,11 @@ bool __get_from_json(char *_str, char *_key, char *_value, int _max_value_len)
                 no_of_closing_square_bracket++;
             }
 
-            if (
-                (no_of_commas > 0 && (no_of_opening_curly_bracket +
-                                      no_of_closing_curly_bracket + no_of_opening_square_bracket + no_of_closing_square_bracket) == 0))
+            if ((no_of_commas > 0 && (no_of_opening_curly_bracket +
+                                      no_of_closing_curly_bracket + 
+                                      no_of_opening_square_bracket + 
+                                      no_of_closing_square_bracket) == 0)
+                                    && (no_of_double_quote%2 == 0))
             {
                 break;
             }

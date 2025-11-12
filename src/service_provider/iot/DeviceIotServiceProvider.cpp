@@ -310,8 +310,19 @@ void DeviceIotServiceProvider::handleSubscribeCallback( uint32_t *args, const ch
 
   // handle channel write action as soon as possible to reflect applied json payload
   __device_iot_service.m_handle_channel_write_asap = true;
+  __task_scheduler.setTimeout( [&]() { __device_iot_service.handleSensorData(); }, 1, __i_dvc_ctrl.millis_now() );
 
-  delete[] topicBuf; delete[] dataBuf;
+  // handle reconfiguration request
+  char *_value_buff = new char[50];
+  memset( _value_buff, 0, 50 );
+  bool _json_result = __get_from_json( dataBuf, (char*)DEVICE_IOT_CONFIG_RECONFIGURE_KEY, _value_buff, 6 );
+  uint16_t reconfigure = StringToUint16( _value_buff, 6 );
+  if( _json_result && reconfigure == 1 ){
+    LogI("Reconfiguring...\n");
+  __task_scheduler.setTimeout( [&]() { __mqtt_service.stop(); }, 1, __i_dvc_ctrl.millis_now() );
+  }
+
+  delete[] topicBuf; delete[] dataBuf; delete[] _value_buff;
 }
 
 #endif
@@ -384,13 +395,13 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
   _json_result = __get_from_json( json_resp, (char*)DEVICE_IOT_CONFIG_INTERFACE_READ_KEY, _value_buff, 99 );
   if( _json_result && strlen(_value_buff) > 0 ){
 
-    uint16_t lastcommaindex = 0, i = 0;
+    uint16_t lastcommaindex = 0, i = 0; this->m_server_configurable_interface_read.clear();
     for (i = 0; i < strlen(_value_buff); i++){
       
       if( _value_buff[i] == ',' ){
 
         this->m_server_configurable_interface_read.push_back( pdiutil::string( _value_buff + lastcommaindex, i - lastcommaindex ) );
-        lastcommaindex = i;
+        lastcommaindex = i+1;
       }     
     }
     this->m_server_configurable_interface_read.push_back( pdiutil::string( _value_buff + lastcommaindex, i - lastcommaindex ) );
@@ -417,13 +428,13 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
   _json_result = __get_from_json( json_resp, (char*)DEVICE_IOT_CONFIG_INTERFACE_WRITE_KEY, _value_buff, 99 );
   if( _json_result && strlen(_value_buff) > 0 ){
 
-    uint16_t lastcommaindex = 0, i = 0;
+    uint16_t lastcommaindex = 0, i = 0; this->m_server_configurable_interface_write.clear();
     for (i = 0; i < strlen(_value_buff); i++){
       
       if( _value_buff[i] == ',' ){
 
         this->m_server_configurable_interface_write.push_back( pdiutil::string( _value_buff + lastcommaindex, i - lastcommaindex ) );
-        lastcommaindex = i;
+        lastcommaindex = i+1;
       }     
     }
     this->m_server_configurable_interface_write.push_back( pdiutil::string( _value_buff + lastcommaindex, i - lastcommaindex ) );

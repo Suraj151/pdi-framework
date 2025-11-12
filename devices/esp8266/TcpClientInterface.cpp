@@ -97,7 +97,10 @@ int16_t TcpClientInterface::disconnect() {
         tcp_sent(m_pcb, NULL);
         tcp_recv(m_pcb, NULL);
         tcp_err(m_pcb, NULL);
-        tcp_close(m_pcb);
+        err_t err = tcp_close(m_pcb);
+        if( err != ERR_OK ){
+            tcp_abort(m_pcb); // Forcefully abort if close fails
+        }
         m_pcb = nullptr;
     }
     m_isConnected = false;
@@ -282,11 +285,11 @@ err_t TcpClientInterface::onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf
 void TcpClientInterface::onError(void* arg, err_t err) {
     TcpClientInterface* client = static_cast<TcpClientInterface*>(arg);
     if (client) {
+        tcp_err(client->m_pcb, NULL);
+        tcp_arg(client->m_pcb, NULL);
+        tcp_sent(client->m_pcb, NULL);
+        tcp_recv(client->m_pcb, NULL);
         client->close(); // Close the connection on error
-        // tcp_arg(client->m_pcb, NULL); // Updated to use client->m_pcb
-        // tcp_sent(client->m_pcb, NULL);
-        // tcp_recv(client->m_pcb, NULL);
-        // tcp_err(client->m_pcb, NULL);
         // client->m_pcb = nullptr;
         // client->disconnect();
     }

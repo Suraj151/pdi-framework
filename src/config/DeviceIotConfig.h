@@ -46,6 +46,7 @@ created Date    : 1st June 2019
 #define DEVICE_IOT_CONFIG_DATA_RATE_KEY       "datarate"
 #define DEVICE_IOT_CONFIG_SAMPLING_RATE_KEY   "samplerate"
 #define DEVICE_IOT_CONFIG_MQTT_KEEP_ALIVE_KEY "keepalive"
+#define DEVICE_IOT_CONFIG_RECONFIGURE_KEY     "reconfig"
 #define DEVICE_IOT_MQTT_KEEP_ALIVE_MIN        10
 #define DEVICE_IOT_MQTT_KEEP_ALIVE_MAX        600
 
