@@ -199,7 +199,7 @@ void MQTTClient::mqtt_client_recv()
     return;
   }
 
-  int len = this->readFullPacket(this->m_mqttClient.mqtt_state.in_buffer, this->m_mqttClient.mqtt_state.in_buffer_length, MQTT_READ_TIMEOUT * 10);
+  int len = this->readFullPacket(this->m_mqttClient.mqtt_state.in_buffer, this->m_mqttClient.mqtt_state.in_buffer_length, MQTT_READ_TIMEOUT * 20);
 
   LogFmtI("MQTT: recieved packet size : %d\n", len);
   LogI("MQTT: recieved packets : ");
