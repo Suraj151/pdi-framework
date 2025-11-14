@@ -118,6 +118,16 @@ void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_t
     if ( _httpCode == HTTP_RESP_OK && nullptr != http_resp && httl_resp_len <= DEVICE_IOT_OTP_API_RESP_LENGTH ) {
 
       _response = http_resp;
+
+      pdiutil::string::size_type _found_status = _response.find(DEVICE_IOT_OTP_STATUS_KEY);
+      pdiutil::string::size_type _found_reconfig = _response.find(DEVICE_IOT_CONFIG_RECONFIGURE_KEY);
+      pdiutil::string::size_type _found_otp = _response.find(DEVICE_IOT_OTP_KEY);
+      if( _found_status != pdiutil::string::npos &&
+          _found_reconfig != pdiutil::string::npos &&
+          _found_otp != pdiutil::string::npos)
+      {
+        __task_scheduler.setTimeout( [&]() { __mqtt_service.stop(); }, 1, __i_dvc_ctrl.millis_now() );
+      }
     }else{
 
       _response = "{\"status\":false,\"remark\":";
@@ -319,7 +329,7 @@ void DeviceIotServiceProvider::handleSubscribeCallback( uint32_t *args, const ch
   uint16_t reconfigure = StringToUint16( _value_buff, 6 );
   if( _json_result && reconfigure == 1 ){
     LogI("Reconfiguring...\n");
-  __task_scheduler.setTimeout( [&]() { __mqtt_service.stop(); }, 1, __i_dvc_ctrl.millis_now() );
+    __task_scheduler.setTimeout( [&]() { __mqtt_service.stop(); }, 1, __i_dvc_ctrl.millis_now() );
   }
 
   delete[] topicBuf; delete[] dataBuf; delete[] _value_buff;
@@ -393,9 +403,10 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
 
   memset( _value_buff, 0, 100 );
   _json_result = __get_from_json( json_resp, (char*)DEVICE_IOT_CONFIG_INTERFACE_READ_KEY, _value_buff, 99 );
+  this->m_server_configurable_interface_read.clear();
   if( _json_result && strlen(_value_buff) > 0 ){
 
-    uint16_t lastcommaindex = 0, i = 0; this->m_server_configurable_interface_read.clear();
+    uint16_t lastcommaindex = 0, i = 0;
     for (i = 0; i < strlen(_value_buff); i++){
       
       if( _value_buff[i] == ',' ){
@@ -418,7 +429,7 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
         gpiopayload += this->m_server_configurable_interface_read[i];
         gpiopayload += "\":{\"mode\":";
         gpiopayload += pdiutil::to_string(isDigital ? DIGITAL_READ : ANALOG_READ);
-        gpiopayload += ",\"val\":0}}}";
+        gpiopayload += ",\"val\":\"NA\"}}}";
         __gpio_service.applyGpioJsonPayload((char*)gpiopayload.c_str(), gpiopayload.size(), &this->m_server_configurable_interface_read);
       #endif
     }
@@ -426,9 +437,10 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
 
   memset( _value_buff, 0, 100 );
   _json_result = __get_from_json( json_resp, (char*)DEVICE_IOT_CONFIG_INTERFACE_WRITE_KEY, _value_buff, 99 );
+  this->m_server_configurable_interface_write.clear();
   if( _json_result && strlen(_value_buff) > 0 ){
 
-    uint16_t lastcommaindex = 0, i = 0; this->m_server_configurable_interface_write.clear();
+    uint16_t lastcommaindex = 0, i = 0;
     for (i = 0; i < strlen(_value_buff); i++){
       
       if( _value_buff[i] == ',' ){
@@ -451,7 +463,7 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
         gpiopayload += this->m_server_configurable_interface_write[i];
         gpiopayload += "\":{\"mode\":";
         gpiopayload += pdiutil::to_string(isDigital ? DIGITAL_WRITE : ANALOG_WRITE);
-        gpiopayload += ",\"val\":0}}}";
+        gpiopayload += ",\"val\":\"NA\"}}}";
         __gpio_service.applyGpioJsonPayload((char*)gpiopayload.c_str(), gpiopayload.size(), &this->m_server_configurable_interface_write);
       #endif
     }
@@ -535,17 +547,20 @@ void DeviceIotServiceProvider::handleSensorData(){
       _payload.replace( did_index, 5, pdiutil::to_string(this->m_server_configurable_device_id).c_str() );
     }
 
-#if defined(ENABLE_MQTT_SERVICE)
-    __task_scheduler.setTimeout( [&]() { __mqtt_service.handleMqttPublish(); }, 1, __i_dvc_ctrl.millis_now() );
+    if( this->m_server_configurable_interface_read.size() > 0 || this->m_server_configurable_interface_write.size() > 0 ){
 
-    memset( __mqtt_service.m_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
-    if( _payload.size()+1 < MQTT_PAYLOAD_BUF_SIZE ){
-      // _payload.toCharArray( __mqtt_service.m_mqtt_payload, _payload.size()+1);
-      strncpy(__mqtt_service.m_mqtt_payload, _payload.c_str(), _payload.size()); 
-    }else{
-      strcat( __mqtt_service.m_mqtt_payload, RODT_ATTR("mqtt data is too big to fit in buffer !"));
-    }
+#if defined(ENABLE_MQTT_SERVICE)
+      __task_scheduler.setTimeout( [&]() { __mqtt_service.handleMqttPublish(); }, 1, __i_dvc_ctrl.millis_now() );
+
+      memset( __mqtt_service.m_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
+      if( _payload.size()+1 < MQTT_PAYLOAD_BUF_SIZE ){
+        // _payload.toCharArray( __mqtt_service.m_mqtt_payload, _payload.size()+1);
+        strncpy(__mqtt_service.m_mqtt_payload, _payload.c_str(), _payload.size()); 
+      }else{
+        strcat( __mqtt_service.m_mqtt_payload, RODT_ATTR("mqtt data is too big to fit in buffer !"));
+      }
 #endif
+    }
   }else{
     this->m_sample_index++;
   }

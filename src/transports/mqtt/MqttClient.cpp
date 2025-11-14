@@ -1097,6 +1097,11 @@ uint16_t MQTTClient::readFullPacket(uint8_t *buffer, uint16_t maxsize, uint16_t 
   uint16_t rlen;
 
   memset(buffer, 0, maxsize);
+
+  if(this->m_client && this->m_client->available() < 1 ){
+    return 0;
+  }
+
   // read the packet type:
   rlen = readPacket(this->m_client, pbuff, 1, timeout);
   if (rlen != 1)

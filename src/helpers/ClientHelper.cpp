@@ -114,7 +114,7 @@ uint16_t readPacket(iClientInterface *client, uint8_t *buffer, uint16_t maxlen, 
   uint16_t len = 0;
   int32_t t = timeout;
 
-  if (nullptr != client && nullptr != buffer && maxlen > 0 && client->available() > 0)
+  if (nullptr != client && nullptr != buffer && maxlen > 0)
   {
 
     while (t > 0)
