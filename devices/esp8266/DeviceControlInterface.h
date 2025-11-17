@@ -17,7 +17,7 @@ created Date    : 1st Jan 2024
 /**
  * Gpio's that should not be touched
  */
-const uint8_t EXCEPTIONAL_GPIO_PINS[] = {3,9};
+const uint8_t EXCEPTIONAL_GPIO_PINS[] = {3};
 
 /**
  * DeviceControlInterface class

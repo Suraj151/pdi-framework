@@ -99,6 +99,9 @@ bool sendPacket(iClientInterface *client, uint8_t *buffer, uint16_t len, uint16_
 
       __i_dvc_ctrl.wait(0);
     }
+
+    // Make sure data has been sent
+    client->write((const uint8_t*)"", 0);
   }
   else
   {

@@ -152,6 +152,25 @@ struct http_param_t{
         return *this;
     }
 
+    // Move constructor
+    http_param_t(http_param_t&& other) noexcept
+        : key(other.key), value(other.value) {
+        other.key = nullptr;
+        other.value = nullptr;
+    }
+
+    // Move assignment
+    http_param_t& operator=(http_param_t&& other) noexcept {
+        if (this != &other) {
+            clear();
+            key = other.key;
+            value = other.value;
+            other.key = nullptr;
+            other.value = nullptr;
+        }
+        return *this;
+    }
+
     // Destructor
     ~http_param_t(){
         clear();

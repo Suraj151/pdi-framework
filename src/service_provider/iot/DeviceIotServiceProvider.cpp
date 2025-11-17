@@ -457,7 +457,12 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
       
       #if defined( ENABLE_GPIO_SERVICE )
 
-      bool isDigital = this->m_server_configurable_interface_write[i][0] == 'D' || this->m_server_configurable_interface_write[i][0] == 'd';
+        bool isDigital = this->m_server_configurable_interface_write[i][0] == 'D' || this->m_server_configurable_interface_write[i][0] == 'd';
+
+        // Using Ananlog write PWM on digital pins
+        if( !isDigital ){
+          this->m_server_configurable_interface_write[i][0] = 'D';
+        }
 
         pdiutil::string gpiopayload = "{\"data\":{\""; 
         gpiopayload += this->m_server_configurable_interface_write[i];
@@ -525,10 +530,15 @@ void DeviceIotServiceProvider::handleSensorData(){
 
   this->m_device_iot->sampleHook();
 
-  if( (this->m_sample_index >= this->m_server_configurable_sample_per_publish-1) || this->m_handle_channel_write_asap ){
+  static uint64_t lastpublishtimestamp = __i_dvc_ctrl.millis_now();
+  bool istimetopublish = (__i_dvc_ctrl.millis_now() - lastpublishtimestamp) >= (this->m_server_configurable_sensor_data_publish_freq*1000);
+
+  if( (this->m_sample_index >= this->m_server_configurable_sample_per_publish-1) || this->m_handle_channel_write_asap || istimetopublish ){
 
     this->m_sample_index = 0;
     this->m_handle_channel_write_asap = false;
+    lastpublishtimestamp = __i_dvc_ctrl.millis_now();
+
     pdiutil::string _payload = "{\"id\":[did],\"packet_type\":\"data\",\"packet_version\":\"";
     _payload += DEVICE_IOT_PACKET_VERSION;
     _payload += "\",\"payload\":";

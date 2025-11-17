@@ -309,6 +309,16 @@ void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payloa
         }
       }
     }
+
+    if( this->m_update_gpio_table_from_copy ){
+
+      for (uint8_t _pin = 0; _pin < MAX_GPIO_PINS; _pin++) {
+
+        if( !__i_dvc_ctrl.isExceptionalGpio(_pin) ){
+          __i_dvc_ctrl.gpioMode((GPIO_MODE)this->m_gpio_config_copy.gpio_mode[_pin], _pin);
+        }
+      }
+    }
   }
 
 }
