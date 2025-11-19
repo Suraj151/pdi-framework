@@ -24,7 +24,7 @@ public:
   /**
    * UARTSerial constructor.
    */
-  UARTSerial();
+  UARTSerial(HardwareSerial& hwserial);
   /**
    * UARTSerial destructor.
    */
@@ -55,10 +55,13 @@ public:
 
 private:
   bool m_connected;
-
+  uint16_t m_port;
+  uint64_t m_speed;
+  HardwareSerial& m_hwserial;
 };
 
 extern UARTSerial __serial_uart;
+extern UARTSerial __serial_uart1;
 
 
 #endif

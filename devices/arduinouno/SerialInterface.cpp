@@ -17,11 +17,17 @@ created Date    : 1st June 2019
 
 
 // initialize instances with respective type or nullptr
-iSerialInterface* iSerialInterface::instances[SERIAL_TYPE_MAX] = {
-  &__serial_uart // SERIAL_TYPE_UART
-  ,nullptr // SERIAL_TYPE_I2C
-  ,nullptr // SERIAL_TYPE_SPI
-  ,nullptr // SERIAL_TYPE_CAN
+iSerialInterface* iSerialInterface::instances[SERIAL_IFACE_MAX] = {
+  &__serial_uart // SERIAL_IFACE_UART
+  ,nullptr // SERIAL_IFACE_UART1
+  ,nullptr // SERIAL_IFACE_I2C
+  ,nullptr // SERIAL_IFACE_I2C1
+  ,nullptr // SERIAL_IFACE_SPI
+  ,nullptr // SERIAL_IFACE_SPI1
+  ,nullptr // SERIAL_IFACE_CAN
+  ,nullptr // SERIAL_IFACE_CAN1
+  ,nullptr // SERIAL_IFACE_CMD
+  ,nullptr // SERIAL_IFACE_IOT
 };
 
 /**
@@ -172,8 +178,8 @@ UARTSerial __serial_uart;
 void serialEvent() {
 
   // check for uart serial data available if any
-  if (Serial.available()) {
-    serial_event_t e(SERIAL_TYPE_UART, &__serial_uart);
+  if (__serial_uart.available()) {
+    serial_event_t e(SERIAL_IFACE_UART, SERIAL_IFACE_CMD, &__serial_uart);
     __utl_event.execute_event(EVENT_SERIAL_AVAILABLE, &e);
     __serial_uart.flush();
   }

@@ -51,6 +51,10 @@ created Date    : 1st June 2019
 #include "GpioConfig.h"
 #endif
 
+#ifdef ENABLE_SERIAL_SERVICE
+#include "SerialConfig.h"
+#endif
+
 #ifdef ENABLE_EMAIL_SERVICE
 #include "EmailConfig.h"
 #endif

@@ -20,7 +20,9 @@ created Date    : 1st June 2019
  */
 CommandLineServiceProvider::CommandLineServiceProvider() : 
   m_terminalCursorIndex(0),
+#ifdef ENABLE_STORAGE_SERVICE
   m_cmdHistoryIndex(-1),
+#endif
   m_cmdAutoCompleteIndex(-1),
   ServiceProvider(SERVICE_CMD, RODT_ATTR("CMD"))
 {
@@ -398,7 +400,9 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
         inseq != CMD_TERM_INSEQ_DOWN_ARROW &&
         inseq != CMD_TERM_INSEQ_TAB
     )){
+#ifdef ENABLE_STORAGE_SERVICE      
       m_cmdHistoryIndex = -1;
+#endif
       m_cmdAutoCompleteIndex = -1;
       return CMD_RESULT_INCOMPLETE;
     }
@@ -600,12 +604,14 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
         m_cmdAutoCompleteIndex = -1;
       }
       
-      // reset index as we are in middle of command execution
+#ifdef ENABLE_STORAGE_SERVICE      // reset index as we are in middle of command execution
       m_cmdHistoryIndex = -1;
+#endif
     }
   }else{
-    // reset index as we are in middle of command execution
+#ifdef ENABLE_STORAGE_SERVICE    // reset index as we are in middle of command execution
     m_cmdHistoryIndex = -1;
+#endif
     m_cmdAutoCompleteIndex = -1;
   }
 

@@ -32,6 +32,10 @@ public:
 
 	bool initService(void *arg = nullptr) override;
 	void processSerial(serial_event_t *se);
+
+	bool isAllowedSerialPort(uint8_t _port, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);
+	void appendSerialJsonPayload(pdiutil::string &_payload, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);
+	void applySerialJsonPayload(char *_payload, uint16_t _payload_length, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);
 };
 
 extern SerialServiceProvider __serial_service;

@@ -765,6 +765,8 @@ bool MQTTClient::begin(iClientInterface *_client, mqtt_general_config_table *_mq
     return false;
   }
 
+  DeleteClient();
+
   m_client = _client;
 
   if (strlen(_mqtt_general_configs->host) > 5 && _mqtt_general_configs->port > 0)

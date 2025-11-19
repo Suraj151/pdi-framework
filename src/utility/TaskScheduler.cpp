@@ -21,7 +21,8 @@ Created Date    : 1st June 2019
  * Initializes the task scheduler with default values.
  */
 TaskScheduler::TaskScheduler() : m_util(nullptr),
-                                 m_max_tasks(MAX_SCHEDULABLE_TASKS)
+                                 m_max_tasks(MAX_SCHEDULABLE_TASKS),
+                                 m_rebase_start_priotask(false)
 {
 }
 
@@ -226,6 +227,11 @@ void TaskScheduler::handle_tasks()
         {
             m_util->yield();
         }
+
+        if( this->m_rebase_start_priotask ){
+            this->m_rebase_start_priotask = false;
+            break;
+        }
     }
     this->remove_expired_tasks();
 }
@@ -331,6 +337,15 @@ void TaskScheduler::setMaxTasksLimit(uint8_t maxtasks)
 void TaskScheduler::setUtilityInterface(iUtilityInterface *util)
 {
     m_util = util;
+}
+
+/**
+ * @brief Break the task execution, sort with priorities and restart the task queue.
+ *
+ */
+void TaskScheduler::rebaseAndRestartPrioTasks()
+{
+    m_rebase_start_priotask = true;
 }
 
 /**

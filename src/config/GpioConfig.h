@@ -26,6 +26,12 @@ created Date    : 1st June 2019
 #define GPIO_HOST_BUF_SIZE            60
 #define ANALOG_GPIO_RESOLUTION        1024
 
+#define GPIO_PAYLOAD_DATA_KEY     "data"
+#define GPIO_PAYLOAD_MODE_KEY     "mode"
+#define GPIO_PAYLOAD_VALUE_KEY    "val"
+#define GPIO_PAYLOAD_MAC_KEY      "mac"
+#define GPIO_ALERT_PIN_KEY        "alrtkey"
+
 #ifndef ENABLE_GPIO_BASIC_ONLY
 
 #define GPIO_GRAPH_ADJ_POINT_DISTANCE 10

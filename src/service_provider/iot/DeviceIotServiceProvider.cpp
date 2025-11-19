@@ -311,11 +311,15 @@ void DeviceIotServiceProvider::handleSubscribeCallback( uint32_t *args, const ch
   memcpy(dataBuf, data, data_len);
   dataBuf[data_len] = 0;
 
+  pdiutil::vector<pdiutil::string> allowed_interface_list = __device_iot_service.m_server_configurable_interface_read;
+  allowed_interface_list.insert(allowed_interface_list.end(), __device_iot_service.m_server_configurable_interface_write.begin(), __device_iot_service.m_server_configurable_interface_write.end());
+  
   #if defined( ENABLE_GPIO_SERVICE )
-    pdiutil::vector<pdiutil::string> concatenated_v = __device_iot_service.m_server_configurable_interface_read;
-    concatenated_v.insert(concatenated_v.end(), __device_iot_service.m_server_configurable_interface_write.begin(), __device_iot_service.m_server_configurable_interface_write.end());
+  __gpio_service.applyGpioJsonPayload( dataBuf, data_len, &allowed_interface_list );
+  #endif
 
-  __gpio_service.applyGpioJsonPayload( dataBuf, data_len, &concatenated_v );
+  #if defined(ENABLE_SERIAL_SERVICE)
+  __serial_service.applySerialJsonPayload( dataBuf, data_len, &allowed_interface_list );
   #endif
 
   // handle channel write action as soon as possible to reflect applied json payload
@@ -421,17 +425,37 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
 
     for(uint16_t i = 0; i < this->m_server_configurable_interface_read.size(); i++ ){
       
-      #if defined( ENABLE_GPIO_SERVICE )
+      int16_t imode = -1;
 
-      bool isDigital = this->m_server_configurable_interface_read[i][0] == 'D' || this->m_server_configurable_interface_read[i][0] == 'd';
+      if( __are_arrays_equal(SERIAL_INTERFACE_UART, this->m_server_configurable_interface_read[i].c_str(), strlen(SERIAL_INTERFACE_UART)) ){
 
-        pdiutil::string gpiopayload = "{\"data\":{\""; 
-        gpiopayload += this->m_server_configurable_interface_read[i];
-        gpiopayload += "\":{\"mode\":";
-        gpiopayload += pdiutil::to_string(isDigital ? DIGITAL_READ : ANALOG_READ);
-        gpiopayload += ",\"val\":\"NA\"}}}";
-        __gpio_service.applyGpioJsonPayload((char*)gpiopayload.c_str(), gpiopayload.size(), &this->m_server_configurable_interface_read);
-      #endif
+        imode = SERIAL_READ;
+      }else if( __are_arrays_equal(SERIAL_INTERFACE_CAN, this->m_server_configurable_interface_read[i].c_str(), strlen(SERIAL_INTERFACE_CAN)) ){
+
+      }else if( __are_arrays_equal(SERIAL_INTERFACE_I2C, this->m_server_configurable_interface_read[i].c_str(), strlen(SERIAL_INTERFACE_I2C)) ){
+
+      }else if( __are_arrays_equal(SERIAL_INTERFACE_SPI, this->m_server_configurable_interface_read[i].c_str(), strlen(SERIAL_INTERFACE_SPI)) ){
+
+      }else{
+
+        #if defined( ENABLE_GPIO_SERVICE )
+        bool isDigital = this->m_server_configurable_interface_read[i][0] == 'D' || this->m_server_configurable_interface_read[i][0] == 'd';
+        imode = isDigital ? DIGITAL_READ : ANALOG_READ;
+        #endif
+      }
+
+      pdiutil::string payloadtoapply = "{\"data\":{\""; 
+      payloadtoapply += this->m_server_configurable_interface_read[i];
+      payloadtoapply += "\":{\"mode\":";
+      payloadtoapply += pdiutil::to_string(imode);
+      payloadtoapply += ",\"val\":\"NA\"}}}";
+
+      if( imode == DIGITAL_READ || imode == ANALOG_READ ){
+
+        #if defined( ENABLE_GPIO_SERVICE )
+        __gpio_service.applyGpioJsonPayload((char*)payloadtoapply.c_str(), payloadtoapply.size(), &this->m_server_configurable_interface_read);
+        #endif
+      }
     }
   }
 
@@ -454,23 +478,43 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
     LogFmtI("Got Write Interface : %s\n", _value_buff);
 
     for(uint16_t i = 0; i < this->m_server_configurable_interface_write.size(); i++ ){
-      
-      #if defined( ENABLE_GPIO_SERVICE )
 
+      int16_t imode = -1;
+
+      if( __are_arrays_equal(SERIAL_INTERFACE_UART, this->m_server_configurable_interface_write[i].c_str(), strlen(SERIAL_INTERFACE_UART)) ){
+
+        imode = SERIAL_WRITE;
+      }else if( __are_arrays_equal(SERIAL_INTERFACE_CAN, this->m_server_configurable_interface_write[i].c_str(), strlen(SERIAL_INTERFACE_CAN)) ){
+
+      }else if( __are_arrays_equal(SERIAL_INTERFACE_I2C, this->m_server_configurable_interface_write[i].c_str(), strlen(SERIAL_INTERFACE_I2C)) ){
+
+      }else if( __are_arrays_equal(SERIAL_INTERFACE_SPI, this->m_server_configurable_interface_write[i].c_str(), strlen(SERIAL_INTERFACE_SPI)) ){
+
+      }else{
+
+        #if defined( ENABLE_GPIO_SERVICE )
         bool isDigital = this->m_server_configurable_interface_write[i][0] == 'D' || this->m_server_configurable_interface_write[i][0] == 'd';
-
         // Using Ananlog write PWM on digital pins
         if( !isDigital ){
           this->m_server_configurable_interface_write[i][0] = 'D';
         }
 
-        pdiutil::string gpiopayload = "{\"data\":{\""; 
-        gpiopayload += this->m_server_configurable_interface_write[i];
-        gpiopayload += "\":{\"mode\":";
-        gpiopayload += pdiutil::to_string(isDigital ? DIGITAL_WRITE : ANALOG_WRITE);
-        gpiopayload += ",\"val\":\"NA\"}}}";
-        __gpio_service.applyGpioJsonPayload((char*)gpiopayload.c_str(), gpiopayload.size(), &this->m_server_configurable_interface_write);
-      #endif
+        imode = isDigital ? DIGITAL_WRITE : ANALOG_WRITE;
+        #endif
+      }
+
+      pdiutil::string payloadtoapply = "{\"data\":{\""; 
+      payloadtoapply += this->m_server_configurable_interface_write[i];
+      payloadtoapply += "\":{\"mode\":";
+      payloadtoapply += pdiutil::to_string(imode);
+      payloadtoapply += ",\"val\":\"NA\"}}}";
+
+      if( imode == DIGITAL_WRITE || imode == ANALOG_WRITE ){
+
+        #if defined( ENABLE_GPIO_SERVICE )
+        __gpio_service.applyGpioJsonPayload((char*)payloadtoapply.c_str(), payloadtoapply.size(), &this->m_server_configurable_interface_write);
+        #endif
+      }
     }
   }
 
@@ -560,7 +604,8 @@ void DeviceIotServiceProvider::handleSensorData(){
     if( this->m_server_configurable_interface_read.size() > 0 || this->m_server_configurable_interface_write.size() > 0 ){
 
 #if defined(ENABLE_MQTT_SERVICE)
-      __task_scheduler.setTimeout( [&]() { __mqtt_service.handleMqttPublish(); }, 1, __i_dvc_ctrl.millis_now() );
+      __task_scheduler.setTimeout( [&]() { __mqtt_service.handleMqttPublish(); }, 1, __i_dvc_ctrl.millis_now(), DEFAULT_TASK_PRIORITY+1 );
+      __task_scheduler.rebaseAndRestartPrioTasks();
 
       memset( __mqtt_service.m_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
       if( _payload.size()+1 < MQTT_PAYLOAD_BUF_SIZE ){

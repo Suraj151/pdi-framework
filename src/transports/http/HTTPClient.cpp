@@ -671,23 +671,23 @@ void Http_Client::AddHeader(const char *name, const char *value, bool inReqHeade
 {
     if (nullptr != name && nullptr != value)
     {
-        http_header_t header;
+        http_header_t header(name, value);
 
-        uint16_t _len = strlen(name);
-        header.key = new char[_len + 1];
-        if (nullptr != header.key)
-        {
-            memset(header.key, 0, _len + 1);
-            strcpy(header.key, name);
-        }
+        // uint16_t _len = strlen(name);
+        // header.key = new char[_len + 1];
+        // if (nullptr != header.key)
+        // {
+        //     memset(header.key, 0, _len + 1);
+        //     strcpy(header.key, name);
+        // }
 
-        _len = strlen(value);
-        header.value = new char[_len + 1];
-        if (nullptr != header.value)
-        {
-            memset(header.value, 0, _len + 1);
-            strcpy(header.value, value);
-        }
+        // _len = strlen(value);
+        // header.value = new char[_len + 1];
+        // if (nullptr != header.value)
+        // {
+        //     memset(header.value, 0, _len + 1);
+        //     strcpy(header.value, value);
+        // }
 
         if (inReqHeader)
         {

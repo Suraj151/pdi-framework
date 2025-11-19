@@ -14,20 +14,6 @@ created Date    : 1st Jan 2024
 #include <interface/interface_includes.h>
 #include <interface/pdi/middlewares/iClientInterface.h>
 
-
-/**
-* available serial types
-*/
-typedef enum serial_types{
-
-  SERIAL_TYPE_UART = 0,
-  SERIAL_TYPE_I2C,
-  SERIAL_TYPE_SPI,
-  SERIAL_TYPE_CAN,
-  SERIAL_TYPE_MAX
-} serial_types_t;
-
-
 // forward declaration
 class iSerialInterface;
 
@@ -35,10 +21,23 @@ class iSerialInterface;
 * serial event wrapper struct
 */
 typedef struct SerialEvent{
-  serial_types_t type;
+  serial_iface_t source;
+  serial_iface_t dest;
   iSerialInterface *serial;
-  SerialEvent() : type(SERIAL_TYPE_MAX), serial(nullptr) {}
-  SerialEvent(serial_types_t _type, iSerialInterface *_serial) : type(_type), serial(_serial) {}
+  void *data;
+  uint16_t size;
+  SerialEvent() : 
+    source(SERIAL_IFACE_MAX), 
+    dest(SERIAL_IFACE_MAX), 
+    serial(nullptr),
+    data(nullptr),
+    size(0) {}
+  SerialEvent(serial_iface_t _src, serial_iface_t _dest, iSerialInterface *_serial, void* _data = nullptr, uint16_t _size = 0) : 
+    source(_src), 
+    dest(_dest), 
+    serial(_serial),
+    data(_data),
+    size(_size) {}
 } serial_event_t;
 
 
@@ -53,7 +52,7 @@ public:
   /**
    * serial interface instances.
    */
-  static iSerialInterface *instances[SERIAL_TYPE_MAX];
+  static iSerialInterface *instances[SERIAL_IFACE_MAX];
 
   /**
    * iSerialInterface constructor.
@@ -71,9 +70,9 @@ public:
    * Get instance of serial.
    * Before using this api, user must make sure of creating respective type instance
    */
-  static iSerialInterface *getSerialInstance(serial_types_t type) {
+  static iSerialInterface *getSerialInstance(serial_iface_t type) {
 
-    if( SERIAL_TYPE_MAX > type ){
+    if( SERIAL_IFACE_MAX > type ){
       return instances[type];
     } 
     return nullptr; 

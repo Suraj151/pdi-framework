@@ -17,17 +17,23 @@ created Date    : 1st June 2019
 
 
 // initialize instances with respective type or nullptr
-iSerialInterface* iSerialInterface::instances[SERIAL_TYPE_MAX] = {
-  &__serial_uart // SERIAL_TYPE_UART
-  ,nullptr // SERIAL_TYPE_I2C
-  ,nullptr // SERIAL_TYPE_SPI
-  ,nullptr // SERIAL_TYPE_CAN
+iSerialInterface* iSerialInterface::instances[SERIAL_IFACE_MAX] = {
+  &__serial_uart // SERIAL_IFACE_UART
+  ,&__serial_uart1 // SERIAL_IFACE_UART1
+  ,nullptr // SERIAL_IFACE_I2C
+  ,nullptr // SERIAL_IFACE_I2C1
+  ,nullptr // SERIAL_IFACE_SPI
+  ,nullptr // SERIAL_IFACE_SPI1
+  ,nullptr // SERIAL_IFACE_CAN
+  ,nullptr // SERIAL_IFACE_CAN1
+  ,nullptr // SERIAL_IFACE_CMD
+  ,nullptr // SERIAL_IFACE_IOT
 };
 
 /**
  * UARTSerial constructor.
  */
-UARTSerial::UARTSerial() : m_connected(false)
+UARTSerial::UARTSerial(HardwareSerial& hwserial) : m_connected(false), m_port(0), m_speed(115200), m_hwserial(hwserial)
 {
 }
 
@@ -43,7 +49,10 @@ UARTSerial::~UARTSerial()
  */
 int16_t UARTSerial::connect(uint16_t port, uint64_t speed)
 {
-  Serial.begin(speed);
+  m_port = port;
+  m_speed = speed;
+
+  m_hwserial.begin(speed);
   m_connected = true;
   return 1;
 }
@@ -53,7 +62,7 @@ int16_t UARTSerial::connect(uint16_t port, uint64_t speed)
  */
 int16_t UARTSerial::disconnect()
 {
-  Serial.end();
+  m_hwserial.end();
   m_connected = false;
   return 0;
 }
@@ -63,7 +72,7 @@ int16_t UARTSerial::disconnect()
  */
 int32_t UARTSerial::write(uint8_t c)
 {
-  return Serial.write(c);
+  return m_hwserial.write(c);
 }
 
 /**
@@ -71,7 +80,7 @@ int32_t UARTSerial::write(uint8_t c)
  */
 int32_t UARTSerial::write(const uint8_t *c_str)
 {
-  return Serial.write((const char*)c_str);
+  return m_hwserial.write((const char*)c_str);
 }
 
 /**
@@ -79,7 +88,7 @@ int32_t UARTSerial::write(const uint8_t *c_str)
  */
 int32_t UARTSerial::write(const uint8_t *c_str, uint32_t size)
 {
-  return Serial.write(c_str, size);
+  return m_hwserial.write(c_str, size);
 }
 
 /**
@@ -87,7 +96,7 @@ int32_t UARTSerial::write(const uint8_t *c_str, uint32_t size)
  */
 int32_t UARTSerial::write_ro(const char *c_str)
 {
-  return Serial.print(c_str);
+  return m_hwserial.print(c_str);
 }
 
 /**
@@ -95,7 +104,7 @@ int32_t UARTSerial::write_ro(const char *c_str)
  */
 uint8_t UARTSerial::read()
 {
-  return Serial.read();
+  return m_hwserial.read();
 }
 
 /**
@@ -104,9 +113,9 @@ uint8_t UARTSerial::read()
 int32_t UARTSerial::read(uint8_t *buf, uint32_t size)
 {
   int32_t count = 0;
-  for (; count < size && Serial.available(); ++count)
+  for (; count < size && m_hwserial.available(); ++count)
   {
-    buf[count] = Serial.read();
+    buf[count] = m_hwserial.read();
   }
   return count;
 }
@@ -116,7 +125,7 @@ int32_t UARTSerial::read(uint8_t *buf, uint32_t size)
  */
 int32_t UARTSerial::available()
 {
-  return Serial.available();
+  return m_hwserial.available();
 }
 
 /**
@@ -139,8 +148,8 @@ void UARTSerial::setTimeout(uint32_t timeout)
  */
 void UARTSerial::flush()
 {
-  Serial.flush();
-  while (Serial.available() > 0) Serial.read(); 
+  m_hwserial.flush();
+  while (m_hwserial.available() > 0) m_hwserial.read(); 
 }
 
 /**
@@ -162,7 +171,8 @@ iTerminalInterface* UARTSerial::with_timestamp()
   return this;
 }
 
-UARTSerial __serial_uart;
+UARTSerial __serial_uart(Serial);
+UARTSerial __serial_uart1(Serial1);
 
 /*
   SerialEvent occurs whenever a new data comes in the hardware serial RX. This
@@ -172,8 +182,8 @@ UARTSerial __serial_uart;
 void serialEvent() {
 
   // check for uart serial data available if any
-  if (Serial.available()) {
-    serial_event_t e(SERIAL_TYPE_UART, &__serial_uart);
+  if (__serial_uart.available()) {
+    serial_event_t e(SERIAL_IFACE_UART, SERIAL_IFACE_CMD, &__serial_uart);
     __utl_event.execute_event(EVENT_SERIAL_AVAILABLE, &e);
   }
 }

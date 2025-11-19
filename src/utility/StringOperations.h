@@ -60,7 +60,7 @@ bool __are_str_equals(const char *str1, const char *str2, uint16_t _overflow_lim
  * @param len The length of the arrays to compare (default is 300).
  * @return True if the arrays are equal, false otherwise.
  */
-bool __are_arrays_equal(char *array1, char *array2, uint16_t len = 300);
+bool __are_arrays_equal(const char *array1, const char *array2, uint16_t len = 300);
 
 /**
  * @brief Appends an unsigned integer to a string buffer using a specified format.

@@ -22,12 +22,6 @@ created Date    : 1st June 2019
 #include <transports/http/HTTPClient.h>
 #endif
 
-#define GPIO_PAYLOAD_DATA_KEY "data"
-#define GPIO_PAYLOAD_MODE_KEY "mode"
-#define GPIO_PAYLOAD_VALUE_KEY "val"
-#define GPIO_PAYLOAD_MAC_KEY "mac"
-#define GPIO_ALERT_PIN_KEY "alrtkey"
-
 /**
  * GpioServiceProvider class
  */

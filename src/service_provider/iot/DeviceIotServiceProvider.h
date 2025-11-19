@@ -15,6 +15,7 @@ created Date    : 1st June 2019
 #include <service_provider/ServiceProvider.h>
 #include <service_provider/transport/MqttServiceProvider.h>
 #include <service_provider/database/DatabaseServiceProvider.h>
+#include <service_provider/transport/SerialServiceProvider.h>
 #include <transports/http/HTTPClient.h>
 
 /**

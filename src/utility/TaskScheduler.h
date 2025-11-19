@@ -176,6 +176,12 @@ public:
     void setUtilityInterface(iUtilityInterface *util);
 
     /**
+     * @brief Break the task execution, sort with priorities and restart the task queue.
+     *
+     */
+    void rebaseAndRestartPrioTasks();
+
+    /**
      * @brief Prints all registered tasks to the terminal.
      *
      * @param terminal Pointer to the terminal interface.
@@ -201,6 +207,12 @@ private:
      * @brief Maximum number of tasks allowed in the scheduler.
      */
     uint8_t m_max_tasks;
+
+    /**
+     * @var bool m_rebase_start_priotask
+     * @brief Break the task execution, sort with priorities and restart the task queue.
+     */
+    bool m_rebase_start_priotask;
 };
 
 /**
