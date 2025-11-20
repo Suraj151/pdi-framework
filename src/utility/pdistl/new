@@ -52,11 +52,11 @@ _UCXXEXPORT void operator delete[](void* ptr, const pdistd::nothrow_t& ) _UCXX_U
 #endif
 
 /* Placement operators */
-inline void* operator new(pdistd::size_t, void* ptr, void* empty) _UCXX_USE_NOEXCEPT { return ptr; }
-inline void operator delete(void* , void*, void* empty) _UCXX_USE_NOEXCEPT { }
+inline void* operator new(pdistd::size_t, void* ptr) _UCXX_USE_NOEXCEPT { return ptr; }
+inline void operator delete(void* , void*) _UCXX_USE_NOEXCEPT { }
 
-inline void* operator new[](pdistd::size_t, void* ptr, void* empty) _UCXX_USE_NOEXCEPT { return ptr; }
-inline void operator delete[](void* , void*, void* empty) _UCXX_USE_NOEXCEPT { }
+inline void* operator new[](pdistd::size_t, void* ptr) _UCXX_USE_NOEXCEPT { return ptr; }
+inline void operator delete[](void* , void*) _UCXX_USE_NOEXCEPT { }
 
 #pragma GCC visibility pop
 

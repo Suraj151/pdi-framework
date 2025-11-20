@@ -187,7 +187,7 @@ struct http_param_t{
             key = new char[_len + 1];
             if (nullptr != key){
                 memset(key, 0, _len + 1);
-                strcpy(key, _key);
+                memcpy(key, _key, _len);
             }
         }
 
@@ -197,7 +197,7 @@ struct http_param_t{
             value = new char[_len + 1];
             if (nullptr != value){
                 memset(value, 0, _len + 1);
-                strcpy(value, _value);
+                memcpy(value, _value, _len);
             }
         }
     }
@@ -237,7 +237,7 @@ struct http_param_t{
             value = new char[_len + 1];
             if (nullptr != value){
                 memset(value, 0, _len + 1);
-                strcpy(value, _value);
+                memcpy(value, _value, _len);
             }
         }
 

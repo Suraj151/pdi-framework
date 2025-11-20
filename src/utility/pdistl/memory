@@ -11,7 +11,9 @@ added Date      : 1st Dec 2024
 added by        : Suraj I.
 ******************************************************************************/
 
-#include "new"
+// todo : check when to use new file version of new operator or standard <new>
+// #include "new"
+#include <new>
 #include "cstddef"
 #include "cstdlib"
 #include "iterator_base"
@@ -65,7 +67,7 @@ public:
 	}
 
 	//Use placement new to engage the constructor
-	void construct(pointer p, const T& val) { new(static_cast<void*>(p), static_cast<void*>(p)) T(val); }
+	void construct(pointer p, const T& val) { new(static_cast<void*>(p)) T(val); }
 	void destroy(pointer p){ p->~T(); }	//Call destructor
 
 	size_type max_size() const _UCXX_USE_NOEXCEPT;
