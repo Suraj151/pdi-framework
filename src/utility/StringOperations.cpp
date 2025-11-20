@@ -426,3 +426,95 @@ bool __get_from_json(char *_str, char *_key, char *_value, int _max_value_len)
     delete[] _str_buf;
     return _occur_index >= 0;
 }
+
+/**
+ * @brief Convert to lowercase if any uppercase char.
+ * @param _str The string to convert to lower.
+ * @param _strlen The length of the string.
+ */
+void __tolowercase(char *_str, int _strlen){
+
+    for (uint16_t i = 0; i < strlen(_str) && i < _strlen; i++)
+    {
+        if (_str[i] >= 'A' && _str[i] <= 'Z')
+        {
+            _str[i] = _str[i] + 32;
+        }
+    }
+}
+
+/**
+ * @brief Convert to uppercase if any lowercase char.
+ * @param _str The string to convert to upper.
+ * @param _strlen The length of the string.
+ */
+void __touppercase(char *_str, int _strlen){
+
+    for (uint16_t i = 0; (nullptr != _str) && (i < strlen(_str)) && (i < _strlen); i++)
+    {
+        if (_str[i] >= 'a' && _str[i] <= 'z')
+        {
+            _str[i] = _str[i] - 32;
+        }
+    }
+}
+
+/**
+ * @brief Get the provided interface in uppercase and lowercase format.
+ * @param _iface The interface perfix.
+ * @param _ifaceport The interface port.
+ * @param _ifaceuppercase The pointer to the buffer to store interface format in uppercase.
+ * @param _ifaceuppercase The pointer to the buffer to store interface format in lowercase.
+ * @param _maxlen The max length of the formatted out.
+ */
+void __get_iface_key_informat( const char* _iface, uint16_t _ifaceport, char* _ifaceuppercase, char* _ifacelowercase, int _maxlen ){
+
+    if( nullptr != _ifaceuppercase ){
+
+        memset(_ifaceuppercase, 0, _maxlen);
+        memcpy(_ifaceuppercase, _iface, strlen(_iface));
+        __touppercase(_ifaceuppercase, _maxlen);
+        __appendUintToBuff(_ifaceuppercase, "%d", _ifaceport, _maxlen - 1);
+    }
+
+    if( nullptr != _ifacelowercase ){
+
+        memset(_ifacelowercase, 0, _maxlen);
+        memcpy(_ifacelowercase, _iface, strlen(_iface));
+        __tolowercase(_ifacelowercase, _maxlen);
+        __appendUintToBuff(_ifacelowercase, "%d", _ifaceport, _maxlen - 1);
+    }
+}
+
+/**
+ * @brief Get the data for provided interface key.
+ * @param _iface The interface perfix.
+ * @param _ifaceport The interface port.
+ * @param _jsonpayload The pointer to the json payload.
+ * @param _ifacejsondata The pointer to the buffer to store interface json data.
+ * @param _maxlen The max length of the iface json data.
+ * @return True if the key-value pair was found, false otherwise.
+ */
+bool __get_iface_data_fromjson( const char* _iface, uint16_t _ifaceport, char* _jsonpayload, int _jsonpayloadlen, char* _ifacejsondata, int _maxjsondatalen ){
+
+    int _iface_key_max_len = strlen(_iface) + 6;
+    char _iface_label_uppercase[_iface_key_max_len];
+    char _iface_label_lowercase[_iface_key_max_len];
+
+    __get_iface_key_informat(_iface, _ifaceport, _iface_label_uppercase, _iface_label_lowercase, _iface_key_max_len);
+
+    if (
+        0 <= __strstr(_jsonpayload, _iface_label_uppercase, _jsonpayloadlen - strlen(_iface_label_uppercase)) ||
+        0 <= __strstr(_jsonpayload, _iface_label_lowercase, _jsonpayloadlen - strlen(_iface_label_lowercase)) 
+    ){
+
+        if (
+            __get_from_json(_jsonpayload, _iface_label_uppercase, _ifacejsondata, _maxjsondatalen) || 
+            __get_from_json(_jsonpayload, _iface_label_lowercase, _ifacejsondata, _maxjsondatalen))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}

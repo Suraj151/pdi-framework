@@ -14,7 +14,7 @@ created Date    : 1st June 2025
 #include "GpioConfig.h"
 
 #define MAX_SERIAL_PORT 2
-#define MAX_SERIAL_DATA_LENGTH_FOR_IOT 150
+#define MAX_SERIAL_DATA_LENGTH_FOR_IOT_PAYLOAD 150
 
 #define SERIAL_INTERFACE_UART  "uart"
 #define SERIAL_INTERFACE_CAN   "can"

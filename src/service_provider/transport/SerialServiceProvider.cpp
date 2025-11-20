@@ -109,10 +109,14 @@ void SerialServiceProvider::appendSerialJsonPayload(pdiutil::string &_payload, p
   bool _remove_comma = false;
   for (uint8_t _port = 0; _port < MAX_SERIAL_PORT; _port++) {
 
-    if( this->isAllowedSerialPort(_port, allowedlist) ){
+    int _iface_keys_max_len = strlen(SERIAL_INTERFACE_UART) + 6;
+    char _iface_label_uppercase[_iface_keys_max_len];
 
-      _payload += "\"UART";
-      _payload += pdiutil::to_string(_port);
+    __get_iface_key_informat(SERIAL_INTERFACE_UART, _port, _iface_label_uppercase, nullptr, _iface_keys_max_len);
+    if( _port != 0 && this->isAllowedSerialPort(SERIAL_INTERFACE_UART, _port, allowedlist) ){ // uart port 0 is used by cmd
+
+      _payload += "\"";
+      _payload += _iface_label_uppercase;
       _payload += "\":{\"";
       _payload += SERIAL_PAYLOAD_MODE_KEY;
       _payload += "\":";
@@ -120,11 +124,67 @@ void SerialServiceProvider::appendSerialJsonPayload(pdiutil::string &_payload, p
       _payload += ",\"";
       _payload += SERIAL_PAYLOAD_VALUE_KEY;
       _payload += "\":";
-      _payload += "\"\"";  // todo read data from serial
+      _payload += "\"\"";  // todo read data from serial uart
       _payload += "},";
 
       _remove_comma = true;
     }
+
+    __get_iface_key_informat(SERIAL_INTERFACE_SPI, _port, _iface_label_uppercase, nullptr, _iface_keys_max_len);
+    if( this->isAllowedSerialPort(SERIAL_INTERFACE_SPI, _port, allowedlist) ){
+
+      _payload += "\"";
+      _payload += _iface_label_uppercase;
+      _payload += "\":{\"";
+      _payload += SERIAL_PAYLOAD_MODE_KEY;
+      _payload += "\":";
+      _payload += pdiutil::to_string((int)SERIAL_READ);
+      _payload += ",\"";
+      _payload += SERIAL_PAYLOAD_VALUE_KEY;
+      _payload += "\":";
+      _payload += "\"\"";  // todo read data from serial spi
+      _payload += "},";
+
+      _remove_comma = true;
+    }
+    __i_dvc_ctrl.yield();
+
+    __get_iface_key_informat(SERIAL_INTERFACE_I2C, _port, _iface_label_uppercase, nullptr, _iface_keys_max_len);
+    if( this->isAllowedSerialPort(SERIAL_INTERFACE_I2C, _port, allowedlist) ){
+
+      _payload += "\"";
+      _payload += _iface_label_uppercase;
+      _payload += "\":{\"";
+      _payload += SERIAL_PAYLOAD_MODE_KEY;
+      _payload += "\":";
+      _payload += pdiutil::to_string((int)SERIAL_READ);
+      _payload += ",\"";
+      _payload += SERIAL_PAYLOAD_VALUE_KEY;
+      _payload += "\":";
+      _payload += "\"\"";  // todo read data from serial i2c
+      _payload += "},";
+
+      _remove_comma = true;
+    }
+
+    __get_iface_key_informat(SERIAL_INTERFACE_CAN, _port, _iface_label_uppercase, nullptr, _iface_keys_max_len);
+    if( this->isAllowedSerialPort(SERIAL_INTERFACE_CAN, _port, allowedlist) ){
+
+      _payload += "\"";
+      _payload += _iface_label_uppercase;
+      _payload += "\":{\"";
+      _payload += SERIAL_PAYLOAD_MODE_KEY;
+      _payload += "\":";
+      _payload += pdiutil::to_string((int)SERIAL_READ);
+      _payload += ",\"";
+      _payload += SERIAL_PAYLOAD_VALUE_KEY;
+      _payload += "\":";
+      _payload += "\"\"";  // todo read data from serial can
+      _payload += "},";
+
+      _remove_comma = true;
+    }
+    __i_dvc_ctrl.yield();
   }
 
   if( _remove_comma ){
@@ -148,62 +208,97 @@ void SerialServiceProvider::applySerialJsonPayload(char *_payload, uint16_t _pay
     0 <= __strstr( _payload, (char*)SERIAL_PAYLOAD_VALUE_KEY, _payload_length - strlen(SERIAL_PAYLOAD_VALUE_KEY) )
   ){
 
-    int _port_data_max_len = MAX_SERIAL_DATA_LENGTH_FOR_IOT, _port_keys_max_len = 10;
+    int _iface_json_data_max_len = MAX_SERIAL_DATA_LENGTH_FOR_IOT_PAYLOAD, _iface_keys_max_len = 10;
+    char _iface_json_data[_iface_json_data_max_len]; 
+    char _iface_mode[_iface_keys_max_len]; 
+    char _iface_data[_iface_json_data_max_len];
 
-    char _port_label_uppercase[_port_keys_max_len];
-    char _port_label_lowercase[_port_keys_max_len];
-    char _port_json_data[_port_data_max_len]; 
-    char _port_mode[_port_keys_max_len]; 
-    char _port_data[_port_data_max_len];
-
-    // Decode the pin mode and value
     for (uint8_t _port = 0; _port < MAX_SERIAL_PORT; _port++) {
 
-      uint8_t _port_label_n = _port;
+      // Decode the UART mode and value. uart port 0 is allocated for cmd so not using
+      memset( _iface_json_data, 0, _iface_json_data_max_len);
+      memset( _iface_mode, 0, _iface_keys_max_len); 
+      memset( _iface_data, 0, _iface_json_data_max_len);
+      if( _port != 0 && this->isAllowedSerialPort(SERIAL_INTERFACE_UART, _port, allowedlist) && 
+        __get_iface_data_fromjson(SERIAL_INTERFACE_UART, _port, _payload, _payload_length, _iface_json_data, _iface_json_data_max_len)
+      ){
 
-      memset( _port_label_uppercase, 0, _port_keys_max_len);
-      memset( _port_label_lowercase, 0, _port_keys_max_len);
-      memset( _port_json_data, 0, _port_data_max_len);
-      memset( _port_mode, 0, _port_keys_max_len); 
-      memset( _port_data, 0, _port_data_max_len);
+        if( 
+          __get_from_json( _iface_json_data, (char*)SERIAL_PAYLOAD_MODE_KEY, _iface_mode, _iface_keys_max_len ) && 
+          __get_from_json( _iface_json_data, (char*)SERIAL_PAYLOAD_VALUE_KEY, _iface_data, _iface_json_data_max_len ) 
+        ){
 
-      // currently support for uart only
-      __appendUintToBuff(_port_label_uppercase, "UART%d", _port_label_n, _port_keys_max_len-1);
-      __appendUintToBuff(_port_label_lowercase, "uart%d", _port_label_n, _port_keys_max_len-1);
+            LogFmtI("Applying to : %s%d, mode : %s, value : %s\n", SERIAL_INTERFACE_UART, _port, _iface_mode, _iface_data);
 
-      if( __get_from_json( _payload, _port_label_uppercase, _port_json_data, _port_data_max_len ) || __get_from_json( _payload, _port_label_lowercase, _port_json_data, _port_data_max_len ) ){
-
-        if( allowedlist != nullptr ){
-
-          bool _is_allowed = false;
-
-          for( size_t i=0; i < allowedlist->size(); i++ ){
-
-            if( __are_str_equals( allowedlist->at(i).c_str(), _port_label_uppercase, strlen( _port_label_uppercase ) ) ||
-                __are_str_equals( allowedlist->at(i).c_str(), _port_label_lowercase, strlen( _port_label_lowercase ) ) ){
-
-              _is_allowed = true;
-              break;
-            }
-          }
-
-          if( !_is_allowed ){
-
-            continue;
-          }
-        }
-
-        if( __get_from_json( _port_json_data, (char*)SERIAL_PAYLOAD_MODE_KEY, _port_mode, _port_keys_max_len ) ){
-
-          if( __get_from_json( _port_json_data, (char*)SERIAL_PAYLOAD_VALUE_KEY, _port_data, _port_data_max_len ) ){
-
-            LogFmtI("Applying to : %s, mode : %s, value : %s\n", _port_label_uppercase, _port_mode, _port_data);
-
-            uint8_t _mode = StringToUint8( _port_mode, _port_keys_max_len );
+            uint8_t _mode = StringToUint8( _iface_mode, _iface_keys_max_len );
             // todo send data on serial
-          }
         }
       }
+      __i_dvc_ctrl.yield();
+
+      // Decode the SPI mode and value
+      memset( _iface_json_data, 0, _iface_json_data_max_len);
+      memset( _iface_mode, 0, _iface_keys_max_len); 
+      memset( _iface_data, 0, _iface_json_data_max_len);
+      if( this->isAllowedSerialPort(SERIAL_INTERFACE_SPI, _port, allowedlist) && 
+        __get_iface_data_fromjson(SERIAL_INTERFACE_SPI, _port, _payload, _payload_length, _iface_json_data, _iface_json_data_max_len)
+      ){
+
+        if( 
+          __get_from_json( _iface_json_data, (char*)SERIAL_PAYLOAD_MODE_KEY, _iface_mode, _iface_keys_max_len ) && 
+          __get_from_json( _iface_json_data, (char*)SERIAL_PAYLOAD_VALUE_KEY, _iface_data, _iface_json_data_max_len ) 
+        ){
+
+            LogFmtI("Applying to : %s%d, mode : %s, value : %s\n", SERIAL_INTERFACE_SPI, _port, _iface_mode, _iface_data);
+
+            uint8_t _mode = StringToUint8( _iface_mode, _iface_keys_max_len );
+            // todo send data on serial
+        }
+      }
+      __i_dvc_ctrl.yield();
+
+      // Decode the I2C mode and value
+      memset( _iface_json_data, 0, _iface_json_data_max_len);
+      memset( _iface_mode, 0, _iface_keys_max_len); 
+      memset( _iface_data, 0, _iface_json_data_max_len);
+      if( this->isAllowedSerialPort(SERIAL_INTERFACE_I2C, _port, allowedlist) && 
+        __get_iface_data_fromjson(SERIAL_INTERFACE_I2C, _port, _payload, _payload_length, _iface_json_data, _iface_json_data_max_len)
+      ){
+
+        if( 
+          __get_from_json( _iface_json_data, (char*)SERIAL_PAYLOAD_MODE_KEY, _iface_mode, _iface_keys_max_len ) && 
+          __get_from_json( _iface_json_data, (char*)SERIAL_PAYLOAD_VALUE_KEY, _iface_data, _iface_json_data_max_len ) 
+        ){
+
+            LogFmtI("Applying to : %s%d, mode : %s, value : %s\n", SERIAL_INTERFACE_I2C, _port, _iface_mode, _iface_data);
+
+            uint8_t _mode = StringToUint8( _iface_mode, _iface_keys_max_len );
+            // todo send data on serial
+        }
+      }
+      __i_dvc_ctrl.yield();
+
+      // Decode the CAN mode and value
+      memset( _iface_json_data, 0, _iface_json_data_max_len);
+      memset( _iface_mode, 0, _iface_keys_max_len); 
+      memset( _iface_data, 0, _iface_json_data_max_len);
+      if( this->isAllowedSerialPort(SERIAL_INTERFACE_CAN, _port, allowedlist) && 
+        __get_iface_data_fromjson(SERIAL_INTERFACE_CAN, _port, _payload, _payload_length, _iface_json_data, _iface_json_data_max_len)
+      ){
+
+        if( 
+          __get_from_json( _iface_json_data, (char*)SERIAL_PAYLOAD_MODE_KEY, _iface_mode, _iface_keys_max_len ) && 
+          __get_from_json( _iface_json_data, (char*)SERIAL_PAYLOAD_VALUE_KEY, _iface_data, _iface_json_data_max_len ) 
+        ){
+
+            LogFmtI("Applying to : %s%d, mode : %s, value : %s\n", SERIAL_INTERFACE_CAN, _port, _iface_mode, _iface_data);
+
+            uint8_t _mode = StringToUint8( _iface_mode, _iface_keys_max_len );
+            // todo send data on serial
+        }
+      }
+      __i_dvc_ctrl.yield();
+
     }
   }
 }
@@ -215,26 +310,20 @@ void SerialServiceProvider::applySerialJsonPayload(char *_payload, uint16_t _pay
  * @param pdiutil::vector<pdiutil::string>* allowedlist
  * @return bool
  */
-bool SerialServiceProvider::isAllowedSerialPort(uint8_t _port, pdiutil::vector<pdiutil::string> *allowedlist){
+bool SerialServiceProvider::isAllowedSerialPort(const char* serial, uint8_t _port, pdiutil::vector<pdiutil::string> *allowedlist){
 
-  int _port_keys_max_len = 10;
+  int _iface_keys_max_len = strlen(serial) + 6;
+  char _iface_label_uppercase[_iface_keys_max_len];
+  char _iface_label_lowercase[_iface_keys_max_len];
 
-  char _port_label_uppercase[_port_keys_max_len];
-  char _port_label_lowercase[_port_keys_max_len];
-
-  memset( _port_label_uppercase, 0, _port_keys_max_len);
-  memset( _port_label_lowercase, 0, _port_keys_max_len);
-
-  // currently support for uart only
-  __appendUintToBuff(_port_label_uppercase, "UART%d", _port, _port_keys_max_len-1);
-  __appendUintToBuff(_port_label_lowercase, "uart%d", _port, _port_keys_max_len-1);
+  __get_iface_key_informat(serial, _port, _iface_label_uppercase, _iface_label_lowercase, _iface_keys_max_len);
 
   if( allowedlist != nullptr ){
 
     for( size_t i=0; i < allowedlist->size(); i++ ){
 
-      if( __are_str_equals( allowedlist->at(i).c_str(), _port_label_uppercase, strlen( _port_label_uppercase ) ) ||
-          __are_str_equals( allowedlist->at(i).c_str(), _port_label_lowercase, strlen( _port_label_lowercase ) ) ){
+      if( __are_str_equals( allowedlist->at(i).c_str(), _iface_label_uppercase, strlen( _iface_label_uppercase ) ) ||
+          __are_str_equals( allowedlist->at(i).c_str(), _iface_label_lowercase, strlen( _iface_label_lowercase ) ) ){
 
         return true;
       }
@@ -245,6 +334,7 @@ bool SerialServiceProvider::isAllowedSerialPort(uint8_t _port, pdiutil::vector<p
 
   return true;
 }
+
 
 SerialServiceProvider __serial_service;
 

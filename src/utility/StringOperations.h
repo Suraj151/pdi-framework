@@ -107,4 +107,40 @@ void __find_and_replace(char *_str, const char *_find_str, const char *_replace_
  */
 bool __get_from_json(char *_str, char *_key, char *_value, int _max_value_len);
 
+
+/**
+ * @brief Convert to lowercase if any uppercase char.
+ * @param _str The string to convert to lower.
+ * @param _strlen The length of the string.
+ */
+void __tolowercase(char *_str, int _strlen);
+
+/**
+ * @brief Convert to uppercase if any lowercase char.
+ * @param _str The string to convert to upper.
+ * @param _strlen The length of the string.
+ */
+void __touppercase(char *_str, int _strlen);
+
+/**
+ * @brief Get the provided interface in uppercase and lowercase format.
+ * @param _iface The interface perfix.
+ * @param _ifaceport The interface port.
+ * @param _ifaceuppercase The pointer to the buffer to store interface format in uppercase.
+ * @param _ifaceuppercase The pointer to the buffer to store interface format in lowercase.
+ * @param _maxlen The max length of the formatted out.
+ */
+void __get_iface_key_informat( const char* _iface, uint16_t _ifaceport, char* _ifaceuppercase, char* _ifacelowercase, int _maxlen );
+
+/**
+ * @brief Get the data for provided interface key.
+ * @param _iface The interface perfix.
+ * @param _ifaceport The interface port.
+ * @param _jsonpayload The pointer to the json payload.
+ * @param _ifacejsondata The pointer to the buffer to store interface json data.
+ * @param _maxlen The max length of the iface json data.
+ * @return True if the key-value pair was found, false otherwise.
+ */
+bool __get_iface_data_fromjson( const char* _iface, uint16_t _ifaceport, char* _jsonpayload, int _jsonpayloadlen, char* _ifacejsondata, int _maxjsondatalen );
+
 #endif
