@@ -673,22 +673,6 @@ void Http_Client::AddHeader(const char *name, const char *value, bool inReqHeade
     {
         http_header_t header(name, value);
 
-        // uint16_t _len = strlen(name);
-        // header.key = new char[_len + 1];
-        // if (nullptr != header.key)
-        // {
-        //     memset(header.key, 0, _len + 1);
-        //     strcpy(header.key, name);
-        // }
-
-        // _len = strlen(value);
-        // header.value = new char[_len + 1];
-        // if (nullptr != header.value)
-        // {
-        //     memset(header.value, 0, _len + 1);
-        //     strcpy(header.value, value);
-        // }
-
         if (inReqHeader)
         {
             m_request.headers.push_back(header);
@@ -746,17 +730,19 @@ int16_t Http_Client::handleResponse()
     m_response.headers.clear();
     m_response.status_code = HTTP_RESP_MAX;
 
-    while (m_client && Connected() && nullptr != m_response.response && max_timeout > 0)
+    char* buf = m_response.response;
+
+    while (m_client && Connected() && nullptr != buf && max_timeout > 0)
     {
         // yield & record now time
         __i_dvc_ctrl.yield();
         now = __i_dvc_ctrl.millis_now();
 
         // clear the buffer before reading
-        memset(m_response.response, 0, m_response.max_resp_length + 1);
+        memset(buf, 0, m_response.max_resp_length + 1);
         // read until the next line (lf) char
         m_response.resp_length = readPacket(m_client,
-                                            (uint8_t *)m_response.response,
+                                            (uint8_t*)buf,
                                             m_response.max_resp_length,
                                             max_timeout,
                                             header_ends ? 0 : '\n');
@@ -766,10 +752,10 @@ int16_t Http_Client::handleResponse()
         {
             // LogFmtI("ReadResponse (%d) : %s\r\n", m_response.resp_length, m_response.response);
             // trim response
-            m_response.response = __strtrim(m_response.response);
-            m_response.response = __strtrim_val(m_response.response, '\n');
-            m_response.response = __strtrim_val(m_response.response, '\r');
-            m_response.resp_length = strlen(m_response.response);
+            char* line = __strtrim(buf);
+            line = __strtrim_val(line, '\n');
+            line = __strtrim_val(line, '\r');
+            uint16_t line_len = strlen(line);
 
             // break once header end and response collected
             if (header_ends)
@@ -778,26 +764,30 @@ int16_t Http_Client::handleResponse()
             }
 
             // check for status code in initial resp
-            int index = __strstr(m_response.response, "HTTP/");
+            int index = __strstr(line, "HTTP/");
             if (-1 != index)
             {
                 index += 5; // ignore version for now - HTTP/
-                while (m_response.response[index++] != (char)space && index < m_response.resp_length);
-                m_response.status_code = StringToUint16(&m_response.response[index]);
+                while (index < line_len && line[index] != space) {
+                    index++;
+                }
+                if (index < line_len) {
+                    m_response.status_code = StringToUint16(&line[index]);
+                }            
             }
 
             // check for header
-            int headerSeperatorIndex = __strstr(m_response.response, ":");
+            int headerSeperatorIndex = __strstr(line, ":");
             if (-1 != headerSeperatorIndex)
             {
-                m_response.response[headerSeperatorIndex] = 0;
-                char *header_name = __strtrim(m_response.response);
-                char *header_value = __strtrim(m_response.response + headerSeperatorIndex + 1);
+                line[headerSeperatorIndex] = 0;
+                char *header_name = __strtrim(line);
+                char *header_value = __strtrim(line + headerSeperatorIndex + 1);
                 AddHeader(header_name, header_value, false);
             }
 
             // check for all headers end
-            if (-1 == headerSeperatorIndex && strlen(m_response.response) == 0)
+            if (-1 == headerSeperatorIndex && line_len == 0)
             {
                 header_ends = true;
             }

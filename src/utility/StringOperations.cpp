@@ -260,7 +260,8 @@ void __find_and_replace(char *_str, const char *_find_str, const char *_replace_
     int _find_str_len = strlen(_find_str);
     int _replace_str_len = strlen(_replace_with);
 
-    int _total_len = _str_len + (_replace_str_len * _occurence);
+    int _total_len = _str_len + (_replace_str_len * _occurence) - (_occurence * _find_str_len) + 1;
+    _total_len = pdistd::max(_str_len, _total_len) + 1;
     char *_buf = new char[_total_len];
 
     if (nullptr == _buf)
@@ -273,7 +274,7 @@ void __find_and_replace(char *_str, const char *_find_str, const char *_replace_
     int j = 0, o = 0;
     for (; j < _str_len && o < _occurence;)
     {
-        int _occur_index = __strstr(&_str[j], _find_str, _str_len);
+        int _occur_index = __strstr(&_str[j], _find_str, _str_len-j);
         if (_occur_index >= 0)
         {
             strncat(_buf, &_str[j], _occur_index);
@@ -291,7 +292,7 @@ void __find_and_replace(char *_str, const char *_find_str, const char *_replace_
         strncat(_buf, &_str[j], (_str_len - j));
     int _fin_len = _str_len - (o * _find_str_len) + (o * _replace_str_len);
 
-    if (strlen(_buf) > 0 && o > 0)
+    if (strlen(_buf) > 0 && o > 0 && _str_len > _fin_len)
     {
         memset(_str, 0, _str_len);
         memcpy(_str, _buf, _fin_len + 1);
@@ -312,7 +313,7 @@ void __find_and_replace(char *_str, const char *_find_str, const char *_replace_
  */
 bool __get_from_json(char *_str, char *_key, char *_value, int _max_value_len)
 {
-    if (nullptr == _str || nullptr == _key)
+    if (nullptr == _str || nullptr == _key || nullptr == _value || _max_value_len <= 0)
     {
         return false;
     }
@@ -330,6 +331,8 @@ bool __get_from_json(char *_str, char *_key, char *_value, int _max_value_len)
     memset(_str_buf, 0, _str_len);
 
     int _occur_index = __strstr(_str, _key, _str_len);
+    int _base_index = _occur_index + _key_str_len; 
+    int _limit = _str_len - _base_index; 
     if (_occur_index >= 0)
     {
         int j = 0;
@@ -341,33 +344,33 @@ bool __get_from_json(char *_str, char *_key, char *_value, int _max_value_len)
         int no_of_double_quote = 0;
         bool foundsemicolon = false;
 
-        while (j < _str_len)
+        while (j < _limit)
         {
-            if (_str[_occur_index + _key_str_len + j] == ',')
+            if (_str[_base_index + j] == ',')
             {
                 no_of_commas++;
             }
-            else if (_str[_occur_index + _key_str_len + j] == ':')
+            else if (_str[_base_index + j] == ':')
             {
                 foundsemicolon = true;
             }
-            else if (foundsemicolon && (_str[_occur_index + _key_str_len + j] == '"'))
+            else if (foundsemicolon && (_str[_base_index + j] == '"'))
             {
                 no_of_double_quote++;
             }
-            else if (_str[_occur_index + _key_str_len + j] == '{')
+            else if (_str[_base_index + j] == '{')
             {
                 no_of_opening_curly_bracket++;
             }
-            else if (_str[_occur_index + _key_str_len + j] == '}')
+            else if (_str[_base_index + j] == '}')
             {
                 no_of_closing_curly_bracket++;
             }
-            else if (_str[_occur_index + _key_str_len + j] == '[')
+            else if (_str[_base_index + j] == '[')
             {
                 no_of_opening_square_bracket++;
             }
-            else if (_str[_occur_index + _key_str_len + j] == ']')
+            else if (_str[_base_index + j] == ']')
             {
                 no_of_closing_square_bracket++;
             }
@@ -412,15 +415,31 @@ bool __get_from_json(char *_str, char *_key, char *_value, int _max_value_len)
         memcpy(_str_buf, &_str[_occur_index], _key_str_len + j + 1);
         __find_and_replace(_str_buf, "\n", "", 5);
         __find_and_replace(_str_buf, _key, "", 1);
+        
         int _key_value_seperator = __strstr(_str_buf, ":", _str_len);
-        memcpy(_str_buf, _str_buf + _key_value_seperator, _key_str_len + j + 1 - _key_value_seperator);
-        memcpy(_str_buf, __strtrim_val(_str_buf, ':', _max_value_len), strlen(_str_buf));
-        memcpy(_str_buf, __strtrim_val(_str_buf, ',', _max_value_len), strlen(_str_buf));
-        memcpy(_str_buf, __strtrim(_str_buf, _max_value_len), strlen(_str_buf));
-        memcpy(_str_buf, __strtrim_val(_str_buf, '"', _max_value_len), strlen(_str_buf));
+        if( _key_value_seperator > 0 ){
 
-        memset(_value, 0, _max_value_len);
-        memcpy(_value, _str_buf, strlen(_str_buf));
+            memcpy(_str_buf, _str_buf + _key_value_seperator, _key_str_len + j + 1 - _key_value_seperator);
+
+            char* _trimmedstr = __strtrim_val(_str_buf, ':', _max_value_len);
+            if( nullptr != _trimmedstr )
+            memcpy(_str_buf, _trimmedstr, strlen(_str_buf));
+
+            _trimmedstr = __strtrim_val(_str_buf, ',', _max_value_len);
+            if( nullptr != _trimmedstr )
+            memcpy(_str_buf, _trimmedstr, strlen(_str_buf));
+
+            _trimmedstr = __strtrim(_str_buf, _max_value_len);
+            if( nullptr != _trimmedstr )
+            memcpy(_str_buf, _trimmedstr, strlen(_str_buf));
+
+            _trimmedstr = __strtrim_val(_str_buf, '"', _max_value_len);
+            if( nullptr != _trimmedstr )
+            memcpy(_str_buf, _trimmedstr, strlen(_str_buf));
+
+            memset(_value, 0, _max_value_len);
+            memcpy(_value, _str_buf, strlen(_str_buf));
+        }
     }
 
     delete[] _str_buf;

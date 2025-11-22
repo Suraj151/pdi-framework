@@ -91,7 +91,11 @@ namespace pdistd
 
         function& operator= (function const& other)
         {
-            delete functorHolderPtr;
+            if( nullptr != functorHolderPtr ){
+
+                delete functorHolderPtr;
+                functorHolderPtr = nullptr;
+            }
 
             if (other.functorHolderPtr != nullptr)
                 functorHolderPtr = other.functorHolderPtr->clone();

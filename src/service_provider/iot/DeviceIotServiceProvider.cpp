@@ -190,11 +190,9 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
 
         if( 0 <= __strstr( http_resp, (char*)DEVICE_IOT_CONFIG_CHANNEL_TOKEN_KEY, DEVICE_IOT_CONFIG_RESP_MAX_SIZE - strlen(DEVICE_IOT_CONFIG_CHANNEL_TOKEN_KEY) ) ){
 
-          bool _json_result = __get_from_json( http_resp, (char*)DEVICE_IOT_CONFIG_CHANNEL_TOKEN_KEY, this->m_server_configurable_channel_token, DEVICE_IOT_CONFIG_CHANNEL_TOKEN_MAX_SIZE );
-
-          _json_result = 
-            __get_from_json( http_resp, (char*)DEVICE_IOT_CONFIG_CHANNEL_WRITE_KEY, this->m_server_configurable_channel_write, DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE ) &&
-            __get_from_json( http_resp, (char*)DEVICE_IOT_CONFIG_CHANNEL_READ_KEY, this->m_server_configurable_channel_read, DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE );
+          bool _json_result = __get_from_json( http_resp, (char*)DEVICE_IOT_CONFIG_CHANNEL_TOKEN_KEY, this->m_server_configurable_channel_token, DEVICE_IOT_CONFIG_CHANNEL_TOKEN_MAX_SIZE-1 ) &&
+            __get_from_json( http_resp, (char*)DEVICE_IOT_CONFIG_CHANNEL_WRITE_KEY, this->m_server_configurable_channel_write, DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE-1 ) &&
+            __get_from_json( http_resp, (char*)DEVICE_IOT_CONFIG_CHANNEL_READ_KEY, this->m_server_configurable_channel_read, DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE-1 );
           
           if(  _json_result && strlen( this->m_server_configurable_channel_token ) && strlen( this->m_server_configurable_channel_write ) && strlen( this->m_server_configurable_channel_read ) ){
 
@@ -366,7 +364,7 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
 
     // else parse the host from iot host config
     http_req_t httpreq; httpreq.init(this->m_device_iot_configs.device_iot_host);
-    memcpy( this->m_server_configurable_channel_host, httpreq.host, strlen( httpreq.host ) );
+    memcpy( this->m_server_configurable_channel_host, httpreq.host, pdistd::min((int)strlen( httpreq.host ), (int)(DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE-1)) );
     LogFmtW("Using Iot Channel Host : %s\n", this->m_server_configurable_channel_host);
   }
 
