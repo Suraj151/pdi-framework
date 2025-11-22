@@ -74,27 +74,29 @@ void DeviceIotSensor::dataHook( pdiutil::string &_payload ){
     pdiutil::string iface_payload = "";
     __gpio_service.appendGpioJsonPayload( iface_payload, false, &concatenated_v );
 
-    char tembuff[ iface_payload.size() + 1 ];
-    memset(tembuff, 0, iface_payload.size() + 1 );
+    char gpiotembuff[ iface_payload.size() + 1 ];
+    memset(gpiotembuff, 0, iface_payload.size() + 1 );
 
-    bool _json_result = __get_from_json( (char*)iface_payload.c_str(), (char*)GPIO_PAYLOAD_DATA_KEY, tembuff, iface_payload.size() + 1 );
+    bool _json_result = __get_from_json( (char*)iface_payload.c_str(), (char*)GPIO_PAYLOAD_DATA_KEY, gpiotembuff, iface_payload.size() + 1 );
 
     if(_json_result){
 
-      _payload += tembuff;
+      _payload += gpiotembuff;
 
       #if defined(ENABLE_SERIAL_SERVICE)
       
       iface_payload = "";
       __serial_service.appendSerialJsonPayload( iface_payload, &concatenated_v );
+      char serialtembuff[ iface_payload.size() + 1 ];
+      memset(serialtembuff, 0, iface_payload.size() + 1 );
 
-      _json_result = __get_from_json( (char*)iface_payload.c_str(), (char*)SERIAL_PAYLOAD_DATA_KEY, tembuff, iface_payload.size() + 1 );
+      _json_result = __get_from_json( (char*)iface_payload.c_str(), (char*)SERIAL_PAYLOAD_DATA_KEY, serialtembuff, iface_payload.size() + 1 );
 
-      if(_json_result){
+      if(_json_result && strlen(serialtembuff) > 2){
 
         _payload.pop_back(); // remove last curly close bracket to continue to add payload
-        tembuff[0] = ',';   // Replace first curly bracket with comma to continue payload
-        _payload += tembuff;
+        serialtembuff[0] = ',';   // Replace first curly bracket with comma to continue payload
+        _payload += serialtembuff;
       }
       #endif
     }
