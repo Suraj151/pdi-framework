@@ -33,7 +33,8 @@ TcpClientInterface::TcpClientInterface(struct tcp_pcb* pcb):
     m_rxBuffer(nullptr),
     m_rxBufferSize(0),
     m_timeout(3000),
-    m_isLastWriteAcked(true) {
+    m_isLastWriteAcked(true),
+    m_port(0) {
 
     if (m_pcb) {
         tcp_arg(m_pcb, this);
@@ -53,6 +54,31 @@ TcpClientInterface::~TcpClientInterface() {
 }
 
 /**
+ * @brief sync/async call to connect client pcb with ip,port
+ */
+int16_t TcpClientInterface::connectpcb(TcpClientInterface* client, const ip_addr_t* ip, uint16_t port){
+
+    if( client && ip ){
+
+        // Set the connection callback
+        tcp_arg(client->m_pcb, client);
+        tcp_err(client->m_pcb, &TcpClientInterface::onError);
+        tcp_sent(client->m_pcb, &TcpClientInterface::onSent);
+
+        // Connect to the server
+        err_t err = tcp_connect(client->m_pcb, ip, port, &TcpClientInterface::onConnected);
+        if (err != ERR_OK) {
+            client->close();
+            return err < 0 ? err : -99; // Return error code if connection fails
+        }
+        client->setNoDelay(true);
+        
+        return 0;
+    }
+    return -100;
+}
+
+/**
  * @brief Connect to a remote server async.
  */
 int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
@@ -65,27 +91,40 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
     }
 
     // Convert the host to an IP address
+    const char* hostname = reinterpret_cast<const char*>(host);
+    m_port = port;
     ip_addr_t serverIp;
-    if (!ipaddr_aton(reinterpret_cast<const char*>(host), &serverIp)) {
-        close();
-        return -99;
+
+    if (!ipaddr_aton(hostname, &serverIp)) {
+        // It's a hostname, resolve via DNS
+        err_t err = dns_gethostbyname(hostname, &serverIp,[](const char* name, const ip_addr_t* ipaddr, void* arg) {
+
+            TcpClientInterface* self = static_cast<TcpClientInterface*>(arg);
+
+            if (ipaddr) {
+                // Connect once resolved
+                self->connectpcb(self, ipaddr, self->m_port);
+            } else {
+
+                self->close();
+            }
+        }, this);
+
+        if (err == ERR_OK) {
+
+            // Resolved immediately (cached), connect now
+        } else if (err == ERR_INPROGRESS) {
+            
+            // Will connect asynchronously in callback
+            return 1;      // indicate "in progress"
+        } else {
+
+            close();
+            return -99;
+        }        
     }
 
-    // Set the connection callback
-    tcp_arg(m_pcb, this);
-    tcp_err(m_pcb, &TcpClientInterface::onError);
-    tcp_sent(m_pcb, &TcpClientInterface::onSent);
-
-    // Connect to the server
-    err_t err = tcp_connect(m_pcb, &serverIp, port, &TcpClientInterface::onConnected);
-    if (err != ERR_OK) {
-        close();
-        return err < 0 ? err : -99; // Return error code if connection fails
-    }
-
-    setNoDelay(true);
-    
-    return 0;
+    return connectpcb(this, &serverIp, m_port);
 }
 
 /**

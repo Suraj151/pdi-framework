@@ -103,6 +103,18 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isAlertPost ){
     nullptr != this->m_http_client
   ){
 
+    pdiutil::string::size_type mac_index = posturl.find("[mac]");
+    if( pdiutil::string::npos != mac_index )
+    {
+      posturl.replace( mac_index, 5, __i_dvc_ctrl.getDeviceMac().c_str() );
+    }
+
+    pdiutil::string::size_type duid_index = posturl.find("[duid]");
+    if( pdiutil::string::npos != duid_index )
+    {
+      posturl.replace( duid_index, 6, m_device_id.c_str() );
+    }
+
     pdiutil::string *_payload = new pdiutil::string();
 
     if( nullptr != _payload ){
@@ -113,7 +125,7 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isAlertPost ){
 
       #ifdef ENABLE_DEVICE_IOT
       this->m_http_client->SetUserAgent("pdistack");
-      this->m_http_client->SetBasicAuthorization("iot-otp", __i_dvc_ctrl.getDeviceMac().c_str());
+      this->m_http_client->SetBasicAuthorization("mac", __i_dvc_ctrl.getDeviceMac().c_str());
       #else
       this->m_http_client->SetUserAgent("pdistack");
       this->m_http_client->SetBasicAuthorization("user", "password");
@@ -154,6 +166,18 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
     _payload += __i_dvc_ctrl.getDeviceMac().c_str();
     _payload += "\",";
   }
+
+#ifdef ENABLE_DEVICE_IOT
+
+  if( m_device_id.size() > 0 ){
+
+    _payload += "\"";
+    _payload += GPIO_PAYLOAD_DUID_KEY;
+    _payload += "\":\"";
+    _payload += m_device_id.c_str();
+    _payload += "\",";
+  }
+#endif
 
 #ifndef ENABLE_GPIO_BASIC_ONLY
   if( isAlertPost ){
@@ -266,7 +290,7 @@ void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payloa
       memset( _pin_data, 0, _pin_data_max_len);
       memset( _pin_mode, 0, _pin_values_max_len); 
       memset( _pin_value, 0, _pin_values_max_len);
-      if( !__i_dvc_ctrl.isExceptionalGpio(_pin_label_n) && (__get_from_json( _payload, _pin_label_uppercase, _pin_data, _pin_data_max_len ) || __get_from_json( _payload, _pin_label_lowercase, _pin_data, _pin_data_max_len )) ){
+      if( !__i_dvc_ctrl.isExceptionalGpio(_pin) && (__get_from_json( _payload, _pin_label_uppercase, _pin_data, _pin_data_max_len ) || __get_from_json( _payload, _pin_label_lowercase, _pin_data, _pin_data_max_len )) ){
 
         if( allowedlist != nullptr ){
 
@@ -294,17 +318,20 @@ void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payloa
 
             LogFmtI("Applying to : %s, mode : %s, value : %s\n", _pin_label_uppercase, _pin_mode, _pin_value);
 
-            uint8_t _mode = StringToUint8( _pin_mode, _pin_values_max_len );
-            uint16_t _value = StringToUint16( _pin_value, _pin_values_max_len );
-            this->m_gpio_config_copy.gpio_mode[_pin] = _mode < GPIO_MODE_MAX ? _mode : this->m_gpio_config_copy.gpio_mode[_pin];
+            if( !__are_arrays_equal(_pin_mode, "NA", 2) ){
+
+              uint8_t _mode = StringToUint8( _pin_mode, _pin_values_max_len );
+              this->m_gpio_config_copy.gpio_mode[_pin] = _mode < GPIO_MODE_MAX ? _mode : this->m_gpio_config_copy.gpio_mode[_pin];
+              this->m_update_gpio_table_from_copy = true;
+            }
 
             if( !__are_arrays_equal(_pin_value, "NA", 2) ){
 
-              uint16_t _value_limit = _mode == ANALOG_WRITE ? ANALOG_GPIO_RESOLUTION : _mode == DIGITAL_BLINK ? _value+1 : GPIO_STATE_MAX;
+              uint16_t _value = StringToUint16( _pin_value, _pin_values_max_len );
+              uint16_t _value_limit = this->m_gpio_config_copy.gpio_mode[_pin] == ANALOG_WRITE ? ANALOG_GPIO_RESOLUTION : this->m_gpio_config_copy.gpio_mode[_pin] == DIGITAL_BLINK ? _value+1 : GPIO_STATE_MAX;
               this->m_gpio_config_copy.gpio_readings[_pin] = _value < _value_limit ? _value : this->m_gpio_config_copy.gpio_readings[_pin];
+              this->m_update_gpio_table_from_copy = true;
             }
-
-            this->m_update_gpio_table_from_copy = true;
           }
         }
       }
@@ -323,6 +350,98 @@ void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payloa
 
 }
 
+/**
+ * apply alert json payload to gpio operations
+ *
+ * @param char* _payload
+ */
+void GpioServiceProvider::applyGpioAlertJsonPayload( char* _payload, uint16_t _payload_length, pdiutil::vector<pdiutil::string> *allowedlist ){
+
+  LogFmtI("Applying GPIO Alert from Json Payload : %s\n", _payload);
+
+  if(
+    0 <= __strstr( _payload, (char*)GPIO_ALERT_COMPARATOR_KEY, _payload_length - strlen(GPIO_PAYLOAD_DATA_KEY) ) &&
+    0 <= __strstr( _payload, (char*)GPIO_PAYLOAD_VALUE_KEY, _payload_length - strlen(GPIO_PAYLOAD_VALUE_KEY) )
+  ){
+
+    int _iface_data_max_len = 30, _iface_keys_max_len = 6;
+    char _iface_label_uppercase[_iface_keys_max_len]; //memset( _iface_label, 0, _iface_keys_max_len); _iface_label[0] = 'D';
+    char _iface_label_lowercase[_iface_keys_max_len];
+    char _iface_data[_iface_data_max_len], _iface_comparator[_iface_keys_max_len], _iface_value[_iface_keys_max_len];
+
+    for (uint8_t _pin = 0; _pin < (MAX_DIGITAL_GPIO_PINS + MAX_ANALOG_GPIO_PINS); _pin++) {
+
+      if( !__i_dvc_ctrl.isExceptionalGpio(_pin) && this->isAllowedGpioPin(_pin, allowedlist) ){
+
+        memset( _iface_data, 0, _iface_data_max_len);
+        memset( _iface_comparator, 0, _iface_keys_max_len); 
+        memset( _iface_value, 0, _iface_keys_max_len);
+
+        if( _pin < MAX_DIGITAL_GPIO_PINS ){
+          __get_iface_key_informat("D", _pin, _iface_label_uppercase, _iface_label_lowercase, _iface_keys_max_len);
+        }else{
+          __get_iface_key_informat("A", _pin - MAX_DIGITAL_GPIO_PINS, _iface_label_uppercase, _iface_label_lowercase, _iface_keys_max_len);
+        }        
+
+        if( 
+          __get_from_json( _payload, _iface_label_uppercase, _iface_data, _iface_data_max_len ) || 
+          __get_from_json( _payload, _iface_label_lowercase, _iface_data, _iface_data_max_len ) 
+        ){
+
+          if( __get_from_json( _iface_data, (char*)GPIO_ALERT_COMPARATOR_KEY, _iface_comparator, _iface_keys_max_len ) ){
+
+            if( __get_from_json( _iface_data, (char*)GPIO_PAYLOAD_VALUE_KEY, _iface_value, _iface_keys_max_len ) ){
+
+              LogFmtI("Applying to : %s, cmp : %s, value : %s\n", _iface_label_uppercase, _iface_comparator, _iface_value);
+
+              uint8_t _comparator = StringToUint8( _iface_comparator, _iface_keys_max_len );
+              uint16_t _value = StringToUint16( _iface_value, _iface_keys_max_len );
+              this->m_gpio_config_copy.gpio_alert_comparator[_pin] = StringToUint8( _iface_comparator, _iface_keys_max_len );
+              this->m_gpio_config_copy.gpio_alert_values[_pin] = StringToUint16( _iface_value, _iface_keys_max_len );
+              this->m_gpio_config_copy.gpio_alert_channel[_pin] = HTTP_SERVER;
+
+              this->m_update_gpio_table_from_copy = true;
+            }
+          }
+        }else{
+
+          this->m_gpio_config_copy.gpio_alert_comparator[_pin] = 0;
+          this->m_gpio_config_copy.gpio_alert_values[_pin] = 0;
+          this->m_gpio_config_copy.gpio_alert_channel[_pin] = NO_ALERT;
+        }
+      }else{
+
+        this->m_gpio_config_copy.gpio_alert_comparator[_pin] = 0;
+        this->m_gpio_config_copy.gpio_alert_values[_pin] = 0;
+        this->m_gpio_config_copy.gpio_alert_channel[_pin] = NO_ALERT;
+      }
+    }
+  }
+}
+
+/**
+ * Set the device id
+ *
+ * @param const char* _id
+ */
+void GpioServiceProvider::setDeviceId(const char* _id){
+
+  m_device_id = _id;
+}
+
+/**
+ * Set the Http host for gpio data/events
+ *
+ * @param const char* _host
+ */
+void GpioServiceProvider::setHttpHost(const char* _host){
+
+  if( strlen(_host) < GPIO_HOST_BUF_SIZE ){
+
+    memcpy( this->m_gpio_config_copy.gpio_host, _host, strlen(_host) );
+    this->m_update_gpio_table_from_copy = true;
+  }
+}
 
 #ifdef ENABLE_EMAIL_SERVICE
 /**
@@ -437,10 +556,10 @@ void GpioServiceProvider::handleGpioOperations(){
       }
 
       uint32_t _now = __i_dvc_ctrl.millis_now();
-      if( _is_alert_condition && ( __gpio_alert_track.is_last_alert_succeed ?
+      if( _is_alert_condition && (( __gpio_alert_track.is_last_alert_succeed ?
         GPIO_ALERT_DURATION_FOR_SUCCEED < ( _now - __gpio_alert_track.last_alert_millis ) :
         GPIO_ALERT_DURATION_FOR_FAILED < ( _now - __gpio_alert_track.last_alert_millis )
-      ) ){
+      ) || __gpio_alert_track.alert_gpio_pin == -1) ){
 
         __gpio_alert_track.alert_gpio_pin = _pin;
         __gpio_alert_track.last_alert_millis = _now;
@@ -524,30 +643,26 @@ void GpioServiceProvider::handleGpioModes( int _gpio_config_type ){
  */
 bool GpioServiceProvider::isAllowedGpioPin(uint8_t _pin, pdiutil::vector<pdiutil::string> *allowedlist){
 
-  int _pin_values_max_len = 6;
-  char _pin_label_uppercase[_pin_values_max_len]; //memset( _pin_label, 0, _pin_values_max_len); _pin_label[0] = 'D';
-  char _pin_label_lowercase[_pin_values_max_len];
+  int _iface_keys_max_len = 6;
+  char _iface_label_uppercase[_iface_keys_max_len]; //memset( _pin_label, 0, _iface_keys_max_len); _pin_label[0] = 'D';
+  char _iface_label_lowercase[_iface_keys_max_len];
   uint8_t _pin_label_n = _pin;
 
-  memset( _pin_label_uppercase, 0, _pin_values_max_len);
-  memset( _pin_label_lowercase, 0, _pin_values_max_len);
   if( _pin < MAX_DIGITAL_GPIO_PINS ){
 
-    __appendUintToBuff(_pin_label_uppercase, "D%d", _pin_label_n, _pin_values_max_len-1);
-    __appendUintToBuff(_pin_label_lowercase, "d%d", _pin_label_n, _pin_values_max_len-1);
+    __get_iface_key_informat("D", _pin_label_n, _iface_label_uppercase, _iface_label_lowercase, _iface_keys_max_len);
   }else{
     _pin_label_n = _pin - MAX_DIGITAL_GPIO_PINS;
 
-    __appendUintToBuff(_pin_label_uppercase, "A%d", _pin_label_n, _pin_values_max_len-1);
-    __appendUintToBuff(_pin_label_lowercase, "a%d", _pin_label_n, _pin_values_max_len-1);
+    __get_iface_key_informat("A", _pin_label_n, _iface_label_uppercase, _iface_label_lowercase, _iface_keys_max_len);
   }
 
   if( allowedlist != nullptr ){
 
     for( size_t i=0; i < allowedlist->size(); i++ ){
 
-      if( __are_str_equals( allowedlist->at(i).c_str(), _pin_label_uppercase, strlen( _pin_label_uppercase ) ) ||
-          __are_str_equals( allowedlist->at(i).c_str(), _pin_label_lowercase, strlen( _pin_label_lowercase ) ) ){
+      if( __are_str_equals( allowedlist->at(i).c_str(), _iface_label_uppercase, strlen( _iface_label_uppercase ) ) ||
+          __are_str_equals( allowedlist->at(i).c_str(), _iface_label_lowercase, strlen( _iface_label_lowercase ) ) ){
 
         return true;
       }

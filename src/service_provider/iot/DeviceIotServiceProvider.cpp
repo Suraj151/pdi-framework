@@ -158,13 +158,13 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
   bool valid_host = ( configurl.size() > 5 && pdiutil::string::npos != configurl.find("http") );
   configurl += DEVICE_IOT_CONFIG_REQ_URL;
 
-  size_t mac_index = configurl.find("[mac]");
+  pdiutil::string::size_type mac_index = configurl.find("[mac]");
   if( pdiutil::string::npos != mac_index )
   {
     configurl.replace( mac_index, 5, __i_dvc_ctrl.getDeviceMac().c_str() );
   }
 
-  size_t duid_index = configurl.find("[duid]");
+  pdiutil::string::size_type duid_index = configurl.find("[duid]");
   if( pdiutil::string::npos != duid_index )
   {
     configurl.replace( duid_index, 6, this->m_device_iot_configs.device_iot_duid );
@@ -514,6 +514,20 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
         #endif
       }
     }
+  }
+
+  memset( _value_buff, 0, 100 );
+  _json_result = __get_from_json( json_resp, (char*)DEVICE_IOT_CONFIG_INTERFACE_EVENT_KEY, _value_buff, 99 );
+  if( _json_result && strlen(_value_buff) > 0 ){
+
+    pdiutil::vector<pdiutil::string> allowed_interface_list = this->m_server_configurable_interface_read;
+    allowed_interface_list.insert(allowed_interface_list.end(), this->m_server_configurable_interface_write.begin(), this->m_server_configurable_interface_write.end());
+
+    #if defined( ENABLE_GPIO_SERVICE )
+    __gpio_service.setDeviceId(this->m_device_iot_configs.device_iot_duid);
+    __gpio_service.setHttpHost(this->m_device_iot_configs.device_iot_host);
+    __gpio_service.applyGpioAlertJsonPayload(_value_buff, strlen(_value_buff), &allowed_interface_list);
+    #endif
   }
 
   this->beginSensorData();

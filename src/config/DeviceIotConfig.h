@@ -43,6 +43,7 @@ created Date    : 1st June 2019
 #define DEVICE_IOT_CONFIG_CHANNEL_TOKEN_MAX_SIZE      100
 #define DEVICE_IOT_CONFIG_INTERFACE_READ_KEY  "ifaceread"
 #define DEVICE_IOT_CONFIG_INTERFACE_WRITE_KEY "ifacewrite"
+#define DEVICE_IOT_CONFIG_INTERFACE_EVENT_KEY "ifaceevent"
 #define DEVICE_IOT_CONFIG_DATA_RATE_KEY       "datarate"
 #define DEVICE_IOT_CONFIG_SAMPLING_RATE_KEY   "samplerate"
 #define DEVICE_IOT_CONFIG_MQTT_KEEP_ALIVE_KEY "keepalive"

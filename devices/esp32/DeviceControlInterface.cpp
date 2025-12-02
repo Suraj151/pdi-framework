@@ -113,37 +113,34 @@ gpio_id_t DeviceControlInterface::gpioFromPinMap(gpio_id_t pin, bool isAnalog)
   switch ( pin ) {
 
     case 0:
-      mapped_pin = isAnalog ? 17 : 16;
+      mapped_pin = isAnalog ? 32 : 4;
       break;
     case 1:
-      mapped_pin = 5;
+      mapped_pin = isAnalog ? 33 : 13;
       break;
     case 2:
-      mapped_pin = 4;
+      mapped_pin = isAnalog ? 34 : 14;
       break;
     case 3:
-      mapped_pin = 0;
+      mapped_pin = isAnalog ? 35 : 16;
       break;
     case 4:
-      mapped_pin = 2;
+      mapped_pin = 17;
       break;
     case 5:
-      mapped_pin = 14;
+      mapped_pin = 18;
       break;
     case 6:
-      mapped_pin = 12;
+      mapped_pin = 19;
       break;
     case 7:
-      mapped_pin = 13;
+      mapped_pin = 21;
       break;
     case 8:
-      mapped_pin = 15;
+      mapped_pin = 22;
       break;
     case 9:
-      mapped_pin = 3;
-      break;
-    case 10:
-      mapped_pin = 1;
+      mapped_pin = 23;
       break;
     default:
       mapped_pin = 0;

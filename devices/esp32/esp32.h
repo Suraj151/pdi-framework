@@ -38,6 +38,8 @@ created Date    : 1st Jan 2024
 #include <lwip/inet.h> // For IP address conversion
 #include <lwip/opt.h>
 #include <lwip/tcpip.h>
+#include "lwip/dns.h"
+#include "netdb.h"
 
 // extern "C"
 // {

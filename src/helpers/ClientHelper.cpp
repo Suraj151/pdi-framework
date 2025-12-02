@@ -77,11 +77,11 @@ bool sendPacket(iClientInterface *client, uint8_t *buffer, uint16_t len, uint16_
       sentBytes += _sent;
       len -= _sent;
 
-      LogI("Client: sending packets : ");
-      for (int i = 0; i < sendlen; i++)
-      {
-        LogFmtI("%c", (char)_buff_pointer[i]);
-      }
+      // LogI("Client: sending packets : ");
+      // for (int i = 0; i < sendlen; i++)
+      // {
+      //   LogFmtI("%c", (char)_buff_pointer[i]);
+      // }
       LogFmtI("\nClient: sent %d/%d\n", sentBytes, _buf_len);
 
       if (len == 0)
