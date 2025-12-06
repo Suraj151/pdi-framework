@@ -31,7 +31,7 @@ created Date    : 1st June 2019
 #define SENSOR_DATA_SAMPLES_PER_PUBLISH_MAX_LIMIT	60
 
 #define DEVICE_IOT_CONFIG_REQ_URL             "/api/fordevice/get-config?mac_id=[mac]&duid=[duid]"
-#define DEVICE_IOT_ALERTS_REQ_URL             "/api/fordevice/get-alerts?mac_id=[mac]&duid=[duid]"
+// #define DEVICE_IOT_EVENTS_REQ_URL             "/api/fordevice/get-events?mac_id=[mac]&duid=[duid]"
 #define DEVICE_IOT_CONFIG_RESP_MAX_SIZE       500
 #define DEVICE_IOT_CONFIG_DEVICEID_KEY        "did"
 #define DEVICE_IOT_CONFIG_CHANNEL_TOKEN_KEY   "token"

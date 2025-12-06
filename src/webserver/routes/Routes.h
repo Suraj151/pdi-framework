@@ -32,7 +32,7 @@ Created Date    : 1st June 2019
 #define WEB_SERVER_GPIO_SERVER_CONFIG_ROUTE "/gpio-server" ///< Route for GPIO server configuration.
 #define WEB_SERVER_GPIO_MODE_CONFIG_ROUTE "/gpio-config"   ///< Route for GPIO mode configuration.
 #define WEB_SERVER_GPIO_WRITE_CONFIG_ROUTE "/gpio-write"   ///< Route for GPIO write operations.
-#define WEB_SERVER_GPIO_ALERT_CONFIG_ROUTE "/gpio-event"   ///< Route for GPIO alert configuration.
+#define WEB_SERVER_GPIO_EVENT_CONFIG_ROUTE "/gpio-event"   ///< Route for GPIO event configuration.
 #define WEB_SERVER_GPIO_MONITOR_ROUTE "/gpio-monitor"      ///< Route for GPIO monitoring.
 #define WEB_SERVER_GPIO_ANALOG_MONITOR_ROUTE "/listen-monitor" ///< Route for analog GPIO monitoring.
 

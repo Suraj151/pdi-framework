@@ -188,10 +188,10 @@ GPIOs are actually going to interact with sensors. We can read sensor or we can 
 * **MAIL Service:**
 MAIL service is uses SMTP transport to connect and send mail to any account. you should have a SMTP server account credentials that device uses to send mail. to set configuration goto local server and select Email section under main menu.
 you can test it with tick option provided in email section before submit configuration form. the best demo way to test this section is create free mailtrap account where we get configurations.
-this service should be enabled from common configuration file wherever this service act as dependency service. for example GPIO alert system has alert channel of email. GPIO alerts generated on user selected alert channel.
+this service should be enabled from common configuration file wherever this service act as dependency service. for example GPIO event system has event channel of email. GPIO events generated on user selected event channel.
 
-* **GPIO Alerts:**
-GPIO alerts are provided to get notified on specific condition met. from local web portal of device GPIO alert conditions can be set in GPIO alert section which is available under GPIO manage section.
+* **GPIO Events:**
+GPIO events are provided to get notified on specific condition met. from local web portal of device GPIO event conditions can be set in GPIO event section which is available under GPIO manage section.
 
 * **Database:**
 Database service can be used to get/set any config in device NVM memory.

@@ -37,8 +37,8 @@ created Date    : 1st June 2019
 #define GPIO_PAYLOAD_VALUE_KEY    "val"
 #define GPIO_PAYLOAD_MAC_KEY      "mac"
 #define GPIO_PAYLOAD_DUID_KEY     "duid"
-#define GPIO_ALERT_COMPARATOR_KEY "cmp"
-#define GPIO_ALERT_PIN_KEY        "alrtkey"
+#define GPIO_EVENT_COMPARATOR_KEY "cmp"
+#define GPIO_EVENT_PIN_KEY        "alrtkey"
 
 #ifndef ENABLE_GPIO_BASIC_ONLY
 
@@ -49,21 +49,21 @@ created Date    : 1st June 2019
 #define GPIO_GRAPH_BOTTOM_MARGIN      GPIO_GRAPH_TOP_MARGIN
 #define GPIO_DATA_POST_FREQ           0
 #define GPIO_DATA_POST_HTTP_URL       "/api/fordevice/data/[duid]"
-#define GPIO_ALERT_POST_HTTP_URL      "/api/fordevice/event/[duid]"
+#define GPIO_EVENT_POST_HTTP_URL      "/api/fordevice/event/[duid]"
 
-#define GPIO_ALERT_DURATION_FOR_SUCCEED 600000
-#define GPIO_ALERT_DURATION_FOR_FAILED  150000
+#define GPIO_EVENT_DURATION_FOR_SUCCEED 600000
+#define GPIO_EVENT_DURATION_FOR_FAILED  150000
 
 /**
- * global gpio alert status
+ * global gpio event status
  */
 typedef struct {
-  bool is_last_alert_succeed;
-  uint32_t last_alert_millis;
-  int8_t alert_gpio_pin;
-} __gpio_alert_track_t;
+  bool is_last_event_succeed;
+  uint32_t last_event_millis;
+  int8_t event_gpio_pin;
+} __gpio_event_track_t;
 
-extern __gpio_alert_track_t __gpio_alert_track;
+extern __gpio_event_track_t __gpio_event_track;
 
 struct last_gpio_monitor_point{
   int x;
@@ -84,7 +84,7 @@ enum GPIO_CONFIG_TYPE {
   GPIO_MODE_CONFIG,
   GPIO_WRITE_CONFIG,
   GPIO_SERVER_CONFIG,
-  GPIO_ALERT_CONFIG,
+  GPIO_EVENT_CONFIG,
 };
 
 enum GPIO_STATE {

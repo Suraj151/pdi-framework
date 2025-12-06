@@ -16,7 +16,7 @@ created Date    : 1st June 2019
 
 
 #ifndef ENABLE_GPIO_BASIC_ONLY
-__gpio_alert_track_t __gpio_alert_track = {
+__gpio_event_track_t __gpio_event_track = {
   false, 0, -1
 };
 #endif
@@ -84,14 +84,14 @@ bool GpioServiceProvider::initService(void *arg){
 /**
  * post gpio data to server specified in gpio configs
  */
-bool GpioServiceProvider::handleGpioHttpRequest( bool isAlertPost ){
+bool GpioServiceProvider::handleGpioHttpRequest( bool isEventPost ){
 
   bool status = false;
 
   pdiutil::string posturl = this->m_gpio_config_copy.gpio_host;
 
-  if( isAlertPost ){
-    posturl += GPIO_ALERT_POST_HTTP_URL;
+  if( isEventPost ){
+    posturl += GPIO_EVENT_POST_HTTP_URL;
   }else{
     posturl += GPIO_DATA_POST_HTTP_URL;
   }
@@ -99,7 +99,7 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isAlertPost ){
   LogI("Handling GPIO Http Request\n");
 
   if( posturl.size() > 5 && this->m_gpio_config_copy.gpio_port > 0 &&
-    ( isAlertPost ? true : ( this->m_gpio_config_copy.gpio_post_frequency > 0 ) ) &&
+    ( isEventPost ? true : ( this->m_gpio_config_copy.gpio_post_frequency > 0 ) ) &&
     nullptr != this->m_http_client
   ){
 
@@ -119,7 +119,7 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isAlertPost ){
 
     if( nullptr != _payload ){
 
-      this->appendGpioJsonPayload( *_payload, isAlertPost );
+      this->appendGpioJsonPayload( *_payload, isEventPost );
 
       this->m_http_client->Begin();
 
@@ -154,7 +154,7 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isAlertPost ){
  *
  * @param pdiutil::string& _payload
  */
-void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool isAlertPost, pdiutil::vector<pdiutil::string> *allowedlist ){
+void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool isEventPost, pdiutil::vector<pdiutil::string> *allowedlist ){
 
   _payload += "{";
 
@@ -180,18 +180,18 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
 #endif
 
 #ifndef ENABLE_GPIO_BASIC_ONLY
-  if( isAlertPost ){
+  if( isEventPost ){
 
     _payload += "\"";
-    _payload += GPIO_ALERT_PIN_KEY;
+    _payload += GPIO_EVENT_PIN_KEY;
     _payload += "\":\"";
 
-    if( __gpio_alert_track.alert_gpio_pin < MAX_DIGITAL_GPIO_PINS ){
+    if( __gpio_event_track.event_gpio_pin < MAX_DIGITAL_GPIO_PINS ){
       _payload += "D";
-      _payload += pdiutil::to_string(__gpio_alert_track.alert_gpio_pin);
+      _payload += pdiutil::to_string(__gpio_event_track.event_gpio_pin);
     }else{
       _payload += "A";
-      _payload += pdiutil::to_string(__gpio_alert_track.alert_gpio_pin - MAX_DIGITAL_GPIO_PINS);
+      _payload += pdiutil::to_string(__gpio_event_track.event_gpio_pin - MAX_DIGITAL_GPIO_PINS);
     }
 
     _payload += "\",";
@@ -351,16 +351,16 @@ void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payloa
 }
 #ifndef ENABLE_GPIO_BASIC_ONLY
 /**
- * apply alert json payload to gpio operations
+ * apply gpio event json payload to gpio operations
  *
  * @param char* _payload
  */
-void GpioServiceProvider::applyGpioAlertJsonPayload( char* _payload, uint16_t _payload_length, pdiutil::vector<pdiutil::string> *allowedlist ){
+void GpioServiceProvider::applyGpioEventJsonPayload( char* _payload, uint16_t _payload_length, pdiutil::vector<pdiutil::string> *allowedlist ){
 
-  LogFmtI("Applying GPIO Alert from Json Payload : %s\n", _payload);
+  LogFmtI("Applying GPIO Events from Json Payload : %s\n", _payload);
 
   if(
-    0 <= __strstr( _payload, (char*)GPIO_ALERT_COMPARATOR_KEY, _payload_length - strlen(GPIO_PAYLOAD_DATA_KEY) ) &&
+    0 <= __strstr( _payload, (char*)GPIO_EVENT_COMPARATOR_KEY, _payload_length - strlen(GPIO_PAYLOAD_DATA_KEY) ) &&
     0 <= __strstr( _payload, (char*)GPIO_PAYLOAD_VALUE_KEY, _payload_length - strlen(GPIO_PAYLOAD_VALUE_KEY) )
   ){
 
@@ -388,7 +388,7 @@ void GpioServiceProvider::applyGpioAlertJsonPayload( char* _payload, uint16_t _p
           __get_from_json( _payload, _iface_label_lowercase, _iface_data, _iface_data_max_len ) 
         ){
 
-          if( __get_from_json( _iface_data, (char*)GPIO_ALERT_COMPARATOR_KEY, _iface_comparator, _iface_keys_max_len ) ){
+          if( __get_from_json( _iface_data, (char*)GPIO_EVENT_COMPARATOR_KEY, _iface_comparator, _iface_keys_max_len ) ){
 
             if( __get_from_json( _iface_data, (char*)GPIO_PAYLOAD_VALUE_KEY, _iface_value, _iface_keys_max_len ) ){
 
@@ -440,14 +440,14 @@ void GpioServiceProvider::setHttpHost(const char* _host){
 
 #ifdef ENABLE_EMAIL_SERVICE
 /**
- * handle gpio email alert
+ * handle gpio email event
  * @return bool
  */
-bool GpioServiceProvider::handleGpioEmailAlert(){
+bool GpioServiceProvider::handleGpioEventOverEmail(){
 
   bool status = false;
 
-  LogI("Handling GPIO email alert\n");
+  LogI("Handling GPIO email event\n");
 
   pdiutil::string *_payload = new pdiutil::string();
 
@@ -541,29 +541,29 @@ void GpioServiceProvider::handleGpioOperations(){
       this->m_gpio_config_copy.gpio_events[_evtidx].eventChannel != GPIO_EVENT_CHANNEL_MAX 
     ){
 
-      bool _is_alert_condition = this->m_gpio_config_copy.gpio_events[_evtidx].isEventOccur(
+      bool _is_event_condition = this->m_gpio_config_copy.gpio_events[_evtidx].isEventOccur(
         this->m_gpio_config_copy.gpio_readings[_gpionumber]
       );
 
       uint32_t _now = __i_dvc_ctrl.millis_now();
-      if( _is_alert_condition && (( __gpio_alert_track.is_last_alert_succeed ?
-        GPIO_ALERT_DURATION_FOR_SUCCEED < ( _now - __gpio_alert_track.last_alert_millis ) :
-        GPIO_ALERT_DURATION_FOR_FAILED < ( _now - __gpio_alert_track.last_alert_millis )
-      ) || __gpio_alert_track.alert_gpio_pin == -1) ){
+      if( _is_event_condition && (( __gpio_event_track.is_last_event_succeed ?
+        GPIO_EVENT_DURATION_FOR_SUCCEED < ( _now - __gpio_event_track.last_event_millis ) :
+        GPIO_EVENT_DURATION_FOR_FAILED < ( _now - __gpio_event_track.last_event_millis )
+      ) || __gpio_event_track.event_gpio_pin == -1) ){
 
-        __gpio_alert_track.alert_gpio_pin = _gpionumber;
-        __gpio_alert_track.last_alert_millis = _now;
+        __gpio_event_track.event_gpio_pin = _gpionumber;
+        __gpio_event_track.last_event_millis = _now;
         switch ( this->m_gpio_config_copy.gpio_events[_evtidx].eventChannel ) {
 
           #ifdef ENABLE_EMAIL_SERVICE
           case EMAIL:{
-            __gpio_alert_track.is_last_alert_succeed = this->handleGpioEmailAlert();
+            __gpio_event_track.is_last_event_succeed = this->handleGpioEventOverEmail();
             break;
           }
           #endif
           #ifdef ENABLE_HTTP_CLIENT
           case HTTP_SERVER:{
-            __gpio_alert_track.is_last_alert_succeed = this->handleGpioHttpRequest(true);
+            __gpio_event_track.is_last_event_succeed = this->handleGpioHttpRequest(true);
             break;
           }
           #endif

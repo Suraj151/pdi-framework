@@ -6,7 +6,7 @@ warranty.
 
 The `GpioConfigPage.h` file defines the HTML content for various GPIO-related
 pages of the web server. These pages allow users to configure GPIO modes, control
-GPIO states, monitor GPIO activity, and manage GPIO alerts. The HTML content is
+GPIO states, monitor GPIO activity, and manage GPIO events. The HTML content is
 stored in program memory (PROG_RODT_ATTR) to optimize memory usage on embedded systems.
 
 Author          : Suraj I.
@@ -28,7 +28,7 @@ static const char WEB_SERVER_GPIO_MENU_TITLE_MODES[] PROG_RODT_ATTR = "gpio mode
 static const char WEB_SERVER_GPIO_MENU_TITLE_CONTROL[] PROG_RODT_ATTR = "gpio control";
 static const char WEB_SERVER_GPIO_MENU_TITLE_SERVER[] PROG_RODT_ATTR = "gpio server";
 static const char WEB_SERVER_GPIO_MENU_TITLE_MONITOR[] PROG_RODT_ATTR = "gpio monitor";
-static const char WEB_SERVER_GPIO_MENU_TITLE_ALERT[] PROG_RODT_ATTR = "gpio events";
+static const char WEB_SERVER_GPIO_MENU_TITLE_EVENT[] PROG_RODT_ATTR = "gpio events";
 
 /**
  * @brief HTML content for the GPIO monitor page.
@@ -88,23 +88,23 @@ static const char WEB_SERVER_GPIO_WRITE_PAGE_TOP[] PROG_RODT_ATTR = "\
 <table>";
 
 /**
- * @brief HTML content for the GPIO alert control page.
+ * @brief HTML content for the GPIO event control page.
  *
- * This static HTML content is used to render the top section of the GPIO alert
+ * This static HTML content is used to render the top section of the GPIO event
  * control page on the web server.
  */
-static const char WEB_SERVER_GPIO_ALERT_PAGE_TOP[] PROG_RODT_ATTR = "\
+static const char WEB_SERVER_GPIO_EVENT_PAGE_TOP[] PROG_RODT_ATTR = "\
 <h2>GPIO Event Control</h2>\
 <form action='/gpio-event' method='POST'>\
 <table>";
 
 /**
- * @brief HTML message for empty GPIO alert configuration.
+ * @brief HTML message for empty GPIO event configuration.
  *
- * This static HTML content is displayed when no GPIO is enabled for alert
+ * This static HTML content is displayed when no GPIO is enabled for event
  * operations. It provides a link to enable GPIO modes.
  */
-static const char WEB_SERVER_GPIO_ALERT_EMPTY_MESSAGE[] PROG_RODT_ATTR = "\
+static const char WEB_SERVER_GPIO_EVENT_EMPTY_MESSAGE[] PROG_RODT_ATTR = "\
 <h4>No GPIO enabled for operation.</h4>\
 <div>enable from \
 <a href='/gpio-config'>\
@@ -120,9 +120,9 @@ GPIO Modes\
 /**
  * @brief HTML message for empty GPIO write configuration.
  *
- * This message reuses the `WEB_SERVER_GPIO_ALERT_EMPTY_MESSAGE` to indicate
+ * This message reuses the `WEB_SERVER_GPIO_EVENT_EMPTY_MESSAGE` to indicate
  * that no GPIO is enabled for write operations.
  */
-static const char *WEB_SERVER_GPIO_WRITE_EMPTY_MESSAGE = WEB_SERVER_GPIO_ALERT_EMPTY_MESSAGE;
+static const char *WEB_SERVER_GPIO_WRITE_EMPTY_MESSAGE = WEB_SERVER_GPIO_EVENT_EMPTY_MESSAGE;
 
 #endif

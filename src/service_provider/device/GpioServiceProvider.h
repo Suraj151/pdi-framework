@@ -41,20 +41,20 @@ public:
   bool initService(void *arg = nullptr) override;
   void enable_update_gpio_table_from_copy(void);
   bool isAllowedGpioPin(uint8_t _pin, pdiutil::vector<pdiutil::string> *allowedlist);
-  void appendGpioJsonPayload(pdiutil::string &_payload, bool isAlertPost = false, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);
+  void appendGpioJsonPayload(pdiutil::string &_payload, bool isEventPost = false, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);
   void applyGpioJsonPayload(char *_payload, uint16_t _payload_length, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);
   #ifndef ENABLE_GPIO_BASIC_ONLY
-  void applyGpioAlertJsonPayload(char *_payload, uint16_t _payload_length, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);
+  void applyGpioEventJsonPayload(char *_payload, uint16_t _payload_length, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);
   #endif
   void setDeviceId(const char* _id);
   void setHttpHost(const char* _host);
   #ifdef ENABLE_EMAIL_SERVICE
-  bool handleGpioEmailAlert(void);
+  bool handleGpioEventOverEmail(void);
 #endif
   void handleGpioOperations(void);
   void handleGpioModes(int _gpio_config_type = GPIO_MODE_CONFIG);
 #ifdef ENABLE_HTTP_CLIENT
-  bool handleGpioHttpRequest(bool isAlertPost = false);
+  bool handleGpioHttpRequest(bool isEventPost = false);
 #endif
   void printConfigToTerminal(iTerminalInterface *terminal) override;
 
