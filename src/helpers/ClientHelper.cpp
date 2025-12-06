@@ -98,6 +98,7 @@ bool sendPacket(iClientInterface *client, uint8_t *buffer, uint16_t len, uint16_
       }
 
       __i_dvc_ctrl.wait(0);
+      now = __i_dvc_ctrl.millis_now(); // reset current timestamp
     }
 
     // Make sure data has been sent

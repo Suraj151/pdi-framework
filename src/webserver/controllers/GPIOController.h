@@ -334,8 +334,8 @@ public:
 		memset(_page, 0, _max_size);
 		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
 		strcat_ro(_page, WEB_SERVER_GPIO_CONFIG_PAGE_TOP);
-		char *_gpio_mode_general_options[] = {"OFF", "DOUT", "DIN", "BLINK", "AOUT"};
-		char *_gpio_mode_analog_options[] = {"OFF", "", "", "", "", "AIN"};
+		const char *_gpio_mode_general_options[] = {"OFF", "DOUT", "DIN", "BLINK", "AOUT"};
+		const char *_gpio_mode_analog_options[] = {"OFF", "", "", "", "", "AIN"};
 		int _gpio_mode_general_options_size = sizeof(_gpio_mode_general_options) / sizeof(_gpio_mode_general_options[0]);
 		int _gpio_mode_analog_options_size = sizeof(_gpio_mode_analog_options) / sizeof(_gpio_mode_analog_options[0]);
 
@@ -408,9 +408,7 @@ public:
 
 				if (__gpio_service.m_gpio_config_copy.gpio_mode[_pin] == OFF || __gpio_service.m_gpio_config_copy.gpio_mode[_pin] == DIGITAL_WRITE || __gpio_service.m_gpio_config_copy.gpio_mode[_pin] == ANALOG_WRITE)
 				{
-					__gpio_service.m_gpio_config_copy.gpio_alert_comparator[_pin] = EQUAL;
-					__gpio_service.m_gpio_config_copy.gpio_alert_channel[_pin] = NO_ALERT;
-					__gpio_service.m_gpio_config_copy.gpio_alert_values[_pin] = OFF;
+					__gpio_service.m_gpio_config_copy.clearGpioEvents(_pin);
 				}
 			}
 
@@ -426,9 +424,7 @@ public:
 
 				if (__gpio_service.m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS + _pin] == OFF)
 				{
-					__gpio_service.m_gpio_config_copy.gpio_alert_comparator[MAX_DIGITAL_GPIO_PINS + _pin] = EQUAL;
-					__gpio_service.m_gpio_config_copy.gpio_alert_channel[MAX_DIGITAL_GPIO_PINS + _pin] = NO_ALERT;
-					__gpio_service.m_gpio_config_copy.gpio_alert_values[MAX_DIGITAL_GPIO_PINS + _pin] = OFF;
+					__gpio_service.m_gpio_config_copy.clearGpioEvents(MAX_DIGITAL_GPIO_PINS + _pin);
 				}
 			}
 
@@ -461,7 +457,7 @@ public:
 		memset(_page, 0, _max_size);
 		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
 		strcat_ro(_page, WEB_SERVER_GPIO_WRITE_PAGE_TOP);
-		char *_gpio_digital_write_options[] = {"LOW", "HIGH"};
+		const char *_gpio_digital_write_options[] = {"LOW", "HIGH"};
 		int _gpio_digital_write_options_size = sizeof(_gpio_digital_write_options) / sizeof(_gpio_digital_write_options[0]);
 
 		char _input_value[10], _name[6], _label[6];
@@ -567,6 +563,32 @@ public:
 	}
 
 	/**
+	 * Get the input gpio pins enabled.
+	 */
+	void getEnabledGpiosForEvents(pdiutil::vector<pdiutil::string> &_enabled_gpios)
+	{
+		for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS; _pin++){
+
+			if (!__i_dvc_ctrl.isExceptionalGpio(_pin) && __gpio_service.m_gpio_config_copy.gpio_mode[_pin] == DIGITAL_READ){
+
+				pdiutil::string gpio = "D";
+				gpio += pdistd::to_string(_pin);
+				_enabled_gpios.push_back(gpio);
+			}
+		}
+
+		for (uint8_t _pin = 0; _pin < MAX_ANALOG_GPIO_PINS; _pin++){
+
+			if (__gpio_service.m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS + _pin] == ANALOG_READ){
+
+				pdiutil::string gpio = "A";
+				gpio += pdistd::to_string(_pin);
+				_enabled_gpios.push_back(gpio);
+			}
+		}
+	}
+
+	/**
 	 * build gpio alert config html.
 	 *
 	 * @param	char*	_page
@@ -578,77 +600,101 @@ public:
 		memset(_page, 0, _max_size);
 		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
 		strcat_ro(_page, WEB_SERVER_GPIO_ALERT_PAGE_TOP);
-		char *_gpio_digital_alert_options[] = {"LOW", "HIGH"};
+		const char *_gpio_digital_alert_options[] = {"LOW", "HIGH"};
 #ifdef ENABLE_EMAIL_SERVICE
-		char *_gpio_alert_channels[] = {"NOALERT", "MAIL", "HTTPSERVER"};
+		const char *_gpio_alert_channels[] = {"NOEVENT", "MAIL", "HTTPSERVER", "DEL"};
 #else
-		char *_gpio_alert_channels[] = {"NOALERT", "HTTPSERVER"};
+		const char *_gpio_alert_channels[] = {"NOEVENT", "HTTPSERVER", "DEL"};
 #endif
-		char *_gpio_analog_alert_comparators[] = {"=", ">", "<"};
+		const char *_gpio_analog_alert_comparators[] = {"=", ">", "<"};
 
 		int _gpio_digital_alert_options_size = sizeof(_gpio_digital_alert_options) / sizeof(_gpio_digital_alert_options[0]);
 		int _gpio_alert_channels_size = sizeof(_gpio_alert_channels) / sizeof(_gpio_alert_channels[0]);
 		int _gpio_analog_alert_comparators_size = sizeof(_gpio_analog_alert_comparators) / sizeof(_gpio_analog_alert_comparators[0]);
 
 		char _analog_value[10], _name[8], _label[8], _alert_label[8], _alert_value[8];
+		pdiutil::vector<pdiutil::string> _enabled_gpios;
+		getEnabledGpiosForEvents(_enabled_gpios);
+		bool _added_options = !_enabled_gpios.empty();
 
-		bool _added_options = false;
-		for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS; _pin++)
-		{
-			memset(_name, 0, 8);
-			memset(_label, 0, 8);
-			memset(_alert_label, 0, 8);
-			__appendUintToBuff(_name, "D%d", _pin, 7);
-			__appendUintToBuff(_label, "d%d", _pin, 7);
-			__appendUintToBuff(_alert_label, "al%d", _pin, 7);
 
-			if (!__i_dvc_ctrl.isExceptionalGpio(_pin) && __gpio_service.m_gpio_config_copy.gpio_mode[_pin] == DIGITAL_READ)
-			{
-				_added_options = true;
-				strcat_ro(_page, HTML_TR_OPEN_TAG);
-				strcat_ro(_page, HTML_TAG_CLOSE_BRACKET);
-				concat_td_select_html_tags(_page, _name, _label, _gpio_digital_alert_options, _gpio_digital_alert_options_size, (int)__gpio_service.m_gpio_config_copy.gpio_alert_values[_pin]);
-				concat_td_select_html_tags(_page, (char *)" ? ", _alert_label, _gpio_alert_channels, _gpio_alert_channels_size, (int)__gpio_service.m_gpio_config_copy.gpio_alert_channel[_pin]);
-				strcat_ro(_page, HTML_TR_CLOSE_TAG);
-			}
-		}
+		for (uint8_t _evtidx = 0; _evtidx < MAX_GPIO_EVENTS; _evtidx++) {
 
-		for (uint8_t _pin = 0; _pin < MAX_ANALOG_GPIO_PINS; _pin++)
-		{
-			memset(_name, 0, 8);
-			memset(_label, 0, 8);
-			memset(_alert_label, 0, 8);
-			memset(_alert_value, 0, 8);
-			__appendUintToBuff(_name, "A%d", _pin, 7);
-			__appendUintToBuff(_label, "a%d", _pin, 7);
-			__appendUintToBuff(_alert_label, "anlt%d", _pin, 7);
-			__appendUintToBuff(_alert_value, "aval%d", _pin, 7);
+			uint8_t gpionumber = __gpio_service.m_gpio_config_copy.gpio_events[_evtidx].gpioNumber;
 
-			if (__gpio_service.m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS + _pin] == ANALOG_READ)
-			{
-				_added_options = true;
-				memset(_analog_value, 0, 10);
-				__appendUintToBuff(_analog_value, "%d", __gpio_service.m_gpio_config_copy.gpio_alert_values[MAX_DIGITAL_GPIO_PINS + _pin], 8);
-				strcat_ro(_page, HTML_TR_OPEN_TAG);
-				strcat_ro(_page, HTML_TAG_CLOSE_BRACKET);
-				strcat_ro(_page, HTML_TD_OPEN_TAG);
-				strcat_ro(_page, HTML_TAG_CLOSE_BRACKET);
-				strcat(_page, _name);
-				strcat_ro(_page, HTML_TD_CLOSE_TAG);
-				strcat_ro(_page, HTML_TD_OPEN_TAG);
-				strcat_ro(_page, HTML_STYLE_ATTR);
-				strcat(_page, (char *)"'display:flex;'");
-				strcat_ro(_page, HTML_TAG_CLOSE_BRACKET);
-				concat_select_html_tag(_page, _label, _gpio_analog_alert_comparators, _gpio_analog_alert_comparators_size, (int)__gpio_service.m_gpio_config_copy.gpio_alert_comparator[MAX_DIGITAL_GPIO_PINS + _pin]);
-				concat_input_html_tag(_page, _alert_value, _analog_value);
-				strcat_ro(_page, HTML_TD_CLOSE_TAG);
-				concat_td_select_html_tags(_page, (char *)" ? ", _alert_label, _gpio_alert_channels, _gpio_alert_channels_size, (int)__gpio_service.m_gpio_config_copy.gpio_alert_channel[MAX_DIGITAL_GPIO_PINS + _pin]);
-				strcat_ro(_page, HTML_TR_CLOSE_TAG);
+			if( __gpio_service.m_gpio_config_copy.gpioHasEvents(gpionumber) ){
+				
+				memset(_name, 0, 8);
+				memset(_label, 0, 8);
+				memset(_alert_label, 0, 8);
+				memset(_alert_value, 0, 8);
+
+				if( gpionumber < MAX_DIGITAL_GPIO_PINS ){
+
+					if (!__i_dvc_ctrl.isExceptionalGpio(gpionumber) && __gpio_service.m_gpio_config_copy.gpio_mode[gpionumber] == DIGITAL_READ)
+					{
+						__appendUintToBuff(_name, "D%d", gpionumber, 7);
+						__appendUintToBuff(_label, "d%d", _evtidx, 7);
+						__appendUintToBuff(_alert_label, "al%d", _evtidx, 7);
+
+						_added_options = true;
+						strcat_ro(_page, HTML_TR_OPEN_TAG);
+						strcat_ro(_page, HTML_TAG_CLOSE_BRACKET);
+						concat_td_select_html_tags(_page, _name, _label, _gpio_digital_alert_options, _gpio_digital_alert_options_size, (int)__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventConditionValue);
+						concat_td_select_html_tags(_page, (char *)" ? ", _alert_label, _gpio_alert_channels, _gpio_alert_channels_size, (int)__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventChannel);
+						strcat_ro(_page, HTML_TR_CLOSE_TAG);
+					}
+				}else{
+
+					if (__gpio_service.m_gpio_config_copy.gpio_mode[gpionumber] == ANALOG_READ)
+					{
+						__appendUintToBuff(_name, "A%d", (gpionumber - MAX_DIGITAL_GPIO_PINS), 7);
+						__appendUintToBuff(_label, "a%d", _evtidx, 7);
+						__appendUintToBuff(_alert_label, "anlt%d", _evtidx, 7);
+						__appendUintToBuff(_alert_value, "aval%d", _evtidx, 7);
+
+						_added_options = true;
+						memset(_analog_value, 0, 10);
+						__appendUintToBuff(_analog_value, "%d", __gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventConditionValue, 8);
+						strcat_ro(_page, HTML_TR_OPEN_TAG);
+						strcat_ro(_page, HTML_TAG_CLOSE_BRACKET);
+						strcat_ro(_page, HTML_TD_OPEN_TAG);
+						strcat_ro(_page, HTML_TAG_CLOSE_BRACKET);
+						strcat(_page, _name);
+						strcat_ro(_page, HTML_TD_CLOSE_TAG);
+						strcat_ro(_page, HTML_TD_OPEN_TAG);
+						strcat_ro(_page, HTML_STYLE_ATTR);
+						strcat_ro(_page, RODT_ATTR("'display:flex;'"));
+						strcat_ro(_page, HTML_TAG_CLOSE_BRACKET);
+						concat_select_html_tag(_page, _label, _gpio_analog_alert_comparators, _gpio_analog_alert_comparators_size, (int)__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventCondition);
+						concat_input_html_tag(_page, _alert_value, _analog_value);
+						strcat_ro(_page, HTML_TD_CLOSE_TAG);
+						concat_td_select_html_tags(_page, (char *)" ? ", _alert_label, _gpio_alert_channels, _gpio_alert_channels_size, (int)__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventChannel);
+						strcat_ro(_page, HTML_TR_CLOSE_TAG);
+					}					
+				}
+				
 			}
 		}
 
 		if (_added_options)
 		{
+			if( _enabled_gpios.size() > 0 ){
+
+				pdiutil::vector<const char*> constcharpvec;
+				constcharpvec.push_back("Select GPIO");
+				for (size_t i = 0; i < _enabled_gpios.size(); i++){
+					constcharpvec.push_back(_enabled_gpios[i].c_str());
+				}
+				const char **arr = constcharpvec.data();
+
+				strcat_ro(_page, HTML_LINE_BREAK_TAG);
+				strcat_ro(_page, HTML_TR_OPEN_TAG);
+				strcat_ro(_page, HTML_TAG_CLOSE_BRACKET);
+				concat_td_select_html_tags(_page, RODT_ATTR("Add Event For "), "ifsl", arr, constcharpvec.size(), -1);
+				strcat_ro(_page, HTML_TR_CLOSE_TAG);
+			}
+
 			strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 		}
 		else
@@ -679,49 +725,97 @@ public:
 
 		if (true)
 		{
-			char _label[8], _alert_label[8], _alert_value[8];
+			if (this->m_web_resource->m_server->hasArg("ifsl")){
 
-			for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS; _pin++)
-			{
-				memset(_label, 0, 8);
-				memset(_alert_label, 0, 8);
-				__appendUintToBuff(_label, "d%d", _pin, 7);
-				__appendUintToBuff(_alert_label, "al%d", _pin, 7);
+				int16_t selectedIfaceIndex = StringToUint16(this->m_web_resource->m_server->arg("ifsl").c_str());
 
-				if (this->m_web_resource->m_server->hasArg(_label) && this->m_web_resource->m_server->hasArg(_alert_label))
-				{
-					__gpio_service.m_gpio_config_copy.gpio_alert_comparator[_pin] = EQUAL;
-					__gpio_service.m_gpio_config_copy.gpio_alert_values[_pin] = StringToUint16(this->m_web_resource->m_server->arg(_label).c_str());
-					__gpio_service.m_gpio_config_copy.gpio_alert_channel[_pin] = StringToUint8(this->m_web_resource->m_server->arg(_alert_label).c_str());
+				if( selectedIfaceIndex > 0 ){
 
-					LogFmtI("Pin D%d : %d : %d\n", _pin, 
-					__gpio_service.m_gpio_config_copy.gpio_alert_values[_pin], 
-					__gpio_service.m_gpio_config_copy.gpio_alert_channel[_pin]);
+					selectedIfaceIndex--; // avoid first option
+					pdiutil::vector<pdiutil::string> _enabled_gpios;
+					getEnabledGpiosForEvents(_enabled_gpios);
 
-					_is_posted = true;
+					if( 
+						selectedIfaceIndex < _enabled_gpios.size() && 
+						(_enabled_gpios[selectedIfaceIndex].size() >= 2) &&
+						(_enabled_gpios[selectedIfaceIndex][0] == 'A' || _enabled_gpios[selectedIfaceIndex][0] == 'D')
+					){
+
+						uint8_t gpionumber = StringToUint8(_enabled_gpios[selectedIfaceIndex].c_str()+1, 3);
+						if(_enabled_gpios[selectedIfaceIndex][0] == 'A'){
+							gpionumber += MAX_DIGITAL_GPIO_PINS;
+						}
+
+						bool ret = __gpio_service.m_gpio_config_copy.updateGpioEvent(
+							gpionumber, NO_CHANNEL, GPIO_EVENT_CONDITION_MAX, 0, true
+						);
+
+						if( ret ){
+							LogFmtI("Adding Event for %s : %d\n", _enabled_gpios[selectedIfaceIndex].c_str(), (int)gpionumber);
+							_is_posted = true;
+						}
+					}
 				}
 			}
+			
+			char _label[8], _alert_label[8], _alert_value[8];
 
-			for (uint8_t _pin = 0; _pin < MAX_ANALOG_GPIO_PINS; _pin++)
-			{
-				memset(_label, 0, 8);
-				memset(_alert_label, 0, 8);
-				memset(_alert_value, 0, 8);
-				__appendUintToBuff(_label, "a%d", _pin, 7);
-				__appendUintToBuff(_alert_label, "anlt%d", _pin, 7);
-				__appendUintToBuff(_alert_value, "aval%d", _pin, 7);
+			for (uint8_t _evtidx = 0; _evtidx < MAX_GPIO_EVENTS; _evtidx++) {
 
-				if (this->m_web_resource->m_server->hasArg(_label) && this->m_web_resource->m_server->hasArg(_alert_value) && this->m_web_resource->m_server->hasArg(_alert_label))
-				{
-					__gpio_service.m_gpio_config_copy.gpio_alert_comparator[MAX_DIGITAL_GPIO_PINS + _pin] = StringToUint8(this->m_web_resource->m_server->arg(_label).c_str());
-					__gpio_service.m_gpio_config_copy.gpio_alert_values[MAX_DIGITAL_GPIO_PINS + _pin] = StringToUint16(this->m_web_resource->m_server->arg(_alert_value).c_str());
-					__gpio_service.m_gpio_config_copy.gpio_alert_channel[MAX_DIGITAL_GPIO_PINS + _pin] = StringToUint8(this->m_web_resource->m_server->arg(_alert_label).c_str());
+				uint8_t gpionumber = __gpio_service.m_gpio_config_copy.gpio_events[_evtidx].gpioNumber;
 
-					LogFmtI("Pin A%d : %d : %d\n", _pin, 
-					__gpio_service.m_gpio_config_copy.gpio_alert_values[MAX_DIGITAL_GPIO_PINS + _pin], 
-					__gpio_service.m_gpio_config_copy.gpio_alert_channel[MAX_DIGITAL_GPIO_PINS + _pin]);
+				if( __gpio_service.m_gpio_config_copy.gpioHasEvents(gpionumber) ){
+					
+					memset(_label, 0, 8);
+					memset(_alert_label, 0, 8);
+					memset(_alert_value, 0, 8);
 
-					_is_posted = true;
+					if( gpionumber < MAX_DIGITAL_GPIO_PINS ){
+
+						__appendUintToBuff(_label, "d%d", _evtidx, 7);
+						__appendUintToBuff(_alert_label, "al%d", _evtidx, 7);
+
+						if (this->m_web_resource->m_server->hasArg(_label) && this->m_web_resource->m_server->hasArg(_alert_label))
+						{
+							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventCondition = EQUAL;
+							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventConditionValue = StringToUint16(this->m_web_resource->m_server->arg(_label).c_str());
+							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventChannel = StringToUint8(this->m_web_resource->m_server->arg(_alert_label).c_str());
+
+							LogFmtI("Pin D%d : %d : %d\n", gpionumber, 
+							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventConditionValue, 
+							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventChannel);
+
+							_is_posted = true;
+							
+							if( __gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventChannel == GPIO_EVENT_CHANNEL_MAX ){
+								__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].clear();
+							}
+						}
+					}else{
+
+						__appendUintToBuff(_label, "a%d", _evtidx, 7);
+						__appendUintToBuff(_alert_label, "anlt%d", _evtidx, 7);
+						__appendUintToBuff(_alert_value, "aval%d", _evtidx, 7);
+
+						if (this->m_web_resource->m_server->hasArg(_label) && this->m_web_resource->m_server->hasArg(_alert_value) && this->m_web_resource->m_server->hasArg(_alert_label))
+						{
+							
+							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventCondition = StringToUint8(this->m_web_resource->m_server->arg(_label).c_str());
+							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventConditionValue = StringToUint16(this->m_web_resource->m_server->arg(_alert_value).c_str());
+							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventChannel = StringToUint8(this->m_web_resource->m_server->arg(_alert_label).c_str());
+
+							LogFmtI("Pin A%d : %d : %d : %d\n", gpionumber, 
+							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventCondition, 
+							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventConditionValue, 
+							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventChannel);
+
+							_is_posted = true;
+
+							if( __gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventChannel == GPIO_EVENT_CHANNEL_MAX ){
+								__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].clear();
+							}
+						}
+					}
 				}
 			}
 

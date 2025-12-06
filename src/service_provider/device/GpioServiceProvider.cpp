@@ -318,14 +318,14 @@ void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payloa
 
             LogFmtI("Applying to : %s, mode : %s, value : %s\n", _pin_label_uppercase, _pin_mode, _pin_value);
 
-            if( !__are_arrays_equal(_pin_mode, "NA", 2) ){
+            if( !__are_arrays_equal(_pin_mode, NOT_APPLICABLE, 2) ){
 
               uint8_t _mode = StringToUint8( _pin_mode, _pin_values_max_len );
               this->m_gpio_config_copy.gpio_mode[_pin] = _mode < GPIO_MODE_MAX ? _mode : this->m_gpio_config_copy.gpio_mode[_pin];
               this->m_update_gpio_table_from_copy = true;
             }
 
-            if( !__are_arrays_equal(_pin_value, "NA", 2) ){
+            if( !__are_arrays_equal(_pin_value, NOT_APPLICABLE, 2) ){
 
               uint16_t _value = StringToUint16( _pin_value, _pin_values_max_len );
               uint16_t _value_limit = this->m_gpio_config_copy.gpio_mode[_pin] == ANALOG_WRITE ? ANALOG_GPIO_RESOLUTION : this->m_gpio_config_copy.gpio_mode[_pin] == DIGITAL_BLINK ? _value+1 : GPIO_STATE_MAX;
@@ -349,7 +349,7 @@ void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payloa
   }
 
 }
-
+#ifndef ENABLE_GPIO_BASIC_ONLY
 /**
  * apply alert json payload to gpio operations
  *
@@ -396,28 +396,23 @@ void GpioServiceProvider::applyGpioAlertJsonPayload( char* _payload, uint16_t _p
 
               uint8_t _comparator = StringToUint8( _iface_comparator, _iface_keys_max_len );
               uint16_t _value = StringToUint16( _iface_value, _iface_keys_max_len );
-              this->m_gpio_config_copy.gpio_alert_comparator[_pin] = StringToUint8( _iface_comparator, _iface_keys_max_len );
-              this->m_gpio_config_copy.gpio_alert_values[_pin] = StringToUint16( _iface_value, _iface_keys_max_len );
-              this->m_gpio_config_copy.gpio_alert_channel[_pin] = HTTP_SERVER;
 
+              this->m_gpio_config_copy.updateGpioEvent(_pin, HTTP_SERVER, _comparator, _value);
               this->m_update_gpio_table_from_copy = true;
             }
           }
         }else{
 
-          this->m_gpio_config_copy.gpio_alert_comparator[_pin] = 0;
-          this->m_gpio_config_copy.gpio_alert_values[_pin] = 0;
-          this->m_gpio_config_copy.gpio_alert_channel[_pin] = NO_ALERT;
+          this->m_gpio_config_copy.clearGpioEvents(_pin);
         }
       }else{
 
-        this->m_gpio_config_copy.gpio_alert_comparator[_pin] = 0;
-        this->m_gpio_config_copy.gpio_alert_values[_pin] = 0;
-        this->m_gpio_config_copy.gpio_alert_channel[_pin] = NO_ALERT;
+        this->m_gpio_config_copy.clearGpioEvents(_pin);
       }
     }
   }
 }
+#endif
 
 /**
  * Set the device id
@@ -496,6 +491,9 @@ void GpioServiceProvider::handleGpioOperations(){
       default:
       case OFF:{
         this->m_gpio_config_copy.gpio_readings[_pin] = 0;
+        #ifndef ENABLE_GPIO_BASIC_ONLY
+        this->m_gpio_config_copy.clearGpioEvents(_pin);
+        #endif
         break;
       }
       case DIGITAL_WRITE:{
@@ -532,28 +530,20 @@ void GpioServiceProvider::handleGpioOperations(){
         break;
       }
     }
+  }
 
 #ifndef ENABLE_GPIO_BASIC_ONLY
-    if( !__i_dvc_ctrl.isExceptionalGpio(_pin) && this->m_gpio_config_copy.gpio_alert_channel[_pin] != NO_ALERT ){
+  for (uint8_t _evtidx = 0; _evtidx < MAX_GPIO_EVENTS; _evtidx++) {
 
-      bool _is_alert_condition = false;
+    uint8_t _gpionumber = this->m_gpio_config_copy.gpio_events[_evtidx].gpioNumber;
 
-      switch ( this->m_gpio_config_copy.gpio_alert_comparator[_pin] ) {
+    if( !__i_dvc_ctrl.isExceptionalGpio(_gpionumber) && 
+      this->m_gpio_config_copy.gpio_events[_evtidx].eventChannel != GPIO_EVENT_CHANNEL_MAX 
+    ){
 
-        case EQUAL:{
-          _is_alert_condition = ( this->m_gpio_config_copy.gpio_readings[_pin] == this->m_gpio_config_copy.gpio_alert_values[_pin] );
-          break;
-        }
-        case GREATER_THAN:{
-          _is_alert_condition = ( this->m_gpio_config_copy.gpio_readings[_pin] > this->m_gpio_config_copy.gpio_alert_values[_pin] );
-          break;
-        }
-        case LESS_THAN:{
-          _is_alert_condition = ( this->m_gpio_config_copy.gpio_readings[_pin] < this->m_gpio_config_copy.gpio_alert_values[_pin] );
-          break;
-        }
-        default: break;
-      }
+      bool _is_alert_condition = this->m_gpio_config_copy.gpio_events[_evtidx].isEventOccur(
+        this->m_gpio_config_copy.gpio_readings[_gpionumber]
+      );
 
       uint32_t _now = __i_dvc_ctrl.millis_now();
       if( _is_alert_condition && (( __gpio_alert_track.is_last_alert_succeed ?
@@ -561,9 +551,9 @@ void GpioServiceProvider::handleGpioOperations(){
         GPIO_ALERT_DURATION_FOR_FAILED < ( _now - __gpio_alert_track.last_alert_millis )
       ) || __gpio_alert_track.alert_gpio_pin == -1) ){
 
-        __gpio_alert_track.alert_gpio_pin = _pin;
+        __gpio_alert_track.alert_gpio_pin = _gpionumber;
         __gpio_alert_track.last_alert_millis = _now;
-        switch ( this->m_gpio_config_copy.gpio_alert_channel[_pin] ) {
+        switch ( this->m_gpio_config_copy.gpio_events[_evtidx].eventChannel ) {
 
           #ifdef ENABLE_EMAIL_SERVICE
           case EMAIL:{
@@ -577,14 +567,12 @@ void GpioServiceProvider::handleGpioOperations(){
             break;
           }
           #endif
-          case NO_ALERT:
           default: break;
         }
       }
     }
-#endif
-
   }
+#endif
 
   if( this->m_update_gpio_table_from_copy ){
     __database_service.set_gpio_config_table(&this->m_gpio_config_copy);
@@ -696,28 +684,35 @@ void GpioServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
     }
 
 #ifndef ENABLE_GPIO_BASIC_ONLY
-    terminal->writeln();
-    terminal->writeln_ro(RODT_ATTR("GPIO Configs (alert comparator) :"));
-    for (uint8_t _pin = 0; _pin < MAX_GPIO_PINS; _pin++) {
-      terminal->write((int32_t)this->m_gpio_config_copy.gpio_alert_comparator[_pin]);
-      terminal->write_ro(RODT_ATTR("\t"));
-    }
 
     terminal->writeln();
-    terminal->writeln_ro(RODT_ATTR("GPIO Configs (alert channels) :"));
-    for (uint8_t _pin = 0; _pin < MAX_GPIO_PINS; _pin++) {
-      terminal->write((int32_t)this->m_gpio_config_copy.gpio_alert_channel[_pin]);
-      terminal->write_ro(RODT_ATTR("\t"));
+    terminal->writeln_ro(RODT_ATTR("GPIO Configs (events) :"));
+    for (uint8_t _evtidx = 0; _evtidx < MAX_GPIO_EVENTS; _evtidx++) {
+
+			uint8_t gpionumber = this->m_gpio_config_copy.gpio_events[_evtidx].gpioNumber;
+
+			if( this->m_gpio_config_copy.gpioHasEvents(gpionumber) ){
+
+        if( gpionumber < MAX_DIGITAL_GPIO_PINS ){
+          
+          terminal->write_ro(RODT_ATTR("D"));
+          terminal->write((int32_t)gpionumber);
+        }else{
+
+          terminal->write_ro(RODT_ATTR("A"));
+          terminal->write((int32_t)gpionumber-MAX_DIGITAL_GPIO_PINS);
+        }
+        terminal->write_ro(RODT_ATTR("\t"));
+        terminal->write((int32_t)this->m_gpio_config_copy.gpio_events[_evtidx].gpioNumber);
+        terminal->write_ro(RODT_ATTR("\t"));
+        terminal->write((int32_t)this->m_gpio_config_copy.gpio_events[_evtidx].eventCondition);
+        terminal->write_ro(RODT_ATTR("\t"));
+        terminal->write((int32_t)this->m_gpio_config_copy.gpio_events[_evtidx].eventConditionValue);
+        terminal->write_ro(RODT_ATTR("\t"));
+        terminal->writeln((int32_t)this->m_gpio_config_copy.gpio_events[_evtidx].eventChannel);
+      }
     }
 
-    terminal->writeln();
-    terminal->writeln_ro(RODT_ATTR("GPIO Configs (alert values) :"));
-    for (uint8_t _pin = 0; _pin < MAX_GPIO_PINS; _pin++) {
-      terminal->write((int32_t)this->m_gpio_config_copy.gpio_alert_values[_pin]);
-      terminal->write_ro(RODT_ATTR("\t"));
-    }
-
-    terminal->writeln();
     terminal->writeln_ro(RODT_ATTR("GPIO Configs (server) :"));
     terminal->write(this->m_gpio_config_copy.gpio_host);
     terminal->write_ro(RODT_ATTR("\t"));

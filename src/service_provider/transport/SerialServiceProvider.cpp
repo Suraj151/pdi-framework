@@ -230,8 +230,18 @@ void SerialServiceProvider::applySerialJsonPayload(char *_payload, uint16_t _pay
 
             LogFmtI("Applying to : %s%d, mode : %s, value : %s\n", SERIAL_INTERFACE_UART, _port, _iface_mode, _iface_data);
 
-            uint8_t _mode = StringToUint8( _iface_mode, _iface_keys_max_len );
-            // todo send data on serial
+            if( !__are_arrays_equal(_iface_mode, NOT_APPLICABLE, 2) ){
+
+              uint8_t _mode = StringToUint8( _iface_mode, _iface_keys_max_len );
+              if( _port == 1 && _mode == SERIAL_WRITE && !__are_arrays_equal(_iface_data, NOT_APPLICABLE, 2) ){
+
+                iSerialInterface *uart1 = iSerialInterface::getSerialInstance(SERIAL_IFACE_UART1);
+                if( uart1 != nullptr ){
+
+                  uart1->write((const char*) _iface_data);
+                }
+              }
+            }
         }
       }
       __i_dvc_ctrl.yield();

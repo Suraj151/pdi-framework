@@ -23,6 +23,12 @@ created Date    : 1st June 2019
 #define MAX_GPIO_PINS                 MAX_DIGITAL_GPIO_PINS + MAX_ANALOG_GPIO_PINS // Assuming analog and digital pins are not same
 #endif
 
+#if !defined(MAX_GPIO_EVENTS)
+#define MAX_GPIO_EVENTS               8
+#endif
+
+#define INVALID_GPIO_NUMBER       UINT8_MAX
+
 #define GPIO_HOST_BUF_SIZE            60
 #define ANALOG_GPIO_RESOLUTION        1024
 
@@ -97,19 +103,69 @@ enum GPIO_MODE {
   GPIO_MODE_MAX
 };
 
-enum GPIO_ALERT_COMPARATOR {
+enum GPIO_EVENT_CONDITION {
   EQUAL=0,
   GREATER_THAN,
   LESS_THAN,
-  GPIO_ALERT_COMPARATOR_MAX
+  GPIO_EVENT_CONDITION_MAX
 };
 
-enum GPIO_ALERT_CHANNEL {
-  NO_ALERT=0,
+enum GPIO_EVENT_CHANNEL {
+  NO_CHANNEL,
+#ifdef ENABLE_EMAIL_SERVICE
   EMAIL,
+#endif
   HTTP_SERVER,
-  GPIO_ALERT_CHANNEL_MAX
+  GPIO_EVENT_CHANNEL_MAX
 };
+
+#ifndef ENABLE_GPIO_BASIC_ONLY
+struct gpio_event {
+  uint8_t gpioNumber;
+  uint8_t eventCondition;
+  uint8_t eventChannel;
+  uint16_t eventConditionValue;
+
+  // Default Constructor
+  gpio_event(){
+    clear();
+  }
+
+  // Clear members method
+  void clear(){
+
+    gpioNumber = INVALID_GPIO_NUMBER;
+    eventCondition = GPIO_EVENT_CONDITION_MAX;
+    eventChannel = GPIO_EVENT_CHANNEL_MAX;
+    eventConditionValue = 0;
+  }
+
+  // Return whether event occured or not
+  bool isEventOccur(uint16_t value){
+
+    bool _is_condition = false;
+
+    switch ( eventCondition ) {
+
+      case EQUAL:{
+        _is_condition = ( value == eventConditionValue );
+        break;
+      }
+      case GREATER_THAN:{
+        _is_condition = ( value > eventConditionValue );
+        break;
+      }
+      case LESS_THAN:{
+        _is_condition = ( value < eventConditionValue );
+        break;
+      }
+      default: break;
+    }
+
+    return _is_condition;
+  }
+};
+#endif
 
 struct gpio_configs {
 
@@ -123,9 +179,7 @@ struct gpio_configs {
     memset(gpio_mode, OFF, MAX_GPIO_PINS);
     memset(gpio_readings, 0, MAX_GPIO_PINS);
 #ifndef ENABLE_GPIO_BASIC_ONLY
-    memset(gpio_alert_comparator, EQUAL, MAX_GPIO_PINS);
-    memset(gpio_alert_channel, NO_ALERT, MAX_GPIO_PINS);
-    memset(gpio_alert_values, 0, MAX_GPIO_PINS);
+    for (size_t i = 0; i < MAX_GPIO_EVENTS; i++) gpio_events[i].clear();
     memset(gpio_host, 0, GPIO_HOST_BUF_SIZE);
     gpio_port = 80;
     gpio_post_frequency = GPIO_DATA_POST_FREQ;
@@ -135,17 +189,90 @@ struct gpio_configs {
   uint8_t gpio_mode[MAX_GPIO_PINS];
   uint16_t gpio_readings[MAX_GPIO_PINS];
 #ifndef ENABLE_GPIO_BASIC_ONLY
-  uint8_t gpio_alert_comparator[MAX_GPIO_PINS];
-  uint8_t gpio_alert_channel[MAX_GPIO_PINS];
-  uint16_t gpio_alert_values[MAX_GPIO_PINS];
+  gpio_event gpio_events[MAX_GPIO_EVENTS];
   char gpio_host[GPIO_HOST_BUF_SIZE];
   int gpio_port;
   int gpio_post_frequency;
+
+  // return true if gpio has event
+  bool gpioHasEvents(uint8_t gpionumber, uint8_t condition = GPIO_EVENT_CONDITION_MAX){
+
+    return -1 != getGpioEventIndex(gpionumber, condition);
+  }
+
+  // return event if found
+  bool getGpioEvent(gpio_event &gpioevent){
+
+    int16_t eventidx = getGpioEventIndex(gpioevent.gpioNumber, gpioevent.eventCondition);
+
+    if( eventidx != -1 && eventidx < MAX_GPIO_EVENTS ){
+
+      gpioevent.eventChannel = gpio_events[eventidx].eventChannel;
+      gpioevent.eventCondition = gpio_events[eventidx].eventCondition;
+      gpioevent.eventConditionValue = gpio_events[eventidx].eventConditionValue;
+      return true;
+    }
+
+    return false;
+  }
+
+  // update or add gpio event
+  bool updateGpioEvent( uint8_t gpionumber, uint8_t channel, uint8_t condition, uint16_t value, bool addforce = false ){
+
+    int16_t eventidx = getGpioEventIndex(gpionumber, condition, addforce);
+
+    // if event not found then add
+    if(eventidx == -1){
+      eventidx = getGpioEventIndex(gpionumber, condition, true);
+    }
+
+    if( eventidx != -1 && eventidx < MAX_GPIO_EVENTS ){
+      
+      gpio_events[eventidx].gpioNumber = gpionumber;
+      gpio_events[eventidx].eventChannel = channel;
+      gpio_events[eventidx].eventCondition = condition;
+      gpio_events[eventidx].eventConditionValue = value;
+      return true;
+    }
+
+    return false;
+  }
+
+  // clear gpio event
+  void clearGpioEvents( uint8_t gpionumber ){
+
+    for (int16_t i = 0; i < MAX_GPIO_EVENTS; i++){
+      
+      if( gpio_events[i].gpioNumber == gpionumber ){
+
+        gpio_events[i].clear();
+      }
+    }
+  }
+
+private:
+
+  // return index 
+  int16_t getGpioEventIndex(uint8_t gpionumber, uint8_t condition = GPIO_EVENT_CONDITION_MAX, bool returnunusedindex = false){
+
+    for (int16_t i = 0; i < MAX_GPIO_EVENTS && gpionumber < MAX_GPIO_PINS; i++){
+      
+      if(
+        (returnunusedindex && gpio_events[i].eventChannel == GPIO_EVENT_CHANNEL_MAX) ||
+        (!returnunusedindex && gpio_events[i].gpioNumber == gpionumber && GPIO_EVENT_CONDITION_MAX == condition && gpio_events[i].eventChannel != GPIO_EVENT_CHANNEL_MAX) ||
+        (!returnunusedindex && gpio_events[i].gpioNumber == gpionumber && gpio_events[i].eventCondition == condition && gpio_events[i].eventChannel != GPIO_EVENT_CHANNEL_MAX)
+      ){
+        return i;
+      }
+    }
+    return -1;
+  }
+
 #endif
 };
 
 // const gpio_configs PROGMEM _gpio_config_defaults = {
-//   {OFF}, {0}, {EQUAL}, {NO_ALERT}, {0}, "", 80, GPIO_DATA_POST_FREQ
+//   {OFF}, {0}, {EQUAL}, {GPIO_EVENT_CHANNEL_MAX}, {0}, "", 80, GPIO_DATA_POST_FREQ
 // };
 
 const int gpio_config_size = sizeof(gpio_configs) + 5;

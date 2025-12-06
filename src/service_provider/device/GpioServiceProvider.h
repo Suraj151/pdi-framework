@@ -43,7 +43,9 @@ public:
   bool isAllowedGpioPin(uint8_t _pin, pdiutil::vector<pdiutil::string> *allowedlist);
   void appendGpioJsonPayload(pdiutil::string &_payload, bool isAlertPost = false, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);
   void applyGpioJsonPayload(char *_payload, uint16_t _payload_length, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);
+  #ifndef ENABLE_GPIO_BASIC_ONLY
   void applyGpioAlertJsonPayload(char *_payload, uint16_t _payload_length, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);
+  #endif
   void setDeviceId(const char* _id);
   void setHttpHost(const char* _host);
   #ifdef ENABLE_EMAIL_SERVICE

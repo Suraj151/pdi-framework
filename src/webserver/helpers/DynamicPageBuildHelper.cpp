@@ -425,7 +425,7 @@ void concat_tr_input_html_tags(
  * @param _exception The index of an option to exclude (default: -1).
  * @param _disabled Whether the dropdown is disabled (default: false).
  */
-void concat_select_html_tag( char *_page, char *_name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
+void concat_select_html_tag( char *_page, char *_name, const char** _options, int _size, int _selected, int _exception, bool _disabled ){
 
   strcat_ro( _page, HTML_SELECT_OPEN );
   if(_disabled)strcat_ro( _page, HTML_DISABLED_ATTR );
@@ -456,7 +456,7 @@ void concat_select_html_tag( char *_page, char *_name, char** _options, int _siz
   strcat_ro( _page, HTML_SELECT_CLOSE );
 }
 
-void concat_select_html_tag( char *_page, const char *_name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
+void concat_select_html_tag( char *_page, const char *_name, const char** _options, int _size, int _selected, int _exception, bool _disabled ){
 
   strcat_ro( _page, HTML_SELECT_OPEN );
   if(_disabled)strcat_ro( _page, HTML_DISABLED_ATTR );
@@ -502,7 +502,7 @@ void concat_select_html_tag( char *_page, const char *_name, char** _options, in
  * @param _exception The index of an option to exclude (default: -1).
  * @param _disabled Whether the dropdown is disabled (default: false).
  */
-void concat_td_select_html_tags( char *_page, char *_label, char *_name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
+void concat_td_select_html_tags( char *_page, char *_label, char *_name, const char** _options, int _size, int _selected, int _exception, bool _disabled ){
 
   strcat_ro( _page, HTML_TD_OPEN_TAG );
   strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
@@ -514,7 +514,7 @@ void concat_td_select_html_tags( char *_page, char *_label, char *_name, char** 
   strcat_ro( _page, HTML_TD_CLOSE_TAG );
 }
 
-void concat_td_select_html_tags( char *_page, const char *_label, const char *_name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
+void concat_td_select_html_tags( char *_page, const char *_label, const char *_name, const char** _options, int _size, int _selected, int _exception, bool _disabled ){
 
   strcat_ro( _page, HTML_TD_OPEN_TAG );
   strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
@@ -541,7 +541,7 @@ void concat_td_select_html_tags( char *_page, const char *_label, const char *_n
  * @param _exception The index of an option to exclude (default: -1).
  * @param _disabled Whether the dropdown is disabled (default: false).
  */
-void concat_tr_select_html_tags( char *_page, const char *_label, const char *_name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
+void concat_tr_select_html_tags( char *_page, const char *_label, const char *_name, const char** _options, int _size, int _selected, int _exception, bool _disabled ){
 
   strcat_ro( _page, HTML_TR_OPEN_TAG );
   strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
@@ -549,7 +549,7 @@ void concat_tr_select_html_tags( char *_page, const char *_label, const char *_n
   strcat_ro( _page, HTML_TR_CLOSE_TAG );
 }
 
-void concat_tr_select_html_tags( char *_page, char *_label, char *_name, char** _options, int _size, int _selected, int _exception, bool _disabled ){
+void concat_tr_select_html_tags( char *_page, char *_label, char *_name, const char** _options, int _size, int _selected, int _exception, bool _disabled ){
 
   strcat_ro( _page, HTML_TR_OPEN_TAG );
   strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );

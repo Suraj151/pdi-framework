@@ -43,6 +43,9 @@ created Date    : 1st June 2019
 #if defined(DEVICE_ARDUINOUNO)
 #define MAX_DIGITAL_GPIO_PINS         14
 #define MAX_ANALOG_GPIO_PINS          5
+#elif defined(DEVICE_ESP32)
+#define MAX_DIGITAL_GPIO_PINS         9
+#define MAX_ANALOG_GPIO_PINS          4
 #else
 #define MAX_DIGITAL_GPIO_PINS         9
 #define MAX_ANALOG_GPIO_PINS          1
@@ -176,5 +179,10 @@ created Date    : 1st June 2019
 // #define ENABLE_LOG_WARNING
 // #define ENABLE_LOG_ERROR
 // #define ENABLE_LOG_SUCCESS
+
+/**
+ * consts
+ */
+#define NOT_APPLICABLE "NA"
 
 #endif

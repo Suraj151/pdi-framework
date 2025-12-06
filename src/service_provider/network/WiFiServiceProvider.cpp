@@ -487,8 +487,8 @@ void WiFiServiceProvider::printStatusToTerminal(iTerminalInterface *terminal){
 
   if( nullptr != terminal ){
 
-    pdiutil::string stname = "NA";
-    pdiutil::string apname = "NA";
+    pdiutil::string stname = NOT_APPLICABLE;
+    pdiutil::string apname = NOT_APPLICABLE;
 
     terminal->writeln();
 

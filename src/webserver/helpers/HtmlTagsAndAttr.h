@@ -53,6 +53,7 @@ static const char HTML_LINK_OPEN_TAG      []PROG_RODT_ATTR = "<a ";
 static const char HTML_LINK_CLOSE_TAG     []PROG_RODT_ATTR = "</a>";
 static const char HTML_SPAN_OPEN_TAG      []PROG_RODT_ATTR = "<span";
 static const char HTML_SPAN_CLOSE_TAG     []PROG_RODT_ATTR = "</span>";
+static const char HTML_LINE_BREAK_TAG     []PROG_RODT_ATTR = "<br>";
 
 /**
  * @section HTML Attributes

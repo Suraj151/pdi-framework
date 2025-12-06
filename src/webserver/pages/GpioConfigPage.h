@@ -28,7 +28,7 @@ static const char WEB_SERVER_GPIO_MENU_TITLE_MODES[] PROG_RODT_ATTR = "gpio mode
 static const char WEB_SERVER_GPIO_MENU_TITLE_CONTROL[] PROG_RODT_ATTR = "gpio control";
 static const char WEB_SERVER_GPIO_MENU_TITLE_SERVER[] PROG_RODT_ATTR = "gpio server";
 static const char WEB_SERVER_GPIO_MENU_TITLE_MONITOR[] PROG_RODT_ATTR = "gpio monitor";
-static const char WEB_SERVER_GPIO_MENU_TITLE_ALERT[] PROG_RODT_ATTR = "gpio alerts";
+static const char WEB_SERVER_GPIO_MENU_TITLE_ALERT[] PROG_RODT_ATTR = "gpio events";
 
 /**
  * @brief HTML content for the GPIO monitor page.
@@ -94,8 +94,8 @@ static const char WEB_SERVER_GPIO_WRITE_PAGE_TOP[] PROG_RODT_ATTR = "\
  * control page on the web server.
  */
 static const char WEB_SERVER_GPIO_ALERT_PAGE_TOP[] PROG_RODT_ATTR = "\
-<h2>GPIO Alert Control</h2>\
-<form action='/gpio-alert' method='POST'>\
+<h2>GPIO Event Control</h2>\
+<form action='/gpio-event' method='POST'>\
 <table>";
 
 /**

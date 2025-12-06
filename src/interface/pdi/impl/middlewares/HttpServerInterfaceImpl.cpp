@@ -668,10 +668,10 @@ void HttpServerInterfaceImpl::sendResponse(int code, mimetype_t content_type, co
     sendPacket(m_client, (uint8_t *)response.c_str(), response.length());
 
     // Send the response body
-    sendPacket(m_client, (uint8_t *)content, strlen(content), 400);
+    sendPacket(m_client, (uint8_t *)content, strlen(content), 400, 3000);
 
     // Make sure data has been sent
-    m_client->write((const uint8_t*)"", 0);
+    // m_client->write((const uint8_t*)"", 0);
 }
 
 /**
@@ -709,13 +709,13 @@ bool HttpServerInterfaceImpl::handleStaticFileRequest(){
 
             // Send the response body
             int iStatus = __i_instance.getFileSystemInstance().readFile(filePath.c_str(), 400, [&](char* data, uint32_t size)->bool{
-                sendPacket(m_client, (uint8_t *)data, size, 400);
+                sendPacket(m_client, (uint8_t *)data, size, 400, 3000);
                 // return true to continue reading
                 return true;
             });
 
             // Make sure data has been sent
-            m_client->write((const uint8_t*)"", 0);
+            // m_client->write((const uint8_t*)"", 0);
 
             bStatus = true;
         }

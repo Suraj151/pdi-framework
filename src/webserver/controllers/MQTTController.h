@@ -242,7 +242,7 @@ public:
     mqtt_lwt_config_table _mqtt_lwt_configs;
     this->m_web_resource->m_db_conn->get_mqtt_lwt_config_table(&_mqtt_lwt_configs);
 
-    char *_qos_options[] = {"0", "1", "2"};
+    const char *_qos_options[] = {"0", "1", "2"};
 
 #ifdef ALLOW_MQTT_CONFIG_MODIFICATION
 
@@ -348,7 +348,7 @@ public:
     mqtt_pubsub_config_table _mqtt_pubsub_configs;
     this->m_web_resource->m_db_conn->get_mqtt_pubsub_config_table(&_mqtt_pubsub_configs);
 
-    char *_qos_options[] = {"0", "1", "2"};
+    const char *_qos_options[] = {"0", "1", "2"};
     char _topic_name[10], _topic_label[10];
     memset(_topic_name, 0, 10);
     memset(_topic_label, 0, 10);
