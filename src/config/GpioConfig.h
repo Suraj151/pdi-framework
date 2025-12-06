@@ -25,6 +25,7 @@ created Date    : 1st June 2019
 
 #if !defined(MAX_GPIO_EVENTS)
 #define MAX_GPIO_EVENTS               8
+#define MAX_EVENTS_PER_GPIO           3
 #endif
 
 #define INVALID_GPIO_NUMBER       UINT8_MAX
@@ -51,15 +52,15 @@ created Date    : 1st June 2019
 #define GPIO_DATA_POST_HTTP_URL       "/api/fordevice/data/[duid]"
 #define GPIO_EVENT_POST_HTTP_URL      "/api/fordevice/event/[duid]"
 
-#define GPIO_EVENT_DURATION_FOR_SUCCEED 600000
-#define GPIO_EVENT_DURATION_FOR_FAILED  150000
+#define GPIO_EVENT_DURATION_FOR_SUCCEED 180000
+#define GPIO_EVENT_DURATION_FOR_FAILED  60000
 
 /**
  * global gpio event status
  */
 typedef struct {
-  bool is_last_event_succeed;
-  uint32_t last_event_millis;
+  bool is_last_event_succeed[MAX_GPIO_EVENTS];
+  uint32_t last_event_millis[MAX_GPIO_EVENTS];
   int8_t event_gpio_pin;
 } __gpio_event_track_t;
 

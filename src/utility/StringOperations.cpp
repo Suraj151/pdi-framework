@@ -22,7 +22,7 @@ Created Date    : 1st June 2019
  * @param _len The maximum length to search (default is 300).
  * @return The index of the first occurrence of the substring, or -1 if not found.
  */
-int __strstr(char *str, const char *substr, int _len)
+int __strstr(const char *str, const char *substr, int _len)
 {
     if (nullptr == str || nullptr == substr || 0 == strlen(str) || 0 == strlen(substr))
     {
@@ -31,21 +31,20 @@ int __strstr(char *str, const char *substr, int _len)
 
     int n = 0;
 
-    while (*str && n < _len)
+    while (*(str+n) && n < _len)
     {
-        char *Begin = str;
         char *pattern = (char *)substr;
 
-        while (*str && *pattern && *str == *pattern)
+        int p = 0;
+        while (*(str+n+p) && *pattern && *(str+n+p) == *pattern)
         {
-            str++;
+            p++;
             pattern++;
         }
 
         if (!*pattern)
             return n;
 
-        str = Begin + 1;
         n++;
     }
 
@@ -311,7 +310,7 @@ void __find_and_replace(char *_str, const char *_find_str, const char *_replace_
  * @param _max_value_len The maximum length of the value buffer.
  * @return True if the key-value pair was found, false otherwise.
  */
-bool __get_from_json(char *_str, char *_key, char *_value, int _max_value_len)
+bool __get_from_json(const char *_str, const char *_key, char *_value, int _max_value_len)
 {
     if (nullptr == _str || nullptr == _key || nullptr == _value || _max_value_len <= 0)
     {
@@ -319,131 +318,70 @@ bool __get_from_json(char *_str, char *_key, char *_value, int _max_value_len)
     }
 
     int _str_len = strlen(_str);
-    int _key_str_len = strlen(_key);
 
-    char *_str_buf = new char[_str_len];
-
-    if (nullptr == _str_buf)
-    {
+    int _key_index = __strstr(_str, _key, _str_len);
+    if (_key_index < 0 || _key_index >= _str_len)
         return false;
-    }
 
-    memset(_str_buf, 0, _str_len);
+    int _colon_index = __strstr(_str + _key_index, ":", (_str_len - _key_index));
+    if (_colon_index < 0)
+        return false;
 
-    int _occur_index = __strstr(_str, _key, _str_len);
-    int _base_index = _occur_index + _key_str_len; 
-    int _limit = _str_len - _base_index; 
-    if (_occur_index >= 0)
-    {
-        int j = 0;
-        int no_of_commas = 0;
-        int no_of_opening_curly_bracket = 0;
-        int no_of_closing_curly_bracket = 0;
-        int no_of_opening_square_bracket = 0;
-        int no_of_closing_square_bracket = 0;
-        int no_of_double_quote = 0;
-        bool foundsemicolon = false;
+    const char* pos = _str + _key_index + _colon_index + 1; // skip colon
+    while ((*pos == ' ' || *pos == '\t' || *pos == '\n') && (pos - _str) < _str_len ) pos++; // skip whitespace
 
-        while (j < _limit)
-        {
-            if (_str[_base_index + j] == ',')
-            {
-                no_of_commas++;
-            }
-            else if (_str[_base_index + j] == ':')
-            {
-                foundsemicolon = true;
-            }
-            else if (foundsemicolon && (_str[_base_index + j] == '"'))
-            {
-                no_of_double_quote++;
-            }
-            else if (_str[_base_index + j] == '{')
-            {
-                no_of_opening_curly_bracket++;
-            }
-            else if (_str[_base_index + j] == '}')
-            {
-                no_of_closing_curly_bracket++;
-            }
-            else if (_str[_base_index + j] == '[')
-            {
-                no_of_opening_square_bracket++;
-            }
-            else if (_str[_base_index + j] == ']')
-            {
-                no_of_closing_square_bracket++;
-            }
+    int quotes = 0, braces = 0, brackets = 0;
+    const char* start = pos;
+    const char* end = pos;
 
-            if ((no_of_commas > 0 && (no_of_opening_curly_bracket +
-                                      no_of_closing_curly_bracket + 
-                                      no_of_opening_square_bracket + 
-                                      no_of_closing_square_bracket) == 0)
-                                    && (no_of_double_quote%2 == 0))
-            {
-                break;
-            }
+    while (*end) {
+        char c = *end;
 
-            if (no_of_opening_curly_bracket > 0 && no_of_opening_curly_bracket == no_of_closing_curly_bracket)
-            {
-                break;
-            }
+        if (c == '"') {
 
-            if (no_of_opening_curly_bracket == 0 && no_of_opening_square_bracket > 0 &&
-                no_of_opening_square_bracket == no_of_closing_square_bracket)
-            {
-                break;
+            // Count consecutive backslashes before this quote
+            int backslashes = 0;
+            const char* tmp = end - 1;
+            while (tmp >= start && *tmp == '\\') {
+                backslashes++;
+                tmp--;
             }
-
-            if (no_of_opening_curly_bracket == 0 && no_of_closing_curly_bracket > 0 &&
-                no_of_opening_square_bracket == no_of_closing_square_bracket)
-            {
-                j--;
-                break;
+            // If even number of backslashes → quote is not escaped
+            if (backslashes % 2 == 0) {
+                quotes ^= 1; // toggle inside/outside string
             }
+        }else if (!quotes) {
 
-            if (no_of_opening_square_bracket == 0 && no_of_closing_square_bracket > 0 &&
-                no_of_opening_curly_bracket == no_of_closing_curly_bracket)
-            {
-                j--;
-                break;
-            }
-
-            j++;
+            if (c == '{') braces++;
+            else if (c == '}') braces--;
+            else if (c == '[') brackets++;
+            else if (c == ']') brackets--;
+            else if (c == ',' && braces == 0 && brackets == 0) break;
         }
 
-        memcpy(_str_buf, &_str[_occur_index], _key_str_len + j + 1);
-        __find_and_replace(_str_buf, "\n", "", 5);
-        __find_and_replace(_str_buf, _key, "", 1);
-        
-        int _key_value_seperator = __strstr(_str_buf, ":", _str_len);
-        if( _key_value_seperator > 0 ){
-
-            memcpy(_str_buf, _str_buf + _key_value_seperator, _key_str_len + j + 1 - _key_value_seperator);
-
-            char* _trimmedstr = __strtrim_val(_str_buf, ':', _max_value_len);
-            if( nullptr != _trimmedstr )
-            memcpy(_str_buf, _trimmedstr, strlen(_str_buf));
-
-            _trimmedstr = __strtrim_val(_str_buf, ',', _max_value_len);
-            if( nullptr != _trimmedstr )
-            memcpy(_str_buf, _trimmedstr, strlen(_str_buf));
-
-            _trimmedstr = __strtrim(_str_buf, _max_value_len);
-            if( nullptr != _trimmedstr )
-            memcpy(_str_buf, _trimmedstr, strlen(_str_buf));
-
-            _trimmedstr = __strtrim_val(_str_buf, '"', _max_value_len);
-            if( nullptr != _trimmedstr )
-            memcpy(_str_buf, _trimmedstr, strlen(_str_buf));
-
-            memset(_value, 0, _max_value_len);
-            memcpy(_value, _str_buf, strlen(_str_buf));
-        }
+        if (braces < 0 || brackets < 0) break; // safety
+        end++;
     }
 
-    delete[] _str_buf;
-    return _occur_index >= 0;
+    int len = end - start;
+    if (len >= _max_value_len) len = _max_value_len - 1;
+
+    memset(_value, 0, _max_value_len);
+    memcpy(_value, start, len);
+
+    char* _trimmedstr = __strtrim_val(_value, ',', _max_value_len);
+    if( nullptr != _trimmedstr )
+    memcpy(_value, _trimmedstr, strlen(_value));
+
+    _trimmedstr = __strtrim(_value, _max_value_len);
+    if( nullptr != _trimmedstr )
+    memcpy(_value, _trimmedstr, strlen(_value));
+
+    _trimmedstr = __strtrim_val(_value, '"', _max_value_len);
+    if( nullptr != _trimmedstr )
+    memcpy(_value, _trimmedstr, strlen(_value));
+
+    return true;
 }
 
 /**

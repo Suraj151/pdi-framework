@@ -17,7 +17,7 @@ created Date    : 1st June 2019
 
 #ifndef ENABLE_GPIO_BASIC_ONLY
 __gpio_event_track_t __gpio_event_track = {
-  false, 0, -1
+  {false}, {0}, -1
 };
 #endif
 
@@ -98,7 +98,7 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isEventPost ){
 
   LogI("Handling GPIO Http Request\n");
 
-  if( posturl.size() > 5 && this->m_gpio_config_copy.gpio_port > 0 &&
+  if( posturl.size() > 5 &&
     ( isEventPost ? true : ( this->m_gpio_config_copy.gpio_post_frequency > 0 ) ) &&
     nullptr != this->m_http_client
   ){
@@ -364,7 +364,7 @@ void GpioServiceProvider::applyGpioEventJsonPayload( char* _payload, uint16_t _p
     0 <= __strstr( _payload, (char*)GPIO_PAYLOAD_VALUE_KEY, _payload_length - strlen(GPIO_PAYLOAD_VALUE_KEY) )
   ){
 
-    int _iface_data_max_len = 30, _iface_keys_max_len = 6;
+    int _iface_data_max_len = 150, _iface_keys_max_len = 6;
     char _iface_label_uppercase[_iface_keys_max_len]; //memset( _iface_label, 0, _iface_keys_max_len); _iface_label[0] = 'D';
     char _iface_label_lowercase[_iface_keys_max_len];
     char _iface_data[_iface_data_max_len], _iface_comparator[_iface_keys_max_len], _iface_value[_iface_keys_max_len];
@@ -388,17 +388,69 @@ void GpioServiceProvider::applyGpioEventJsonPayload( char* _payload, uint16_t _p
           __get_from_json( _payload, _iface_label_lowercase, _iface_data, _iface_data_max_len ) 
         ){
 
-          if( __get_from_json( _iface_data, (char*)GPIO_EVENT_COMPARATOR_KEY, _iface_comparator, _iface_keys_max_len ) ){
+          int _iface_data_index = 0;
+          for(uint8_t _ifevnt = 0; _ifevnt < MAX_EVENTS_PER_GPIO; _ifevnt++) {
 
-            if( __get_from_json( _iface_data, (char*)GPIO_PAYLOAD_VALUE_KEY, _iface_value, _iface_keys_max_len ) ){
+            // In array of events use index to point to next item in array
+            
+            int _iface_val_len = strlen(_iface_value);
+            if( _iface_val_len > 0 ){
 
-              LogFmtI("Applying to : %s, cmp : %s, value : %s\n", _iface_label_uppercase, _iface_comparator, _iface_value);
+              int _found_idx = __strstr(_iface_data + _iface_data_index, _iface_value, strlen(_iface_data + _iface_data_index));
 
-              uint8_t _comparator = StringToUint8( _iface_comparator, _iface_keys_max_len );
-              uint16_t _value = StringToUint16( _iface_value, _iface_keys_max_len );
+              // Unknown error, break if not found
+              if( _found_idx < 0 ){
 
-              this->m_gpio_config_copy.updateGpioEvent(_pin, HTTP_SERVER, _comparator, _value);
-              this->m_update_gpio_table_from_copy = true;
+                _iface_data_index = 0;
+                break;
+              }else{
+
+                _iface_data_index += _found_idx + _iface_val_len;
+                // Break for out of bond index
+                if( _iface_data_index >= strlen(_iface_data) ){
+                  
+                  _iface_data_index = 0;
+                  break;
+                }else{
+
+                  // search last _iface_value object end by comma 
+                  _found_idx = __strstr(_iface_data + _iface_data_index, ",", strlen(_iface_data + _iface_data_index));
+
+                  // Unknown error, break if not found
+                  if( _found_idx < 0 ){
+
+                    _iface_data_index = 0;
+                    break;
+                  }else{
+
+                    _iface_data_index += _found_idx + 1;
+                    // Break for out of bond index
+                    if( _iface_data_index >= strlen(_iface_data) ){
+                      
+                      _iface_data_index = 0;
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+
+            if( __get_from_json( _iface_data + _iface_data_index, (char*)GPIO_EVENT_COMPARATOR_KEY, _iface_comparator, _iface_keys_max_len ) ){
+
+              if( __get_from_json( _iface_data + _iface_data_index, (char*)GPIO_PAYLOAD_VALUE_KEY, _iface_value, _iface_keys_max_len ) ){
+
+                LogFmtI("Applying to : %s, cmp : %s, value : %s\n", _iface_label_uppercase, _iface_comparator, _iface_value);
+
+                uint8_t _comparator = StringToUint8( _iface_comparator, _iface_keys_max_len );
+                uint16_t _value = StringToUint16( _iface_value, _iface_keys_max_len );
+
+                this->m_gpio_config_copy.updateGpioEvent(_pin, HTTP_SERVER, _comparator, _value);
+                this->m_update_gpio_table_from_copy = true;
+              }else{
+                break;
+              }
+            }else{
+              break;
             }
           }
         }else{
@@ -537,33 +589,35 @@ void GpioServiceProvider::handleGpioOperations(){
 
     uint8_t _gpionumber = this->m_gpio_config_copy.gpio_events[_evtidx].gpioNumber;
 
-    if( !__i_dvc_ctrl.isExceptionalGpio(_gpionumber) && 
-      this->m_gpio_config_copy.gpio_events[_evtidx].eventChannel != GPIO_EVENT_CHANNEL_MAX 
-    ){
+    if( !__i_dvc_ctrl.isExceptionalGpio(_gpionumber) && this->m_gpio_config_copy.gpioHasEvents(_gpionumber) ){
 
       bool _is_event_condition = this->m_gpio_config_copy.gpio_events[_evtidx].isEventOccur(
         this->m_gpio_config_copy.gpio_readings[_gpionumber]
       );
 
+      if(_is_event_condition){
+        LogFmtI("\nGPIO Event %d occured\n", (int)_evtidx);
+      }
+
       uint32_t _now = __i_dvc_ctrl.millis_now();
-      if( _is_event_condition && (( __gpio_event_track.is_last_event_succeed ?
-        GPIO_EVENT_DURATION_FOR_SUCCEED < ( _now - __gpio_event_track.last_event_millis ) :
-        GPIO_EVENT_DURATION_FOR_FAILED < ( _now - __gpio_event_track.last_event_millis )
+      if( _is_event_condition && (( __gpio_event_track.is_last_event_succeed[_evtidx] ?
+        GPIO_EVENT_DURATION_FOR_SUCCEED < ( _now - __gpio_event_track.last_event_millis[_evtidx] ) :
+        GPIO_EVENT_DURATION_FOR_FAILED < ( _now - __gpio_event_track.last_event_millis[_evtidx] )
       ) || __gpio_event_track.event_gpio_pin == -1) ){
 
         __gpio_event_track.event_gpio_pin = _gpionumber;
-        __gpio_event_track.last_event_millis = _now;
+        __gpio_event_track.last_event_millis[_evtidx] = _now;
         switch ( this->m_gpio_config_copy.gpio_events[_evtidx].eventChannel ) {
 
           #ifdef ENABLE_EMAIL_SERVICE
           case EMAIL:{
-            __gpio_event_track.is_last_event_succeed = this->handleGpioEventOverEmail();
+            __gpio_event_track.is_last_event_succeed[_evtidx] = this->handleGpioEventOverEmail();
             break;
           }
           #endif
           #ifdef ENABLE_HTTP_CLIENT
           case HTTP_SERVER:{
-            __gpio_event_track.is_last_event_succeed = this->handleGpioHttpRequest(true);
+            __gpio_event_track.is_last_event_succeed[_evtidx] = this->handleGpioHttpRequest(true);
             break;
           }
           #endif

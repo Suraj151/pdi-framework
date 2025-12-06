@@ -25,7 +25,7 @@ Created Date    : 1st June 2019
  * @param _len The maximum length to search (default is 300).
  * @return The index of the first occurrence of the substring, or -1 if not found.
  */
-int __strstr(char *str, const char *substr, int _len = 300);
+int __strstr(const char *str, const char *substr, int _len = 300);
 
 /**
  * @brief Trims leading and trailing whitespace from a string.
@@ -105,7 +105,7 @@ void __find_and_replace(char *_str, const char *_find_str, const char *_replace_
  * @param _max_value_len The maximum length of the value buffer.
  * @return True if the key-value pair was found, false otherwise.
  */
-bool __get_from_json(char *_str, char *_key, char *_value, int _max_value_len);
+bool __get_from_json(const char *_str, const char *_key, char *_value, int _max_value_len);
 
 
 /**
