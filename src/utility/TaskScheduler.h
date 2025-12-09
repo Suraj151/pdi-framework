@@ -201,6 +201,12 @@ protected:
      */
     iUtilityInterface *m_util;
 
+    /**
+     * @brief Sort the task indices according to their priority and score.
+     *
+     */
+    void getSortedTaskList(uint16_t* _priority_indices, uint16_t _task_count);
+
 private:
     /**
      * @var uint8_t m_max_tasks

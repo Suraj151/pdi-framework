@@ -173,6 +173,87 @@ int TaskScheduler::register_task(CallBackVoidArgFn _task_fn, uint64_t _duration,
 }
 
 /**
+ * @brief Sort the task indices according to their priority and score.
+ *
+ */
+void TaskScheduler::getSortedTaskList(uint16_t* _priority_indices, uint16_t _task_count)
+{
+    const uint32_t tolerance = 3; // ms tolerance window
+    uint64_t now = m_util->millis_now();
+
+    for (uint16_t i = 0; i < _task_count; i++)
+        _priority_indices[i] = i;
+
+    for (uint16_t i = 0; i < _task_count; i++)
+    {
+        for (uint16_t j = i + 1; j < _task_count; j++)
+        {
+            auto &task_i = this->m_tasks[_priority_indices[i]];
+            auto &task_j = this->m_tasks[_priority_indices[j]];
+
+            uint64_t next_due_i = task_i._last_millis + task_i._duration;
+            uint64_t next_due_j = task_j._last_millis + task_j._duration;
+
+            bool swap_needed = false;
+
+            // --- Catch-up logic: overdue tasks get priority ---
+            bool overdue_i = (now >= next_due_i);
+            bool overdue_j = (now >= next_due_j);
+
+            // --- Compute lateness in ms (0 if not overdue) ---
+            int64_t lateness_i = overdue_i ? (int64_t)(now - next_due_i) : 0;
+            int64_t lateness_j = overdue_j ? (int64_t)(now - next_due_j) : 0;
+
+            // --- Blend priority and lateness into a score ---
+            int score_i = task_i._task_priority * 100 + (int)pdistd::min<int64_t>(lateness_i / 10, 50);
+            int score_j = task_j._task_priority * 100 + (int)pdistd::min<int64_t>(lateness_j / 10, 50);
+            
+            // --- Compare blended score first (priority-biased) ---
+            if (score_i != score_j) {
+                swap_needed = (score_j > score_i);
+            }
+            else {
+                // --- Scores equal → compare due times with tolerance ---
+                int64_t diff = (int64_t)(next_due_i - next_due_j);
+
+                if (pdistd::abs(diff) > (int64_t)tolerance) {
+                    swap_needed = (next_due_j < next_due_i);
+                } else {
+                    // --- Due times effectively equal → compare exec time ---
+                    if (task_i._task_exec_millis > task_j._task_exec_millis) {
+                        swap_needed = true;
+                    }
+                }
+            }
+
+            // // --- Normal comparison with tolerance ---
+            // int64_t diff = (int64_t)(next_due_i - next_due_j);
+
+            // if (pdistd::abs(diff) > (int64_t)tolerance) {
+
+            //     swap_needed = (next_due_j < next_due_i);
+            // } else {
+            //     // Due times are effectively equal → compare blended score
+            //     if (score_j > score_i) {
+
+            //         swap_needed = true;
+            //     }
+            //     else if (score_i == score_j) {
+            //         // If score also equal → compare exec time
+            //         if (task_i._task_exec_millis > task_j._task_exec_millis) {
+            //             swap_needed = true;
+            //         }
+            //     }
+            // }
+
+            if (swap_needed) {
+                pdistd::swap(_priority_indices[i], _priority_indices[j]);
+            }
+        }
+    }
+}
+
+/**
  * @brief Executes all registered tasks that are due.
  *
  * This function must be called periodically (ideally every millisecond) to handle tasks.
@@ -187,40 +268,37 @@ void TaskScheduler::handle_tasks()
     uint16_t _task_count = this->m_tasks.size();
     uint16_t _priority_indices[_task_count];
 
-    for (uint16_t i = 0; i < _task_count; i++)
-        _priority_indices[i] = i;
-    for (uint16_t i = 0; i < _task_count; i++)
-    {
-        for (uint16_t j = i + 1; j < _task_count; j++)
-        {
-            if (this->m_tasks[i]._task_priority < this->m_tasks[j]._task_priority)
-            {
-                pdistd::swap(_priority_indices[i], _priority_indices[j]);
-            }
-        }
-    }
+    this->getSortedTaskList(_priority_indices, _task_count);
+    this->m_rebase_start_priotask = true; // run only one task and break for next turn
 
     for (uint16_t i = 0; i < _task_count; i++)
     {
         uint64_t _last_start_ms = m_util->millis_now();
+        auto &_task = this->m_tasks[_priority_indices[i]];
 
-        if (_last_start_ms < this->m_tasks[_priority_indices[i]]._last_millis)
+        if (_last_start_ms < _task._last_millis)
         {
-            this->m_tasks[_priority_indices[i]]._last_millis = _last_start_ms;
+            _task._last_millis = _last_start_ms;
         }
 
-        if (this->m_tasks[_priority_indices[i]]._max_attempts != 0 &&
-            (_last_start_ms - this->m_tasks[_priority_indices[i]]._last_millis) > this->m_tasks[_priority_indices[i]]._duration)
+        if (_task._max_attempts != 0 && (_last_start_ms - _task._last_millis) >= _task._duration)
         {
-            if (nullptr != this->m_tasks[_priority_indices[i]]._task)
+            if (nullptr != _task._task)
             {
-                this->m_tasks[_priority_indices[i]]._task();
+                _task._task();
             }
-            this->m_tasks[_priority_indices[i]]._last_millis = _last_start_ms;
-            this->m_tasks[_priority_indices[i]]._max_attempts = this->m_tasks[_priority_indices[i]]._max_attempts > 0 ? this->m_tasks[_priority_indices[i]]._max_attempts - 1 : this->m_tasks[_priority_indices[i]]._max_attempts;
+
+            // --- Catch-up: advance last_millis by multiples of duration ---
+            int catchupround = 0;
+            while ((_last_start_ms - _task._last_millis) >= _task._duration) {
+                _task._last_millis += _task._duration; // Reduced drift
+                if (++catchupround > 3) break;  // break for max catchup rounds
+            }
+
+            _task._max_attempts = _task._max_attempts > 0 ? _task._max_attempts - 1 : _task._max_attempts;
 
             uint64_t _task_end_ms = m_util->millis_now();
-            this->m_tasks[_priority_indices[i]]._task_exec_millis = _task_end_ms > _last_start_ms ? (_task_end_ms - _last_start_ms) : 0;
+            _task._task_exec_millis = _task_end_ms > _last_start_ms ? (_task_end_ms - _last_start_ms) : 0;
         }
 
         if (nullptr != m_util)
@@ -228,6 +306,7 @@ void TaskScheduler::handle_tasks()
             m_util->yield();
         }
 
+        // Break the loop in case resorting is needed
         if( this->m_rebase_start_priotask ){
             this->m_rebase_start_priotask = false;
             break;
