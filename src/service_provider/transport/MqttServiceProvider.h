@@ -41,7 +41,7 @@ public:
   ~MqttServiceProvider();
 
   bool initService(void *arg = nullptr) override;
-  void handleMqttPublish(void);
+  void handleMqttPublish(bool sync=false);
   void handleMqttSubScribe(void);
   void handleMqttConfigChange(int _mqtt_config_type = MQTT_GENERAL_CONFIG);
   static void handleMqttDataCb(uint32_t *args, const char *topic, uint32_t topic_len, const char *data, uint32_t data_len);

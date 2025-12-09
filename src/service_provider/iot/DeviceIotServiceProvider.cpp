@@ -616,7 +616,7 @@ void DeviceIotServiceProvider::handleSensorData(){
     if( this->m_server_configurable_interface_read.size() > 0 || this->m_server_configurable_interface_write.size() > 0 ){
 
 #if defined(ENABLE_MQTT_SERVICE)
-      __task_scheduler.setTimeout( [&]() { __mqtt_service.handleMqttPublish(); }, 1, __i_dvc_ctrl.millis_now(), DEFAULT_TASK_PRIORITY+1 );
+      __task_scheduler.setTimeout( [&]() { __mqtt_service.handleMqttPublish(true); }, 1, __i_dvc_ctrl.millis_now(), DEFAULT_TASK_PRIORITY+1 );
       __task_scheduler.rebaseAndRestartPrioTasks();
 
       memset( __mqtt_service.m_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );

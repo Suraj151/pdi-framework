@@ -19,7 +19,7 @@ created Date    : 1st June 2019
 #define MQTT_READ_TIMEOUT 10
 
 #ifndef QUEUE_BUFFER_SIZE
-#define QUEUE_BUFFER_SIZE 2048
+#define QUEUE_BUFFER_SIZE 1536
 #endif
 
 void mqttConnectedCb(uint32_t *args)

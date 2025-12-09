@@ -70,9 +70,9 @@ bool MqttServiceProvider::initService( void *arg ){
 /**
  * check and do mqtt publish on given configs.
  */
-void MqttServiceProvider::handleMqttPublish(){
+void MqttServiceProvider::handleMqttPublish(bool sync){
 
-  LogI("MQTT: handling mqtt publish interval\n");
+  LogFmtI("MQTT: handling mqtt publish interval, %d\n", (int)sync);
   if( !this->m_mqtt_client.is_mqtt_connected() ) return;
 
   mqtt_pubsub_config_table _mqtt_pubsub_configs;
@@ -81,8 +81,9 @@ void MqttServiceProvider::handleMqttPublish(){
   for (uint8_t i = 0; i < MQTT_MAX_PUBLISH_TOPIC; i++) {
 
     __find_and_replace( _mqtt_pubsub_configs.publish_topics[i].topic, "[mac]", __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
-    LogFmtI("MQTT: publishing on topic : %s\n", _mqtt_pubsub_configs.publish_topics[i].topic);
     if( nullptr != this->m_mqtt_payload && strlen(_mqtt_pubsub_configs.publish_topics[i].topic) > 0 ){
+
+      LogFmtI("MQTT: publishing on topic : %s\n", _mqtt_pubsub_configs.publish_topics[i].topic);
 
       #ifdef ENABLE_MQTT_DEFAULT_PAYLOAD
 
@@ -115,7 +116,7 @@ void MqttServiceProvider::handleMqttPublish(){
       }
       __find_and_replace( this->m_mqtt_payload, "[mac]", __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
 
-      this->m_mqtt_client.Publish(
+      bool ret = this->m_mqtt_client.Publish(
         _mqtt_pubsub_configs.publish_topics[i].topic,
         this->m_mqtt_payload,
         strlen( this->m_mqtt_payload ),
@@ -123,6 +124,10 @@ void MqttServiceProvider::handleMqttPublish(){
         _mqtt_pubsub_configs.publish_topics[i].qos : MQTT_MAX_QOS_LEVEL,
         _mqtt_pubsub_configs.publish_topics[i].retain
       );
+
+      if( ret && sync ){
+        this->m_mqtt_client.MQTT_Task();
+      }
     }
   }
 }
