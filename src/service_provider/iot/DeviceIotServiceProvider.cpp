@@ -526,6 +526,7 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
     #if defined( ENABLE_GPIO_SERVICE )
     __gpio_service.setDeviceId(this->m_device_iot_configs.device_iot_duid);
     __gpio_service.setHttpHost(this->m_device_iot_configs.device_iot_host);
+    __gpio_service.m_gpio_config_copy.clearAllGpioEvents();
     __gpio_service.applyGpioEventJsonPayload(_value_buff, strlen(_value_buff), &allowed_interface_list);
     #endif
   }

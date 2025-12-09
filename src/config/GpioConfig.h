@@ -251,6 +251,12 @@ struct gpio_configs {
     }
   }
 
+  // clear all gpio event
+  void clearAllGpioEvents(){
+    for (int16_t i = 0; i < MAX_GPIO_PINS; i++){      
+      clearGpioEvents(i);
+    }
+  }
 private:
 
   // return index 

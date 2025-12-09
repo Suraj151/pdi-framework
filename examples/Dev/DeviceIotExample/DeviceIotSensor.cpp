@@ -65,9 +65,9 @@ void DeviceIotSensor::dataHook( pdiutil::string &_payload ){
 
   LogI("Gathering sensor data samples : ");
 
-
   #if defined( ENABLE_GPIO_SERVICE )
 
+    LogI("\n");
     pdiutil::vector<pdiutil::string> concatenated_v = __device_iot_service.m_server_configurable_interface_read;
     concatenated_v.insert(concatenated_v.end(), __device_iot_service.m_server_configurable_interface_write.begin(), __device_iot_service.m_server_configurable_interface_write.end());
 
