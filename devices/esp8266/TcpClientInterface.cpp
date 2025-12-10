@@ -10,6 +10,11 @@ created Date    : 1st May 2025
 #include "TcpClientInterface.h"
 #include "DeviceControlInterface.h"
 
+struct dnsFoundResult {
+    ip_addr_t addr;
+    bool found;
+};
+
 /**
  * @brief Constructor for TcpClientInterface.
  */
@@ -33,8 +38,7 @@ TcpClientInterface::TcpClientInterface(struct tcp_pcb* pcb):
     m_rxBuffer(nullptr),
     m_rxBufferSize(0),
     m_timeout(3000),
-    m_isLastWriteAcked(true),
-    m_port(0) {
+    m_isLastWriteAcked(true) {
 
     if (m_pcb) {
         tcp_arg(m_pcb, this);
@@ -54,35 +58,45 @@ TcpClientInterface::~TcpClientInterface() {
 }
 
 /**
- * @brief sync/async call to connect client pcb with ip,port
- */
-int16_t TcpClientInterface::connectpcb(TcpClientInterface* client, const ip_addr_t* ip, uint16_t port){
-
-    if( client && ip ){
-
-        // Set the connection callback
-        tcp_arg(client->m_pcb, client);
-        tcp_err(client->m_pcb, &TcpClientInterface::onError);
-        tcp_sent(client->m_pcb, &TcpClientInterface::onSent);
-
-        // Connect to the server
-        err_t err = tcp_connect(client->m_pcb, ip, port, &TcpClientInterface::onConnected);
-        if (err != ERR_OK) {
-            client->close();
-            return err < 0 ? err : -99; // Return error code if connection fails
-        }
-        client->setNoDelay(true);
-        
-        return 0;
-    }
-    return -100;
-}
-
-/**
  * @brief Connect to a remote server async.
  */
 int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
+
     close(); // Ensure any previous connection is closed
+
+    uint32_t now = __i_dvc_ctrl.millis_now();
+    const char* hostname = reinterpret_cast<const char*>(host);
+    ip_addr_t serverIp;
+
+    // Convert the host to an IP address
+    if (!ipaddr_aton(hostname, &serverIp)) {
+
+        dnsFoundResult dnsresult{IP4_ADDRESS_NONE, false};
+        // It's a hostname, resolve via DNS
+        err_t err = dns_gethostbyname(hostname, &serverIp,[](const char* name, const ip_addr_t* ipaddr, void* arg) {
+
+            dnsFoundResult* dnsfound = static_cast<dnsFoundResult*>(arg);
+            if (ipaddr) {
+                // Connect once resolved
+                dnsfound->addr = *ipaddr;
+                dnsfound->found = true;
+            } else {
+            }
+        }, &dnsresult);
+
+        if (err == ERR_OK) {
+            // Resolved immediately (cached), connect now
+        } else if (err == ERR_INPROGRESS) {
+            
+            while (!dnsresult.found && (__i_dvc_ctrl.millis_now() - now) < m_timeout){
+                __i_dvc_ctrl.yield();
+            }
+            if( !dnsresult.found ) return -100;  // timeout
+            serverIp = dnsresult.addr;
+        } else {
+            return -99;
+        }        
+    }
 
     // Allocate a new TCP protocol control block
     m_pcb = tcp_new();
@@ -90,41 +104,26 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
         return -99;
     }
 
-    // Convert the host to an IP address
-    const char* hostname = reinterpret_cast<const char*>(host);
-    m_port = port;
-    ip_addr_t serverIp;
+    // Set the connection callback
+    tcp_arg(m_pcb, this);
+    tcp_err(m_pcb, &TcpClientInterface::onError);
+    tcp_sent(m_pcb, &TcpClientInterface::onSent);
 
-    if (!ipaddr_aton(hostname, &serverIp)) {
-        // It's a hostname, resolve via DNS
-        err_t err = dns_gethostbyname(hostname, &serverIp,[](const char* name, const ip_addr_t* ipaddr, void* arg) {
+    // Connect to the server
+    err_t err = tcp_connect(m_pcb, &serverIp, port, &TcpClientInterface::onConnected);
+    if (err != ERR_OK) {
+        close();
+        return err < 0 ? err : -99; // Return error code if connection fails
+    }
+    setNoDelay(true);
 
-            TcpClientInterface* self = static_cast<TcpClientInterface*>(arg);
-
-            if (ipaddr) {
-                // Connect once resolved
-                self->connectpcb(self, ipaddr, self->m_port);
-            } else {
-
-                self->close();
-            }
-        }, this);
-
-        if (err == ERR_OK) {
-
-            // Resolved immediately (cached), connect now
-        } else if (err == ERR_INPROGRESS) {
-            
-            // Will connect asynchronously in callback
-            return 1;      // indicate "in progress"
-        } else {
-
-            close();
-            return -99;
-        }        
+    while (!connected() && (__i_dvc_ctrl.millis_now() - now) < m_timeout){
+        __i_dvc_ctrl.yield();
     }
 
-    return connectpcb(this, &serverIp, m_port);
+    if( !connected() ) return -100;  // timeout
+    
+    return 0;
 }
 
 /**

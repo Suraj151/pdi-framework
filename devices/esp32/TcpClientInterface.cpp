@@ -19,8 +19,7 @@ TcpClientInterface::TcpClientInterface() :
     m_rxBuffer(nullptr),
     m_rxBufferSize(0),
     m_timeout(3000),
-    m_isLastWriteAcked(true),
-    m_port(0) {}
+    m_isLastWriteAcked(true) {}
 
 /**
  * @brief Parameterized Constructor for TcpClientInterface.
@@ -54,47 +53,17 @@ TcpClientInterface::~TcpClientInterface() {
 }
 
 /**
- * @brief sync/async call to connect client pcb with ip,port
- */
-int16_t TcpClientInterface::connectpcb(TcpClientInterface* client, const ip_addr_t* ip, uint16_t port){
-
-    if( client && ip ){
-
-        // Set the connection callback
-        tcp_arg(client->m_pcb, client);
-        tcp_err(client->m_pcb, &TcpClientInterface::onError);
-        tcp_sent(client->m_pcb, &TcpClientInterface::onSent);
-
-        // Connect to the server
-        err_t err = tcp_connect(client->m_pcb, ip, port, &TcpClientInterface::onConnected);
-        if (err != ERR_OK) {
-            client->close();
-            return err < 0 ? err : -99; // Return error code if connection fails
-        }
-        client->setNoDelay(true);
-        
-        return 0;
-    }
-    return -100;
-}
-
-/**
  * @brief Connect to a remote server async.
  */
 int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
+
     close(); // Ensure any previous connection is closed
 
-    // Allocate a new TCP protocol control block
-    m_pcb = tcp_new();
-    if (!m_pcb) {
-        return -99;
-    }
-
-    // Convert the host to an IP address
+    uint32_t now = __i_dvc_ctrl.millis_now();
     const char* hostname = reinterpret_cast<const char*>(host);
-    m_port = port;
     ip_addr_t serverIp;
 
+    // Convert the host to an IP address
     if (!ipaddr_aton(hostname, &serverIp)) {
         // It's a hostname, resolve via DNS
         struct addrinfo *res; struct addrinfo hints;
@@ -111,13 +80,36 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
                 serverIp.u_addr.ip4.addr = ((struct sockaddr_in *)res->ai_addr)->sin_addr.s_addr;
             }
         } else {
-
-            close();
             return -99;
         }        
     }
 
-    return connectpcb(this, &serverIp, m_port);
+    // Allocate a new TCP protocol control block
+    m_pcb = tcp_new();
+    if (!m_pcb) {
+        return -99;
+    }
+
+    // Set the connection callback
+    tcp_arg(m_pcb, this);
+    tcp_err(m_pcb, &TcpClientInterface::onError);
+    tcp_sent(m_pcb, &TcpClientInterface::onSent);
+
+    // Connect to the server
+    err_t err = tcp_connect(m_pcb, &serverIp, port, &TcpClientInterface::onConnected);
+    if (err != ERR_OK) {
+        close();
+        return err < 0 ? err : -99; // Return error code if connection fails
+    }
+    setNoDelay(true);
+
+    while (!connected() && (__i_dvc_ctrl.millis_now() - now) < m_timeout){
+        __i_dvc_ctrl.yield();
+    }
+
+    if( !connected() ) return -100;  // timeout    
+
+    return 0;
 }
 
 /**

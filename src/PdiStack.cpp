@@ -19,10 +19,13 @@ created Date    : 1st June 2019
 PDIStack::PDIStack()
 #ifdef ENABLE_WIFI_SERVICE
   :
-  m_client(&__i_wifi_client),
+  m_client(nullptr),
   m_server(&__i_http_server)
 #endif
 {
+#ifdef ENABLE_WIFI_SERVICE
+  m_client = new TcpClientInterface;
+#endif
   __utl_event.begin(&__i_dvc_ctrl);
   __task_scheduler.setUtilityInterface(&__i_dvc_ctrl);
   __task_scheduler.setMaxTasksLimit(MAX_SCHEDULABLE_TASKS);
@@ -35,6 +38,7 @@ PDIStack::PDIStack()
  */
 PDIStack::~PDIStack(){
 #ifdef ENABLE_WIFI_SERVICE
+  delete this->m_client;
   this->m_client = nullptr;
   this->m_server = nullptr;
 #endif

@@ -14,7 +14,6 @@ created Date    : 1st Jan 2024
 #include "LoggerInterface.h"
 #include "DatabaseInterface.h"
 #include "DeviceControlInterface.h"
-#include "ClientInterface.h"
 #include "ServerInterface.h"
 #ifdef ENABLE_WIFI_SERVICE
 #include "WiFiInterface.h"

@@ -18,7 +18,6 @@ DatabaseInterface __i_db;
 DeviceControlInterface __i_dvc_ctrl;
 #ifdef ENABLE_WIFI_SERVICE
 WiFiInterface __i_wifi;
-WiFiClientInterface __i_wifi_client;
 WiFiServerInterface __i_wifi_server;
 #endif
 #ifdef ENABLE_NETWORK_SERVICE

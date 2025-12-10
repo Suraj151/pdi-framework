@@ -30,7 +30,7 @@ bool connectToServer(iClientInterface *client, char *host, uint16_t port, uint16
 
   LogFmtI("Client Connect result : %d\n", result);
 
-  return result != 0;
+  return result >= 0;
 }
 
 bool isConnected(iClientInterface *client)

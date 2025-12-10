@@ -14,7 +14,6 @@ created Date    : 1st Jan 2024
 #include "mockdevice.h"
 #include <interface/pdi/middlewares/iDeviceControlInterface.h>
 #include "LoggerInterface.h"
-// #include "WiFiClientInterface.h"
 #include "PingInterface.h"
 
 /**

@@ -11,7 +11,6 @@ created Date    : 1st Jan 2024
 #include "DeviceControlInterface.h"
 #include "ExceptionsNotifier.h"
 #include "LoggerInterface.h"
-#include "WiFiClientInterface.h"
 #include "core/Espnow.h"
 #include "PingInterface.h"
 #include "SerialInterface.h"
@@ -354,12 +353,13 @@ upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *v
 {
     String binary_path = path;
     upgrade_status_t status = UPGRADE_STATUS_MAX;
+    WiFiClient _wifi_client;
 
 #ifdef ENABLE_WIFI_SERVICE
     ESPhttpUpdate.rebootOnUpdate(false);
     ESPhttpUpdate.followRedirects(true);
     ESPhttpUpdate.setAuthorization("ota", __i_dvc_ctrl.getDeviceMac().c_str());
-    t_httpUpdate_return ret = ESPhttpUpdate.update( *(__i_wifi_client.getWiFiClient()), binary_path );
+    t_httpUpdate_return ret = ESPhttpUpdate.update( _wifi_client, binary_path );
 
     if( ret == HTTP_UPDATE_FAILED ){
 

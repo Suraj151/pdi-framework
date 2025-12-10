@@ -501,9 +501,9 @@ int16_t Http_Client::SendRequest(const char *type, const char *url, const char *
             {
                 m_client->flush();
                 m_client->disconnect();
-                __i_dvc_ctrl.wait(100);
-                m_client->setTimeout(m_request.timeout);
-                bStatus = m_client->connect((const uint8_t *)m_request.host, m_request.port);
+                // __i_dvc_ctrl.wait(100);
+                // m_client->setTimeout(m_request.timeout);
+                bStatus = connectToServer(m_client, m_request.host, m_request.port, m_request.timeout);
             }
         }
 
