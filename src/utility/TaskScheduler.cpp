@@ -288,11 +288,17 @@ void TaskScheduler::handle_tasks()
                 _task._task();
             }
 
-            // --- Catch-up: advance last_millis by multiples of duration ---
-            int catchupround = 0;
-            while ((_last_start_ms - _task._last_millis) >= _task._duration) {
-                _task._last_millis += _task._duration; // Reduced drift
-                if (++catchupround > 3) break;  // break for max catchup rounds
+            if( 0 == _task._last_millis ){
+
+                _task._last_millis = _last_start_ms;
+            }else{
+
+                // --- Catch-up: advance last_millis by multiples of duration ---
+                int catchupround = 0;
+                while ((_last_start_ms - _task._last_millis) >= _task._duration) {
+                    _task._last_millis += _task._duration; // Reduced drift
+                    if (++catchupround > 3) break;  // break for max catchup rounds
+                }
             }
 
             _task._max_attempts = _task._max_attempts > 0 ? _task._max_attempts - 1 : _task._max_attempts;
