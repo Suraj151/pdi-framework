@@ -790,6 +790,40 @@ int16_t Http_Client::handleResponse()
             if (-1 == headerSeperatorIndex && line_len == 0)
             {
                 header_ends = true;
+
+                char *transferencoding = nullptr;
+                if(GetHeader(HTTP_HEADER_KEY_TRANSFER_ENCODING, transferencoding, false)){
+
+                    if( __are_arrays_equal(transferencoding,"chunked", strlen(transferencoding)) ){
+
+                        pdiutil::string body; 
+                        
+                        while (true && body.size() < m_response.max_resp_length) { 
+                            
+                            __i_dvc_ctrl.yield();
+
+                            // read chunk size line 
+                            char sizeLine[32]; 
+                            int len = readPacket(m_client, (uint8_t*)sizeLine, sizeof(sizeLine)-1, max_timeout, '\n'); 
+                            sizeLine[len] = '\0'; 
+                            uint16_t chunkSize = StringToHex16(sizeLine, len-2); 
+                            if (chunkSize == 0) break; 
+                            
+                            // read chunk data 
+                            m_client->readStringUntil(body, 0, false, nullptr, chunkSize);
+                            
+                            // consume trailing CRLF 
+                            pdiutil::string crlf;
+                            m_client->readLine(crlf, nullptr, 2);
+                        }
+
+                        memset(m_response.response, 0, m_response.max_resp_length + 1);
+                        uint16_t copyLen = pdistd::min(m_response.max_resp_length, (uint16_t)body.size());
+                        strncpy(m_response.response, body.c_str(), copyLen);
+                        m_response.resp_length = copyLen;
+                        break;
+                    }
+                }                
             }
         }
 

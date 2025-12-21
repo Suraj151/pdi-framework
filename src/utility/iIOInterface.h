@@ -327,7 +327,7 @@ public:
       // Read a byte from the input
       c = read();
       if (_delimiter!=0 && (c == _delimiter || c == 0)) {
-        if(_keepdelimiterinstr)
+        if(_keepdelimiterinstr && c != 0)
           _outstr += c;
         break;
       }

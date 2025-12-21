@@ -89,6 +89,7 @@ typedef enum {
 #define HTTP_HEADER_KEY_HOST            "Host"
 #define HTTP_HEADER_KEY_USER_AGENT      "User-Agent"
 #define HTTP_HEADER_KEY_ACCEPT_ENCODING "Accept-Encoding"
+#define HTTP_HEADER_KEY_TRANSFER_ENCODING "Transfer-Encoding"
 #define HTTP_HEADER_KEY_CONNECTION      "Connection"
 #define HTTP_HEADER_KEY_LOCATION        "Location"
 #define HTTP_HEADER_KEY_AUTHORIZATION   "Authorization"
