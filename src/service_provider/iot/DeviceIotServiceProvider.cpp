@@ -628,6 +628,11 @@ void DeviceIotServiceProvider::handleSensorData(){
         strcat( __mqtt_service.m_mqtt_payload, RODT_ATTR("mqtt data is too big to fit in buffer !"));
       }
 #endif
+    }else{
+
+      // Considering server not provided any interface to operate on. So closing the current mqtt 
+      // and will retry soon to get Updated config from server
+      __task_scheduler.setTimeout( [&]() { __mqtt_service.stop(); }, 1, __i_dvc_ctrl.millis_now() );
     }
   }else{
     this->m_sample_index++;
