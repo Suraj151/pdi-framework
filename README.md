@@ -51,11 +51,11 @@ For example if we want to build for arduino uno then command will be
 
 Currently below devices has been supported
 
-* arduinouno
-* esp8266
-* esp32
-
-
+| device | Installed Board version in Arduino IDE |
+|--------|---------------|
+| arduinouno | 1.8.6 |
+| esp8266 | 3.1.2 |
+| esp32 | 3.3.3 |
 
 # Usage
 
