@@ -20,11 +20,17 @@ PDI framework sits on the top of service layers which internally uses the portab
 
 # Installation
 
+***installation from Arduino library manager for this library is not supported due to autogen scripts which required to generate the device specific config and DB table sources. Also the external libraries this framework depends on which is part of git submodules config in this repository.***
+
+
 **install manually**
 
 To install manually, clone this repo to devices libraries path. for example with Esp8266 device it will be copied in esp8266 libraries path 
 ( in windows 10 generally path is like ==> C:\Users\suraj\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\x.x.x\libraries...).
+
 ( in Ubuntu generally path is like ==> ~/Arduino/libraries).
+
+Follow device official docs to install device specific toolchains. for example to install esp32 device specific toolchains you can follow https://docs.espressif.com/projects/arduino-esp32/en/latest/installing.html#linux link. similarely for other devices if provided.
 
 **install external dependency**
 
