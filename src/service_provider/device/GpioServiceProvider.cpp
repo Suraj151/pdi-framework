@@ -595,15 +595,30 @@ void GpioServiceProvider::handleGpioOperations(){
         this->m_gpio_config_copy.gpio_readings[_gpionumber]
       );
 
+      uint32_t _now = __i_dvc_ctrl.millis_now();
+      uint32_t debounceduration = __gpio_event_track.is_last_event_succeed[_evtidx] ?
+      GPIO_EVENT_DURATION_FOR_SUCCEED : GPIO_EVENT_DURATION_FOR_FAILED;
+
+      if( _now < __gpio_event_track.last_event_millis[_evtidx] ){
+        __gpio_event_track.last_event_millis[_evtidx] = 0;
+      }
+      uint32_t _time_elapse = _now - __gpio_event_track.last_event_millis[_evtidx];
+
       if(_is_event_condition){
+
         LogFmtI("\nGPIO Event %d occured\n", (int)_evtidx);
+      }else{
+
+        // Reduce the last event millis once event stop occuring for few countdowns
+        // uint32_t millistoreduce = (debounceduration / (MILLISECOND_DURATION_10000 * 6)) * MILLISECOND_DURATION_1000;
+
+        // if( __gpio_event_track.last_event_millis[_evtidx] > millistoreduce ){
+        //   __gpio_event_track.last_event_millis[_evtidx] = __gpio_event_track.last_event_millis[_evtidx] - millistoreduce;
+        // }
+        __gpio_event_track.last_event_millis[_evtidx] = 0;
       }
 
-      uint32_t _now = __i_dvc_ctrl.millis_now();
-      if( _is_event_condition && (( __gpio_event_track.is_last_event_succeed[_evtidx] ?
-        GPIO_EVENT_DURATION_FOR_SUCCEED < ( _now - __gpio_event_track.last_event_millis[_evtidx] ) :
-        GPIO_EVENT_DURATION_FOR_FAILED < ( _now - __gpio_event_track.last_event_millis[_evtidx] )
-      ) || __gpio_event_track.event_gpio_pin == -1) ){
+      if( _is_event_condition && ((debounceduration < _time_elapse) || (__gpio_event_track.last_event_millis[_evtidx] == 0) || (__gpio_event_track.event_gpio_pin == -1)) ){
 
         __gpio_event_track.event_gpio_pin = _gpionumber;
         __gpio_event_track.last_event_millis[_evtidx] = _now;
