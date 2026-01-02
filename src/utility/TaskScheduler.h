@@ -207,6 +207,12 @@ protected:
      */
     void getSortedTaskList(uint16_t* _priority_indices, uint16_t _task_count);
 
+    /**
+     * @brief Return the computed score for task.
+     *
+     */
+    int computeScore(const task_t& _t, uint64_t _now);
+
 private:
     /**
      * @var uint8_t m_max_tasks

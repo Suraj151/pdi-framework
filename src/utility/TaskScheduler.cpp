@@ -173,6 +173,46 @@ int TaskScheduler::register_task(CallBackVoidArgFn _task_fn, uint64_t _duration,
 }
 
 /**
+ * @brief Return the computed score for task.
+ *
+ */
+int TaskScheduler::computeScore(const task_t& _t, uint64_t _now)
+{
+    uint64_t next_due = _t._last_millis + _t._duration;
+
+    // --- Catch-up logic: overdue tasks get priority ---
+    bool overdue = (_now >= next_due);
+
+    // --- Compute lateness in ms (0 if not overdue) ---
+    int64_t lateness = overdue ? (int64_t)(_now - next_due) : 0;
+
+    // --- Compute earlyness in ms (0 if overdue) ---
+    int64_t earlyness = overdue ? 0 : (int64_t)(next_due - _now);
+
+    // --- Compute recentness in ms ---
+    int64_t recentness = (int64_t)(_now - _t._last_millis);
+
+    int rangecap = 50;
+
+    // --- Blend policy, priority into a score ---
+    switch (_t._task_policy) { 
+        case TASK_POLICY_ROUNDROBIN: 
+            // Equal slices: favor tasks that ran less recently 
+            return _t._task_priority * 100 + pdistd::min((int)floor(log2((double)recentness + 1.0)), rangecap); 
+        case TASK_POLICY_DEADLINE: 
+            // Earliest deadline first: smaller next_due is higher urgency 
+            return _t._task_priority * 100 + pdistd::max(0, rangecap - pdistd::min((int)floor(log2((double)earlyness + 1.0)), rangecap)); 
+        case TASK_POLICY_FAIRSHARE: 
+            // Favor tasks that consumed less CPU time 
+            return _t._task_priority * 100 + pdistd::max(0, rangecap - pdistd::min((int)floor(log2((double)_t._task_exec_millis + 1.0)), rangecap)); 
+        case TASK_POLICY_FIFO: 
+        default: 
+            // Priority dominates, lateness nudges overdue tasks 
+            return _t._task_priority * 100 + pdistd::min((int)lateness / 10, rangecap); 
+    }
+}
+
+/**
  * @brief Sort the task indices according to their priority and score.
  *
  */
@@ -196,23 +236,15 @@ void TaskScheduler::getSortedTaskList(uint16_t* _priority_indices, uint16_t _tas
 
             bool swap_needed = false;
 
-            // --- Catch-up logic: overdue tasks get priority ---
-            bool overdue_i = (now >= next_due_i);
-            bool overdue_j = (now >= next_due_j);
-
-            // --- Compute lateness in ms (0 if not overdue) ---
-            int64_t lateness_i = overdue_i ? (int64_t)(now - next_due_i) : 0;
-            int64_t lateness_j = overdue_j ? (int64_t)(now - next_due_j) : 0;
-
-            // --- Blend priority and lateness into a score ---
-            int score_i = task_i._task_priority * 100 + (int)pdistd::min<int64_t>(lateness_i / 10, 50);
-            int score_j = task_j._task_priority * 100 + (int)pdistd::min<int64_t>(lateness_j / 10, 50);
+            // --- Blend policy, priority into a score ---
+            int score_i = this->computeScore(task_i, now);
+            int score_j = this->computeScore(task_j, now);
             
             // --- Compare blended score first (priority-biased) ---
             if (score_i != score_j) {
+
                 swap_needed = (score_j > score_i);
-            }
-            else {
+            } else {
                 // --- Scores equal → compare due times with tolerance ---
                 int64_t diff = (int64_t)(next_due_i - next_due_j);
 
@@ -225,26 +257,6 @@ void TaskScheduler::getSortedTaskList(uint16_t* _priority_indices, uint16_t _tas
                     }
                 }
             }
-
-            // // --- Normal comparison with tolerance ---
-            // int64_t diff = (int64_t)(next_due_i - next_due_j);
-
-            // if (pdistd::abs(diff) > (int64_t)tolerance) {
-
-            //     swap_needed = (next_due_j < next_due_i);
-            // } else {
-            //     // Due times are effectively equal → compare blended score
-            //     if (score_j > score_i) {
-
-            //         swap_needed = true;
-            //     }
-            //     else if (score_i == score_j) {
-            //         // If score also equal → compare exec time
-            //         if (task_i._task_exec_millis > task_j._task_exec_millis) {
-            //             swap_needed = true;
-            //         }
-            //     }
-            // }
 
             if (swap_needed) {
                 pdistd::swap(_priority_indices[i], _priority_indices[j]);
@@ -446,6 +458,7 @@ void TaskScheduler::printTasksToTerminal(iTerminalInterface *terminal)
         terminal->writeln_ro(RODT_ATTR("Tasks : "));
         terminal->write_ro(RODT_ATTR("id        ")); // max column size=10
         terminal->write_ro(RODT_ATTR("priority  ")); // max column size=10
+        terminal->write_ro(RODT_ATTR("policy    ")); // max column size=10
         terminal->write_ro(RODT_ATTR("interval  ")); // max column size=10
         terminal->write_ro(RODT_ATTR("last_ms   ")); // max column size=10
         terminal->write_ro(RODT_ATTR("exc_ms    ")); // max column size=10
@@ -459,6 +472,9 @@ void TaskScheduler::printTasksToTerminal(iTerminalInterface *terminal)
             terminal->write(content);
 
             Int32ToString(this->m_tasks[i]._task_priority, content, 20, 10);
+            terminal->write(content);
+
+            Int32ToString(this->m_tasks[i]._task_policy, content, 20, 10);
             terminal->write(content);
 
             Int64ToString(this->m_tasks[i]._duration, content, 20, 10);

@@ -293,6 +293,18 @@ typedef enum {
 
 #define DEFAULT_TASK_PRIORITY 0
 
+typedef enum TaskMode { 
+    TASK_MODE_INLINE = 0, 
+    TASK_MODE_CONCURRENT 
+} task_mode_t;
+
+typedef enum TaskPolicy { 
+    TASK_POLICY_FIFO = 0, ///< First-In-First-Out 
+    TASK_POLICY_ROUNDROBIN, ///< Equal time slices 
+    TASK_POLICY_DEADLINE, ///< Earliest deadline first 
+    TASK_POLICY_FAIRSHARE ///< Balance across tasks 
+} task_policy_t;
+
 struct task_t {
     int _task_id; ///< Task ID
     int _max_attempts; ///< Maximum number of attempts
@@ -301,6 +313,8 @@ struct task_t {
     CallBackVoidArgFn _task; ///< Task callback function
     int _task_priority; ///< Task priority (default is 0)
     uint64_t _task_exec_millis; ///< Task execution timestamp
+    task_mode_t _task_mode; ///< Task mode
+    task_policy_t _task_policy; ///< Task policy
 
     task_t() { clear(); }
     ~task_t() { clear(); }
@@ -313,6 +327,8 @@ struct task_t {
         _task = nullptr;
         _task_priority = 0;
         _task_exec_millis = 0;
+        _task_mode = TASK_MODE_INLINE;
+        _task_policy = TASK_POLICY_FIFO;
     }
 
     task_t(const task_t &t) {
@@ -323,6 +339,8 @@ struct task_t {
         _task = t._task;
         _task_priority = t._task_priority;
         _task_exec_millis = t._task_exec_millis;
+        _task_mode = t._task_mode;
+        _task_policy = t._task_policy;
     }
 };
 
