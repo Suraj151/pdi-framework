@@ -10,6 +10,10 @@ created Date    : 1st June 2019
 #include "PdiStack.h"
 #include <utility/EventUtil.h>
 
+#ifdef ENABLE_CONCURRENT_EXECUTION
+#include <interface/pdi/threading/fiber/iFiber.h>
+#endif
+
 /**
  * @brief Constructor for the PDIStack class.
  *
@@ -148,7 +152,13 @@ void PDIStack::serve(){
   #ifdef ENABLE_HTTP_SERVER
   __web_server.handle_clients();
   #endif
-  __task_scheduler.handle_tasks();
+
+  #ifdef ENABLE_CONCURRENT_EXECUTION
+  __i_exec_scheduler.run();
+  #endif
+
+  __task_scheduler.run(); // run cooperative taskscheduler in loop
+
   __i_dvc_ctrl.yield();
   __i_dvc_ctrl.handleEvents();
 }

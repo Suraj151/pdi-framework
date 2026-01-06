@@ -38,6 +38,14 @@ created Date    : 1st June 2019
 #endif
 
 /**
+ * enable/disable concurrency in task scheduling. currently implemented for esp8266 only.
+ * By default will kept disabled. use only if you aware on the task context handling.
+ */
+#if defined(DEVICE_ESP8266)
+// #define ENABLE_CONCURRENT_EXECUTION
+#endif
+
+/**
  * define number of gpios based on device enabled
  */
 #if defined(DEVICE_ARDUINOUNO)

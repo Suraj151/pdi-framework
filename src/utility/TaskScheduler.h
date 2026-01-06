@@ -17,6 +17,7 @@ Created Date    : 1st June 2019
 #define __TASK_SCHEDULER_H__
 
 #include "iUtilityInterface.h"
+#include <interface/pdi/threading/iExecution.h>
 
 /**
  * @class TaskScheduler
@@ -26,7 +27,7 @@ Created Date    : 1st June 2019
  * or timeouts, executing them, and removing them when necessary. It supports
  * task prioritization and handles expired tasks automatically.
  */
-class TaskScheduler
+class TaskScheduler : public iExecutionScheduler
 {
 public:
     /**
@@ -160,6 +161,13 @@ public:
     int get_unique_task_id(void);
 
     /**
+     * @brief Get task by its id
+     *
+     * @return task pointer pointing to task
+     */
+    task_t* get_task(int _id);
+
+    /**
      * @brief Sets the maximum number of tasks allowed in the scheduler.
      *
      * @param maxtasks The maximum number of tasks.
@@ -187,6 +195,34 @@ public:
      * @param terminal Pointer to the terminal interface.
      */
     void printTasksToTerminal(iTerminalInterface *terminal);
+
+    /**
+     * @brief Base class api to yield the running task.
+     * Currently handling device specific yield not switching context as this is under cooperative schedule context.
+     */
+    void yield() override;
+
+    /**
+     * @brief Sleep the current task .
+     * Currently not handling here as this is under cooperative schedule context.
+     * @param ms sleep time in milliseconds.
+     */
+    void sleep(uint32_t ms) override;
+
+    /**
+     * @brief Run the scheduled tasks.
+     * This needs to be called from main entry loop to run the cooperative tasks.
+     */
+    void run() override;
+
+    #ifdef ENABLE_CONCURRENT_EXECUTION
+
+    /**
+     * @brief Schedule task under execution scheduler
+     */
+    void scheduleUnderExecSched(iExecutionScheduler* _exec_sched, int _task_id, uint32_t stackdepth);
+
+    #endif
 
 protected:
     /**

@@ -42,6 +42,10 @@ created Date    : 1st Jan 2024
 #endif
 #include "InstanceInterface.cpp"
 
+#ifdef ENABLE_CONCURRENT_EXECUTION
+#include "threading/Fiber.cpp"
+#endif
+
 // This function converts a read-only string (PGM_P) to a dynamically allocated char pointer.
 // The caller is responsible for deleting the allocated memory to avoid memory leaks.
 // It reads the string from program memory and copies it to a new char array, which is

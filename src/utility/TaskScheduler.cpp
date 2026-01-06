@@ -24,6 +24,7 @@ TaskScheduler::TaskScheduler() : m_util(nullptr),
                                  m_max_tasks(MAX_SCHEDULABLE_TASKS),
                                  m_rebase_start_priotask(false)
 {
+    this->m_tasks.reserve(MAX_SCHEDULABLE_TASKS);
 }
 
 /**
@@ -192,23 +193,34 @@ int TaskScheduler::computeScore(const task_t& _t, uint64_t _now)
     // --- Compute recentness in ms ---
     int64_t recentness = (int64_t)(_now - _t._last_millis);
 
-    int rangecap = 50;
+    // Priority Weight
+    int priority_weight = 100;
+
+    // Policy Weight is policy_boost * policy_cap
+    int policy_cap = 50;
+    double policy_boost = 1.0;
+
+    switch (_t._task_policy) { 
+        case TASK_POLICY_DEADLINE: { policy_boost = 2; break; }
+        case TASK_POLICY_FAIRSHARE: { policy_boost = 1.5; break; }
+        default: break;
+    }
 
     // --- Blend policy, priority into a score ---
     switch (_t._task_policy) { 
         case TASK_POLICY_ROUNDROBIN: 
             // Equal slices: favor tasks that ran less recently 
-            return _t._task_priority * 100 + pdistd::min((int)floor(log2((double)recentness + 1.0)), rangecap); 
+            return _t._task_priority * priority_weight + policy_boost * pdistd::min((int)floor(log2((double)recentness + 1.0)), policy_cap); 
         case TASK_POLICY_DEADLINE: 
             // Earliest deadline first: smaller next_due is higher urgency 
-            return _t._task_priority * 100 + pdistd::max(0, rangecap - pdistd::min((int)floor(log2((double)earlyness + 1.0)), rangecap)); 
+            return _t._task_priority * priority_weight + policy_boost * pdistd::max(0, policy_cap - pdistd::min((int)floor(log2((double)earlyness + 1.0)), policy_cap)); 
         case TASK_POLICY_FAIRSHARE: 
             // Favor tasks that consumed less CPU time 
-            return _t._task_priority * 100 + pdistd::max(0, rangecap - pdistd::min((int)floor(log2((double)_t._task_exec_millis + 1.0)), rangecap)); 
+            return _t._task_priority * priority_weight + policy_boost * pdistd::max(0, policy_cap - pdistd::min((int)floor(log2((double)_t._task_exec_millis + 1.0)), policy_cap)); 
         case TASK_POLICY_FIFO: 
         default: 
             // Priority dominates, lateness nudges overdue tasks 
-            return _t._task_priority * 100 + pdistd::min((int)lateness / 10, rangecap); 
+            return _t._task_priority * priority_weight + policy_boost * pdistd::min((int)lateness / 10, policy_cap); 
     }
 }
 
@@ -287,6 +299,10 @@ void TaskScheduler::handle_tasks()
     {
         uint64_t _last_start_ms = m_util->millis_now();
         auto &_task = this->m_tasks[_priority_indices[i]];
+
+        #ifdef ENABLE_CONCURRENT_EXECUTION
+        if( _task._task_mode == TASK_MODE_CONCURRENT_EXEC ) continue;
+        #endif
 
         if (_last_start_ms < _task._last_millis)
         {
@@ -415,6 +431,23 @@ int TaskScheduler::get_unique_task_id()
 }
 
 /**
+ * @brief Get task by its id
+ *
+ * @return task pointer pointing to task
+ */
+task_t* TaskScheduler::get_task(int _id)
+{
+    for (int i = 0; i < this->m_tasks.size(); i++)
+    {
+        if (this->m_tasks[i]._task_id == _id)
+        {
+            return &this->m_tasks[i];
+        }
+    }
+    return nullptr;
+}
+
+/**
  * @brief Sets the maximum number of tasks allowed in the scheduler.
  *
  * @param maxtasks The maximum number of tasks.
@@ -492,6 +525,55 @@ void TaskScheduler::printTasksToTerminal(iTerminalInterface *terminal)
         }
     }
 }
+
+/**
+ * @brief Base class api to yield the running task.
+ * Currently handling device specific yield not switching context as this is under cooperative schedule context.
+ */
+void TaskScheduler::yield() 
+{
+    m_util->yield();
+}
+
+/**
+ * @brief Sleep the current task .
+ * Currently not handling here as this is under cooperative schedule context.
+ * @param ms sleep time in milliseconds.
+ */
+void TaskScheduler::sleep(uint32_t ms) 
+{
+    
+}
+
+/**
+ * @brief Run the scheduled tasks.
+ * This needs to be called from main entry loop to run the cooperative tasks.
+ */
+void TaskScheduler::run() 
+{
+    this->handle_tasks();
+}
+
+#ifdef ENABLE_CONCURRENT_EXECUTION
+
+/**
+ * @brief Schedule task under execution scheduler
+ */
+void TaskScheduler::scheduleUnderExecSched(iExecutionScheduler* _exec_sched, int _task_id, uint32_t stackdepth)
+{
+    if( _exec_sched ){
+
+        task_t* t = __task_scheduler.get_task(_task_id);
+
+        if(nullptr != t){
+
+            t->_task_mode = TASK_MODE_CONCURRENT_EXEC;
+            _exec_sched->schedule_task(t, stackdepth);
+        }
+    }
+}
+
+#endif
 
 /**
  * @brief Global instance of the TaskScheduler class.
