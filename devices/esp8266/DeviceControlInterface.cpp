@@ -310,7 +310,16 @@ void DeviceControlInterface::wait(double timeoutms)
 {
     uint32_t _timeoutms = (uint32_t)timeoutms;
     uint32_t _remainingtimeoutus = (uint32_t)((timeoutms - _timeoutms) * 1000.0); // convert to microseconds
+
+    // Using delay to run other contexual tasks if any
+    #ifdef ENABLE_CONCURRENT_EXECUTION
+    if(_timeoutms > 0){
+        __i_exec_scheduler.sleep_from_othersched(_timeoutms);
+    }
+    delay(0);
+    #else
     delay(_timeoutms); // delay in milliseconds
+    #endif
     if( _remainingtimeoutus > 0 )
         delayMicroseconds(_remainingtimeoutus); // delay in microseconds
 }

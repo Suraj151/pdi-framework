@@ -50,6 +50,45 @@ void xtensa_save_context(struct FiberContext* ctx) {
 }
 
 __attribute__((naked))
+void xtensa_save_context_ISR(struct FiberContext* ctx, void* exc_frame) {
+    asm volatile (
+        // a2 = ctx, a3 = exc_frame
+
+        // Save GPRs a0..a15 (current window registers)
+        "s32i   a0,  a2, 0\n"
+        "s32i   a1,  a2, 4\n"
+        "s32i   a2,  a2, 8\n"
+        "s32i   a3,  a2, 12\n"
+        "s32i   a4,  a2, 16\n"
+        "s32i   a5,  a2, 20\n"
+        "s32i   a6,  a2, 24\n"
+        "s32i   a7,  a2, 28\n"
+        "s32i   a8,  a2, 32\n"
+        "s32i   a9,  a2, 36\n"
+        "s32i   a10, a2, 40\n"
+        "s32i   a11, a2, 44\n"
+        "s32i   a12, a2, 48\n"
+        "s32i   a13, a2, 52\n"
+        "s32i   a14, a2, 56\n"
+        "s32i   a15, a2, 60\n"
+
+        // Load PS from exception frame
+        "l32i   a4, a3, " XSTR(EXC_PS_OFFSET) "\n"          // offset 0: PS
+        "s32i   a4, a2, 64\n"
+
+        // Load PC from exception frame
+        "l32i   a4, a3, " XSTR(EXC_PC_OFFSET) "\n"          // offset 4: PC
+        "s32i   a4, a2, 68\n"
+
+        // Load SP from exception frame
+        "l32i   a4, a3, " XSTR(EXC_SP_OFFSET) "\n"          // offset 12: SP
+        "s32i   a4, a2, 72\n"
+
+        "ret\n"
+    );
+}
+
+__attribute__((naked))
 void xtensa_restore_context(const struct FiberContext* ctx) {
     asm volatile (
         // Keep ctx base in a3 (do not clobber until done)

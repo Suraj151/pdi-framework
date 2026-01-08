@@ -557,7 +557,7 @@ void TaskScheduler::run()
 #ifdef ENABLE_CONCURRENT_EXECUTION
 
 /**
- * @brief Schedule task under execution scheduler
+ * @brief Schedule task under context based execution scheduler
  */
 void TaskScheduler::scheduleUnderExecSched(iExecutionScheduler* _exec_sched, int _task_id, uint32_t stackdepth)
 {
@@ -565,7 +565,7 @@ void TaskScheduler::scheduleUnderExecSched(iExecutionScheduler* _exec_sched, int
 
         task_t* t = __task_scheduler.get_task(_task_id);
 
-        if(nullptr != t){
+        if(nullptr != t && t->_task_mode != TASK_MODE_CONCURRENT_EXEC && nullptr == t->_task_exec){
 
             t->_task_mode = TASK_MODE_CONCURRENT_EXEC;
             _exec_sched->schedule_task(t, stackdepth);

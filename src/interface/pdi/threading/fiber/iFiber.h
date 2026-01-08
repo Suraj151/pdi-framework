@@ -29,12 +29,24 @@ public:
     void* arg = nullptr; // argument    
     FiberState state = FiberState::Ready;
     int task_id = -1; // link back to corresponding task_t
+    // int effective_priority = 0; // base_priority + aging boost
+    int wait_ticks = 0; // counts how many times skipped
 };
+
+// forward declaration
+class Fiber;
 
 // Fiber Sheduler interface
 class iFiberScheduler : public iExecutionScheduler {
 public:
     virtual ~iFiberScheduler() {}
+
+    virtual void destroy_fiber(Fiber* f) {}
+    virtual void add_to_ready(Fiber* f) {}
+    virtual void remove_from_ready(Fiber* f) {}
+    virtual void remove_from_sleepers(Fiber* f) {}
+
+    virtual Fiber* pick_next_ready() { return nullptr; }
 };
 
 #endif

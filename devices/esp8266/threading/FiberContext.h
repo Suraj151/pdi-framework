@@ -31,8 +31,8 @@ struct FiberContext {
 // } __attribute__((aligned(16)));
 
 void xtensa_save_context(struct FiberContext* ctx);
+void xtensa_save_context_ISR(struct FiberContext* ctx, void* exc_frame);
 void xtensa_restore_context(const struct FiberContext* ctx);
-void xtensa_restore_from_frame();
 
 #ifdef __cplusplus
 }

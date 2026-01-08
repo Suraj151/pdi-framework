@@ -111,9 +111,9 @@ void FiberScheduler::schedule_task(task_t* task, uint32_t stacksize){
     // Clear the rest for hygiene (optional)
     for (int i = 3; i <= 15; ++i) f->ctx.a[i] = 0;
 
-    // Add to ready list
+    // Add to ready list    
     noInterrupts();
-    ready.push_back(f);
+    add_to_ready(f);
     interrupts();
 }
 
@@ -128,7 +128,7 @@ void FiberScheduler::yield(){
     noInterrupts(); 
     if (f->state == FiberState::Running) {
         f->state = FiberState::Ready;
-        ready.push_back(f); 
+        add_to_ready(f);
     }
     interrupts();
 
@@ -182,13 +182,15 @@ void FiberScheduler::run(){
     for (size_t i = 0; i < sleepers.size();) {
 
         auto si = sleepers[i];
-        if (si.wake_ms <= now && si.f) {
+        if (si.f && (int32_t)(now - si.wake_ms) >= 0) {
 
             si.f->state = FiberState::Ready;
-            noInterrupts(); ready.push_back(si.f); interrupts();
+            noInterrupts(); 
+            add_to_ready(si.f); 
             // erase by swap-pop for O(1)
             sleepers[i] = sleepers.back();
             sleepers.pop_back();
+            interrupts();
         } else {
             ++i;
         }
@@ -197,10 +199,10 @@ void FiberScheduler::run(){
     // If nothing is running, start one
     if (__base_ctx_saved && !current && !ready.empty()) {
 
-        Fiber* next = nullptr;
-        noInterrupts();
-        next = ready.back(); ready.pop_back();
-        interrupts();
+        Fiber* next = pick_next_ready();
+        // noInterrupts();
+        // next = ready.back(); ready.pop_back(); // LIFO fasion
+        // interrupts();
 
         if (!next) return;
         current = next;
@@ -271,6 +273,16 @@ void FiberScheduler::destroy_fiber(Fiber* f) {
 }
 
 /**
+ * Add fiber to ready queue
+ */
+void FiberScheduler::add_to_ready(Fiber* f) {
+    if(f){
+        // f->wait_ticks = 0;
+        ready.push_back(f);
+    }
+}
+
+/**
  * Remove fiber from ready queue
  */
 void FiberScheduler::remove_from_ready(Fiber* f) {
@@ -289,6 +301,88 @@ void FiberScheduler::remove_from_sleepers(Fiber* f) {
         if (sleepers[i].f == f) { sleepers[i] = sleepers.back(); sleepers.pop_back(); }
         else { ++i; }
     }
+}
+
+/**
+ * Pick the next ready fiber
+ */
+Fiber* FiberScheduler::pick_next_ready() {
+
+    Fiber* best = nullptr;
+    int bestScore = -1;
+
+    for (int i = 0; i < ready.size(); ++i) {
+
+        Fiber* f = ready[i];
+
+        task_t* t = __task_scheduler.get_task(f->task_id);
+        if (!t) continue;
+
+        // Aging: score(effective priority) = base_priority + wait_ticks
+        int score = t->_task_priority + f->wait_ticks;
+
+        if (score > bestScore) {
+            bestScore = score;
+            best = f;
+        }
+
+        // Increment wait_ticks for all. max boost 255
+        if (f->wait_ticks < 255) f->wait_ticks++;
+    }
+
+    if (nullptr != best) {
+        // Reset wait_ticks for the chosen fiber
+        best->wait_ticks = 0;
+
+        // Remove from ready list
+        noInterrupts();
+        remove_from_ready(best);
+        interrupts();
+    }
+
+    return best;
+}
+
+/**
+ * Yield other scheduler to manage pending work in this scheduler
+ */
+void FiberScheduler::yield_from_othersched() {
+
+    if (!can_yield_from_othersched()) return; // reject if already active
+    othersched_active = true;
+
+    // capture caller context as base to switch back and return control back to caller
+    __base_ctx_saved = false;
+    run();
+    // safer side if exit of this scheduler missed
+    __base_ctx_saved = false;
+
+    othersched_active = false;
+}
+
+/**
+ * Sleep other scheduler to manage pending work in this scheduler
+ */
+void FiberScheduler::sleep_from_othersched(uint32_t ms) {
+
+    if (!can_sleep_from_othersched()) return; // reject if already active
+    othersched_active = true;
+
+    uint32_t exitms = __i_dvc_ctrl.millis_now() + ms;
+
+    while ((int32_t)(__i_dvc_ctrl.millis_now() - exitms) < 0)
+    {
+        // capture caller context as base to switch back and return control back to caller
+        __base_ctx_saved = false;
+        run();
+        // yield device level functionalities
+        __i_dvc_ctrl.yield();
+    }
+    
+    // safer side if exit of this scheduler missed
+    __base_ctx_saved = false;
+
+    othersched_active = false;
 }
 
 ExecutionScheduler __i_exec_scheduler;

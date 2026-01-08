@@ -10,10 +10,6 @@ created Date    : 1st June 2019
 #include "PdiStack.h"
 #include <utility/EventUtil.h>
 
-#ifdef ENABLE_CONCURRENT_EXECUTION
-#include <interface/pdi/threading/fiber/iFiber.h>
-#endif
-
 /**
  * @brief Constructor for the PDIStack class.
  *

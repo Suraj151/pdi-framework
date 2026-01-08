@@ -23,7 +23,7 @@ FiberMutex::unlock(){
         Fiber* f = m_waiters.back();     // LIFO; use back for O(1)
         m_waiters.pop_back();
         noInterrupts(); 
-        __i_exec_scheduler.ready.push_back(f);
+        __i_exec_scheduler.add_to_ready(f);
         interrupts();
     } else {
         m_locked = false;

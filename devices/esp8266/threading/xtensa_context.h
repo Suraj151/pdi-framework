@@ -87,4 +87,15 @@ Windowed -
 #define PS_UM   0x00000020
 #define PS_EXCM 0x00000010
 
+// Offsets into the Xtensa exception frame (ESP8266 LX106)
+#define EXC_PS_OFFSET   0   // saved processor status
+#define EXC_PC_OFFSET   4   // saved program counter
+#define EXC_A0_OFFSET   8   // return address register
+#define EXC_SP_OFFSET   12  // saved stack pointer (A1)
+
+#define XSTR(x) STR(x)
+#define STR(x) #x
+
+// You can extend this with other registers if needed
+
 #endif /* XTENSA_CONTEXT_H */

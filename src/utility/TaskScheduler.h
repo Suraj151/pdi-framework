@@ -119,13 +119,13 @@ public:
      * @brief Registers a new task.
      *
      * @param _task_fn The callback function for the task.
-     * @param _duration The interval or timeout duration for the task in milliseconds.
+     * @param _duration The interval or timeout duration for the task in milliseconds (default is 1).
      * @param _task_priority The priority of the task (default is DEFAULT_TASK_PRIORITY).
      * @param _last_millis The last execution time of the task (default is 0).
      * @param _max_attempts The maximum number of attempts for the task (default is -1 for unlimited).
      * @return The unique ID of the registered task.
      */
-    int register_task(CallBackVoidArgFn _task_fn, uint64_t _duration, int _task_priority = DEFAULT_TASK_PRIORITY, uint64_t _last_millis = 0, int _max_attempts = -1);
+    int register_task(CallBackVoidArgFn _task_fn, uint64_t _duration = 1, int _task_priority = DEFAULT_TASK_PRIORITY, uint64_t _last_millis = 0, int _max_attempts = -1);
 
     /**
      * @brief Executes all registered tasks that are due.
@@ -218,7 +218,7 @@ public:
     #ifdef ENABLE_CONCURRENT_EXECUTION
 
     /**
-     * @brief Schedule task under execution scheduler
+     * @brief Schedule task under context based execution scheduler
      */
     void scheduleUnderExecSched(iExecutionScheduler* _exec_sched, int _task_id, uint32_t stackdepth);
 
