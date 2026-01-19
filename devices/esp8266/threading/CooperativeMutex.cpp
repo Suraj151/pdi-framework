@@ -1,4 +1,4 @@
-/***************************** Fiber Muitex ***********************************
+/*************************** Cooperative Muitex ******************************
 This file is part of the PDI stack.
 
 This is free software. You can redistribute it and/or modify it but without any
@@ -8,22 +8,22 @@ Author          : Suraj I.
 Created Date    : 1st June 2025
 ******************************************************************************/
 
-#include "FiberMutex.h"
+#include "CooperativeMutex.h"
 
-FiberMutex::lock(){
+CooperativeMutex::lock(){
 
     if (!m_locked) { m_locked = true; return; }
-    m_waiters.push_back(__i_exec_scheduler.current); 
-    __i_exec_scheduler.yield(); // park this fiber    
+    m_waiters.push_back(__i_cooperative_scheduler.current); 
+    __i_cooperative_scheduler.yield(); // park this cooperative    
 }
 
-FiberMutex::unlock(){
+CooperativeMutex::unlock(){
 
     if (!m_waiters.empty()) {
-        Fiber* f = m_waiters.back();     // LIFO; use back for O(1)
+        Cooperative* f = m_waiters.back();     // LIFO; use back for O(1)
         m_waiters.pop_back();
         noInterrupts(); 
-        __i_exec_scheduler.add_to_ready(f);
+        __i_cooperative_scheduler.add_to_ready(f);
         interrupts();
     } else {
         m_locked = false;

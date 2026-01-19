@@ -13,6 +13,9 @@ created Date    : 1st Jan 2024
 
 #include <interface/interface_includes.h>
 
+// Executive state
+enum class ExecState { Ready, Running, Sleeping, Finished };
+
 // Generic execution context interface
 class iExecutionContext {
 public:
@@ -26,6 +29,12 @@ public:
 class iExecutive {
 public:
     virtual ~iExecutive() {}
+
+    uint8_t* stack = nullptr;       // allocated stack memory
+    uint32_t stack_size;
+    int task_id = -1; // link back to corresponding task_t
+    void (*entry)(void*) = nullptr; // entry function 
+    void* arg = nullptr; // argument    
 };
 
 /**
@@ -54,9 +63,6 @@ inline uint32_t fetch_softirq_bits() {
     return bits;
 }
 
-// forward declaration
-class ExecutionScheduler;
-
 // Generic execution scheduler interface
 class iExecutionScheduler {
 public:
@@ -74,7 +80,12 @@ public:
     virtual bool can_sleep_from_othersched() { return false; }    
 };
 
-// globals (for simplicity)
-extern ExecutionScheduler __i_exec_scheduler;
+// forward declaration of derived schedulers from iExecutionScheduler
+class CooperativeScheduler;
+class PreemptiveScheduler;
 
+
+// globals (for simplicity)
+extern CooperativeScheduler __i_cooperative_scheduler;
+extern PreemptiveScheduler __i_preemptive_scheduler;
 #endif

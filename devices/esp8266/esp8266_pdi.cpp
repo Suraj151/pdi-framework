@@ -42,8 +42,10 @@ created Date    : 1st Jan 2024
 #endif
 #include "InstanceInterface.cpp"
 
-#ifdef ENABLE_CONCURRENT_EXECUTION
-#include "threading/Fiber.cpp"
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+#include "threading/Cooperative.cpp"
+#include "threading/XtensaTimer.cpp"
+#include "threading/Preemptive.cpp"
 #endif
 
 // This function converts a read-only string (PGM_P) to a dynamically allocated char pointer.

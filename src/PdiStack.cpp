@@ -149,8 +149,8 @@ void PDIStack::serve(){
   __web_server.handle_clients();
   #endif
 
-  #ifdef ENABLE_CONCURRENT_EXECUTION
-  __i_exec_scheduler.run();
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  __i_cooperative_scheduler.run();
   #endif
 
   __task_scheduler.run(); // run cooperative taskscheduler in loop

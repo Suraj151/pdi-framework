@@ -28,6 +28,8 @@ created Date    : 1st Jan 2024
 
 extern "C"
 {
+#include "ets_sys.h"
+#include "osapi.h"
 #include "user_interface.h"
 #include <espnow.h>
 #include <ping.h>

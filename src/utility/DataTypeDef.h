@@ -293,15 +293,16 @@ typedef enum {
 
 #define DEFAULT_TASK_PRIORITY 0
 
-#ifdef ENABLE_CONCURRENT_EXECUTION
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
 // forward declaration
 class iExecutive;
 #endif
 
 typedef enum TaskMode { 
     TASK_MODE_INLINE = 0, 
-#ifdef ENABLE_CONCURRENT_EXECUTION
-    TASK_MODE_CONCURRENT_EXEC, 
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+    TASK_MODE_COOPERATIVE, 
+    TASK_MODE_PREEMPTIVE, 
 #endif
     TASK_MODE_MAX
 } task_mode_t;
@@ -323,7 +324,7 @@ struct task_t {
     uint64_t _task_exec_millis; ///< Task execution timestamp
     task_mode_t _task_mode; ///< Task mode
     task_policy_t _task_policy; ///< Task policy
-    #ifdef ENABLE_CONCURRENT_EXECUTION    
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION    
     iExecutive* _task_exec = nullptr; ///< Task executive
     #endif
 
@@ -340,7 +341,7 @@ struct task_t {
         _task_exec_millis = 0;
         _task_mode = TASK_MODE_INLINE;
         _task_policy = TASK_POLICY_FIFO;
-        // #ifdef ENABLE_CONCURRENT_EXECUTION
+        // #ifdef ENABLE_CONTEXTUAL_EXECUTION
         // if(_task_exec != nullptr){
         //     delete _task_exec;
         // }
@@ -359,7 +360,7 @@ struct task_t {
         _task_exec_millis = t._task_exec_millis;
         _task_mode = t._task_mode;
         _task_policy = t._task_policy;
-        #ifdef ENABLE_CONCURRENT_EXECUTION
+        #ifdef ENABLE_CONTEXTUAL_EXECUTION
         _task_exec = t._task_exec;
         #endif
     }
@@ -378,7 +379,7 @@ struct task_t {
             _task_exec_millis = t._task_exec_millis;
             _task_mode = t._task_mode;
             _task_policy = t._task_policy;
-            #ifdef ENABLE_CONCURRENT_EXECUTION
+            #ifdef ENABLE_CONTEXTUAL_EXECUTION
             _task_exec = t._task_exec;
             #endif
         }

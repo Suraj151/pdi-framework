@@ -300,8 +300,8 @@ void TaskScheduler::handle_tasks()
         uint64_t _last_start_ms = m_util->millis_now();
         auto &_task = this->m_tasks[_priority_indices[i]];
 
-        #ifdef ENABLE_CONCURRENT_EXECUTION
-        if( _task._task_mode == TASK_MODE_CONCURRENT_EXEC ) continue;
+        #ifdef ENABLE_CONTEXTUAL_EXECUTION
+        if( _task._task_mode != TASK_MODE_INLINE ) continue;
         #endif
 
         if (_last_start_ms < _task._last_millis)
@@ -554,21 +554,25 @@ void TaskScheduler::run()
     this->handle_tasks();
 }
 
-#ifdef ENABLE_CONCURRENT_EXECUTION
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
 
 /**
  * @brief Schedule task under context based execution scheduler
  */
-void TaskScheduler::scheduleUnderExecSched(iExecutionScheduler* _exec_sched, int _task_id, uint32_t stackdepth)
+void TaskScheduler::scheduleUnderExecSched(iExecutionScheduler* _exec_sched, int _task_id, task_mode_t _task_mode, uint32_t _stackdepth)
 {
     if( _exec_sched ){
 
         task_t* t = __task_scheduler.get_task(_task_id);
 
-        if(nullptr != t && t->_task_mode != TASK_MODE_CONCURRENT_EXEC && nullptr == t->_task_exec){
+        if( 
+            nullptr != t && 
+            _task_mode != TASK_MODE_INLINE && 
+            nullptr == t->_task_exec
+        ){
 
-            t->_task_mode = TASK_MODE_CONCURRENT_EXEC;
-            _exec_sched->schedule_task(t, stackdepth);
+            t->_task_mode = _task_mode;
+            _exec_sched->schedule_task(t, _stackdepth);
         }
     }
 }

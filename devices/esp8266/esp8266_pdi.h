@@ -36,8 +36,9 @@ created Date    : 1st Jan 2024
 #endif
 #include "InstanceInterface.h"
 
-#ifdef ENABLE_CONCURRENT_EXECUTION
-#include "threading/Fiber.h"
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+#include "threading/Cooperative.h"
+#include "threading/Preemptive.h"
 #endif
 
 #endif  // _ESP8266_PORTABLE_DEVICE_INTERFACE_H_

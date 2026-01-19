@@ -215,12 +215,12 @@ public:
      */
     void run() override;
 
-    #ifdef ENABLE_CONCURRENT_EXECUTION
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
 
     /**
      * @brief Schedule task under context based execution scheduler
      */
-    void scheduleUnderExecSched(iExecutionScheduler* _exec_sched, int _task_id, uint32_t stackdepth);
+    void scheduleUnderExecSched(iExecutionScheduler* _exec_sched, int _task_id, task_mode_t _task_mode, uint32_t _stackdepth);
 
     #endif
 
