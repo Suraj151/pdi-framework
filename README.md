@@ -3,7 +3,7 @@
 PDIStack Framework covers all essential things to build IoT applications easily.
 Basically it is designed on the top of portable interface layers that any device can create their interface from. esp*-arduino examples provided to make things easy to understand for developers.
 
-PDI Framework is a modular C++ stack for embedded and IoT systems, supporting services like WiFi, HTTP client & server, MQTT client, SSH server, Telnet server, OTA, GPIO, Serial, Terminal over serial/telnet/ssh, SFTP, SMTP client and much more.  
+PDI Framework is a modular C++ stack for embedded and IoT systems, supporting services like WiFi, HTTP client & server, MQTT client, SSH server, Telnet server, OTA, GPIO, Serial, Terminal over serial/telnet/ssh, SFTP, SMTP client and much more handled with configurable Task Scheduler.
 **Features:** Secure communication, device management, command-line/web interfaces, scheduler, and cross-platform support.
 
 **PDI Framework Structure**
@@ -276,8 +276,8 @@ Queue is dynamic service which enables users to push any data in it and pop it l
 * **String Helpers :**
 String Helpers helps the user in many string related operations like finding, replacing, JSON parsing, etc.
 
-* **Scheduler :**
-Scheduler enables the feature of scheduling many things that executes later once or every time on specific intervals/timeouts. Scheduler also accepts priority as parameter for task, where by default big number is kept as big priority.
+* **Task Scheduler :**
+Task Scheduler enables the feature of scheduling many things that executes later once or every time on specific intervals/timeouts. Scheduler also accepts priority, policy as parameter for task, where by default big number is kept as higher priority. Scheduler provides the api to change the scheduling mode where it can be inline, cooperative, preemptive task mode, once set the task mode the specific task will get scheduled accordingly if api supported to the device. make sure you understood the scheduling modes before apply them. By default all task are scheduled as inline tasks.
 
 * **Reset Factory :**
 This helps to reset the whole device to its default settings in case of device malfunctioning badly. By pressing flash key on device for about 6-7 seconds this service resets all settings to its default one. also this service accept task which should be run while reset factory executing.
