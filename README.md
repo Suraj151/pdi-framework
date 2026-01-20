@@ -4,7 +4,8 @@ PDIStack Framework covers all essential things to build IoT applications easily.
 Basically it is designed on the top of portable interface layers that any device can create their interface from. esp*-arduino examples provided to make things easy to understand for developers.
 
 PDI Framework is a modular C++ stack for embedded and IoT systems, supporting services like WiFi, HTTP client & server, MQTT client, SSH server, Telnet server, OTA, GPIO, Serial, Terminal over serial/telnet/ssh, SFTP, SMTP client and much more handled with configurable Task Scheduler.
-**Features:** Secure communication, device management, command-line/web interfaces, scheduler, and cross-platform support.
+
+**Features:** Secure communication, device management, command-line/web interfaces, Configurable Task Scheduler (inline/cooperative/preemptive), and cross-platform support.
 
 **PDI Framework Structure**
 
