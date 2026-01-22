@@ -16,12 +16,14 @@ static Preemptive __non_preemptive;
 static volatile bool __non_preemptive_saved = false;
 
 // Period may got added in preemptive task as curently we dont yield/sleep from main arduino loop 
-static uint32_t __timer_period = 10000;
+static uint32_t __timer_period = 5000;
 
 /**
  * hardware timer ISR coroutine get called from inside timer ISR with the interrupted context captured
  */
 void IRAM_ATTR __attribute__((naked)) timer1_isr_coroutine(XtensaContext* ctx){
+
+    noInterrupts();
 
     __isr_ctx = ctx;
 
@@ -35,6 +37,7 @@ void IRAM_ATTR __attribute__((naked)) timer1_isr_coroutine(XtensaContext* ctx){
     __i_preemptive_scheduler.run();
 
     timer1_update_us(__timer_period); // Update the period
+    interrupts();
 }
 
 /**
@@ -160,6 +163,27 @@ void PreemptiveScheduler::schedule_task(task_t* task, uint32_t stacksize){
 }
 
 /**
+ * mute the current task.
+ */
+void PreemptiveScheduler::mute(){
+
+    Preemptive* f = current;
+    if (!f) return;
+
+    noInterrupts(); 
+
+    if (f->state == CooperativeState::Running) {
+        f->state = CooperativeState::Mute;
+    }
+
+    // xtensa_save_context(&f->ctx);
+    // if(f->state == PreemptiveState::Mute)
+        PreemptiveScheduler::exit();
+    
+    interrupts();
+}
+
+/**
  * yield the current task.
  */
 void PreemptiveScheduler::yield(){
@@ -170,12 +194,11 @@ void PreemptiveScheduler::yield(){
     noInterrupts(); 
 
     if (f->state == PreemptiveState::Running) {
-        f->state = PreemptiveState::Ready;
         add_to_ready(f);
     }
 
-    xtensa_save_context(&f->ctx);
-    if(f->state == PreemptiveState::Ready)
+    // xtensa_save_context(&f->ctx);
+    // if(f->state == PreemptiveState::Ready)
         PreemptiveScheduler::exit();
     
     interrupts();
@@ -194,8 +217,8 @@ void PreemptiveScheduler::sleep(uint32_t ms){
     f->state = PreemptiveState::Sleeping;
     sleepers.push_back({ __i_dvc_ctrl.millis_now() + ms, current }); 
 
-    xtensa_save_context(&f->ctx);
-    if(f->state == PreemptiveState::Sleeping)
+    // xtensa_save_context(&f->ctx);
+    // if(f->state == PreemptiveState::Sleeping)
         PreemptiveScheduler::exit();
 
     interrupts();
@@ -214,7 +237,6 @@ void PreemptiveScheduler::run(){
         auto si = sleepers[i];
         if (si.f && (int32_t)(now - si.wake_ms) >= 0) {
 
-            si.f->state = PreemptiveState::Ready;
             add_to_ready(si.f); 
             sleepers[i] = sleepers.back();
             sleepers.pop_back();
@@ -232,10 +254,22 @@ void PreemptiveScheduler::run(){
                 return; // continue same task
             }
 
-            current->state = PreemptiveState::Ready;
-            current->ctx = *__isr_ctx;
             add_to_ready(current);
+        }else if(current->state == PreemptiveState::Ready){ // yielded task
+
+            if( ready.empty() ){
+                current->state = PreemptiveState::Running;
+                return; // continue same task
+            }
+            
+        // }else if(current->state == PreemptiveState::Sleeping){
+
+        // }else if(current->state == PreemptiveState::Mute){
         }
+
+        // Save the last interrupted context and remove task from current pointer
+        current->ctx = *__isr_ctx;
+        current = nullptr;
     }
 
     // If any task ready then switch to it
@@ -278,11 +312,15 @@ void PreemptiveScheduler::exit(){
     }
 
     noInterrupts();
-    __i_preemptive_scheduler.current = nullptr;
+    // __i_preemptive_scheduler.current = nullptr; // can we remove pointer in ISR ?
     timer1_update_us(1);
     interrupts();
 
-    while(1); // wait for context switch by ISR
+    while(1) // wait for context switch by ISR
+    {
+        if(f && f->state == PreemptiveState::Running)
+            break;
+    }
 }
 
 /**
@@ -309,6 +347,7 @@ void PreemptiveScheduler::destroy_preemptive(Preemptive* f) {
 void PreemptiveScheduler::add_to_ready(Preemptive* f) {
     if(f){
         // f->wait_ticks = 0;
+        f->state = PreemptiveState::Ready;
         ready.push_back(f);
     }
 }

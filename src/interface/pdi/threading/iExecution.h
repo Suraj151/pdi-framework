@@ -14,7 +14,7 @@ created Date    : 1st Jan 2024
 #include <interface/interface_includes.h>
 
 // Executive state
-enum class ExecState { Ready, Running, Sleeping, Finished };
+enum class ExecState { Ready, Running, Sleeping, Mute, Finished };
 
 // Generic execution context interface
 class iExecutionContext {
@@ -69,6 +69,7 @@ public:
     virtual ~iExecutionScheduler() {}
 
     virtual void schedule_task(task_t* task, uint32_t stacksize) {}
+    virtual void mute() = 0;
     virtual void yield() = 0;
     virtual void sleep(uint32_t ms) = 0;
     virtual void run() = 0;

@@ -13,6 +13,9 @@ created Date    : 1st June 2019
 
 #include "esp8266.h"
 #include <interface/pdi/modules/serial/iSerialInterface.h>
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+#include "threading/PreemptiveMutex.h"
+#endif
 
 /**
  * UARTSerial class
@@ -58,6 +61,9 @@ private:
   uint16_t m_port;
   uint64_t m_speed;
   HardwareSerial& m_hwserial;
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  PreemptiveMutex m_mutex;
+  #endif
 };
 
 extern UARTSerial __serial_uart;

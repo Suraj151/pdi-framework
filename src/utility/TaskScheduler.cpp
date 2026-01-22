@@ -546,6 +546,15 @@ void TaskScheduler::sleep(uint32_t ms)
 }
 
 /**
+ * @brief mute the current task .
+ * Currently not handling here as this is under cooperative schedule context.
+ */
+void TaskScheduler::mute() 
+{
+    
+}
+
+/**
  * @brief Run the scheduled tasks.
  * This needs to be called from main entry loop to run the cooperative tasks.
  */

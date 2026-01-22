@@ -210,6 +210,12 @@ public:
     void sleep(uint32_t ms) override;
 
     /**
+     * @brief Mute the current task .
+     * Currently not handling here as this is under cooperative schedule context.
+     */
+    void mute() override;
+
+    /**
      * @brief Run the scheduled tasks.
      * This needs to be called from main entry loop to run the cooperative tasks.
      */

@@ -37,6 +37,10 @@ void DeviceControlInterface::gpioMode(GPIO_MODE mode, gpio_id_t pin)
     // get the hw pin from map
     gpio_id_t hwpin = gpioFromPinMap(pin, (ANALOG_READ==mode));
 
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.lock();
+    #endif
+
     switch (mode)
     {
     case DIGITAL_WRITE:
@@ -51,6 +55,10 @@ void DeviceControlInterface::gpioMode(GPIO_MODE mode, gpio_id_t pin)
     default:
         break;
     }
+
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.unlock();
+    #endif
 }
 
 /**
@@ -60,6 +68,10 @@ void DeviceControlInterface::gpioWrite(GPIO_MODE mode, gpio_id_t pin, gpio_val_t
 {
     // get the hw pin from map
     gpio_id_t hwpin = gpioFromPinMap(pin, (ANALOG_READ==mode));
+
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.lock();
+    #endif
 
     switch (mode)
     {
@@ -75,6 +87,10 @@ void DeviceControlInterface::gpioWrite(GPIO_MODE mode, gpio_id_t pin, gpio_val_t
     default:
         break;
     }
+
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.unlock();
+    #endif
 }
 
 /**
@@ -84,8 +100,11 @@ gpio_val_t DeviceControlInterface::gpioRead(GPIO_MODE mode, gpio_id_t pin)
 {
     // get the hw pin from map
     gpio_id_t hwpin = gpioFromPinMap(pin, (ANALOG_READ==mode));
-
     gpio_val_t value = -1;
+
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.lock();
+    #endif
 
     switch (mode)
     {
@@ -98,6 +117,10 @@ gpio_val_t DeviceControlInterface::gpioRead(GPIO_MODE mode, gpio_id_t pin)
     default:
         break;
     }
+
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.unlock();
+    #endif
 
     return value;
 }
@@ -169,7 +192,17 @@ bool DeviceControlInterface::isExceptionalGpio(gpio_id_t pin)
  */
 iGpioBlinkerInterface *DeviceControlInterface::createGpioBlinkerInstance(gpio_id_t pin, gpio_val_t duration)
 {
-    return new GpioBlinkerInterface(pin, duration);
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.lock();
+    #endif
+
+    iGpioBlinkerInterface * p = new GpioBlinkerInterface(pin, duration);
+
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.unlock();
+    #endif
+    
+    return p;
 }
 
 /**
@@ -177,10 +210,18 @@ iGpioBlinkerInterface *DeviceControlInterface::createGpioBlinkerInstance(gpio_id
  */
 void DeviceControlInterface::releaseGpioBlinkerInstance(iGpioBlinkerInterface *instance)
 {
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.lock();
+    #endif
+
     if (nullptr != instance)
     {
         delete instance;
     }
+
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.unlock();
+    #endif
 }
 
 /**
@@ -312,6 +353,9 @@ void DeviceControlInterface::wait(double timeoutms)
     uint32_t _remainingtimeoutus = (uint32_t)((timeoutms - _timeoutms) * 1000.0); // convert to microseconds
 
     // Using delay to run other contexual tasks if any
+    // We can sleep from preemptive sched as well in case if we dont have cooperative tasks.
+    // But if we have cooperative tasks then utilize this sleep for cooperative tasks 
+    // Since preemptive tasks will get the scheduled slots soon if scheduled
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
     if(_timeoutms > 0){
         __i_cooperative_scheduler.sleep_from_othersched(_timeoutms);
@@ -347,12 +391,20 @@ void DeviceControlInterface::log(logger_type_t log_type, const char *content)
  */
 void DeviceControlInterface::yield()
 {
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.lock();
+    #endif
+
     // run_scheduled_functions();
     // run_scheduled_recurrent_functions();
     // esp_schedule();
     esp_yield();
     optimistic_yield(1000);
     delay(0);
+
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.unlock();
+    #endif
 }
 
 /**

@@ -13,7 +13,9 @@ created Date    : 1st Jan 2024
 
 #include "esp8266.h"
 #include <interface/pdi/iLoggerInterface.h>
-
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+#include "threading/PreemptiveMutex.h"
+#endif
 
 #if defined(LOGBEGIN) && ( defined(ENABLE_LOG_ALL) || defined(ENABLE_LOG_INFO) || defined(ENABLE_LOG_ERROR) || defined(ENABLE_LOG_WARNING) || defined(ENABLE_LOG_SUCCESS) )
 #undef LOGBEGIN
@@ -65,6 +67,9 @@ created Date    : 1st Jan 2024
  */
 class LoggerInterface : public iLoggerInterface
 {
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  PreemptiveMutex m_mutex;
+  #endif
 
 public:
   /**

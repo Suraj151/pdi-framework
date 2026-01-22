@@ -13,6 +13,9 @@ created Date    : 1st Jan 2024
 
 #include "esp8266.h"
 #include <interface/pdi/middlewares/iDeviceControlInterface.h>
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+#include "threading/PreemptiveMutex.h"
+#endif
 
 /**
  * Gpio's that should not be touched
@@ -24,6 +27,9 @@ const uint8_t EXCEPTIONAL_GPIO_PINS[] = {3};
  */
 class DeviceControlInterface: public iDeviceControlInterface
 {
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  PreemptiveMutex m_mutex;
+  #endif
 
 public:
   /**

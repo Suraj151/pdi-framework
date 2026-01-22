@@ -128,6 +128,27 @@ void CooperativeScheduler::schedule_task(task_t* task, uint32_t stacksize){
 }
 
 /**
+ * mute the current task.
+ */
+void CooperativeScheduler::mute(){
+
+    Cooperative* f = current;
+    if (!f) return;
+
+    noInterrupts(); 
+
+    if (f->state == CooperativeState::Running) {
+        f->state = CooperativeState::Mute;
+    }
+
+    xtensa_save_context(&f->ctx);
+    if(f->state == CooperativeState::Mute)
+        CooperativeScheduler::exit();
+
+    interrupts();
+}
+
+/**
  * yield the current task.
  */
 void CooperativeScheduler::yield(){
@@ -138,7 +159,6 @@ void CooperativeScheduler::yield(){
     noInterrupts(); 
 
     if (f->state == CooperativeState::Running) {
-        f->state = CooperativeState::Ready;
         add_to_ready(f);
     }
 
@@ -190,7 +210,6 @@ void CooperativeScheduler::run(){
         auto si = sleepers[i];
         if (si.f && (int32_t)(now - si.wake_ms) >= 0) {
 
-            si.f->state = CooperativeState::Ready;
             noInterrupts(); 
             add_to_ready(si.f); 
             // erase by swap-pop for O(1)
@@ -261,6 +280,7 @@ void CooperativeScheduler::destroy_cooperative(Cooperative* f) {
 void CooperativeScheduler::add_to_ready(Cooperative* f) {
     if(f){
         // f->wait_ticks = 0;
+        f->state = PreemptiveState::Ready;
         ready.push_back(f);
     }
 }

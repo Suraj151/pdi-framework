@@ -39,6 +39,7 @@ created Date    : 1st Jan 2024
 #ifdef ENABLE_CONTEXTUAL_EXECUTION
 #include "threading/Cooperative.h"
 #include "threading/Preemptive.h"
+#include "threading/PreemptiveMutex.h"
 #endif
 
 #endif  // _ESP8266_PORTABLE_DEVICE_INTERFACE_H_

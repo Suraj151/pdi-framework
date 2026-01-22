@@ -72,7 +72,17 @@ int16_t UARTSerial::disconnect()
  */
 int32_t UARTSerial::write(uint8_t c)
 {
-  return m_hwserial.write(c);
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  m_mutex.lock();
+  #endif
+
+  int32_t ret = m_hwserial.write(c);
+
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  m_mutex.unlock();
+  #endif
+
+  return ret;
 }
 
 /**
@@ -80,7 +90,17 @@ int32_t UARTSerial::write(uint8_t c)
  */
 int32_t UARTSerial::write(const uint8_t *c_str)
 {
-  return m_hwserial.write((const char*)c_str);
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  m_mutex.lock();
+  #endif
+
+  int32_t ret = m_hwserial.write((const char*)c_str);
+
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  m_mutex.unlock();
+  #endif
+
+  return ret;
 }
 
 /**
@@ -88,7 +108,17 @@ int32_t UARTSerial::write(const uint8_t *c_str)
  */
 int32_t UARTSerial::write(const uint8_t *c_str, uint32_t size)
 {
-  return m_hwserial.write(c_str, size);
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  m_mutex.lock();
+  #endif
+
+  int32_t ret = m_hwserial.write(c_str, size);
+
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  m_mutex.unlock();
+  #endif
+
+  return ret;
 }
 
 /**
@@ -96,7 +126,17 @@ int32_t UARTSerial::write(const uint8_t *c_str, uint32_t size)
  */
 int32_t UARTSerial::write_ro(const char *c_str)
 {
-  return m_hwserial.print(c_str);
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  m_mutex.lock();
+  #endif
+
+  int32_t ret = m_hwserial.print(c_str);
+  
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  m_mutex.unlock();
+  #endif
+
+  return ret;
 }
 
 /**
@@ -104,7 +144,17 @@ int32_t UARTSerial::write_ro(const char *c_str)
  */
 uint8_t UARTSerial::read()
 {
-  return m_hwserial.read();
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  m_mutex.lock();
+  #endif
+
+  uint8_t ret = m_hwserial.read();
+
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  m_mutex.unlock();
+  #endif
+  
+  return ret;
 }
 
 /**
@@ -113,10 +163,20 @@ uint8_t UARTSerial::read()
 int32_t UARTSerial::read(uint8_t *buf, uint32_t size)
 {
   uint32_t count = 0;
+
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  m_mutex.lock();
+  #endif
+
   for (; count < size && m_hwserial.available(); ++count)
   {
     buf[count] = m_hwserial.read();
   }
+
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  m_mutex.unlock();
+  #endif
+
   return count;
 }
 
@@ -125,7 +185,17 @@ int32_t UARTSerial::read(uint8_t *buf, uint32_t size)
  */
 int32_t UARTSerial::available()
 {
-  return m_hwserial.available();
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  m_mutex.lock();
+  #endif
+
+  int32_t ret = m_hwserial.available();
+
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  m_mutex.unlock();
+  #endif
+
+  return ret;
 }
 
 /**
@@ -148,8 +218,16 @@ void UARTSerial::setTimeout(uint32_t timeout)
  */
 void UARTSerial::flush()
 {
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  m_mutex.lock();
+  #endif
+
   m_hwserial.flush();
   while (m_hwserial.available() > 0) m_hwserial.read(); 
+
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  m_mutex.unlock();
+  #endif  
 }
 
 /**

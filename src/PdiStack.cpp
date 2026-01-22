@@ -151,6 +151,7 @@ void PDIStack::serve(){
 
   #ifdef ENABLE_CONTEXTUAL_EXECUTION
   __i_cooperative_scheduler.run();
+  __i_preemptive_scheduler.yield();
   #endif
 
   __task_scheduler.run(); // run cooperative taskscheduler in loop

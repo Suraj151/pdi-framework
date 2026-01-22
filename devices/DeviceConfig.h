@@ -42,7 +42,7 @@ created Date    : 1st June 2019
  * By default will kept disabled. use only if you aware on the task context handling.
  */
 #if defined(DEVICE_ESP8266)
-#define ENABLE_CONTEXTUAL_EXECUTION
+// #define ENABLE_CONTEXTUAL_EXECUTION
 #endif
 
 /**

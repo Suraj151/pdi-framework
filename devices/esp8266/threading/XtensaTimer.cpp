@@ -79,9 +79,7 @@ void IRAM_ATTR __attribute__((naked)) timer1_isr(void* arg, void *frame) {
         : "r"(&__isr_entry_ctx), "r"(frame)
     );
 
-    noInterrupts();
     timer1_isr_coroutine(&__isr_entry_ctx);
-    interrupts();
     // asm volatile ("rfi 1\n");
 }
 
