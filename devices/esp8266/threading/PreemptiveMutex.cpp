@@ -32,6 +32,9 @@ PreemptiveMutex::~PreemptiveMutex(){
  */
 void PreemptiveMutex::lock(){
 
+
+    if(!__i_preemptive_scheduler.current) return;
+
     noInterrupts();
 
     if (!m_locked) { 
@@ -51,6 +54,8 @@ void PreemptiveMutex::lock(){
  * Unlock this mutex
  */
 void PreemptiveMutex::unlock(){
+
+    if(!__i_preemptive_scheduler.current) return;
 
     noInterrupts(); 
     
