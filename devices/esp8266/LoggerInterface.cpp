@@ -9,6 +9,7 @@ created Date    : 1st Jan 2024
 ******************************************************************************/
 
 #include "LoggerInterface.h"
+#include "SerialInterface.h"
 
 /**
  * LoggerInterface constructor.
@@ -67,11 +68,11 @@ void LoggerInterface::log(logger_type_t log_type, const char *content)
 void LoggerInterface::log_info(const char *info)
 {
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.lock();
+    __serial_uart.m_mutex.lock();
     #endif
     Serial.print(info);
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.unlock();
+    __serial_uart.m_mutex.unlock();
     #endif
 }
 
@@ -81,11 +82,11 @@ void LoggerInterface::log_info(const char *info)
 void LoggerInterface::log_error(const char *error)
 {
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.lock();
+    __serial_uart.m_mutex.lock();
     #endif
     Serial.print(error);
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.unlock();
+    __serial_uart.m_mutex.unlock();
     #endif
 }
 
@@ -95,11 +96,11 @@ void LoggerInterface::log_error(const char *error)
 void LoggerInterface::log_warning(const char *warning)
 {
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.lock();
+    __serial_uart.m_mutex.lock();
     #endif
     Serial.print(warning);
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.unlock();
+    __serial_uart.m_mutex.unlock();
     #endif
 }
 
@@ -109,11 +110,11 @@ void LoggerInterface::log_warning(const char *warning)
 void LoggerInterface::log_success(const char *success)
 {
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.lock();
+    __serial_uart.m_mutex.lock();
     #endif
     Serial.print(success);
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.unlock();
+    __serial_uart.m_mutex.unlock();
     #endif
 }
 
@@ -123,9 +124,9 @@ void LoggerInterface::log_success(const char *success)
 void LoggerInterface::log_format(const char *format, logger_type_t log_type, ...)
 {
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.lock();
+    __serial_uart.m_mutex.lock();
     #endif
-    
+
     int fmtLen = strlen(format); 
     char *fmtLocal = new char[fmtLen+1];
     memset(fmtLocal, 0, fmtLen+1);
@@ -187,7 +188,7 @@ void LoggerInterface::log_format(const char *format, logger_type_t log_type, ...
     delete[] fmtLocal;
 
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.unlock();
+    __serial_uart.m_mutex.unlock();
     #endif
 }
 

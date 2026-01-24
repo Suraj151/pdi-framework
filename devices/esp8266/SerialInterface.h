@@ -56,14 +56,17 @@ public:
   // terminal api
   iTerminalInterface* with_timestamp() override;
 
+  // Make mutex to be accesible for log service for now.
+  // todo : make this private once log service initializd with iointerface
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  PreemptiveMutex m_mutex;
+  #endif
+
 private:
   bool m_connected;
   uint16_t m_port;
   uint64_t m_speed;
   HardwareSerial& m_hwserial;
-  #ifdef ENABLE_CONTEXTUAL_EXECUTION
-  PreemptiveMutex m_mutex;
-  #endif
 };
 
 extern UARTSerial __serial_uart;

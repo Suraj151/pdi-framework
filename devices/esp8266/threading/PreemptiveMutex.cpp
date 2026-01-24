@@ -19,12 +19,16 @@ PreemptiveMutex::PreemptiveMutex(){
 /**
  * Destructor
  */
-PreemptiveMutex::~PreemptiveMutex(){
+PreemptiveMutex::~PreemptiveMutex() {
 
-    // Shift every waiters to ready list
-    while (!m_waiters.empty()){
-        unlock();
+    while (!m_waiters.empty()) {
+        
+        Preemptive* f = m_waiters.front();
+        m_waiters.erase(m_waiters.begin());
+        __i_preemptive_scheduler.add_to_ready(f);
     }
+    m_locked = false;
+    m_owner = nullptr;
 }
 
 /**
@@ -40,14 +44,21 @@ void PreemptiveMutex::lock(){
     if (!m_locked) { 
 
         m_locked = true; 
+        m_owner = __i_preemptive_scheduler.current;
         interrupts();
         return; 
     }
 
+    // Avoid lock twice
+    if (__i_preemptive_scheduler.current == m_owner) {
+
+        interrupts(); 
+        return; 
+    }    
+
     m_waiters.push_back(__i_preemptive_scheduler.current); 
-    __i_preemptive_scheduler.mute(); // park this current preemptive    
-    
     interrupts();
+    __i_preemptive_scheduler.mute(); // park this current preemptive        
 }
 
 /**
@@ -55,18 +66,23 @@ void PreemptiveMutex::lock(){
  */
 void PreemptiveMutex::unlock(){
 
-    if(!__i_preemptive_scheduler.current) return;
+    // if(!__i_preemptive_scheduler.current) return;
+
+    // Only owner can unlock
+    if (__i_preemptive_scheduler.current != m_owner) return;
 
     noInterrupts(); 
     
     if (!m_waiters.empty()) {
     
-        Preemptive* f = m_waiters.back();     // LIFO; use back for O(1)
-        m_waiters.pop_back();
+        Preemptive* f = m_waiters.front();     // FIFO;
+        m_waiters.erase(m_waiters.begin());
+        m_owner = f;
         __i_preemptive_scheduler.add_to_ready(f);
     } else {
     
         m_locked = false;
+        m_owner = nullptr;
     }    
     
     interrupts();

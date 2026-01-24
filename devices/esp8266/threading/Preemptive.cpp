@@ -15,21 +15,21 @@ static XtensaContext* __isr_ctx;
 static Preemptive __non_preemptive;
 static volatile bool __non_preemptive_saved = false;
 
-// Period may got added in preemptive task as curently we dont yield/sleep from main arduino loop 
-static uint32_t __timer_period = 5000;
+// Period may got added in preemptive task execution as curently we dont calculate the ISR context switch period
+// Real time tuning requires period < 1ms - ISR context switch period/cycles in microseconds
+static uint32_t __timer_period = 5000; // in microseconds
 
 /**
  * hardware timer ISR coroutine get called from inside timer ISR with the interrupted context captured
  */
 void IRAM_ATTR __attribute__((naked)) timer1_isr_coroutine(XtensaContext* ctx){
 
-    noInterrupts();
+    // noInterrupts();
 
     __isr_ctx = ctx;
 
     if (!__non_preemptive_saved) {
         __non_preemptive_saved = true;
-        __non_preemptive.state = PreemptiveState::Ready;
         __non_preemptive.ctx = *__isr_ctx;
         __i_preemptive_scheduler.add_to_ready(&__non_preemptive);
     }
@@ -37,7 +37,7 @@ void IRAM_ATTR __attribute__((naked)) timer1_isr_coroutine(XtensaContext* ctx){
     __i_preemptive_scheduler.run();
 
     timer1_update_us(__timer_period); // Update the period
-    interrupts();
+    // interrupts();
 }
 
 /**
@@ -231,7 +231,9 @@ void PreemptiveScheduler::sleep(uint32_t ms){
 void PreemptiveScheduler::run(){
 
     // Wake sleepers whose time has arrived
+    // todo : try to avoid using millis inside ISR. need to find alternate
     uint32_t now = __i_dvc_ctrl.millis_now();
+    
     for (size_t i = 0; i < sleepers.size();) {
 
         auto si = sleepers[i];

@@ -67,10 +67,6 @@ created Date    : 1st Jan 2024
  */
 class LoggerInterface : public iLoggerInterface
 {
-  #ifdef ENABLE_CONTEXTUAL_EXECUTION
-  PreemptiveMutex m_mutex;
-  #endif
-
 public:
   /**
    * iLoggerInterface constructor.

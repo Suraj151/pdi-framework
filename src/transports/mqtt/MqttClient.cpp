@@ -386,6 +386,8 @@ void MQTTClient::mqtt_client_recv()
   else if (0 == len)
   {
     LogW("MQTT: No response received yet\n");
+    if(this->m_mqttClient.connState == MQTT_PING_SENT)  // Go for the pending data queue if did not received ping resp yet
+      this->m_mqttClient.connState = MQTT_DATA;
   }
   else
   {

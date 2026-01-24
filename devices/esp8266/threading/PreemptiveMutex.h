@@ -18,6 +18,7 @@ Created Date    : 1st June 2025
 class PreemptiveMutex : public iMutex {
     bool m_locked = false;
     pdiutil::vector<Preemptive*> m_waiters; 
+    Preemptive* m_owner = nullptr;
 public:
     PreemptiveMutex();
     virtual ~PreemptiveMutex();
