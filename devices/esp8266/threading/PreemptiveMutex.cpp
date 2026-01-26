@@ -13,7 +13,7 @@ Created Date    : 1st June 2025
 /**
  * Constructor
  */
-PreemptiveMutex::PreemptiveMutex(){
+PreemptiveMutex::PreemptiveMutex() : m_locked(false), m_owner(nullptr) {
 }
 
 /**
@@ -36,10 +36,13 @@ PreemptiveMutex::~PreemptiveMutex() {
  */
 void PreemptiveMutex::lock(){
 
-
-    if(!__i_preemptive_scheduler.current) return;
-
     noInterrupts();
+
+    if(!__i_preemptive_scheduler.current) {
+
+        interrupts();
+        return;
+    }
 
     if (!m_locked) { 
 
@@ -57,8 +60,9 @@ void PreemptiveMutex::lock(){
     }    
 
     m_waiters.push_back(__i_preemptive_scheduler.current); 
+    __i_preemptive_scheduler.mute(); // park this current preemptive 
+           
     interrupts();
-    __i_preemptive_scheduler.mute(); // park this current preemptive        
 }
 
 /**
@@ -68,10 +72,14 @@ void PreemptiveMutex::unlock(){
 
     // if(!__i_preemptive_scheduler.current) return;
 
-    // Only owner can unlock
-    if (__i_preemptive_scheduler.current != m_owner) return;
-
     noInterrupts(); 
+
+    // Only owner can unlock
+    if (__i_preemptive_scheduler.current != m_owner) {
+
+        interrupts();
+        return;
+    }
     
     if (!m_waiters.empty()) {
     

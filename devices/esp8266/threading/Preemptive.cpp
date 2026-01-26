@@ -15,28 +15,42 @@ static XtensaContext* __isr_ctx;
 static Preemptive __non_preemptive;
 static volatile bool __non_preemptive_saved = false;
 
-// Period may got added in preemptive task execution as curently we dont calculate the ISR context switch period
+// Context switch period required to set in timer
 // Real time tuning requires period < 1ms - ISR context switch period/cycles in microseconds
-static uint32_t __timer_period = 5000; // in microseconds
+static uint32_t __timer_period = 1000; // in microseconds
 
 /**
- * hardware timer ISR coroutine get called from inside timer ISR with the interrupted context captured
+ * hardware timer ISR coroutine get called from timer ISR handler with the interrupted context captured
  */
 void IRAM_ATTR __attribute__((naked)) timer1_isr_coroutine(XtensaContext* ctx){
 
     // noInterrupts();
 
+    // Capture microseconds
+    uint32_t current_us = micros();
+
+    // Keep copy of interrupted context
     __isr_ctx = ctx;
 
+    // Capture the main loop once
     if (!__non_preemptive_saved) {
         __non_preemptive_saved = true;
         __non_preemptive.ctx = *__isr_ctx;
         __i_preemptive_scheduler.add_to_ready(&__non_preemptive);
     }
 
+    // Switch tasks
     __i_preemptive_scheduler.run();
 
-    timer1_update_us(__timer_period); // Update the period
+    // Calculate spent time in ISR in microseconds.
+    // These are not approximates as we are not considering the rest time spent outside measured boundaries
+    // Make sure that spent time in ISR should be less than period
+    uint32_t spent_time_in_us = micros() - current_us;
+    if( spent_time_in_us > __timer_period ) spent_time_in_us = 0;
+
+    // Tune the period at runtime
+    timer1_update_us(__timer_period - spent_time_in_us);
+
     // interrupts();
 }
 
@@ -172,8 +186,8 @@ void PreemptiveScheduler::mute(){
 
     noInterrupts(); 
 
-    if (f->state == CooperativeState::Running) {
-        f->state = CooperativeState::Mute;
+    if (f->state == PreemptiveState::Running) {
+        f->state = PreemptiveState::Mute;
     }
 
     // xtensa_save_context(&f->ctx);
@@ -335,11 +349,11 @@ void PreemptiveScheduler::destroy_preemptive(Preemptive* f) {
         noInterrupts(); 
         remove_from_sleepers(f);
         remove_from_ready(f);
-        interrupts();
     
         __task_scheduler.remove_task(f->task_id);
         delete f; 
         f = nullptr;
+        interrupts();
     }
 }
 

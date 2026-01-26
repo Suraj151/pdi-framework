@@ -74,6 +74,7 @@ int32_t UARTSerial::write(uint8_t c)
 {
   #ifdef ENABLE_CONTEXTUAL_EXECUTION
   m_mutex.lock();
+  noInterrupts();
   #endif
 
   int32_t ret = m_hwserial.write(c);
@@ -92,6 +93,7 @@ int32_t UARTSerial::write(const uint8_t *c_str)
 {
   #ifdef ENABLE_CONTEXTUAL_EXECUTION
   m_mutex.lock();
+  noInterrupts();
   #endif
 
   int32_t ret = m_hwserial.write((const char*)c_str);
@@ -110,6 +112,7 @@ int32_t UARTSerial::write(const uint8_t *c_str, uint32_t size)
 {
   #ifdef ENABLE_CONTEXTUAL_EXECUTION
   m_mutex.lock();
+  noInterrupts();
   #endif
 
   int32_t ret = m_hwserial.write(c_str, size);
@@ -128,6 +131,7 @@ int32_t UARTSerial::write_ro(const char *c_str)
 {
   #ifdef ENABLE_CONTEXTUAL_EXECUTION
   m_mutex.lock();
+  noInterrupts();
   #endif
 
   int32_t ret = m_hwserial.print(c_str);
@@ -146,6 +150,7 @@ uint8_t UARTSerial::read()
 {
   #ifdef ENABLE_CONTEXTUAL_EXECUTION
   m_mutex.lock();
+  noInterrupts();
   #endif
 
   uint8_t ret = m_hwserial.read();
@@ -166,6 +171,7 @@ int32_t UARTSerial::read(uint8_t *buf, uint32_t size)
 
   #ifdef ENABLE_CONTEXTUAL_EXECUTION
   m_mutex.lock();
+  noInterrupts();
   #endif
 
   for (; count < size && m_hwserial.available(); ++count)
@@ -187,6 +193,7 @@ int32_t UARTSerial::available()
 {
   #ifdef ENABLE_CONTEXTUAL_EXECUTION
   m_mutex.lock();
+  noInterrupts();
   #endif
 
   int32_t ret = m_hwserial.available();
@@ -220,6 +227,7 @@ void UARTSerial::flush()
 {
   #ifdef ENABLE_CONTEXTUAL_EXECUTION
   m_mutex.lock();
+  noInterrupts();
   #endif
 
   m_hwserial.flush();
@@ -240,7 +248,7 @@ iTerminalInterface* UARTSerial::with_timestamp()
 {
   char tembuff[15];
   memset(tembuff, 0, 15);
-  sprintf(tembuff, "%ld", millis());
+  snprintf(tembuff, sizeof(tembuff), "%lu", millis());
   
   write('[');
   write_pad(tembuff, 10, true);
