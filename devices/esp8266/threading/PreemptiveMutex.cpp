@@ -61,7 +61,7 @@ void PreemptiveMutex::lock(){
 
     m_waiters.push_back(__i_preemptive_scheduler.current); 
     __i_preemptive_scheduler.mute(); // park this current preemptive 
-           
+
     interrupts();
 }
 
@@ -94,4 +94,21 @@ void PreemptiveMutex::unlock(){
     }    
     
     interrupts();
+}
+
+/**
+ * Lock this mutex and enable critical section.
+ */
+void PreemptiveMutex::critical_lock(){
+
+    lock();
+    noInterrupts();
+}
+
+/**
+ * Unlock this mutex and enable critical section.
+ */
+void PreemptiveMutex::critical_unlock(){
+
+    unlock();
 }

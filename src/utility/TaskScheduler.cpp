@@ -260,7 +260,7 @@ void TaskScheduler::getSortedTaskList(uint16_t* _priority_indices, uint16_t _tas
                 // --- Scores equal → compare due times with tolerance ---
                 int64_t diff = (int64_t)(next_due_i - next_due_j);
 
-                if (pdistd::abs(diff) > (int64_t)tolerance) {
+                if (abs(diff) > (int64_t)tolerance) {
                     swap_needed = (next_due_j < next_due_i);
                 } else {
                     // --- Due times effectively equal → compare exec time ---

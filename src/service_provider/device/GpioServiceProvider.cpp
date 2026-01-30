@@ -476,6 +476,7 @@ void GpioServiceProvider::setDeviceId(const char* _id){
   m_device_id = _id;
 }
 
+#ifndef ENABLE_GPIO_BASIC_ONLY
 /**
  * Set the Http host for gpio data/events
  *
@@ -489,6 +490,7 @@ void GpioServiceProvider::setHttpHost(const char* _host){
     this->m_update_gpio_table_from_copy = true;
   }
 }
+#endif
 
 #ifdef ENABLE_EMAIL_SERVICE
 /**

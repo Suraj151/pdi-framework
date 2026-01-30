@@ -29,7 +29,7 @@ StorageInterface::~StorageInterface() {}
  * @param size The number of bytes to read.
  * @return FLASH_HAL_OK(0) or FLASH_HAL_READ_ERROR(-1) if failed.
  */
-int64_t StorageInterface::read(uint64_t address, void* buffer, uint64_t size) const {
+int64_t StorageInterface::read(uint64_t address, void* buffer, uint64_t size) {
     // return flash_hal_read(m_start_address + address, size, reinterpret_cast<uint8_t*>(buffer));
     return 0;
 }

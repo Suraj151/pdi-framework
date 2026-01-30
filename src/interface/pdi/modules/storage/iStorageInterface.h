@@ -54,7 +54,7 @@ public:
      * @param size The number of bytes to read.
      * @return no of bytes read or -1 on failure.
      */
-    virtual int64_t read(uint64_t address, void* buffer, uint64_t size) const = 0;
+    virtual int64_t read(uint64_t address, void* buffer, uint64_t size) = 0;
 
     /**
      * @brief Write data to the storage.

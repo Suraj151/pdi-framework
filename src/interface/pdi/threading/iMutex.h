@@ -18,6 +18,9 @@ public:
     virtual ~iMutex() {}
     virtual void lock() = 0;
     virtual void unlock() = 0;
+
+    virtual void critical_lock() = 0;
+    virtual void critical_unlock() = 0;
 };
 
 #endif

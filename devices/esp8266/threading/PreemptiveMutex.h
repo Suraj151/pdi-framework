@@ -24,6 +24,9 @@ public:
     virtual ~PreemptiveMutex();
     void lock() override;
     void unlock() override;
+
+    void critical_lock() override;
+    void critical_unlock() override;    
 };
 
 

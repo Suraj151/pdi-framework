@@ -13,6 +13,9 @@ Created Date    : 1st June 2019
 
 #include "esp8266.h"
 #include <interface/pdi/modules/storage/iStorageInterface.h>
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+#include "threading/PreemptiveMutex.h"
+#endif
 
 /**
  * @class StorageInterface
@@ -41,7 +44,7 @@ public:
      * @param size The number of bytes to read.
      * @return The number of bytes read or FLASH_HAL_READ_ERROR(-1) if failed.
      */
-    int64_t read(uint64_t address, void* buffer, uint64_t size) const override;
+    int64_t read(uint64_t address, void* buffer, uint64_t size) override;
 
     /**
      * @brief Writes data to the storage.
@@ -68,6 +71,10 @@ public:
 
 private:
     uint64_t m_start_address = 0; ///< Start address of the storage
+
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    PreemptiveMutex m_mutex;
+    #endif
 };
 
 #endif // _STORAGE_INTERFACE_H

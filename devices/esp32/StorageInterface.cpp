@@ -44,7 +44,7 @@ StorageInterface::~StorageInterface() {}
  * @param size The number of bytes to read.
  * @return The number of bytes read or negative if failed.
  */
-int64_t StorageInterface::read(uint64_t address, void* buffer, uint64_t size) const {
+int64_t StorageInterface::read(uint64_t address, void* buffer, uint64_t size) {
 
     int64_t bytesRead = -1;
 

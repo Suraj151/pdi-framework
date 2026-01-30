@@ -68,11 +68,11 @@ void LoggerInterface::log(logger_type_t log_type, const char *content)
 void LoggerInterface::log_info(const char *info)
 {
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    __serial_uart.m_mutex.lock();
+    __serial_uart.m_mutex.critical_lock();
     #endif
     Serial.print(info);
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    __serial_uart.m_mutex.unlock();
+    __serial_uart.m_mutex.critical_unlock();
     #endif
 }
 
@@ -82,11 +82,11 @@ void LoggerInterface::log_info(const char *info)
 void LoggerInterface::log_error(const char *error)
 {
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    __serial_uart.m_mutex.lock();
+    __serial_uart.m_mutex.critical_lock();
     #endif
     Serial.print(error);
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    __serial_uart.m_mutex.unlock();
+    __serial_uart.m_mutex.critical_unlock();
     #endif
 }
 
@@ -96,11 +96,11 @@ void LoggerInterface::log_error(const char *error)
 void LoggerInterface::log_warning(const char *warning)
 {
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    __serial_uart.m_mutex.lock();
+    __serial_uart.m_mutex.critical_lock();
     #endif
     Serial.print(warning);
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    __serial_uart.m_mutex.unlock();
+    __serial_uart.m_mutex.critical_unlock();
     #endif
 }
 
@@ -110,11 +110,11 @@ void LoggerInterface::log_warning(const char *warning)
 void LoggerInterface::log_success(const char *success)
 {
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    __serial_uart.m_mutex.lock();
+    __serial_uart.m_mutex.critical_lock();
     #endif
     Serial.print(success);
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    __serial_uart.m_mutex.unlock();
+    __serial_uart.m_mutex.critical_unlock();
     #endif
 }
 
@@ -123,10 +123,6 @@ void LoggerInterface::log_success(const char *success)
  */
 void LoggerInterface::log_format(const char *format, logger_type_t log_type, ...)
 {
-    #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    __serial_uart.m_mutex.lock();
-    #endif
-
     int fmtLen = strlen(format); 
     char *fmtLocal = new char[fmtLen+1];
     memset(fmtLocal, 0, fmtLen+1);
@@ -144,52 +140,90 @@ void LoggerInterface::log_format(const char *format, logger_type_t log_type, ...
             if (fmtLocal[indx] == 'd')
             {
                 int i = va_arg(args, int);
+                #ifdef ENABLE_CONTEXTUAL_EXECUTION
+                __serial_uart.m_mutex.critical_lock();
+                #endif
                 Serial.print(i);
+                #ifdef ENABLE_CONTEXTUAL_EXECUTION
+                __serial_uart.m_mutex.critical_unlock();
+                #endif
             }
             else if (fmtLocal[indx] == 'x')
             {
                 int x = va_arg(args, int);
+                #ifdef ENABLE_CONTEXTUAL_EXECUTION
+                __serial_uart.m_mutex.critical_lock();
+                #endif
                 Serial.print(x, HEX);
+                #ifdef ENABLE_CONTEXTUAL_EXECUTION
+                __serial_uart.m_mutex.critical_unlock();
+                #endif
             }
             else if (fmtLocal[indx] == 'c')
             {
                 // A 'char' variable will be promoted to 'int'
                 // A character literal in C is already 'int' by itself
                 int c = va_arg(args, int);
+                #ifdef ENABLE_CONTEXTUAL_EXECUTION
+                __serial_uart.m_mutex.critical_lock();
+                #endif
                 Serial.print((char)c);
+                #ifdef ENABLE_CONTEXTUAL_EXECUTION
+                __serial_uart.m_mutex.critical_unlock();
+                #endif
             }
             else if (fmtLocal[indx] == 'f')
             {
                 double d = va_arg(args, double);
+                #ifdef ENABLE_CONTEXTUAL_EXECUTION
+                __serial_uart.m_mutex.critical_lock();
+                #endif
                 Serial.print(d);
+                #ifdef ENABLE_CONTEXTUAL_EXECUTION
+                __serial_uart.m_mutex.critical_unlock();
+                #endif
             }
             else if (fmtLocal[indx] == 's')
             {
                 char *s = va_arg(args, char*);
                 if( nullptr != s )
                 {
+                    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+                    __serial_uart.m_mutex.critical_lock();
+                    #endif
                     Serial.print(s);
+                    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+                    __serial_uart.m_mutex.critical_unlock();
+                    #endif
                 }
             }
             else
             {
                 --indx;
+                #ifdef ENABLE_CONTEXTUAL_EXECUTION
+                __serial_uart.m_mutex.critical_lock();
+                #endif
                 Serial.print(fmtLocal[indx]);
+                #ifdef ENABLE_CONTEXTUAL_EXECUTION
+                __serial_uart.m_mutex.critical_unlock();
+                #endif
             }
         }
         else
         {
+            #ifdef ENABLE_CONTEXTUAL_EXECUTION
+            __serial_uart.m_mutex.critical_lock();
+            #endif
             Serial.print(fmtLocal[indx]);
+            #ifdef ENABLE_CONTEXTUAL_EXECUTION
+            __serial_uart.m_mutex.critical_unlock();
+            #endif
         }
     }
     
     va_end(args);
 
     delete[] fmtLocal;
-
-    #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    __serial_uart.m_mutex.unlock();
-    #endif
 }
 
 LoggerInterface __i_logger;

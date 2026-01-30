@@ -47,7 +47,9 @@ public:
   void applyGpioEventJsonPayload(char *_payload, uint16_t _payload_length, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);
   #endif
   void setDeviceId(const char* _id);
+  #ifndef ENABLE_GPIO_BASIC_ONLY
   void setHttpHost(const char* _host);
+  #endif
   #ifdef ENABLE_EMAIL_SERVICE
   bool handleGpioEventOverEmail(void);
 #endif

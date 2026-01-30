@@ -41,7 +41,7 @@ public:
      * @param size The number of bytes to read.
      * @return The number of bytes read or FLASH_HAL_READ_ERROR(-1) if failed.
      */
-    int64_t read(uint64_t address, void* buffer, uint64_t size) const override;
+    int64_t read(uint64_t address, void* buffer, uint64_t size) override;
 
     /**
      * @brief Writes data to the storage.

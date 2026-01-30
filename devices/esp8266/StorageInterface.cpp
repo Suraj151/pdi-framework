@@ -29,8 +29,15 @@ StorageInterface::~StorageInterface() {}
  * @param size The number of bytes to read.
  * @return FLASH_HAL_OK(0) or FLASH_HAL_READ_ERROR(-1) if failed.
  */
-int64_t StorageInterface::read(uint64_t address, void* buffer, uint64_t size) const {
-    return flash_hal_read(m_start_address + address, size, reinterpret_cast<uint8_t*>(buffer));
+int64_t StorageInterface::read(uint64_t address, void* buffer, uint64_t size) {
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.critical_lock();
+    #endif
+    int64_t ret = flash_hal_read(m_start_address + address, size, reinterpret_cast<uint8_t*>(buffer));
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.critical_unlock();
+    #endif
+    return ret;
 }
 
 /**
@@ -41,7 +48,14 @@ int64_t StorageInterface::read(uint64_t address, void* buffer, uint64_t size) co
  * @return FLASH_HAL_OK(0) or FLASH_HAL_WRITE_ERROR(-2) if failed.
  */
 int64_t StorageInterface::write(uint64_t address, const void* buffer, uint64_t size) {
-    return flash_hal_write(m_start_address + address, size, reinterpret_cast<const uint8_t*>(buffer));
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.critical_lock();
+    #endif
+    int64_t ret = flash_hal_write(m_start_address + address, size, reinterpret_cast<const uint8_t*>(buffer));
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.critical_unlock();
+    #endif
+    return ret;
 }
 
 /**
@@ -51,7 +65,14 @@ int64_t StorageInterface::write(uint64_t address, const void* buffer, uint64_t s
  * @return True if the erase operation was successful, false otherwise.
  */
 bool StorageInterface::erase(uint64_t address, uint64_t size) {
-    return flash_hal_erase(m_start_address + address, size) == 0; // Erase the specified block
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.critical_lock();
+    #endif
+    bool ret = flash_hal_erase(m_start_address + address, size) == 0; // Erase the specified block
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.critical_unlock();
+    #endif
+    return ret;
 }
 
 /**

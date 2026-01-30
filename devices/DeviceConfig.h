@@ -46,17 +46,25 @@ created Date    : 1st June 2019
 #endif
 
 /**
- * define number of gpios based on device enabled
+ * Device specific stuff
  */
 #if defined(DEVICE_ARDUINOUNO)
+
 #define MAX_DIGITAL_GPIO_PINS         14
 #define MAX_ANALOG_GPIO_PINS          5
+
+#define log2(x) (log(x)/log(2.0))   // log2 might not available for uno
+
 #elif defined(DEVICE_ESP32)
+
 #define MAX_DIGITAL_GPIO_PINS         9
 #define MAX_ANALOG_GPIO_PINS          4
+
 #else
+
 #define MAX_DIGITAL_GPIO_PINS         9
 #define MAX_ANALOG_GPIO_PINS          1
+
 #endif
 
 /**
