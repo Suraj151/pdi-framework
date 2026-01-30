@@ -188,7 +188,13 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
         if (chunk < remaining)
             flags |= TCP_WRITE_FLAG_MORE; // do not tcp-PuSH (yet)
 
+        #ifdef ENABLE_CONTEXTUAL_EXECUTION
+        m_mutex.critical_lock();
+        #endif
         err = tcp_write(m_pcb, c_str + total_sent, chunk, flags);
+        #ifdef ENABLE_CONTEXTUAL_EXECUTION
+        m_mutex.critical_unlock();
+        #endif
         if (err != ERR_OK) {
             return err < 0 ? err : -99; // Return error code if write fails
         }
@@ -199,7 +205,13 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
     // Ensure last write has been ackowledged
     if (m_isLastWriteAcked){
 
+        #ifdef ENABLE_CONTEXTUAL_EXECUTION
+        m_mutex.critical_lock();
+        #endif
         err = tcp_output(m_pcb); // Ensure the data is sent
+        #ifdef ENABLE_CONTEXTUAL_EXECUTION
+        m_mutex.critical_unlock();
+        #endif
         if (err != ERR_OK) {
             return err < 0 ? err : -99; // Return error code if write fails
         }

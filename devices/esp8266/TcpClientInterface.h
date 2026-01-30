@@ -13,6 +13,9 @@ created Date    : 1st May 2025
 #include "esp8266.h"
 #include <interface/pdi/middlewares/iClientInterface.h>
 
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+#include "threading/PreemptiveMutex.h"
+#endif
 
 /**
  * @class TcpClientInterface
@@ -177,6 +180,10 @@ private:
     uint32_t m_rxBufferSize; ///< Size of the receive buffer.
     uint32_t m_timeout;    ///< Timeout value in milliseconds.
     bool m_isLastWriteAcked;
+
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    PreemptiveMutex m_mutex;
+    #endif
 
     // LWIP callback functions
     static err_t onConnected(void* arg, struct tcp_pcb* tpcb, err_t err);
