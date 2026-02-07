@@ -121,10 +121,17 @@ class DashboardController : public Controller {
 			memset(_page, 0, PAGE_HTML_MAX_SIZE);
 
 			strcat_ro(_page, WEB_SERVER_HEADER_HTML);
-			strcat_ro(_page, WEB_SERVER_DASHBOARD_PAGE);
-			strcat_ro(_page, WEB_SERVER_FOOTER_WITH_DASHBOARD_MONITOR_HTML);
+			BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 
-			this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+			strcat_ro(_page, WEB_SERVER_DASHBOARD_PAGE);
+			CONTINUE_SEND_IN_CHUNK(_page);
+
+			strcat_ro(_page, WEB_SERVER_FOOTER_WITH_DASHBOARD_MONITOR_HTML);
+			CONTINUE_SEND_IN_CHUNK(_page);
+
+			END_SENDING_CHUNK();
+
+			// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 			delete[] _page;
 		}
 };

@@ -57,7 +57,9 @@ bool sendPacket(iClientInterface *client, uint8_t *buffer, uint16_t len, uint16_
 
     while (len > 0)
     {
-      while (!client->availableforwrite()){
+      int32_t sendlen = len > max_bytes_in_one_write ? max_bytes_in_one_write : len;
+
+      while (!client->availableforwrite(sendlen)){
         __i_dvc_ctrl.yield();
         if ((__i_dvc_ctrl.millis_now() - now) > timeout)
         {
@@ -68,10 +70,10 @@ bool sendPacket(iClientInterface *client, uint8_t *buffer, uint16_t len, uint16_
       if (!status)
       {
         LogE("Client: send packet - timeout on availableforwrite\n");
+        client->close();
         break;
       }
       
-      int32_t sendlen = len > max_bytes_in_one_write ? max_bytes_in_one_write : len;
       uint8_t *_buff_pointer = buffer + sentBytes;
       int32_t _sent = client->write(_buff_pointer, sendlen);
       sentBytes += _sent;

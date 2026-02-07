@@ -167,7 +167,7 @@ public:
     /**
      * @brief Check whether available for write
      */
-    bool availableforwrite() override;
+    bool availableforwrite(uint32_t size) override;
 
     /** 
      * @brief Flush the output buffer.

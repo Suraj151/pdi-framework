@@ -256,7 +256,13 @@ bool WiFiInterface::reconnect()
   bool status = false;
   if (nullptr != this->m_wifi)
   {
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.critical_lock();
+    #endif
     status = this->m_wifi->reconnect();
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.critical_unlock();
+    #endif
   }
   return status;
 }
@@ -541,7 +547,13 @@ void WiFiInterface::scanNetworksAsync(pdiutil::function<void(int)> _onComplete, 
 {
   if (nullptr != this->m_wifi)
   {
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.critical_lock();
+    #endif
     this->m_wifi->scanNetworksAsync(_onComplete, _show_hidden);
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.critical_unlock();
+    #endif
   }
 }
 

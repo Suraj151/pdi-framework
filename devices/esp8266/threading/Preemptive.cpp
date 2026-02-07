@@ -17,7 +17,7 @@ static volatile bool __non_preemptive_saved = false;
 
 // Context switch period required to set in timer
 // Real time tuning requires period < 1ms - ISR context switch period/cycles in microseconds
-static uint32_t __timer_period = 1000; // in microseconds
+static uint32_t __timer_period = 1500; // in microseconds
 
 /**
  * hardware timer ISR coroutine get called from timer ISR handler with the interrupted context captured
@@ -181,10 +181,14 @@ void PreemptiveScheduler::schedule_task(task_t* task, uint32_t stacksize){
  */
 void PreemptiveScheduler::mute(){
 
-    Preemptive* f = current;
-    if (!f) return;
-
     noInterrupts(); 
+
+    Preemptive* f = current;
+    if (!f) {
+        interrupts();
+        return;
+    }
+
 
     if (f->state == PreemptiveState::Running) {
         f->state = PreemptiveState::Mute;
@@ -202,10 +206,13 @@ void PreemptiveScheduler::mute(){
  */
 void PreemptiveScheduler::yield(){
 
-    Preemptive* f = current;
-    if (!f) return;
-
     noInterrupts(); 
+
+    Preemptive* f = current;
+    if (!f) {
+        interrupts();
+        return;
+    }
 
     if (f->state == PreemptiveState::Running) {
         add_to_ready(f);
@@ -223,10 +230,13 @@ void PreemptiveScheduler::yield(){
  */
 void PreemptiveScheduler::sleep(uint32_t ms){
 
-    Preemptive* f = current;
-    if (!f) return;
-
     noInterrupts(); 
+
+    Preemptive* f = current;
+    if (!f) {
+        interrupts();
+        return;
+    }
 
     f->state = PreemptiveState::Sleeping;
     sleepers.push_back({ __i_dvc_ctrl.millis_now() + ms, current }); 
@@ -314,6 +324,39 @@ void PreemptiveScheduler::run(){
         //     next->ctx.t[12], next->ctx.t[13], next->ctx.t[14], next->ctx.t[15]
         // );
     }
+}
+
+/**
+ * Enable scheduler
+ * This will yield current task and start timer ticks if disabled earlier.
+ */
+void PreemptiveScheduler::enable_sched(){
+
+    if (!current) return;
+
+    if(!preemptiveisr_active){
+
+        preemptiveisr_active = true;
+        timer1_start_us(__timer_period);
+    }
+    yield();
+}
+
+/**
+ * Disable scheduler
+ * This will stop timer ticks if it is running
+ */
+void PreemptiveScheduler::disable_sched(){
+
+    if (!current) return;
+    
+    noInterrupts();
+    if(preemptiveisr_active){
+
+        timer1_clear();
+        preemptiveisr_active = false;
+    }
+    interrupts();
 }
 
 /**

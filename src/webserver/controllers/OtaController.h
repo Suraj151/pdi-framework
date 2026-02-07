@@ -66,9 +66,10 @@ public:
 			return;
 		}
 
-		memset(_page, 0, _max_size);
+		// memset(_page, 0, _max_size);
 		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
 		strcat_ro(_page, WEB_SERVER_OTA_CONFIG_PAGE_TOP);
+		CONTINUE_SEND_IN_CHUNK(_page);
 
 		ota_config_table _ota_configs;
 		this->m_web_resource->m_db_conn->get_ota_config_table(&_ota_configs);
@@ -92,6 +93,7 @@ public:
 		if (_enable_flash)
 			concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
 		strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
+		CONTINUE_SEND_IN_CHUNK(_page);
 	}
 
 	/**
@@ -134,9 +136,13 @@ public:
 #endif
 
 		char *_page = new char[PAGE_HTML_MAX_SIZE];
-		this->build_ota_server_config_html(_page, _is_posted);
+		memset(_page, 0, PAGE_HTML_MAX_SIZE);
 
-		this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+		BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+		this->build_ota_server_config_html(_page, _is_posted);
+		END_SENDING_CHUNK();
+
+		// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 		delete[] _page;
 	}
 };

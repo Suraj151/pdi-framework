@@ -71,10 +71,11 @@ public:
   void build_wifi_config_html(char *_page, bool _is_error = false, bool _enable_flash = false, int _max_size = PAGE_HTML_MAX_SIZE)
   {
 
-    memset(_page, 0, _max_size);
+    // memset(_page, 0, _max_size);
     char _ip_address[20];
     strcat_ro(_page, WEB_SERVER_HEADER_HTML);
     strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_TOP);
+    CONTINUE_SEND_IN_CHUNK(_page);
 
 #ifdef ALLOW_WIFI_CONFIG_MODIFICATION
 
@@ -87,6 +88,7 @@ public:
     concat_tr_input_html_tags(_page, RODT_ATTR("WiFi Gateway:"), RODT_ATTR("sta_gip"), _ip_address);
     __int_ip_to_str(_ip_address, this->wifi_configs.sta_subnet, 20);
     concat_tr_input_html_tags(_page, RODT_ATTR("WiFi Subnet:"), RODT_ATTR("sta_sip"), _ip_address);
+    CONTINUE_SEND_IN_CHUNK(_page);
 
     concat_tr_input_html_tags(_page, RODT_ATTR("Access Name:"), RODT_ATTR("ap_ssid"), this->wifi_configs.ap_ssid, WIFI_CONFIGS_BUF_SIZE - 1);
     concat_tr_input_html_tags(_page, RODT_ATTR("Access Password:"), RODT_ATTR("ap_pswd"), this->wifi_configs.ap_password, WIFI_CONFIGS_BUF_SIZE - 1);
@@ -99,7 +101,7 @@ public:
     concat_tr_input_html_tags(_page, RODT_ATTR("Access Subnet:"), RODT_ATTR("ap_sip"), _ip_address);
 
     strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
-
+    CONTINUE_SEND_IN_CHUNK(_page);
 #else
 
 #ifdef ALLOW_WIFI_SSID_PASSKEY_CONFIG_MODIFICATION_ONLY
@@ -120,6 +122,7 @@ public:
     concat_tr_input_html_tags(_page, RODT_ATTR("WiFi Gateway:"), RODT_ATTR("sta_gip"), _ip_address, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true);
     __int_ip_to_str(_ip_address, this->wifi_configs.sta_subnet, 20);
     concat_tr_input_html_tags(_page, RODT_ATTR("WiFi Subnet:"), RODT_ATTR("sta_sip"), _ip_address, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true);
+    CONTINUE_SEND_IN_CHUNK(_page);
 
     concat_tr_input_html_tags(_page, RODT_ATTR("Access Name:"), RODT_ATTR("ap_ssid"), this->wifi_configs.ap_ssid, WIFI_CONFIGS_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
     concat_tr_input_html_tags(_page, RODT_ATTR("Access Password:"), RODT_ATTR("ap_pswd"), this->wifi_configs.ap_password, WIFI_CONFIGS_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
@@ -134,6 +137,7 @@ public:
 #ifdef ALLOW_WIFI_SSID_PASSKEY_CONFIG_MODIFICATION_ONLY
 
     strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
+    CONTINUE_SEND_IN_CHUNK(_page);
 
 #endif
 
@@ -142,6 +146,7 @@ public:
     if (_enable_flash)
       concat_flash_message_div(_page, _is_error ? RODT_ATTR("Invalid length error(3-20)") : RODT_ATTR("Config saved Successfully..applying new configs."), _is_error ? ALERT_DANGER : ALERT_SUCCESS);
     strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
+    CONTINUE_SEND_IN_CHUNK(_page);
   }
 
   /**
@@ -181,6 +186,7 @@ public:
       pdiutil::string _ap_lip = this->m_web_resource->m_server->arg("ap_lip");
       pdiutil::string _ap_gip = this->m_web_resource->m_server->arg("ap_gip");
       pdiutil::string _ap_sip = this->m_web_resource->m_server->arg("ap_sip");
+      __i_dvc_ctrl.yield();
 
       LogI("\nSubmitted info :\n");
       LogFmtI("sta ssid : %s\n", _sta_ssid.c_str());
@@ -193,6 +199,7 @@ public:
       LogFmtI("ap local ip : %s\n", _ap_lip.c_str());
       LogFmtI("ap gateway : %s\n", _ap_gip.c_str());
       LogFmtI("ap subnet : %s\n\n", _ap_sip.c_str());
+      __i_dvc_ctrl.yield();
 
       if (_sta_ssid.size() <= WIFI_CONFIGS_BUF_SIZE && _sta_pswd.size() <= WIFI_CONFIGS_BUF_SIZE
 
@@ -236,6 +243,7 @@ public:
 
 #endif
 
+        __i_dvc_ctrl.yield();
         this->m_web_resource->m_db_conn->set_wifi_config_table(&this->wifi_configs);
         // this->set_wifi_config_table( &this->wifi_configs );
         _is_error = false;
@@ -245,13 +253,17 @@ public:
 #endif
 
     char *_page = new char[PAGE_HTML_MAX_SIZE];
-    this->build_wifi_config_html(_page, _is_error, _is_posted);
+    memset(_page, 0, PAGE_HTML_MAX_SIZE);
 
-    if (_is_posted && !_is_error)
-    {
+    if (_is_posted && !_is_error){
       this->m_route_handler->send_inactive_session_headers();
     }
-    this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+
+    BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+    this->build_wifi_config_html(_page, _is_error, _is_posted);
+    END_SENDING_CHUNK();
+
+    // this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
     delete[] _page;
     if (_is_posted && !_is_error)
     {

@@ -13,6 +13,9 @@ created Date    : 1st June 2019
 
 #include "esp8266.h"
 #include <interface/pdi/modules/wifi/iWiFiInterface.h>
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+#include "threading/PreemptiveMutex.h"
+#endif
 
 // declare device specific
 class IPAddress;
@@ -103,6 +106,10 @@ private:
    * @var	int16_t for network indication
    */
   int16_t   m_wifi_led;
+
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  PreemptiveMutex m_mutex;
+  #endif
 };
 
 #endif

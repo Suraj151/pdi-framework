@@ -185,13 +185,14 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
     // Ensure last write has been ackowledged
     if (m_isLastWriteAcked){
 
+        m_isLastWriteAcked = false;
         err = tcp_output(m_pcb); // Ensure the data is sent
         if (err != ERR_OK) {
             return err < 0 ? err : -99; // Return error code if write fails
         }
     }
 
-    m_isLastWriteAcked = !(size > 0);
+    // m_isLastWriteAcked = !(size > 0);
 
     __i_dvc_ctrl.yield();
 
@@ -421,8 +422,41 @@ void TcpClientInterface::setTimeout(uint32_t timeout) {
 /**
  * @brief Check whether available for write
  */
-bool TcpClientInterface::availableforwrite() {
-    return m_isConnected && m_isLastWriteAcked;
+bool TcpClientInterface::availableforwrite(uint32_t size) {
+
+    // err_t err = tcp_write_checks(m_pcb, size);
+    err_t err = ERR_OK;
+
+    if ( m_pcb &&
+        (m_pcb->state != ESTABLISHED) &&
+        (m_pcb->state != CLOSE_WAIT) &&
+        (m_pcb->state != SYN_SENT) &&
+        (m_pcb->state != SYN_RCVD)) {
+
+        // m_isConnected = false;
+        err = ERR_CONN;
+    }
+
+    if(m_pcb && err == ERR_OK) {
+
+        err_t tcpout_err = tcp_output(m_pcb);  // Ensure the data is sent
+        uint32_t availablebuff = tcp_sndbuf(m_pcb);
+        uint32_t queuelen = tcp_sndqueuelen(m_pcb);
+
+        if((availablebuff < size) || (queuelen >= TCP_SND_QUEUELEN) || (queuelen > TCP_SNDQUEUELEN_OVERFLOW)){
+
+            err = ERR_MEM;
+        }
+
+        // if(!m_isLastWriteAcked && err == ERR_OK && tcpout_err == ERR_OK){
+            
+        //     m_isLastWriteAcked = true;
+        // }
+    }
+
+    __i_dvc_ctrl.yield();
+
+    return m_isConnected && m_isLastWriteAcked && err == ERR_OK;
 }
 
 /**
@@ -430,10 +464,19 @@ bool TcpClientInterface::availableforwrite() {
  */
 void TcpClientInterface::flush() {
     if (m_rxBuffer) {
+
         if(nullptr != m_pcb && m_rxBufferSize > 0)
             tcp_recved(m_pcb, m_rxBufferSize); // Notify the TCP stack that data has been read
+        
         delete[] m_rxBuffer;
         m_rxBuffer = nullptr;
         m_rxBufferSize = 0;
     }
+
+    if(nullptr != m_pcb){
+
+        tcp_output(m_pcb);
+    }
+
+    m_isLastWriteAcked = true;
 }

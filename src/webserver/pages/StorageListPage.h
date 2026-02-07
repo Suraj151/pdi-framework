@@ -23,7 +23,7 @@ static const char WEB_SERVER_STORAGE_LIST_PAGE_TOP[] PROG_RODT_ATTR = "\
 <h2>Storage</h2>\
 ";
 
-static const char WEB_SERVER_STORAGE_LIST_PAGE_BOTTOM[] PROG_RODT_ATTR = "\
+static const char WEB_SERVER_STORAGE_LIST_PAGE_BOTTOM_SCRIPT1[] PROG_RODT_ATTR = "\
 <script>\
 var rq=new XMLHttpRequest();\
 function rql(){\
@@ -48,8 +48,11 @@ rq.addEventListener('load',rql);\
 setTimeout(function(){\
 rq.open('GET','/storage-filelist'+location.search);\
 rq.send();\
-},400);\
+},2000);\
 </script>\
+";
+
+static const char WEB_SERVER_STORAGE_LIST_PAGE_BOTTOM_FORMS[] PROG_RODT_ATTR = "\
 <style>\
 form{\
 text-align:left;\
@@ -73,6 +76,9 @@ Upload File\
 Create Folder\
 </button>\
 </form>\
+";
+
+static const char WEB_SERVER_STORAGE_LIST_PAGE_BOTTOM_SCRIPT2[] PROG_RODT_ATTR = "\
 <script>\
 document.getElementById('frm1').addEventListener('submit',function(e1){\
 e1.preventDefault();\

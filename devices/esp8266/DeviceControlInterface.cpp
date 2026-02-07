@@ -388,22 +388,36 @@ void DeviceControlInterface::log(logger_type_t log_type, const char *content)
 
 /**
  * yield
+ * Currently allowing device yield with toggling preemptive scheduler. This avoids disturbing
+ * device yield by preemptive scheduler ticks
  */
 void DeviceControlInterface::yield()
 {
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.lock();
+    __i_preemptive_scheduler.disable_sched();
     #endif
 
     // run_scheduled_functions();
     // run_scheduled_recurrent_functions();
     // esp_schedule();
     esp_yield();
+
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    __i_preemptive_scheduler.enable_sched();
+    __i_preemptive_scheduler.disable_sched();
+    #endif
+
     optimistic_yield(1000);
+
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    __i_preemptive_scheduler.enable_sched();
+    __i_preemptive_scheduler.disable_sched();
+    #endif
+
     delay(0);
 
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.unlock();
+    __i_preemptive_scheduler.enable_sched();
     #endif
 }
 

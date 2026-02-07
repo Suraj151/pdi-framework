@@ -47,7 +47,8 @@ public:
   virtual void setStoragePath(const pdiutil::string &storagepath) override;                  // set storage path for static files
   virtual bool handleStaticFileRequest() override;
 
-  virtual void send(int code, mimetype_t content_type = MIME_TYPE_MAX, const char *content = nullptr) override;
+  virtual void send(int code, mimetype_t content_type = MIME_TYPE_MAX, const char *content = nullptr, bool send_in_chunks = false) override;
+  virtual void sendChunk(const char *chunk = nullptr) override;
 protected:
 
   iTcpServerInterface* m_server;
@@ -97,8 +98,8 @@ protected:
   } m_clientRequest;
 
   void parseRequest();
-  void prepareResponseHeader(pdiutil::string& _header, int code, const char *content_type, uint32_t content_length);
-  void sendResponse(int code, mimetype_t content_type, const char *content);
+  void prepareResponseHeader(pdiutil::string& _header, int code, const char *content_type, uint32_t content_length, bool chunk_encoding = false);
+  void sendResponse(int code, mimetype_t content_type, const char *content, bool chunk_encoding = false);
   void closeClient();
 };
 

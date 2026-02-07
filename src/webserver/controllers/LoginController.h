@@ -79,13 +79,15 @@ class LoginController : public Controller {
       int _max_size=PAGE_HTML_MAX_SIZE
     ){
 
-      memset( _page, 0, _max_size );
+      // memset( _page, 0, _max_size );
 
       if( _enable_header_footer ) strcat_ro( _page, WEB_SERVER_HEADER_HTML );
+      CONTINUE_SEND_IN_CHUNK(_page);
       strcat_ro( _page, _pgm_page );
       if( _enable_flash )
       concat_flash_message_div( _page, _message, _alert_type );
       if( _enable_header_footer ) strcat_ro( _page, WEB_SERVER_FOOTER_HTML );
+      CONTINUE_SEND_IN_CHUNK(_page);
     }
 
 		/**
@@ -98,9 +100,10 @@ class LoginController : public Controller {
 		 */
 		void build_login_config_html( char* _page, bool _is_error=false, bool _enable_flash=false, int _max_size=PAGE_HTML_MAX_SIZE ){
 
-      memset( _page, 0, _max_size );
+      // memset( _page, 0, _max_size );
       strcat_ro( _page, WEB_SERVER_HEADER_HTML );
       strcat_ro( _page, WEB_SERVER_LOGIN_CONFIG_PAGE_TOP );
+      CONTINUE_SEND_IN_CHUNK(_page);
 
       concat_tr_input_html_tags( _page, RODT_ATTR("Username:"), RODT_ATTR("usrnm"), this->login_credentials.username, LOGIN_CONFIGS_BUF_SIZE-1 );
       concat_tr_input_html_tags( _page, RODT_ATTR("Password:"), RODT_ATTR("pswd"), this->login_credentials.password, LOGIN_CONFIGS_BUF_SIZE-1, (char*)"password" );
@@ -109,6 +112,7 @@ class LoginController : public Controller {
       if( _enable_flash )
       concat_flash_message_div( _page, _is_error ? RODT_ATTR("Invalid length error(3-20)"): HTML_SUCCESS_FLASH, _is_error ? ALERT_DANGER:ALERT_SUCCESS );
       strcat_ro( _page, WEB_SERVER_FOOTER_HTML );
+      CONTINUE_SEND_IN_CHUNK(_page);
     }
 
 		/**
@@ -157,12 +161,17 @@ class LoginController : public Controller {
       }
 
       char* _page = new char[PAGE_HTML_MAX_SIZE];
-      this->build_login_config_html( _page, _is_error, _is_posted );
+      memset(_page, 0, PAGE_HTML_MAX_SIZE);
 
       if( _is_posted && !_is_error ){
         this->m_route_handler->send_inactive_session_headers();
       }
-      this->m_web_resource->m_server->send( HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page );
+
+      BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+      this->build_login_config_html( _page, _is_error, _is_posted );
+      END_SENDING_CHUNK();
+
+      // this->m_web_resource->m_server->send( HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page );
       delete[] _page;
     }
 
@@ -182,9 +191,13 @@ class LoginController : public Controller {
       this->m_route_handler->send_inactive_session_headers();
 
       char* _page = new char[PAGE_HTML_MAX_SIZE];
-      this->build_html( _page, WEB_SERVER_LOGOUT_PAGE );
+      memset(_page, 0, PAGE_HTML_MAX_SIZE);
 
-      this->m_web_resource->m_server->send( HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page );
+      BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+      this->build_html( _page, WEB_SERVER_LOGOUT_PAGE );
+      END_SENDING_CHUNK();
+
+      // this->m_web_resource->m_server->send( HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page );
       delete[] _page;
     }
 
@@ -222,9 +235,13 @@ class LoginController : public Controller {
       }
 
       char* _page = new char[PAGE_HTML_MAX_SIZE];
-      this->build_html( _page, WEB_SERVER_LOGIN_PAGE, _is_posted, (char*)"Wrong Credentials.", ALERT_DANGER );
+      memset(_page, 0, PAGE_HTML_MAX_SIZE);
 
-      this->m_web_resource->m_server->send( HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page );
+      BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+      this->build_html( _page, WEB_SERVER_LOGIN_PAGE, _is_posted, (char*)"Wrong Credentials.", ALERT_DANGER );
+      END_SENDING_CHUNK();
+
+      // this->m_web_resource->m_server->send( HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page );
       delete[] _page;
     }
 

@@ -74,6 +74,10 @@ public:
     virtual void sleep(uint32_t ms) = 0;
     virtual void run() = 0;
 
+    // API to pause and run scheduler at runtime if supported
+    virtual void enable_sched() {}
+    virtual void disable_sched() {}
+
     // useful api for passing control within across schedulers
     virtual void yield_from_othersched() {}
     virtual void sleep_from_othersched(uint32_t ms) {}

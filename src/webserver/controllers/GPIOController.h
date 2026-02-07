@@ -156,17 +156,21 @@ public:
 
 		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
 		strcat_ro(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_TOP);
+		BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 
 		concat_svg_menu_card(_page, WEB_SERVER_GPIO_MENU_TITLE_MODES, SVG_ICON48_PATH_TUNE, WEB_SERVER_GPIO_MODE_CONFIG_ROUTE);
 		concat_svg_menu_card(_page, WEB_SERVER_GPIO_MENU_TITLE_CONTROL, SVG_ICON48_PATH_GAME_ASSET, WEB_SERVER_GPIO_WRITE_CONFIG_ROUTE);
 		concat_svg_menu_card(_page, WEB_SERVER_GPIO_MENU_TITLE_SERVER, SVG_ICON48_PATH_COMPUTER, WEB_SERVER_GPIO_SERVER_CONFIG_ROUTE);
+		CONTINUE_SEND_IN_CHUNK(_page);
 		concat_svg_menu_card(_page, WEB_SERVER_GPIO_MENU_TITLE_MONITOR, SVG_ICON48_PATH_EYE, WEB_SERVER_GPIO_MONITOR_ROUTE);
 		concat_svg_menu_card(_page, WEB_SERVER_GPIO_MENU_TITLE_EVENT, SVG_ICON48_PATH_NOTIFICATION, WEB_SERVER_GPIO_EVENT_CONFIG_ROUTE);
 
 		strcat_ro(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_BOTTOM);
 		strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
+		CONTINUE_SEND_IN_CHUNK(_page);
 
-		this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+		END_SENDING_CHUNK();
+		// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 		delete[] _page;
 	}
 
@@ -178,9 +182,10 @@ public:
 	 */
 	void build_gpio_monitor_html(char *_page, int _max_size = PAGE_HTML_MAX_SIZE)
 	{
-		memset(_page, 0, _max_size);
+		// memset(_page, 0, _max_size);
 		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
 		strcat_ro(_page, WEB_SERVER_GPIO_MONITOR_PAGE_TOP);
+		CONTINUE_SEND_IN_CHUNK(_page);
 
 		char *_gpio_monitor_table_heading[] = {"Pin", "Mode", "value"};
 		strcat_ro(_page, HTML_TABLE_OPEN_TAG);
@@ -199,6 +204,7 @@ public:
 				__appendUintToBuff(_name, "D%d", _pin, 4);
 
 				concat_table_data_row(_page, _gpio_monitor_table_data, 3, nullptr, nullptr, RODT_ATTR("btnd"), nullptr);
+				CONTINUE_SEND_IN_CHUNK(_page);
 			}
 		}
 
@@ -210,6 +216,7 @@ public:
 				__appendUintToBuff(_name, "A%d", _pin, 4);
 
 				concat_table_data_row(_page, _gpio_monitor_table_data, 3, nullptr, nullptr, RODT_ATTR("btnd"), nullptr);
+				CONTINUE_SEND_IN_CHUNK(_page);
 			}
 		}
 		strcat_ro(_page, HTML_TABLE_CLOSE_TAG);
@@ -221,7 +228,9 @@ public:
 		strcat_ro(_page, WEB_SERVER_GPIO_MONITOR_SVG_ELEMENT);
 		strcat_ro(_page, HTML_DIV_CLOSE_TAG);
 		concat_graph_axis_title_div(_page, (char *)"Time");
+		CONTINUE_SEND_IN_CHUNK(_page);
 		strcat_ro(_page, WEB_SERVER_FOOTER_WITH_ANALOG_MONITOR_HTML);
+		CONTINUE_SEND_IN_CHUNK(_page);
 	}
 
 	/**
@@ -238,11 +247,15 @@ public:
 		}
 
 		char *_page = new char[PAGE_HTML_MAX_SIZE];
+		memset(_page, 0, PAGE_HTML_MAX_SIZE);
+
+		BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 		this->build_gpio_monitor_html(_page);
+		END_SENDING_CHUNK();
 
 		this->_last_monitor_point.x = 0;
 		this->_last_monitor_point.y = GPIO_MAX_GRAPH_HEIGHT - GPIO_GRAPH_BOTTOM_MARGIN;
-		this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+		// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 		delete[] _page;
 	}
 
@@ -255,9 +268,10 @@ public:
 	 */
 	void build_gpio_server_config_html(char *_page, bool _enable_flash = false, int _max_size = PAGE_HTML_MAX_SIZE)
 	{
-		memset(_page, 0, _max_size);
+		// memset(_page, 0, _max_size);
 		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
 		strcat_ro(_page, WEB_SERVER_GPIO_SERVER_PAGE_TOP);
+		CONTINUE_SEND_IN_CHUNK(_page);
 
 		char _port[10], _freq[10];
 		memset(_port, 0, 10);
@@ -268,11 +282,13 @@ public:
 		concat_tr_input_html_tags(_page, RODT_ATTR("Host Address:"), RODT_ATTR("hst"), __gpio_service.m_gpio_config_copy.gpio_host, GPIO_HOST_BUF_SIZE - 1);
 		concat_tr_input_html_tags(_page, RODT_ATTR("Host Port:"), RODT_ATTR("prt"), _port);
 		concat_tr_input_html_tags(_page, RODT_ATTR("Post Frequency:"), RODT_ATTR("frq"), _freq);
+		CONTINUE_SEND_IN_CHUNK(_page);
 
 		strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 		if (_enable_flash)
 			concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
 		strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
+		CONTINUE_SEND_IN_CHUNK(_page);
 	}
 
 	/**
@@ -302,6 +318,7 @@ public:
 			LogFmtI("gpio host : %s\n", _gpio_host.c_str());
 			LogFmtI("gpio port : %s\n", _gpio_port.c_str());
 			LogFmtI("post freq : %s\n\n", _post_freq.c_str());
+			__i_dvc_ctrl.yield();
 
 			strncpy(__gpio_service.m_gpio_config_copy.gpio_host, _gpio_host.c_str(), _gpio_host.size());
 			__gpio_service.m_gpio_config_copy.gpio_port = StringToUint16(_gpio_port.c_str());
@@ -312,9 +329,13 @@ public:
 		}
 
 		char *_page = new char[PAGE_HTML_MAX_SIZE];
-		this->build_gpio_server_config_html(_page, _is_posted);
+		memset(_page, 0, PAGE_HTML_MAX_SIZE);
 
-		this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+		BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+		this->build_gpio_server_config_html(_page, _is_posted);
+		END_SENDING_CHUNK();
+
+		// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 		delete[] _page;
 		if (_is_posted)
 		{
@@ -331,9 +352,11 @@ public:
 	 */
 	void build_gpio_mode_config_html(char *_page, bool _enable_flash = false, int _max_size = PAGE_HTML_MAX_SIZE)
 	{
-		memset(_page, 0, _max_size);
+		// memset(_page, 0, _max_size);
 		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
 		strcat_ro(_page, WEB_SERVER_GPIO_CONFIG_PAGE_TOP);
+		CONTINUE_SEND_IN_CHUNK(_page);
+
 		const char *_gpio_mode_general_options[] = {"OFF", "DOUT", "DIN", "BLINK", "AOUT"};
 		const char *_gpio_mode_analog_options[] = {"OFF", "", "", "", "", "AIN"};
 		int _gpio_mode_general_options_size = sizeof(_gpio_mode_general_options) / sizeof(_gpio_mode_general_options[0]);
@@ -352,6 +375,7 @@ public:
 			if (!__i_dvc_ctrl.isExceptionalGpio(_pin))
 			{
 				concat_tr_select_html_tags(_page, _name, _label, _gpio_mode_general_options, _gpio_mode_general_options_size, (int)__gpio_service.m_gpio_config_copy.gpio_mode[_pin], _exception);
+				CONTINUE_SEND_IN_CHUNK(_page);
 			}
 		}
 
@@ -364,6 +388,7 @@ public:
 			if (!__i_dvc_ctrl.isExceptionalGpio(_pin))
 			{
 				concat_tr_select_html_tags(_page, _name, _label, _gpio_mode_analog_options, _gpio_mode_analog_options_size, (int)__gpio_service.m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS + _pin]);
+				CONTINUE_SEND_IN_CHUNK(_page);
 			}
 		}
 
@@ -371,6 +396,7 @@ public:
 		if (_enable_flash)
 			concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
 		strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
+		CONTINUE_SEND_IN_CHUNK(_page);
 	}
 
 	/**
@@ -428,15 +454,21 @@ public:
 				}
 			}
 
+			__i_dvc_ctrl.yield();
+
 			this->m_web_resource->m_db_conn->set_gpio_config_table(&__gpio_service.m_gpio_config_copy);
 
 			_is_posted = true;
 		}
 
 		char *_page = new char[PAGE_HTML_MAX_SIZE];
-		this->build_gpio_mode_config_html(_page, _is_posted);
+		memset(_page, 0, PAGE_HTML_MAX_SIZE);
 
-		this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+		BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+		this->build_gpio_mode_config_html(_page, _is_posted);
+		END_SENDING_CHUNK();
+
+		// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 		delete[] _page;
 		if (_is_posted)
 		{
@@ -454,9 +486,11 @@ public:
 	void build_gpio_write_config_html(char *_page, bool _enable_flash = false, int _max_size = PAGE_HTML_MAX_SIZE)
 	{
 
-		memset(_page, 0, _max_size);
+		// memset(_page, 0, _max_size);
 		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
 		strcat_ro(_page, WEB_SERVER_GPIO_WRITE_PAGE_TOP);
+		CONTINUE_SEND_IN_CHUNK(_page);
+
 		const char *_gpio_digital_write_options[] = {"LOW", "HIGH"};
 		int _gpio_digital_write_options_size = sizeof(_gpio_digital_write_options) / sizeof(_gpio_digital_write_options[0]);
 
@@ -493,6 +527,7 @@ public:
 						concat_tr_input_html_tags(_page, _name, _label, _input_value, 0, HTML_INPUT_RANGE_TAG_TYPE, false, false);
 					}
 				}
+				CONTINUE_SEND_IN_CHUNK(_page);
 			}
 		}
 
@@ -507,6 +542,7 @@ public:
 		if (_enable_flash)
 			concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
 		strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
+		CONTINUE_SEND_IN_CHUNK(_page);
 	}
 
 	/**
@@ -545,6 +581,8 @@ public:
 				}
 			}
 
+			__i_dvc_ctrl.yield();
+
 			if (_is_posted)
 			{
 				this->m_web_resource->m_db_conn->set_gpio_config_table(&__gpio_service.m_gpio_config_copy);
@@ -552,9 +590,13 @@ public:
 		}
 
 		char *_page = new char[PAGE_HTML_MAX_SIZE];
-		this->build_gpio_write_config_html(_page, _is_posted);
+		memset(_page, 0, PAGE_HTML_MAX_SIZE);
 
-		this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+		BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+		this->build_gpio_write_config_html(_page, _is_posted);
+		END_SENDING_CHUNK();
+
+		// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 		delete[] _page;
 		if (_is_posted)
 		{
@@ -597,9 +639,11 @@ public:
 	 */
 	void build_gpio_event_config_html(char *_page, bool _enable_flash = false, int _max_size = PAGE_HTML_MAX_SIZE)
 	{
-		memset(_page, 0, _max_size);
+		// memset(_page, 0, _max_size);
 		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
 		strcat_ro(_page, WEB_SERVER_GPIO_EVENT_PAGE_TOP);
+		CONTINUE_SEND_IN_CHUNK(_page);
+
 		const char *_gpio_digital_event_options[] = {"LOW", "HIGH"};
 #ifdef ENABLE_EMAIL_SERVICE
 		const char *_gpio_event_channels[] = {"NOEVENT", "MAIL", "HTTPSERVER", "DEL"};
@@ -673,7 +717,7 @@ public:
 						strcat_ro(_page, HTML_TR_CLOSE_TAG);
 					}					
 				}
-				
+				CONTINUE_SEND_IN_CHUNK(_page);
 			}
 		}
 
@@ -704,6 +748,7 @@ public:
 		if (_enable_flash)
 			concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
 		strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
+		CONTINUE_SEND_IN_CHUNK(_page);
 	}
 
 	/**
@@ -817,6 +862,7 @@ public:
 						}
 					}
 				}
+				__i_dvc_ctrl.yield();
 			}
 
 			if (_is_posted)
@@ -826,9 +872,13 @@ public:
 		}
 
 		char *_page = new char[PAGE_HTML_MAX_SIZE];
-		this->build_gpio_event_config_html(_page, _is_posted);
+		memset(_page, 0, PAGE_HTML_MAX_SIZE);
 
-		this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+		BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+		this->build_gpio_event_config_html(_page, _is_posted);
+		END_SENDING_CHUNK();
+
+		// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 		delete[] _page;
 		if (_is_posted)
 		{

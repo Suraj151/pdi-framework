@@ -86,6 +86,7 @@ void HttpServerInterfaceImpl::handleClient(){
     // Check if there is a new client connection
     if (!m_client && m_server->hasClient()) {
         m_client = m_server->accept();
+        m_currentclient_lastactivity_timestamp = __i_instance.getUtilityInstance().millis_now();
     }
 
     if (m_client && m_client->connected()) {
@@ -277,11 +278,33 @@ void HttpServerInterfaceImpl::setStoragePath(const pdiutil::string &storagepath)
 /**
  * send
  */
-void HttpServerInterfaceImpl::send(int code, mimetype_t content_type, const char *content){
+void HttpServerInterfaceImpl::send(int code, mimetype_t content_type, const char *content, bool send_in_chunks){
     if( MIME_TYPE_MAX != content_type ){
-        sendResponse(code, content_type, content);
+        sendResponse(code, content_type, content, send_in_chunks);
     }else{
-        sendResponse(code, MIME_TYPE_TEXT_HTML, "");
+        sendResponse(code, MIME_TYPE_TEXT_HTML, "", send_in_chunks);
+    }
+}
+
+/**
+ * send content in chunk
+ */
+void HttpServerInterfaceImpl::sendChunk(const char *chunk){
+
+    int32_t chunklen = strlen(chunk);
+    
+    if( chunk && chunklen >= 0 ){
+    
+        // Send the chunk in response
+        char temp[20]; memset(temp, 0, 20);
+        snprintf(temp, 20, "%X\r\n", chunklen);
+
+        sendPacket(m_client, (uint8_t *)temp, strlen(temp));
+        __i_instance.getUtilityInstance().yield();
+        sendPacket(m_client, (uint8_t *)chunk, chunklen, 400, 5000);
+        __i_instance.getUtilityInstance().yield();
+        sendPacket(m_client, (uint8_t *)"\r\n", 2);
+        __i_instance.getUtilityInstance().yield();
     }
 }
 
@@ -619,7 +642,7 @@ void HttpServerInterfaceImpl::parseRequest(){
 /**
  * @brief Prepare the header for response
  */
-void HttpServerInterfaceImpl::prepareResponseHeader(pdiutil::string& _header, int code, const char *content_type, uint32_t content_length){
+void HttpServerInterfaceImpl::prepareResponseHeader(pdiutil::string& _header, int code, const char *content_type, uint32_t content_length, bool chunk_encoding){
 
     _header.clear();
 
@@ -631,7 +654,11 @@ void HttpServerInterfaceImpl::prepareResponseHeader(pdiutil::string& _header, in
     _header += "\r\n";
 
     addHeader(HTTP_HEADER_KEY_CONTENT_TYPE, content_type);
-    addHeader(HTTP_HEADER_KEY_CONTENT_LENGTH, pdiutil::to_string(content_length));
+
+    if(chunk_encoding)
+        addHeader(HTTP_HEADER_KEY_TRANSFER_ENCODING, CHARPTR_WRAP("chunked"));
+    else
+        addHeader(HTTP_HEADER_KEY_CONTENT_LENGTH, pdiutil::to_string(content_length));
 
     pdiutil::string keepalive = header(HTTP_HEADER_KEY_CONNECTION);
     if (keepalive.empty() || keepalive == "close") {
@@ -655,20 +682,26 @@ void HttpServerInterfaceImpl::prepareResponseHeader(pdiutil::string& _header, in
 /**
  * @brief Send response to client
  */
-void HttpServerInterfaceImpl::sendResponse(int code, mimetype_t content_type, const char *content){
+void HttpServerInterfaceImpl::sendResponse(int code, mimetype_t content_type, const char *content, bool chunk_encoding){
 
     if (!m_client || !content) {
         return; // Client not initialized
     }
 
     pdiutil::string response;
-    prepareResponseHeader(response, code, getMimeTypeString(content_type), strlen(content));
+    prepareResponseHeader(response, code, getMimeTypeString(content_type), strlen(content), chunk_encoding);
 
     // Send the response headers
     sendPacket(m_client, (uint8_t *)response.c_str(), response.length());
 
     // Send the response body
-    sendPacket(m_client, (uint8_t *)content, strlen(content), 400, 3000);
+    if(chunk_encoding){
+
+        if(strlen(content))
+            sendChunk(content);
+    }else{
+        sendPacket(m_client, (uint8_t *)content, strlen(content), 400, 3000);
+    }
 
     // Make sure data has been sent
     // m_client->write((const uint8_t*)"", 0);

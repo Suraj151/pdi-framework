@@ -68,13 +68,17 @@ public:
 		memset(_page, 0, _max_size);
 		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
 		strcat_ro(_page, WEB_SERVER_DEVICE_REGISTER_CONFIG_PAGE_TOP);
+		CONTINUE_SEND_IN_CHUNK(_page);
 
 		device_iot_config_table _device_iot_configs;
 		this->m_web_resource->m_db_conn->get_device_iot_config_table(&_device_iot_configs);
 
 		concat_tr_input_html_tags(_page, RODT_ATTR("Device Id:"), RODT_ATTR("duid"), _device_iot_configs.device_iot_duid, DEVICE_IOT_DUID_MAX_LENGTH - 1);
 		concat_tr_input_html_tags(_page, RODT_ATTR("Registry Host:"), RODT_ATTR("dhst"), _device_iot_configs.device_iot_host, DEVICE_IOT_HOST_BUF_SIZE - 1);
+		CONTINUE_SEND_IN_CHUNK(_page);
+
 		strcat_ro(_page, WEB_SERVER_FOOTER_WITH_OTP_MONITOR_HTML);
+		CONTINUE_SEND_IN_CHUNK(_page);
 	}
 
 	/**
@@ -116,9 +120,13 @@ public:
 		else
 		{
 			char *_page = new char[PAGE_HTML_MAX_SIZE];
+			memset(_page, 0, PAGE_HTML_MAX_SIZE);
+			
+			BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 			this->build_device_register_config_html(_page);
+			END_SENDING_CHUNK();
 
-			this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+			// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 			delete[] _page;
 		}
 	}

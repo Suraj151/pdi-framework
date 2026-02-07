@@ -30,7 +30,7 @@ Created Date    : 1st June 2019
  * @define PAGE_HTML_MAX_SIZE
  * @brief Defines the maximum size of an HTML page.
  */
-#define PAGE_HTML_MAX_SIZE 5000
+#define PAGE_HTML_MAX_SIZE 1800
 
 /**
  * @define MIN_ACCEPTED_ARG_SIZE
@@ -96,5 +96,36 @@ public:
  * This instance is used to manage resources throughout the PDI stack.
  */
 extern WebResourceProvider __web_resource;
+
+/**
+ * @define BEGIN_SEND_IN_CHUNK
+ * @brief Defines the start of page content send in chunk.
+ */
+#define BEGIN_SEND_IN_CHUNK(code, type, page) \
+    do { \
+        __web_resource.m_server->send(code,type,page,true); \
+        memset(page, 0, PAGE_HTML_MAX_SIZE); \
+    } while(0)
+
+/**
+ * @define CONTINUE_SEND_IN_CHUNK
+ * @brief Defines the continueation of page content send in chunk.
+ */
+#define CONTINUE_SEND_IN_CHUNK(page) \
+    do { \
+        if(strlen(page)) { \
+            __web_resource.m_server->sendChunk(page); \
+            memset(page, 0, PAGE_HTML_MAX_SIZE); \
+        } \
+    } while(0)
+
+/**
+ * @define END_SENDING_CHUNK
+ * @brief Defines the end of chunks.
+ */
+#define END_SENDING_CHUNK() \
+    do { \
+        __web_resource.m_server->sendChunk(""); \
+    } while(0)
 
 #endif

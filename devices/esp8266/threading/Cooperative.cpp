@@ -132,10 +132,13 @@ void CooperativeScheduler::schedule_task(task_t* task, uint32_t stacksize){
  */
 void CooperativeScheduler::mute(){
 
-    Cooperative* f = current;
-    if (!f) return;
-
     noInterrupts(); 
+
+    Cooperative* f = current;
+    if (!f) {
+        interrupts();
+        return;
+    }
 
     if (f->state == CooperativeState::Running) {
         f->state = CooperativeState::Mute;
@@ -153,10 +156,13 @@ void CooperativeScheduler::mute(){
  */
 void CooperativeScheduler::yield(){
 
-    Cooperative* f = current;
-    if (!f) return;
-
     noInterrupts(); 
+
+    Cooperative* f = current;
+    if (!f) {
+        interrupts();
+        return;
+    }
 
     if (f->state == CooperativeState::Running) {
         add_to_ready(f);
@@ -174,10 +180,13 @@ void CooperativeScheduler::yield(){
  */
 void CooperativeScheduler::sleep(uint32_t ms){
 
-    Cooperative* f = current;
-    if (!f) return;
-
     noInterrupts(); 
+
+    Cooperative* f = current;
+    if (!f) {
+        interrupts();
+        return;
+    }
 
     f->state = CooperativeState::Sleeping;
     sleepers.push_back({ __i_dvc_ctrl.millis_now() + ms, current }); 

@@ -102,7 +102,8 @@ void PreemptiveMutex::unlock(){
 void PreemptiveMutex::critical_lock(){
 
     lock();
-    noInterrupts();
+    // noInterrupts();
+    cli();
 }
 
 /**
@@ -111,4 +112,5 @@ void PreemptiveMutex::critical_lock(){
 void PreemptiveMutex::critical_unlock(){
 
     unlock();
+    sei();
 }

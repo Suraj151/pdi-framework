@@ -131,6 +131,9 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
  */
 int16_t TcpClientInterface::disconnect() {
     if (m_pcb) {
+        #ifdef ENABLE_CONTEXTUAL_EXECUTION
+        m_mutex.critical_lock();
+        #endif
         tcp_arg(m_pcb, NULL);
         tcp_sent(m_pcb, NULL);
         tcp_recv(m_pcb, NULL);
@@ -140,6 +143,9 @@ int16_t TcpClientInterface::disconnect() {
             tcp_abort(m_pcb); // Forcefully abort if close fails
         }
         m_pcb = nullptr;
+        #ifdef ENABLE_CONTEXTUAL_EXECUTION
+        m_mutex.critical_unlock();
+        #endif
     }
     m_isConnected = false;
     return 0;
@@ -208,6 +214,7 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
         m_mutex.critical_lock();
         #endif
+        m_isLastWriteAcked = false;
         err = tcp_output(m_pcb); // Ensure the data is sent
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
         m_mutex.critical_unlock();
@@ -217,7 +224,7 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
         }
     }
 
-    m_isLastWriteAcked = !(size > 0);
+    // m_isLastWriteAcked = !(size > 0);
 
     __i_dvc_ctrl.yield();
 
@@ -265,8 +272,15 @@ int32_t TcpClientInterface::read(uint8_t* buffer, uint32_t size) {
     memmove(m_rxBuffer, m_rxBuffer + bytesToRead, m_rxBufferSize - bytesToRead);
     m_rxBufferSize -= bytesToRead;
 
-    if(m_pcb != nullptr)
+    if(m_pcb != nullptr){
+        #ifdef ENABLE_CONTEXTUAL_EXECUTION
+        m_mutex.critical_lock();
+        #endif
         tcp_recved(m_pcb, bytesToRead); // Notify the TCP stack that data has been read
+        #ifdef ENABLE_CONTEXTUAL_EXECUTION
+        m_mutex.critical_unlock();
+        #endif
+    }
 
     return bytesToRead;
 }
@@ -319,11 +333,18 @@ err_t TcpClientInterface::onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf
             memcpy(newBuffer, client->m_rxBuffer, client->m_rxBufferSize);
             delete[] client->m_rxBuffer;
         }
+
+        #ifdef ENABLE_CONTEXTUAL_EXECUTION
+        client->m_mutex.critical_lock();
+        #endif
         pbuf_copy_partial(p, newBuffer + client->m_rxBufferSize, p->tot_len, 0);
         client->m_rxBuffer = newBuffer;
         client->m_rxBufferSize = newSize;
     
         pbuf_free(p); // Free the pbuf
+        #ifdef ENABLE_CONTEXTUAL_EXECUTION
+        client->m_mutex.critical_unlock();
+        #endif
     }
 
     return ERR_OK;
@@ -338,10 +359,16 @@ void TcpClientInterface::onError(void* arg, err_t err) {
 
         if (client->m_pcb) {
 
+            #ifdef ENABLE_CONTEXTUAL_EXECUTION
+            client->m_mutex.critical_lock();
+            #endif
             tcp_err(client->m_pcb, NULL);
             tcp_arg(client->m_pcb, NULL);
             tcp_sent(client->m_pcb, NULL);
             tcp_recv(client->m_pcb, NULL);
+            #ifdef ENABLE_CONTEXTUAL_EXECUTION
+            client->m_mutex.critical_unlock();
+            #endif
             
             client->m_pcb = nullptr;
             client->flush();
@@ -463,19 +490,77 @@ void TcpClientInterface::setTimeout(uint32_t timeout) {
 /**
  * @brief Check whether available for write
  */
-bool TcpClientInterface::availableforwrite() {
-    return m_isConnected && m_isLastWriteAcked;
+bool TcpClientInterface::availableforwrite(uint32_t size) {
+
+    // err_t err = tcp_write_checks(m_pcb, size);
+    err_t err = ERR_OK;
+
+    if ( m_pcb &&
+        (m_pcb->state != ESTABLISHED) &&
+        (m_pcb->state != CLOSE_WAIT) &&
+        (m_pcb->state != SYN_SENT) &&
+        (m_pcb->state != SYN_RCVD)) {
+
+        // m_isConnected = false;
+        err = ERR_CONN;
+    }
+
+    if(m_pcb && err == ERR_OK) {
+
+        #ifdef ENABLE_CONTEXTUAL_EXECUTION
+        m_mutex.critical_lock();
+        #endif
+        err_t tcpout_err = tcp_output(m_pcb);  // Ensure the data is sent
+        #ifdef ENABLE_CONTEXTUAL_EXECUTION
+        m_mutex.critical_unlock();
+        #endif
+
+        uint32_t availablebuff = tcp_sndbuf(m_pcb);
+        uint32_t queuelen = tcp_sndqueuelen(m_pcb);
+
+        if((availablebuff < size) || (queuelen >= TCP_SND_QUEUELEN) || (queuelen > TCP_SNDQUEUELEN_OVERFLOW)){
+
+            err = ERR_MEM;
+        }
+
+        // if(!m_isLastWriteAcked && err == ERR_OK && tcpout_err == ERR_OK){
+            
+        //     m_isLastWriteAcked = true;
+        // }
+    }
+
+    __i_dvc_ctrl.yield();
+
+    return m_isConnected && m_isLastWriteAcked && err == ERR_OK;
 }
 
 /**
  * @brief Flush the buffer.
  */
 void TcpClientInterface::flush() {
+
     if (m_rxBuffer) {
-        if(nullptr != m_pcb && m_rxBufferSize > 0)
+
+        if(nullptr != m_pcb && m_rxBufferSize > 0){
+
+            #ifdef ENABLE_CONTEXTUAL_EXECUTION
+            m_mutex.critical_lock();
+            #endif
             tcp_recved(m_pcb, m_rxBufferSize); // Notify the TCP stack that data has been read
+            #ifdef ENABLE_CONTEXTUAL_EXECUTION
+            m_mutex.critical_unlock();
+            #endif
+        }
+
         delete[] m_rxBuffer;
         m_rxBuffer = nullptr;
         m_rxBufferSize = 0;
     }
+
+    if(nullptr != m_pcb){
+
+        tcp_output(m_pcb);
+    }
+
+    m_isLastWriteAcked = true;
 }

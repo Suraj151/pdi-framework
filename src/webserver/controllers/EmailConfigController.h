@@ -77,9 +77,10 @@ public:
 	void build_email_config_html(char *_page, bool _is_error = false, bool _enable_flash = false, bool _is_test_mail = false, int _max_size = PAGE_HTML_MAX_SIZE)
 	{
 
-		memset(_page, 0, _max_size);
+		// memset(_page, 0, _max_size);
 		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
 		strcat_ro(_page, WEB_SERVER_EMAIL_CONFIG_PAGE_TOP);
+		CONTINUE_SEND_IN_CHUNK(_page);
 
 		char _port[10];
 		memset(_port, 0, 10);
@@ -93,6 +94,7 @@ public:
 		concat_tr_input_html_tags(_page, RODT_ATTR("Mail Port:"), RODT_ATTR("ml_prt"), _port);
 		concat_tr_input_html_tags(_page, RODT_ATTR("Mail Username:"), RODT_ATTR("ml_usr"), this->email_configs.mail_username, DEFAULT_MAIL_USERNAME_MAX_SIZE - 1);
 		concat_tr_input_html_tags(_page, RODT_ATTR("Mail Password:"), RODT_ATTR("ml_psw"), this->email_configs.mail_password, DEFAULT_MAIL_PASSWORD_MAX_SIZE - 1, (char *)"password");
+		CONTINUE_SEND_IN_CHUNK(_page);
 
 		concat_tr_input_html_tags(_page, RODT_ATTR("Mail From:"), RODT_ATTR("ml_frm"), this->email_configs.mail_from, DEFAULT_MAIL_FROM_MAX_SIZE - 1);
 		concat_tr_input_html_tags(_page, RODT_ATTR("Mail From Name:"), RODT_ATTR("ml_frnm"), this->email_configs.mail_from_name, DEFAULT_MAIL_FROM_NAME_MAX_SIZE - 1);
@@ -101,6 +103,7 @@ public:
 		concat_tr_input_html_tags(_page, RODT_ATTR("Mail Subject:"), RODT_ATTR("ml_sub"), this->email_configs.mail_subject, DEFAULT_MAIL_SUBJECT_MAX_SIZE - 1);
 		concat_tr_input_html_tags(_page, RODT_ATTR("Send Test Mail ?"), RODT_ATTR("tstml"), "test", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, false);
 		// concat_tr_input_html_tags( _page, RODT_ATTR("Mail Frequency:"), RODT_ATTR("ml_freq"), _freq );
+		CONTINUE_SEND_IN_CHUNK(_page);
 
 		strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 
@@ -109,6 +112,7 @@ public:
 																									 : HTML_SUCCESS_FLASH,
 									 _is_error ? ALERT_DANGER : ALERT_SUCCESS);
 		strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
+		CONTINUE_SEND_IN_CHUNK(_page);
 	}
 
 	/**
@@ -148,6 +152,7 @@ public:
 			pdiutil::string _mail_subject = this->m_web_resource->m_server->arg("ml_sub");
 			// pdiutil::string _mail_frequency = this->m_web_resource->m_server->arg("ml_freq");
 			pdiutil::string _test_mail = this->m_web_resource->m_server->arg("tstml");
+			__i_dvc_ctrl.yield();
 
 			LogI("\nSubmitted info :\n");
 			LogFmtI("mail domain : %s\n",_mail_domain.c_str());
@@ -160,6 +165,7 @@ public:
 			LogFmtI("mail to : %s\n",_mail_to.c_str());
 			LogFmtI("mail subject : %s\n",_mail_subject.c_str());
 			LogFmtI("test mail : %s\n\n",_test_mail.c_str());
+			__i_dvc_ctrl.yield();
 
 			if (_mail_domain.size() <= DEFAULT_SENDING_DOMAIN_MAX_SIZE && _mail_server.size() <= DEFAULT_MAIL_HOST_MAX_SIZE &&
 				_mail_username.size() <= DEFAULT_MAIL_USERNAME_MAX_SIZE && _mail_password.size() <= DEFAULT_MAIL_PASSWORD_MAX_SIZE &&
@@ -180,6 +186,7 @@ public:
 				strncpy(this->email_configs.mail_subject, _mail_subject.c_str(), _mail_subject.size());
 				// this->email_configs.mail_frequency = (uint16_t)_mail_frequency.toInt();
 				_is_test_mail = (bool)(_test_mail == "test");
+				__i_dvc_ctrl.yield();
 
 				this->m_web_resource->m_db_conn->set_email_config_table(&this->email_configs);
 				_is_error = false;
@@ -188,9 +195,13 @@ public:
 		}
 
 		char *_page = new char[PAGE_HTML_MAX_SIZE];
-		this->build_email_config_html(_page, _is_error, _is_posted, _is_test_mail);
+		memset(_page, 0, PAGE_HTML_MAX_SIZE);
 
-		this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+		BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+		this->build_email_config_html(_page, _is_error, _is_posted, _is_test_mail);
+		END_SENDING_CHUNK();
+
+		// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 		delete[] _page;
 
 		if (_is_posted && !_is_error && _is_test_mail)

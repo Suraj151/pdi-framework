@@ -34,7 +34,10 @@ public:
     void mute() override;
     void yield() override;
     void sleep(uint32_t ms) override;
-    void run() override;
+    void IRAM_ATTR run() override;
+
+    void enable_sched() override;
+    void disable_sched() override;
 
     static IRAM_ATTR void exit();
 

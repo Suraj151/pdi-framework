@@ -301,7 +301,7 @@ public:
    * @return Number of bytes available.
    */
   virtual int32_t available() = 0;
-  virtual bool availableforwrite() { return true; }
+  virtual bool availableforwrite(uint32_t size) { return true; }
 
   /**
    * @brief Reads until provided char not get.

@@ -87,9 +87,10 @@ public:
 			return;
 		}
 
-		memset(_page, 0, _max_size);
+		// memset(_page, 0, _max_size);
 		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
 		strcat_ro(_page, WEB_SERVER_STORAGE_LIST_PAGE_TOP);
+		CONTINUE_SEND_IN_CHUNK(_page);
 
 		// Prepare the path to fetch
 		pdiutil::string currentpath = __i_fs.getHomeDirectory();
@@ -111,6 +112,7 @@ public:
 			concat_id_attribute(_page, RODT_ATTR("strg-tbl"));
 			concat_style_attribute(_page, RODT_ATTR("width:92%;margin-bottom:10px;"));
 			strcat_ro(_page, HTML_TAG_CLOSE_BRACKET);
+			CONTINUE_SEND_IN_CHUNK(_page);
 
 			// char *_storage_table_heading[] = {"", "Name", "Size"};
 			// concat_table_heading_row(_page, _storage_table_heading, 3, nullptr, nullptr, nullptr, RODT_ATTR("text-align:left"));
@@ -122,6 +124,7 @@ public:
 			char *_storage_path_row[] = {(char*)currentpath.c_str(), (char*)stat.c_str()};
 			const char *_storage_path_row_colspan[] = {RODT_ATTR("3"), RODT_ATTR("1' style='width:80px;")};
 			concat_table_data_row(_page, _storage_path_row, 2, nullptr, nullptr, nullptr, nullptr, _storage_path_row_colspan);
+			CONTINUE_SEND_IN_CHUNK(_page);
 
 			// Add empty row
 			char *_storage_empty_row[] = {"&nbsp;"};
@@ -132,6 +135,7 @@ public:
 			pdiutil::string loaderdiv = CHARPTR_WRAP("<div id='ldr' class='ldr'></div>");
 			char *_storage_loader_row[] = {(char*)loaderdiv.c_str()};
 			concat_table_data_row(_page, _storage_loader_row, 1, nullptr, nullptr, nullptr, nullptr, _storage_empty_row_colspan);
+			CONTINUE_SEND_IN_CHUNK(_page);
 
 			// // Prepare temporary buffers
 			// uint32_t filenamenavlen = strlen(WEB_SERVER_STORAGE_LIST_ROUTE) + strlen(CURRENT_PATH_ATTRIBUTE) + currentpath.length() + 2*FILE_NAME_MAX_SIZE + 100;
@@ -192,11 +196,17 @@ public:
 			strcat_ro(_page, HTML_TABLE_CLOSE_TAG);
 		}
 
-		strcat_ro(_page, WEB_SERVER_STORAGE_LIST_PAGE_BOTTOM);
+		strcat_ro(_page, WEB_SERVER_STORAGE_LIST_PAGE_BOTTOM_SCRIPT1);
+		CONTINUE_SEND_IN_CHUNK(_page);
+		strcat_ro(_page, WEB_SERVER_STORAGE_LIST_PAGE_BOTTOM_FORMS);
+		CONTINUE_SEND_IN_CHUNK(_page);
+		strcat_ro(_page, WEB_SERVER_STORAGE_LIST_PAGE_BOTTOM_SCRIPT2);
+		CONTINUE_SEND_IN_CHUNK(_page);
 
 		if (_enable_flash)
 			concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
 		strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
+		CONTINUE_SEND_IN_CHUNK(_page);
 	}
 
 	/**
@@ -214,9 +224,13 @@ public:
 		}
 
 		char *_page = new char[PAGE_HTML_MAX_SIZE];
-		this->build_storage_html(_page);
+		memset(_page, 0, PAGE_HTML_MAX_SIZE);
 
-		this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+		BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+		this->build_storage_html(_page);
+		END_SENDING_CHUNK();
+
+		// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 		delete[] _page;
 	}
 

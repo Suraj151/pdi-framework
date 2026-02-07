@@ -150,7 +150,10 @@ void PDIStack::serve(){
   #endif
 
   #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  // Run Cooperative tasks
   __i_cooperative_scheduler.run();
+
+  // Yield to preemptive tasks if any
   __i_preemptive_scheduler.yield();
   #endif
 

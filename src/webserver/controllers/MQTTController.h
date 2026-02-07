@@ -81,15 +81,19 @@ public:
 
     strcat_ro(_page, WEB_SERVER_HEADER_HTML);
     strcat_ro(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_TOP);
+    BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 
     concat_svg_menu_card(_page, WEB_SERVER_MQTT_MENU_TITLE_GENERAL, SVG_ICON48_PATH_SETTINGS, WEB_SERVER_MQTT_GENERAL_CONFIG_ROUTE);
     concat_svg_menu_card(_page, WEB_SERVER_MQTT_MENU_TITLE_LWT, SVG_ICON48_PATH_BEENHERE, WEB_SERVER_MQTT_LWT_CONFIG_ROUTE);
     concat_svg_menu_card(_page, WEB_SERVER_MQTT_MENU_TITLE_PUBSUB, SVG_ICON48_PATH_IMPORT_EXPORT, WEB_SERVER_MQTT_PUBSUB_CONFIG_ROUTE);
+    CONTINUE_SEND_IN_CHUNK(_page);
 
     strcat_ro(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_BOTTOM);
     strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
+    CONTINUE_SEND_IN_CHUNK(_page);
 
-    this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+    END_SENDING_CHUNK();
+    // this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
     delete[] _page;
   }
 
@@ -108,9 +112,10 @@ public:
       return;
     }
 
-    memset(_page, 0, _max_size);
+    // memset(_page, 0, _max_size);
     strcat_ro(_page, WEB_SERVER_HEADER_HTML);
     strcat_ro(_page, WEB_SERVER_MQTT_GENERAL_PAGE_TOP);
+    CONTINUE_SEND_IN_CHUNK(_page);
 
     mqtt_general_config_table _mqtt_general_configs;
     this->m_web_resource->m_db_conn->get_mqtt_general_config_table(&_mqtt_general_configs);
@@ -127,27 +132,30 @@ public:
     concat_tr_input_html_tags(_page, RODT_ATTR("Host Port:"), RODT_ATTR("prt"), _port);
     concat_tr_input_html_tags(_page, RODT_ATTR("Client Id:"), RODT_ATTR("clid"), _mqtt_general_configs.client_id, MQTT_CLIENT_ID_BUF_SIZE - 1);
     concat_tr_input_html_tags(_page, RODT_ATTR("Username:"), RODT_ATTR("usrn"), _mqtt_general_configs.username, MQTT_USERNAME_BUF_SIZE - 1);
+    CONTINUE_SEND_IN_CHUNK(_page);
     concat_tr_input_html_tags(_page, RODT_ATTR("Password:"), RODT_ATTR("pswd"), _mqtt_general_configs.password, MQTT_PASSWORD_BUF_SIZE - 1);
     concat_tr_input_html_tags(_page, RODT_ATTR("Keep Alive:"), RODT_ATTR("kpalv"), _keepalive);
     concat_tr_input_html_tags(_page, RODT_ATTR("Clean Session:"), RODT_ATTR("cln"), "clean", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_general_configs.clean_session != 0);
 
     strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
-
+    CONTINUE_SEND_IN_CHUNK(_page);
 #else
 
     concat_tr_input_html_tags(_page, RODT_ATTR("Host Address:"), RODT_ATTR("hst"), _mqtt_general_configs.host, MQTT_HOST_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
     concat_tr_input_html_tags(_page, RODT_ATTR("Host Port:"), RODT_ATTR("prt"), _port, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true);
     concat_tr_input_html_tags(_page, RODT_ATTR("Client Id:"), RODT_ATTR("clid"), _mqtt_general_configs.client_id, MQTT_CLIENT_ID_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
     concat_tr_input_html_tags(_page, RODT_ATTR("Username:"), RODT_ATTR("usrn"), _mqtt_general_configs.username, MQTT_USERNAME_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
+    CONTINUE_SEND_IN_CHUNK(_page);
     concat_tr_input_html_tags(_page, RODT_ATTR("Password:"), RODT_ATTR("pswd"), _mqtt_general_configs.password, MQTT_PASSWORD_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
     concat_tr_input_html_tags(_page, RODT_ATTR("Keep Alive:"), RODT_ATTR("kpalv"), _keepalive, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true);
     concat_tr_input_html_tags(_page, RODT_ATTR("Clean Session:"), RODT_ATTR("cln"), "clean", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_general_configs.clean_session != 0, true);
-
+    CONTINUE_SEND_IN_CHUNK(_page);
 #endif
 
     if (_enable_flash)
       concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
     strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
+    CONTINUE_SEND_IN_CHUNK(_page);
   }
 
   /**
@@ -177,6 +185,7 @@ public:
       pdiutil::string _password = this->m_web_resource->m_server->arg("pswd");
       pdiutil::string _keep_alive = this->m_web_resource->m_server->arg("kpalv");
       pdiutil::string _clean_session = this->m_web_resource->m_server->arg("cln");
+      __i_dvc_ctrl.yield();
 
       LogI("\nSubmitted info :\n");
       LogFmtI("mqtt host : %s\n", _mqtt_host.c_str());
@@ -186,6 +195,7 @@ public:
       LogFmtI("password : %s\n", _password.c_str());
       LogFmtI("keep alive : %s\n", _keep_alive.c_str());
       LogFmtI("clean session : %s\n\n", _clean_session.c_str());
+      __i_dvc_ctrl.yield();
 
       mqtt_general_config_table *_mqtt_general_configs = new mqtt_general_config_table;
       memset((void *)_mqtt_general_configs, 0, sizeof(mqtt_general_config_table));
@@ -202,15 +212,20 @@ public:
 
       this->m_web_resource->m_db_conn->set_mqtt_general_config_table(_mqtt_general_configs);
       delete _mqtt_general_configs;
+      __i_dvc_ctrl.yield();
 
       _is_posted = true;
     }
 #endif
 
     char *_page = new char[PAGE_HTML_MAX_SIZE];
-    this->build_mqtt_general_config_html(_page, _is_posted);
+    memset(_page, 0, PAGE_HTML_MAX_SIZE);
 
-    this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+    BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+    this->build_mqtt_general_config_html(_page, _is_posted);
+    END_SENDING_CHUNK();
+
+    // this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
     delete[] _page;
     if (_is_posted)
     {
@@ -234,10 +249,11 @@ public:
       return;
     }
 
-    memset(_page, 0, _max_size);
+    // memset(_page, 0, _max_size);
     char _ip_address[20];
     strcat_ro(_page, WEB_SERVER_HEADER_HTML);
     strcat_ro(_page, WEB_SERVER_MQTT_LWT_PAGE_TOP);
+    CONTINUE_SEND_IN_CHUNK(_page);
 
     mqtt_lwt_config_table _mqtt_lwt_configs;
     this->m_web_resource->m_db_conn->get_mqtt_lwt_config_table(&_mqtt_lwt_configs);
@@ -252,19 +268,20 @@ public:
     concat_tr_input_html_tags(_page, RODT_ATTR("Will Retain:"), RODT_ATTR("wrtn"), "retain", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_lwt_configs.will_retain != 0);
 
     strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
-
+    CONTINUE_SEND_IN_CHUNK(_page);
 #else
 
     concat_tr_input_html_tags(_page, RODT_ATTR("Will Topic:"), RODT_ATTR("wtpc"), _mqtt_lwt_configs.will_topic, MQTT_TOPIC_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
     concat_tr_input_html_tags(_page, RODT_ATTR("Will Message:"), RODT_ATTR("wmsg"), _mqtt_lwt_configs.will_message, MQTT_TOPIC_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
     concat_tr_select_html_tags(_page, RODT_ATTR("Will QoS:"), RODT_ATTR("wqos"), _qos_options, 3, _mqtt_lwt_configs.will_qos, 0, true);
     concat_tr_input_html_tags(_page, RODT_ATTR("Will Retain:"), RODT_ATTR("wrtn"), "retain", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_lwt_configs.will_retain != 0, true);
-
+    CONTINUE_SEND_IN_CHUNK(_page);
 #endif
 
     if (_enable_flash)
       concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
     strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
+    CONTINUE_SEND_IN_CHUNK(_page);
   }
 
   /**
@@ -297,6 +314,7 @@ public:
       LogFmtI("will message : %s\n", _will_message.c_str());
       LogFmtI("will qos : %s\n", _will_qos.c_str());
       LogFmtI("will retain : %s\n\n", _will_retain.c_str());
+      __i_dvc_ctrl.yield();
 
       mqtt_lwt_config_table *_mqtt_lwt_configs = new mqtt_lwt_config_table;
       memset((void *)_mqtt_lwt_configs, 0, sizeof(mqtt_lwt_config_table));
@@ -307,16 +325,20 @@ public:
       _mqtt_lwt_configs->will_retain = (int)(_will_retain == "retain");
 
       this->m_web_resource->m_db_conn->set_mqtt_lwt_config_table(_mqtt_lwt_configs);
-
       delete _mqtt_lwt_configs;
       _is_posted = true;
+      __i_dvc_ctrl.yield();
     }
 #endif
 
     char *_page = new char[PAGE_HTML_MAX_SIZE];
-    this->build_mqtt_lwt_config_html(_page, _is_posted);
+    memset(_page, 0, PAGE_HTML_MAX_SIZE);
 
-    this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+    BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+    this->build_mqtt_lwt_config_html(_page, _is_posted);
+    END_SENDING_CHUNK();
+
+    // this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
     delete[] _page;
     if (_is_posted)
     {
@@ -340,10 +362,11 @@ public:
       return;
     }
 
-    memset(_page, 0, _max_size);
+    // memset(_page, 0, _max_size);
     char _ip_address[20];
     strcat_ro(_page, WEB_SERVER_HEADER_HTML);
     strcat_ro(_page, WEB_SERVER_MQTT_PUBSUB_PAGE_TOP);
+    CONTINUE_SEND_IN_CHUNK(_page);
 
     mqtt_pubsub_config_table _mqtt_pubsub_configs;
     this->m_web_resource->m_db_conn->get_mqtt_pubsub_config_table(&_mqtt_pubsub_configs);
@@ -392,6 +415,7 @@ public:
       concat_tr_input_html_tags(_page, _retain_label, _retain_name, "retain", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_pubsub_configs.publish_topics[i].retain != 0, true);
 
 #endif
+      CONTINUE_SEND_IN_CHUNK(_page);
     }
 #ifdef ALLOW_MQTT_CONFIG_MODIFICATION
 
@@ -425,6 +449,7 @@ public:
       concat_tr_select_html_tags(_page, _qos_label, _qos_name, _qos_options, 3, _mqtt_pubsub_configs.subscribe_topics[i].qos, 0, true);
 
 #endif
+      CONTINUE_SEND_IN_CHUNK(_page);
     }
 
 #ifdef ALLOW_MQTT_CONFIG_MODIFICATION
@@ -434,6 +459,7 @@ public:
     if (_enable_flash)
       concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
     strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
+    CONTINUE_SEND_IN_CHUNK(_page);
   }
 
   /**
@@ -489,6 +515,7 @@ public:
 
         LogFmtI("%d : Topic(%s), Qos(%s), Retain(%s)\n", i, _topic.c_str(),_qos.c_str(),_retain.c_str());
       }
+      __i_dvc_ctrl.yield();
 
       LogI("\nSubscribe Topics\n");
 
@@ -514,13 +541,18 @@ public:
 
       delete _mqtt_pubsub_configs;
       _is_posted = true;
+      __i_dvc_ctrl.yield();
     }
 #endif
 
     char *_page = new char[PAGE_HTML_MAX_SIZE];
-    this->build_mqtt_pubsub_config_html(_page, _is_posted);
+    memset(_page, 0, PAGE_HTML_MAX_SIZE);
 
-    this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+    BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+    this->build_mqtt_pubsub_config_html(_page, _is_posted);
+    END_SENDING_CHUNK();
+
+    // this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
     delete[] _page;
     if (_is_posted)
     {

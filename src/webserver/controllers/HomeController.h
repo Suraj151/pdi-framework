@@ -70,15 +70,17 @@ public:
 		bool _enable_header_footer = true,
 		int _max_size = PAGE_HTML_MAX_SIZE)
 	{
-		memset(_page, 0, _max_size);
+		// memset(_page, 0, _max_size);
 
 		if (_enable_header_footer)
 			strcat_ro(_page, WEB_SERVER_HEADER_HTML);
 		strcat_ro(_page, _pgm_page);
+		CONTINUE_SEND_IN_CHUNK(_page);
 		if (_enable_flash)
 			concat_flash_message_div(_page, _message, _alert_type);
 		if (_enable_header_footer)
 			strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
+		CONTINUE_SEND_IN_CHUNK(_page);
 	}
 
 	/**
@@ -103,9 +105,13 @@ public:
 	  }
 
 	  char *_page = new char[PAGE_HTML_MAX_SIZE];
-	  this->build_html(_page, WEB_SERVER_404_PAGE);
+	  memset(_page, 0, PAGE_HTML_MAX_SIZE);
 
-	  this->m_web_resource->m_server->send(HTTP_RESP_NOT_FOUND, MIME_TYPE_TEXT_HTML, _page);
+	  BEGIN_SEND_IN_CHUNK(HTTP_RESP_NOT_FOUND, MIME_TYPE_TEXT_HTML, _page);
+	  this->build_html(_page, WEB_SERVER_404_PAGE);
+	  END_SENDING_CHUNK();
+
+	//   this->m_web_resource->m_server->send(HTTP_RESP_NOT_FOUND, MIME_TYPE_TEXT_HTML, _page);
 	  delete[] _page;
 	}
 
@@ -124,9 +130,10 @@ public:
 		}
 
 		char *_page = new char[PAGE_HTML_MAX_SIZE];
-
 		memset(_page, 0, PAGE_HTML_MAX_SIZE);
+		
 		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+		BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 
 		if (this->m_route_handler->has_active_session())
 		{
@@ -136,6 +143,7 @@ public:
 			concat_svg_menu_card(_page, WEB_SERVER_HOME_MENU_TITLE_LOGIN, SVG_ICON48_PATH_ACCOUNT_CIRCLE, WEB_SERVER_LOGIN_CONFIG_ROUTE);
 			concat_svg_menu_card(_page, WEB_SERVER_HOME_MENU_TITLE_WIFI, SVG_ICON48_PATH_WIFI, WEB_SERVER_WIFI_CONFIG_ROUTE);
 			concat_svg_menu_card(_page, WEB_SERVER_HOME_MENU_TITLE_OTA, SVG_ICON48_PATH_CLOUD_DOWNLOAD, WEB_SERVER_OTA_CONFIG_ROUTE);
+			CONTINUE_SEND_IN_CHUNK(_page);
 #ifdef ENABLE_MQTT_SERVICE
 			concat_svg_menu_card(_page, WEB_SERVER_HOME_MENU_TITLE_MQTT, SVG_ICON48_PATH_SEND, WEB_SERVER_MQTT_MANAGE_CONFIG_ROUTE);
 #endif
@@ -145,26 +153,31 @@ public:
 #ifdef ENABLE_EMAIL_SERVICE
 			concat_svg_menu_card(_page, WEB_SERVER_HOME_MENU_TITLE_EMAIL, SVG_ICON48_PATH_MAIL, WEB_SERVER_EMAIL_CONFIG_ROUTE);
 #endif
+			CONTINUE_SEND_IN_CHUNK(_page);
 #ifdef ENABLE_STORAGE_SERVICE
 			concat_svg_menu_card(_page, WEB_SERVER_HOME_MENU_TITLE_STORAGE, SVG_ICON48_PATH_COMPUTER, WEB_SERVER_STORAGE_LIST_ROUTE);
 #endif
 #ifdef ENABLE_DEVICE_IOT
 			concat_svg_menu_card(_page, WEB_SERVER_HOME_MENU_TITLE_DEVICE_REGISTER, SVG_ICON48_PATH_BEENHERE, WEB_SERVER_DEVICE_REGISTER_CONFIG_ROUTE);
 #endif
+			CONTINUE_SEND_IN_CHUNK(_page);
 			concat_svg_menu_card(_page, WEB_SERVER_HOME_MENU_TITLE_DASHBOARD, SVG_ICON48_PATH_DASHBOARD, WEB_SERVER_DASHBOARD_ROUTE);
 			concat_svg_menu_card(_page, WEB_SERVER_HOME_MENU_TITLE_LOGOUT, SVG_ICON48_PATH_POWER, WEB_SERVER_LOGOUT_ROUTE);
+			CONTINUE_SEND_IN_CHUNK(_page);
 
 			strcat_ro(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_BOTTOM);
 		}
 		else
 		{
-
 			strcat_ro(_page, WEB_SERVER_HOME_PAGE);
 		}
 
 		strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
 
-		this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+		CONTINUE_SEND_IN_CHUNK(_page);
+		END_SENDING_CHUNK();
+
+		// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 		delete[] _page;
 	}
 };

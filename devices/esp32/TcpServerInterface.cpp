@@ -123,8 +123,9 @@ err_t TcpServerInterface::onAccept(void* arg, struct tcp_pcb* newpcb, err_t err)
 
     // Only allow one client at a time for simplicity
     if (server->m_clientPcb) {
-        tcp_abort(newpcb);
-        return ERR_ABRT;
+        // tcp_abort(newpcb);
+        // return ERR_ABRT;
+        tcp_abort(server->m_clientPcb);
     }
 
     server->m_clientPcb = newpcb;
