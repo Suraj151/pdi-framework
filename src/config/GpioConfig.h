@@ -49,8 +49,8 @@ created Date    : 1st June 2019
 #define GPIO_GRAPH_TOP_MARGIN         25
 #define GPIO_GRAPH_BOTTOM_MARGIN      GPIO_GRAPH_TOP_MARGIN
 #define GPIO_DATA_POST_FREQ           0
-#define GPIO_DATA_POST_HTTP_URL       "/api/fordevice/data/[duid]"
-#define GPIO_EVENT_POST_HTTP_URL      "/api/fordevice/event/[duid]"
+#define GPIO_DATA_POST_HTTP_URL       CHARPTR_WRAP("/api/fordevice/data/[duid]")
+#define GPIO_EVENT_POST_HTTP_URL      CHARPTR_WRAP("/api/fordevice/event/[duid]")
 
 #define GPIO_EVENT_DURATION_FOR_SUCCEED 300000
 #define GPIO_EVENT_DURATION_FOR_FAILED  120000

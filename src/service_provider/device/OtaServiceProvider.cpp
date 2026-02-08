@@ -130,7 +130,7 @@ http_ota_status OtaServiceProvider::handle()
       {
         memset(_version_buf, 0, OTA_VERSION_LENGTH);
 
-        if (__get_from_json(http_resp, (char *)OTA_VERSION_KEY, _version_buf, OTA_VERSION_LENGTH))
+        if (__get_from_json(http_resp, OTA_VERSION_KEY, _version_buf, OTA_VERSION_LENGTH))
         {
           _firm_version = StringToUint32(_version_buf);
 

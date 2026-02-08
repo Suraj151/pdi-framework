@@ -96,7 +96,7 @@ typedef enum {
 #define HTTP_HEADER_KEY_CONTENT_TYPE    "Content-Type"
 #define HTTP_HEADER_KEY_CONTENT_LENGTH  "Content-Length"
 #define HTTP_HEADER_KEY_KEEP_ALIVE      "Keep-Alive"
-#define HTTP_HEADER_KEY_ACCESS_CONTROL_ALLOW_ORIGIN "Access-Control-Allow-Origin"
+#define HTTP_HEADER_KEY_ACCESS_CONTROL_ALLOW_ORIGIN CHARPTR_WRAP("Access-Control-Allow-Origin")
 #define HTTP_HEADER_KEY_CONTENT_DISPOSITION "Content-Disposition"
 
 // #define HTTP_VERSION_1_0_STR            "HTTP/1.0"

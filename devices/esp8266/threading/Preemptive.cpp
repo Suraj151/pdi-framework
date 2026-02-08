@@ -17,7 +17,7 @@ static volatile bool __non_preemptive_saved = false;
 
 // Context switch period required to set in timer
 // Real time tuning requires period < 1ms - ISR context switch period/cycles in microseconds
-static uint32_t __timer_period = 1500; // in microseconds
+static uint32_t __timer_period = 1000; // in microseconds
 
 /**
  * hardware timer ISR coroutine get called from timer ISR handler with the interrupted context captured
@@ -368,6 +368,9 @@ void PreemptiveScheduler::exit(){
     if (f && f->state == PreemptiveState::Finished){
 
         __i_preemptive_scheduler.destroy_preemptive(f);
+        
+        __i_preemptive_scheduler.current = nullptr; 
+        f = nullptr;
     }
 
     noInterrupts();

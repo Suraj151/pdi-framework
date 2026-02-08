@@ -275,11 +275,11 @@ void CooperativeScheduler::destroy_cooperative(Cooperative* f) {
         noInterrupts(); 
         remove_from_sleepers(f);
         remove_from_ready(f);
-        interrupts();
     
         __task_scheduler.remove_task(f->task_id);
         delete f; 
         f = nullptr;
+        interrupts();
     }
 }
 

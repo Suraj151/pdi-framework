@@ -146,8 +146,18 @@ void PDIStack::initialize(){
 void PDIStack::serve(){
 
   #ifdef ENABLE_HTTP_SERVER
+  // Handle web server clients
   __web_server.handle_clients();
   #endif
+
+  // Run inline taskscheduler in loop
+  __task_scheduler.run();
+
+  // Yield
+  __i_dvc_ctrl.yield();
+
+  // Handle device pending events
+  __i_dvc_ctrl.handleEvents();
 
   #ifdef ENABLE_CONTEXTUAL_EXECUTION
   // Run Cooperative tasks
@@ -156,11 +166,6 @@ void PDIStack::serve(){
   // Yield to preemptive tasks if any
   __i_preemptive_scheduler.yield();
   #endif
-
-  __task_scheduler.run(); // run cooperative taskscheduler in loop
-
-  __i_dvc_ctrl.yield();
-  __i_dvc_ctrl.handleEvents();
 }
 
 /**

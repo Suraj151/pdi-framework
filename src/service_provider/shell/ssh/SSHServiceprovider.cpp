@@ -632,6 +632,7 @@ void LWSSH::SSHServer::handleChannelRequest(){
                                 res == CMD_RESULT_TERMINAL_ABORTED
                             ){
                                 __auth_service.setAuthorized(false);
+                                __i_fs.changeDirectory(__i_fs.getHomeDirectory());
                                 m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
                             }
                             #endif

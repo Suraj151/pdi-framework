@@ -77,7 +77,7 @@ void DeviceIotSensor::dataHook( pdiutil::string &_payload ){
     char gpiotembuff[ iface_payload.size() + 1 ];
     memset(gpiotembuff, 0, iface_payload.size() + 1 );
 
-    bool _json_result = __get_from_json( (char*)iface_payload.c_str(), (char*)GPIO_PAYLOAD_DATA_KEY, gpiotembuff, iface_payload.size() + 1 );
+    bool _json_result = __get_from_json( iface_payload.c_str(), GPIO_PAYLOAD_DATA_KEY, gpiotembuff, iface_payload.size() + 1 );
 
     if(_json_result){
 
@@ -90,7 +90,7 @@ void DeviceIotSensor::dataHook( pdiutil::string &_payload ){
       char serialtembuff[ iface_payload.size() + 1 ];
       memset(serialtembuff, 0, iface_payload.size() + 1 );
 
-      _json_result = __get_from_json( (char*)iface_payload.c_str(), (char*)SERIAL_PAYLOAD_DATA_KEY, serialtembuff, iface_payload.size() + 1 );
+      _json_result = __get_from_json( iface_payload.c_str(), SERIAL_PAYLOAD_DATA_KEY, serialtembuff, iface_payload.size() + 1 );
 
       if(_json_result && strlen(serialtembuff) > 2){
 

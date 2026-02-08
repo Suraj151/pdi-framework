@@ -260,6 +260,7 @@ bool WiFiInterface::reconnect()
     m_mutex.critical_lock();
     #endif
     status = this->m_wifi->reconnect();
+    __i_dvc_ctrl.wait(0);
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
     m_mutex.critical_unlock();
     #endif

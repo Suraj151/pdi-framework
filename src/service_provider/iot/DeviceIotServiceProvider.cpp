@@ -188,11 +188,11 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
 
       if( httl_resp_len < DEVICE_IOT_CONFIG_RESP_MAX_SIZE ){
 
-        if( 0 <= __strstr( http_resp, (char*)DEVICE_IOT_CONFIG_CHANNEL_TOKEN_KEY, DEVICE_IOT_CONFIG_RESP_MAX_SIZE - strlen(DEVICE_IOT_CONFIG_CHANNEL_TOKEN_KEY) ) ){
+        if( 0 <= __strstr( http_resp, DEVICE_IOT_CONFIG_CHANNEL_TOKEN_KEY, DEVICE_IOT_CONFIG_RESP_MAX_SIZE - strlen(DEVICE_IOT_CONFIG_CHANNEL_TOKEN_KEY) ) ){
 
-          bool _json_result = __get_from_json( http_resp, (char*)DEVICE_IOT_CONFIG_CHANNEL_TOKEN_KEY, this->m_server_configurable_channel_token, DEVICE_IOT_CONFIG_CHANNEL_TOKEN_MAX_SIZE-1 ) &&
-            __get_from_json( http_resp, (char*)DEVICE_IOT_CONFIG_CHANNEL_WRITE_KEY, this->m_server_configurable_channel_write, DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE-1 ) &&
-            __get_from_json( http_resp, (char*)DEVICE_IOT_CONFIG_CHANNEL_READ_KEY, this->m_server_configurable_channel_read, DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE-1 );
+          bool _json_result = __get_from_json( http_resp, DEVICE_IOT_CONFIG_CHANNEL_TOKEN_KEY, this->m_server_configurable_channel_token, DEVICE_IOT_CONFIG_CHANNEL_TOKEN_MAX_SIZE-1 ) &&
+            __get_from_json( http_resp, DEVICE_IOT_CONFIG_CHANNEL_WRITE_KEY, this->m_server_configurable_channel_write, DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE-1 ) &&
+            __get_from_json( http_resp, DEVICE_IOT_CONFIG_CHANNEL_READ_KEY, this->m_server_configurable_channel_read, DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE-1 );
           
           if(  _json_result && strlen( this->m_server_configurable_channel_token ) && strlen( this->m_server_configurable_channel_write ) && strlen( this->m_server_configurable_channel_read ) ){
 
@@ -327,7 +327,7 @@ void DeviceIotServiceProvider::handleSubscribeCallback( uint32_t *args, const ch
   // handle reconfiguration request
   char *_value_buff = new char[50];
   memset( _value_buff, 0, 50 );
-  bool _json_result = __get_from_json( dataBuf, (char*)DEVICE_IOT_CONFIG_RECONFIGURE_KEY, _value_buff, 6 );
+  bool _json_result = __get_from_json( dataBuf, DEVICE_IOT_CONFIG_RECONFIGURE_KEY, _value_buff, 6 );
   uint16_t reconfigure = StringToUint16( _value_buff, 6 );
   if( _json_result && reconfigure == 1 ){
     LogI("Reconfiguring...\n");
@@ -347,7 +347,7 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
   char *_value_buff = new char[100];
 
   memset( _value_buff, 0, 100 );
-  bool _json_result = __get_from_json( json_resp, (char*)DEVICE_IOT_CONFIG_DEVICEID_KEY, _value_buff, 31 );
+  bool _json_result = __get_from_json( json_resp, DEVICE_IOT_CONFIG_DEVICEID_KEY, _value_buff, 31 );
   uint64_t device_id = StringToUint64( _value_buff, 31 );
   if( _json_result && 0 < device_id && device_id <= UINT64_MAX ){
 
@@ -356,7 +356,7 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
   }
 
   memset( this->m_server_configurable_channel_host, 0, DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE );
-  _json_result = __get_from_json( json_resp, (char*)DEVICE_IOT_CONFIG_CHANNEL_HOST_KEY, this->m_server_configurable_channel_host, DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE-1 );
+  _json_result = __get_from_json( json_resp, DEVICE_IOT_CONFIG_CHANNEL_HOST_KEY, this->m_server_configurable_channel_host, DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE-1 );
   if( _json_result && strlen(this->m_server_configurable_channel_host) > 5 ){
 
     LogFmtI("Got Channel Host : %s\n", this->m_server_configurable_channel_host);
@@ -369,7 +369,7 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
   }
 
   memset( _value_buff, 0, 100 );
-  _json_result = __get_from_json( json_resp, (char*)DEVICE_IOT_CONFIG_CHANNEL_PORT_KEY, _value_buff, 31 );
+  _json_result = __get_from_json( json_resp, DEVICE_IOT_CONFIG_CHANNEL_PORT_KEY, _value_buff, 31 );
   if( _json_result && 0 < this->m_server_configurable_channel_port && this->m_server_configurable_channel_port <= UINT32_MAX ){
 
     this->m_server_configurable_channel_port = StringToUint32( _value_buff, 31 );
@@ -379,7 +379,7 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
   }
 
   memset( _value_buff, 0, 100 );
-  _json_result = __get_from_json( json_resp, (char*)DEVICE_IOT_CONFIG_DATA_RATE_KEY, _value_buff, 6 );
+  _json_result = __get_from_json( json_resp, DEVICE_IOT_CONFIG_DATA_RATE_KEY, _value_buff, 6 );
   uint16_t data_rate = StringToUint16( _value_buff, 6 );
   if( _json_result && SENSOR_DATA_PUBLISH_FREQ_MIN_LIMIT <= data_rate && data_rate <= SENSOR_DATA_PUBLISH_FREQ_MAX_LIMIT ){
 
@@ -395,7 +395,7 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
   }
 
   memset( _value_buff, 0, 100 );
-  _json_result = __get_from_json( json_resp, (char*)DEVICE_IOT_CONFIG_MQTT_KEEP_ALIVE_KEY, _value_buff, 6 );
+  _json_result = __get_from_json( json_resp, DEVICE_IOT_CONFIG_MQTT_KEEP_ALIVE_KEY, _value_buff, 6 );
   uint16_t keep_alive = StringToUint16( _value_buff, 6 );
   if( _json_result && DEVICE_IOT_MQTT_KEEP_ALIVE_MIN <= keep_alive && keep_alive <= DEVICE_IOT_MQTT_KEEP_ALIVE_MAX ){
 
@@ -404,7 +404,7 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
   }
 
   memset( _value_buff, 0, 100 );
-  _json_result = __get_from_json( json_resp, (char*)DEVICE_IOT_CONFIG_INTERFACE_READ_KEY, _value_buff, 99 );
+  _json_result = __get_from_json( json_resp, DEVICE_IOT_CONFIG_INTERFACE_READ_KEY, _value_buff, 99 );
   this->m_server_configurable_interface_read.clear();
   if( _json_result && strlen(_value_buff) > 0 ){
 
@@ -458,7 +458,7 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
   }
 
   memset( _value_buff, 0, 100 );
-  _json_result = __get_from_json( json_resp, (char*)DEVICE_IOT_CONFIG_INTERFACE_WRITE_KEY, _value_buff, 99 );
+  _json_result = __get_from_json( json_resp, DEVICE_IOT_CONFIG_INTERFACE_WRITE_KEY, _value_buff, 99 );
   this->m_server_configurable_interface_write.clear();
   if( _json_result && strlen(_value_buff) > 0 ){
 
@@ -517,7 +517,7 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
   }
 
   memset( _value_buff, 0, 100 );
-  _json_result = __get_from_json( json_resp, (char*)DEVICE_IOT_CONFIG_INTERFACE_EVENT_KEY, _value_buff, 99 );
+  _json_result = __get_from_json( json_resp, DEVICE_IOT_CONFIG_INTERFACE_EVENT_KEY, _value_buff, 99 );
   if( _json_result && strlen(_value_buff) > 0 ){
 
     pdiutil::vector<pdiutil::string> allowed_interface_list = this->m_server_configurable_interface_read;

@@ -27,10 +27,10 @@ created Date    : 1st June 2019
 
 
 #define DEFAULT_SENDING_DOMAIN            "www.example.com"
-#define DEFAULT_MAIL_HOST                 "sandbox.smtp.mailtrap.io"
+#define DEFAULT_MAIL_HOST                 ""
 #define DEFAULT_MAIL_PORT                 2525
-#define DEFAULT_MAIL_USERNAME             "b3ffe50b2430a0"
-#define DEFAULT_MAIL_PASSWORD             "a3c7845387ed29"
+#define DEFAULT_MAIL_USERNAME             ""
+#define DEFAULT_MAIL_PASSWORD             ""
 #define DEFAULT_MAIL_FROM                 "surajinamdar151@gmail.com"
 #define DEFAULT_MAIL_TO                   DEFAULT_MAIL_FROM
 #define DEFAULT_MAIL_SUBJECT              "device status"

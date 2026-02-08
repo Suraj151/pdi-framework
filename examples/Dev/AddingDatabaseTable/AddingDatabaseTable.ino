@@ -50,7 +50,7 @@ StudentTable __student_table;
 void setup() {
 
 	// NOTE : Please disable framework serial log for this demo or framework log will get printed alongwith this demo log
-	// Disable it by commenting ==> #define ENABLE_LOG_* lines in src/config/Common.h file of this framework library
+	// Disable it by commenting ==> #define ENABLE_LOG_* lines in devices/DeviceConfig.h file of this framework library
 
 	Serial.begin(115200);
 	Serial.printf("Hold on!!!, Stack will initialize and begin within next %d seconds !\n", WIFI_STATION_CONNECT_ATTEMPT_TIMEOUT);

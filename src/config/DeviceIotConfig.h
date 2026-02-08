@@ -16,7 +16,7 @@ created Date    : 1st June 2019
 
 #define DEVICE_IOT_PACKET_VERSION      "1.0.0"
 
-#define DEVICE_IOT_OTP_REQ_URL         "/api/fordevice/get-otp?mac_id=[mac]&duid=[duid]"
+#define DEVICE_IOT_OTP_REQ_URL         CHARPTR_WRAP("/api/fordevice/get-otp?mac_id=[mac]&duid=[duid]")
 #define DEVICE_IOT_HOST_BUF_SIZE       50
 #define DEVICE_IOT_OTP_KEY             "otp"
 #define DEVICE_IOT_OTP_STATUS_KEY      "status"
@@ -30,7 +30,7 @@ created Date    : 1st June 2019
 #define SENSOR_DATA_SAMPLES_PER_PUBLISH_MAX_BUFF	100
 #define SENSOR_DATA_SAMPLES_PER_PUBLISH_MAX_LIMIT	60
 
-#define DEVICE_IOT_CONFIG_REQ_URL             "/api/fordevice/get-config?mac_id=[mac]&duid=[duid]"
+#define DEVICE_IOT_CONFIG_REQ_URL             CHARPTR_WRAP("/api/fordevice/get-config?mac_id=[mac]&duid=[duid]")
 // #define DEVICE_IOT_EVENTS_REQ_URL             "/api/fordevice/get-events?mac_id=[mac]&duid=[duid]"
 #define DEVICE_IOT_CONFIG_RESP_MAX_SIZE       500
 #define DEVICE_IOT_CONFIG_DEVICEID_KEY        "did"

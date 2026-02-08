@@ -312,9 +312,9 @@ void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payloa
           }
         }
 
-        if( __get_from_json( _pin_data, (char*)GPIO_PAYLOAD_MODE_KEY, _pin_mode, _pin_values_max_len ) ){
+        if( __get_from_json( _pin_data, GPIO_PAYLOAD_MODE_KEY, _pin_mode, _pin_values_max_len ) ){
 
-          if( __get_from_json( _pin_data, (char*)GPIO_PAYLOAD_VALUE_KEY, _pin_value, _pin_values_max_len ) ){
+          if( __get_from_json( _pin_data, GPIO_PAYLOAD_VALUE_KEY, _pin_value, _pin_values_max_len ) ){
 
             LogFmtI("Applying to : %s, mode : %s, value : %s\n", _pin_label_uppercase, _pin_mode, _pin_value);
 
@@ -435,9 +435,9 @@ void GpioServiceProvider::applyGpioEventJsonPayload( char* _payload, uint16_t _p
               }
             }
 
-            if( __get_from_json( _iface_data + _iface_data_index, (char*)GPIO_EVENT_COMPARATOR_KEY, _iface_comparator, _iface_keys_max_len ) ){
+            if( __get_from_json( _iface_data + _iface_data_index, GPIO_EVENT_COMPARATOR_KEY, _iface_comparator, _iface_keys_max_len ) ){
 
-              if( __get_from_json( _iface_data + _iface_data_index, (char*)GPIO_PAYLOAD_VALUE_KEY, _iface_value, _iface_keys_max_len ) ){
+              if( __get_from_json( _iface_data + _iface_data_index, GPIO_PAYLOAD_VALUE_KEY, _iface_value, _iface_keys_max_len ) ){
 
                 LogFmtI("Applying to : %s, cmp : %s, value : %s\n", _iface_label_uppercase, _iface_comparator, _iface_value);
 

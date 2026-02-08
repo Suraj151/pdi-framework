@@ -224,8 +224,8 @@ void SerialServiceProvider::applySerialJsonPayload(char *_payload, uint16_t _pay
       ){
 
         if( 
-          __get_from_json( _iface_json_data, (char*)SERIAL_PAYLOAD_MODE_KEY, _iface_mode, _iface_keys_max_len ) && 
-          __get_from_json( _iface_json_data, (char*)SERIAL_PAYLOAD_VALUE_KEY, _iface_data, _iface_json_data_max_len ) 
+          __get_from_json( _iface_json_data, SERIAL_PAYLOAD_MODE_KEY, _iface_mode, _iface_keys_max_len ) && 
+          __get_from_json( _iface_json_data, SERIAL_PAYLOAD_VALUE_KEY, _iface_data, _iface_json_data_max_len ) 
         ){
 
             LogFmtI("Applying to : %s%d, mode : %s, value : %s\n", SERIAL_INTERFACE_UART, _port, _iface_mode, _iface_data);
@@ -255,8 +255,8 @@ void SerialServiceProvider::applySerialJsonPayload(char *_payload, uint16_t _pay
       ){
 
         if( 
-          __get_from_json( _iface_json_data, (char*)SERIAL_PAYLOAD_MODE_KEY, _iface_mode, _iface_keys_max_len ) && 
-          __get_from_json( _iface_json_data, (char*)SERIAL_PAYLOAD_VALUE_KEY, _iface_data, _iface_json_data_max_len ) 
+          __get_from_json( _iface_json_data, SERIAL_PAYLOAD_MODE_KEY, _iface_mode, _iface_keys_max_len ) && 
+          __get_from_json( _iface_json_data, SERIAL_PAYLOAD_VALUE_KEY, _iface_data, _iface_json_data_max_len ) 
         ){
 
             LogFmtI("Applying to : %s%d, mode : %s, value : %s\n", SERIAL_INTERFACE_SPI, _port, _iface_mode, _iface_data);
@@ -276,8 +276,8 @@ void SerialServiceProvider::applySerialJsonPayload(char *_payload, uint16_t _pay
       ){
 
         if( 
-          __get_from_json( _iface_json_data, (char*)SERIAL_PAYLOAD_MODE_KEY, _iface_mode, _iface_keys_max_len ) && 
-          __get_from_json( _iface_json_data, (char*)SERIAL_PAYLOAD_VALUE_KEY, _iface_data, _iface_json_data_max_len ) 
+          __get_from_json( _iface_json_data, SERIAL_PAYLOAD_MODE_KEY, _iface_mode, _iface_keys_max_len ) && 
+          __get_from_json( _iface_json_data, SERIAL_PAYLOAD_VALUE_KEY, _iface_data, _iface_json_data_max_len ) 
         ){
 
             LogFmtI("Applying to : %s%d, mode : %s, value : %s\n", SERIAL_INTERFACE_I2C, _port, _iface_mode, _iface_data);
@@ -297,8 +297,8 @@ void SerialServiceProvider::applySerialJsonPayload(char *_payload, uint16_t _pay
       ){
 
         if( 
-          __get_from_json( _iface_json_data, (char*)SERIAL_PAYLOAD_MODE_KEY, _iface_mode, _iface_keys_max_len ) && 
-          __get_from_json( _iface_json_data, (char*)SERIAL_PAYLOAD_VALUE_KEY, _iface_data, _iface_json_data_max_len ) 
+          __get_from_json( _iface_json_data, SERIAL_PAYLOAD_MODE_KEY, _iface_mode, _iface_keys_max_len ) && 
+          __get_from_json( _iface_json_data, SERIAL_PAYLOAD_VALUE_KEY, _iface_data, _iface_json_data_max_len ) 
         ){
 
             LogFmtI("Applying to : %s%d, mode : %s, value : %s\n", SERIAL_INTERFACE_CAN, _port, _iface_mode, _iface_data);
