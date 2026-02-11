@@ -138,20 +138,20 @@ public:
 		bool _is_test_mail = false;
 		bool _is_error = true;
 
-		if (this->m_web_resource->m_server->hasArg("ml_dmn") && this->m_web_resource->m_server->hasArg("ml_srvr"))
+		if (this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("ml_dmn")) && this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("ml_srvr")))
 		{
 
-			pdiutil::string _mail_domain = this->m_web_resource->m_server->arg("ml_dmn");
-			pdiutil::string _mail_server = this->m_web_resource->m_server->arg("ml_srvr");
-			pdiutil::string _mail_port = this->m_web_resource->m_server->arg("ml_prt");
-			pdiutil::string _mail_username = this->m_web_resource->m_server->arg("ml_usr");
-			pdiutil::string _mail_password = this->m_web_resource->m_server->arg("ml_psw");
-			pdiutil::string _mail_from = this->m_web_resource->m_server->arg("ml_frm");
-			pdiutil::string _mail_from_name = this->m_web_resource->m_server->arg("ml_frnm");
-			pdiutil::string _mail_to = this->m_web_resource->m_server->arg("ml_to");
-			pdiutil::string _mail_subject = this->m_web_resource->m_server->arg("ml_sub");
-			// pdiutil::string _mail_frequency = this->m_web_resource->m_server->arg("ml_freq");
-			pdiutil::string _test_mail = this->m_web_resource->m_server->arg("tstml");
+			pdiutil::string _mail_domain = this->m_web_resource->m_server->arg(CHARPTR_WRAP("ml_dmn"));
+			pdiutil::string _mail_server = this->m_web_resource->m_server->arg(CHARPTR_WRAP("ml_srvr"));
+			pdiutil::string _mail_port = this->m_web_resource->m_server->arg(CHARPTR_WRAP("ml_prt"));
+			pdiutil::string _mail_username = this->m_web_resource->m_server->arg(CHARPTR_WRAP("ml_usr"));
+			pdiutil::string _mail_password = this->m_web_resource->m_server->arg(CHARPTR_WRAP("ml_psw"));
+			pdiutil::string _mail_from = this->m_web_resource->m_server->arg(CHARPTR_WRAP("ml_frm"));
+			pdiutil::string _mail_from_name = this->m_web_resource->m_server->arg(CHARPTR_WRAP("ml_frnm"));
+			pdiutil::string _mail_to = this->m_web_resource->m_server->arg(CHARPTR_WRAP("ml_to"));
+			pdiutil::string _mail_subject = this->m_web_resource->m_server->arg(CHARPTR_WRAP("ml_sub"));
+			// pdiutil::string _mail_frequency = this->m_web_resource->m_server->arg(CHARPTR_WRAP("ml_freq"));
+			pdiutil::string _test_mail = this->m_web_resource->m_server->arg(CHARPTR_WRAP("tstml"));
 			__i_dvc_ctrl.yield();
 
 			LogI("\nSubmitted info :\n");

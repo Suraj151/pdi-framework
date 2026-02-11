@@ -302,7 +302,7 @@ public:
 			}
 		}
 
-        this->m_web_resource->m_server->addHeader("Location", loc);
+        this->m_web_resource->m_server->addHeader(HTTP_HEADER_KEY_LOCATION, loc);
         this->m_web_resource->m_server->send(HTTP_RESP_MOVED_PERMANENTLY);
 	}
 
@@ -399,15 +399,15 @@ public:
 				}
 				strncat(tempbuffer, _path.c_str(), _path.length());
 
-				jsonresp += "{\"n\":\"";
+				jsonresp += CHARPTR_WRAP("{\"n\":\"");
 				jsonresp += item.name;
-				jsonresp += "\",\"s\":\"";
+				jsonresp += CHARPTR_WRAP("\",\"s\":\"");
 				jsonresp += pdiutil::to_string(item.size);
-				jsonresp += "\",\"t\":\"";
+				jsonresp += CHARPTR_WRAP("\",\"t\":\"");
 				jsonresp += item.type == FILE_TYPE_DIR ? "D":"F";
-				jsonresp += "\",\"l\":\"";
+				jsonresp += CHARPTR_WRAP("\",\"l\":\"");
 				jsonresp += tempbuffer;
-				jsonresp += "\"},";
+				jsonresp += CHARPTR_WRAP("\"},");
 
 				// deallocates memory for items
 				delete[] item.name;
@@ -466,7 +466,7 @@ public:
 			}
 		}
 
-        this->m_web_resource->m_server->addHeader("Location", loc);
+        this->m_web_resource->m_server->addHeader(HTTP_HEADER_KEY_LOCATION, loc);
         this->m_web_resource->m_server->send(HTTP_RESP_MOVED_PERMANENTLY);
 	}
 

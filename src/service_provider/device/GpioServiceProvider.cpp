@@ -162,9 +162,9 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
 
     _payload += "\"";
     _payload += GPIO_PAYLOAD_MAC_KEY;
-    _payload += "\":\"";
+    _payload += CHARPTR_WRAP("\":\"");
     _payload += __i_dvc_ctrl.getDeviceMac().c_str();
-    _payload += "\",";
+    _payload += CHARPTR_WRAP("\",");
   }
 
 #ifdef ENABLE_DEVICE_IOT
@@ -173,9 +173,9 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
 
     _payload += "\"";
     _payload += GPIO_PAYLOAD_DUID_KEY;
-    _payload += "\":\"";
+    _payload += CHARPTR_WRAP("\":\"");
     _payload += m_device_id.c_str();
-    _payload += "\",";
+    _payload += CHARPTR_WRAP("\",");
   }
 #endif
 
@@ -184,7 +184,7 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
 
     _payload += "\"";
     _payload += GPIO_EVENT_PIN_KEY;
-    _payload += "\":\"";
+    _payload += CHARPTR_WRAP("\":\"");
 
     if( __gpio_event_track.event_gpio_pin < MAX_DIGITAL_GPIO_PINS ){
       _payload += "D";
@@ -194,13 +194,13 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
       _payload += pdiutil::to_string(__gpio_event_track.event_gpio_pin - MAX_DIGITAL_GPIO_PINS);
     }
 
-    _payload += "\",";
+    _payload += CHARPTR_WRAP("\",");
   }
 #endif
 
   _payload += "\"";
   _payload += GPIO_PAYLOAD_DATA_KEY;
-  _payload += "\":{";
+  _payload += CHARPTR_WRAP("\":{");
 
   bool _remove_comma = false;
   for (uint8_t _pin = 0; _pin < MAX_DIGITAL_GPIO_PINS; _pin++) {
@@ -209,15 +209,15 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
 
       _payload += "\"D";
       _payload += pdiutil::to_string(_pin);
-      _payload += "\":{\"";
+      _payload += CHARPTR_WRAP("\":{\"");
       _payload += GPIO_PAYLOAD_MODE_KEY;
-      _payload += "\":";
+      _payload += CHARPTR_WRAP("\":");
       _payload += pdiutil::to_string(this->m_gpio_config_copy.gpio_mode[_pin]);
-      _payload += ",\"";
+      _payload += CHARPTR_WRAP(",\"");
       _payload += GPIO_PAYLOAD_VALUE_KEY;
-      _payload += "\":";
+      _payload += CHARPTR_WRAP("\":");
       _payload += pdiutil::to_string(this->m_gpio_config_copy.gpio_readings[_pin]);
-      _payload += "},";
+      _payload += CHARPTR_WRAP("},");
 
       _remove_comma = true;
     }
@@ -229,15 +229,15 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
 
       _payload += "\"A";
       _payload += pdiutil::to_string(_pin);
-      _payload += "\":{\"";
+      _payload += CHARPTR_WRAP("\":{\"");
       _payload += GPIO_PAYLOAD_MODE_KEY;
-      _payload += "\":";
+      _payload += CHARPTR_WRAP("\":");
       _payload += pdiutil::to_string(this->m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS+_pin]);
-      _payload += ",\"";
+      _payload += CHARPTR_WRAP(",\"");
       _payload += GPIO_PAYLOAD_VALUE_KEY;
-      _payload += "\":";
+      _payload += CHARPTR_WRAP("\":");
       _payload += pdiutil::to_string(this->m_gpio_config_copy.gpio_readings[MAX_DIGITAL_GPIO_PINS+_pin]);
-      _payload += "},";
+      _payload += CHARPTR_WRAP("},");
 
       _remove_comma = true;
     }
@@ -247,7 +247,7 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
     _payload.pop_back(); // remove last comma
   }
 
-  _payload += "}}";
+  _payload += CHARPTR_WRAP("}}");
 }
 
 /**
@@ -509,7 +509,7 @@ bool GpioServiceProvider::handleGpioEventOverEmail(){
 
     this->appendGpioJsonPayload( *_payload, true );
 
-    *_payload += "\n\nRegards\n";
+    *_payload += CHARPTR_WRAP("\n\nRegards\n");
 
     if( __i_dvc_ctrl.getDeviceMac().size() ){
 

@@ -238,7 +238,8 @@ class LoginController : public Controller {
       memset(_page, 0, PAGE_HTML_MAX_SIZE);
 
       BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
-      this->build_html( _page, WEB_SERVER_LOGIN_PAGE, _is_posted, (char*)"Wrong Credentials.", ALERT_DANGER );
+      pdiutil::string msg = CHARPTR_WRAP("Wrong Credentials.");
+      this->build_html( _page, WEB_SERVER_LOGIN_PAGE, _is_posted, (char*)msg.c_str(), ALERT_DANGER );
       END_SENDING_CHUNK();
 
       // this->m_web_resource->m_server->send( HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page );

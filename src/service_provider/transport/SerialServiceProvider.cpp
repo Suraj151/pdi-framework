@@ -104,7 +104,7 @@ void SerialServiceProvider::appendSerialJsonPayload(pdiutil::string &_payload, p
 
   _payload += "{\"";
   _payload += SERIAL_PAYLOAD_DATA_KEY;
-  _payload += "\":{";
+  _payload += CHARPTR_WRAP("\":{");
 
   bool _remove_comma = false;
   for (uint8_t _port = 0; _port < MAX_SERIAL_PORT; _port++) {
@@ -117,15 +117,15 @@ void SerialServiceProvider::appendSerialJsonPayload(pdiutil::string &_payload, p
 
       _payload += "\"";
       _payload += _iface_label_uppercase;
-      _payload += "\":{\"";
+      _payload += CHARPTR_WRAP("\":{\"");
       _payload += SERIAL_PAYLOAD_MODE_KEY;
-      _payload += "\":";
+      _payload += CHARPTR_WRAP("\":");
       _payload += pdiutil::to_string((int)SERIAL_READ);
-      _payload += ",\"";
+      _payload += CHARPTR_WRAP(",\"");
       _payload += SERIAL_PAYLOAD_VALUE_KEY;
-      _payload += "\":";
-      _payload += "\"\"";  // todo read data from serial uart
-      _payload += "},";
+      _payload += CHARPTR_WRAP("\":");
+      _payload += CHARPTR_WRAP("\"\"");  // todo read data from serial uart
+      _payload += CHARPTR_WRAP("},");
 
       _remove_comma = true;
     }
@@ -135,15 +135,15 @@ void SerialServiceProvider::appendSerialJsonPayload(pdiutil::string &_payload, p
 
       _payload += "\"";
       _payload += _iface_label_uppercase;
-      _payload += "\":{\"";
+      _payload += CHARPTR_WRAP("\":{\"");
       _payload += SERIAL_PAYLOAD_MODE_KEY;
-      _payload += "\":";
+      _payload += CHARPTR_WRAP("\":");
       _payload += pdiutil::to_string((int)SERIAL_READ);
-      _payload += ",\"";
+      _payload += CHARPTR_WRAP(",\"");
       _payload += SERIAL_PAYLOAD_VALUE_KEY;
-      _payload += "\":";
-      _payload += "\"\"";  // todo read data from serial spi
-      _payload += "},";
+      _payload += CHARPTR_WRAP("\":");
+      _payload += CHARPTR_WRAP("\"\"");  // todo read data from serial spi
+      _payload += CHARPTR_WRAP("},");
 
       _remove_comma = true;
     }
@@ -154,15 +154,15 @@ void SerialServiceProvider::appendSerialJsonPayload(pdiutil::string &_payload, p
 
       _payload += "\"";
       _payload += _iface_label_uppercase;
-      _payload += "\":{\"";
+      _payload += CHARPTR_WRAP("\":{\"");
       _payload += SERIAL_PAYLOAD_MODE_KEY;
-      _payload += "\":";
+      _payload += CHARPTR_WRAP("\":");
       _payload += pdiutil::to_string((int)SERIAL_READ);
-      _payload += ",\"";
+      _payload += CHARPTR_WRAP(",\"");
       _payload += SERIAL_PAYLOAD_VALUE_KEY;
-      _payload += "\":";
-      _payload += "\"\"";  // todo read data from serial i2c
-      _payload += "},";
+      _payload += CHARPTR_WRAP("\":");
+      _payload += CHARPTR_WRAP("\"\"");  // todo read data from serial i2c
+      _payload += CHARPTR_WRAP("},");
 
       _remove_comma = true;
     }
@@ -172,15 +172,15 @@ void SerialServiceProvider::appendSerialJsonPayload(pdiutil::string &_payload, p
 
       _payload += "\"";
       _payload += _iface_label_uppercase;
-      _payload += "\":{\"";
+      _payload += CHARPTR_WRAP("\":{\"");
       _payload += SERIAL_PAYLOAD_MODE_KEY;
-      _payload += "\":";
+      _payload += CHARPTR_WRAP("\":");
       _payload += pdiutil::to_string((int)SERIAL_READ);
-      _payload += ",\"";
+      _payload += CHARPTR_WRAP(",\"");
       _payload += SERIAL_PAYLOAD_VALUE_KEY;
-      _payload += "\":";
-      _payload += "\"\"";  // todo read data from serial can
-      _payload += "},";
+      _payload += CHARPTR_WRAP("\":");
+      _payload += CHARPTR_WRAP("\"\"");  // todo read data from serial can
+      _payload += CHARPTR_WRAP("},");
 
       _remove_comma = true;
     }
@@ -191,7 +191,7 @@ void SerialServiceProvider::appendSerialJsonPayload(pdiutil::string &_payload, p
     _payload.pop_back(); // remove last comma
   }
 
-  _payload += "}}";
+  _payload += CHARPTR_WRAP("}}");
 }
 
 /**

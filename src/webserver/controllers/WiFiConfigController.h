@@ -172,20 +172,20 @@ public:
     bool _is_error = true;
 
 #if defined(ALLOW_WIFI_CONFIG_MODIFICATION) || defined(ALLOW_WIFI_SSID_PASSKEY_CONFIG_MODIFICATION_ONLY)
-    if (this->m_web_resource->m_server->hasArg("sta_ssid") && this->m_web_resource->m_server->hasArg("sta_pswd"))
+    if (this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("sta_ssid")) && this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("sta_pswd")))
     {
 
-      pdiutil::string _sta_ssid = this->m_web_resource->m_server->arg("sta_ssid");
-      pdiutil::string _sta_pswd = this->m_web_resource->m_server->arg("sta_pswd");
-      pdiutil::string _sta_lip = this->m_web_resource->m_server->arg("sta_lip");
-      pdiutil::string _sta_gip = this->m_web_resource->m_server->arg("sta_gip");
-      pdiutil::string _sta_sip = this->m_web_resource->m_server->arg("sta_sip");
+      pdiutil::string _sta_ssid = this->m_web_resource->m_server->arg(CHARPTR_WRAP("sta_ssid"));
+      pdiutil::string _sta_pswd = this->m_web_resource->m_server->arg(CHARPTR_WRAP("sta_pswd"));
+      pdiutil::string _sta_lip = this->m_web_resource->m_server->arg(CHARPTR_WRAP("sta_lip"));
+      pdiutil::string _sta_gip = this->m_web_resource->m_server->arg(CHARPTR_WRAP("sta_gip"));
+      pdiutil::string _sta_sip = this->m_web_resource->m_server->arg(CHARPTR_WRAP("sta_sip"));
 
-      pdiutil::string _ap_ssid = this->m_web_resource->m_server->arg("ap_ssid");
-      pdiutil::string _ap_pswd = this->m_web_resource->m_server->arg("ap_pswd");
-      pdiutil::string _ap_lip = this->m_web_resource->m_server->arg("ap_lip");
-      pdiutil::string _ap_gip = this->m_web_resource->m_server->arg("ap_gip");
-      pdiutil::string _ap_sip = this->m_web_resource->m_server->arg("ap_sip");
+      pdiutil::string _ap_ssid = this->m_web_resource->m_server->arg(CHARPTR_WRAP("ap_ssid"));
+      pdiutil::string _ap_pswd = this->m_web_resource->m_server->arg(CHARPTR_WRAP("ap_pswd"));
+      pdiutil::string _ap_lip = this->m_web_resource->m_server->arg(CHARPTR_WRAP("ap_lip"));
+      pdiutil::string _ap_gip = this->m_web_resource->m_server->arg(CHARPTR_WRAP("ap_gip"));
+      pdiutil::string _ap_sip = this->m_web_resource->m_server->arg(CHARPTR_WRAP("ap_sip"));
       __i_dvc_ctrl.yield();
 
       LogI("\nSubmitted info :\n");

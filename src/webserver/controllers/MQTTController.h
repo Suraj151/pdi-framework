@@ -176,15 +176,15 @@ public:
     bool _is_posted = false;
 
 #ifdef ALLOW_MQTT_CONFIG_MODIFICATION
-    if (this->m_web_resource->m_server->hasArg("hst") && this->m_web_resource->m_server->hasArg("prt"))
+    if (this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("hst")) && this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("prt")))
     {
-      pdiutil::string _mqtt_host = this->m_web_resource->m_server->arg("hst");
-      pdiutil::string _mqtt_port = this->m_web_resource->m_server->arg("prt");
-      pdiutil::string _client_id = this->m_web_resource->m_server->arg("clid");
-      pdiutil::string _username = this->m_web_resource->m_server->arg("usrn");
-      pdiutil::string _password = this->m_web_resource->m_server->arg("pswd");
-      pdiutil::string _keep_alive = this->m_web_resource->m_server->arg("kpalv");
-      pdiutil::string _clean_session = this->m_web_resource->m_server->arg("cln");
+      pdiutil::string _mqtt_host = this->m_web_resource->m_server->arg(CHARPTR_WRAP("hst"));
+      pdiutil::string _mqtt_port = this->m_web_resource->m_server->arg(CHARPTR_WRAP("prt"));
+      pdiutil::string _client_id = this->m_web_resource->m_server->arg(CHARPTR_WRAP("clid"));
+      pdiutil::string _username = this->m_web_resource->m_server->arg(CHARPTR_WRAP("usrn"));
+      pdiutil::string _password = this->m_web_resource->m_server->arg(CHARPTR_WRAP("pswd"));
+      pdiutil::string _keep_alive = this->m_web_resource->m_server->arg(CHARPTR_WRAP("kpalv"));
+      pdiutil::string _clean_session = this->m_web_resource->m_server->arg(CHARPTR_WRAP("cln"));
       __i_dvc_ctrl.yield();
 
       LogI("\nSubmitted info :\n");
@@ -302,12 +302,12 @@ public:
     bool _is_posted = false;
 
 #ifdef ALLOW_MQTT_CONFIG_MODIFICATION
-    if (this->m_web_resource->m_server->hasArg("wtpc") && this->m_web_resource->m_server->hasArg("wmsg"))
+    if (this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("wtpc")) && this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("wmsg")))
     {
-      pdiutil::string _will_topic = this->m_web_resource->m_server->arg("wtpc");
-      pdiutil::string _will_message = this->m_web_resource->m_server->arg("wmsg");
-      pdiutil::string _will_qos = this->m_web_resource->m_server->arg("wqos");
-      pdiutil::string _will_retain = this->m_web_resource->m_server->arg("wrtn");
+      pdiutil::string _will_topic = this->m_web_resource->m_server->arg(CHARPTR_WRAP("wtpc"));
+      pdiutil::string _will_message = this->m_web_resource->m_server->arg(CHARPTR_WRAP("wmsg"));
+      pdiutil::string _will_qos = this->m_web_resource->m_server->arg(CHARPTR_WRAP("wqos"));
+      pdiutil::string _will_retain = this->m_web_resource->m_server->arg(CHARPTR_WRAP("wrtn"));
 
       LogI("\nSubmitted info :\n");
       LogFmtI("will topic : %s\n", _will_topic.c_str());

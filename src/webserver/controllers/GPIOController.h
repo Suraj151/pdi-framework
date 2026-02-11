@@ -224,10 +224,16 @@ public:
 		strcat_ro(_page, HTML_DIV_OPEN_TAG);
 		concat_style_attribute(_page, RODT_ATTR("display:inline-flex;margin-top:25px;"));
 		strcat_ro(_page, HTML_TAG_CLOSE_BRACKET);
-		concat_graph_axis_title_div(_page, (char *)"A0 ( 0 - 1024 )", (char *)"writing-mode:vertical-lr");
+		
+		pdiutil::string y_axis_title = CHARPTR_WRAP("A0 ( 0 - 1024 )");
+		pdiutil::string y_axis_title_style = CHARPTR_WRAP("writing-mode:vertical-lr");
+		concat_graph_axis_title_div(_page, (char*)y_axis_title.c_str(), (char*)y_axis_title_style.c_str());
+
 		strcat_ro(_page, WEB_SERVER_GPIO_MONITOR_SVG_ELEMENT);
 		strcat_ro(_page, HTML_DIV_CLOSE_TAG);
-		concat_graph_axis_title_div(_page, (char *)"Time");
+
+		pdiutil::string x_axis_title = CHARPTR_WRAP("Time");
+		concat_graph_axis_title_div(_page, (char*)x_axis_title.c_str());
 		CONTINUE_SEND_IN_CHUNK(_page);
 		strcat_ro(_page, WEB_SERVER_FOOTER_WITH_ANALOG_MONITOR_HTML);
 		CONTINUE_SEND_IN_CHUNK(_page);

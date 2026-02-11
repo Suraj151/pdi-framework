@@ -67,7 +67,7 @@ void EmailServiceProvider::handleEmail()
           __gpio_service.appendGpioJsonPayload(*_payload);
 #endif
 
-          *_payload += "\n\nRegards\n";
+          *_payload += CHARPTR_WRAP("\n\nRegards\n");
           *_payload += __i_dvc_ctrl.getDeviceMac().c_str();
 
           if (this->sendMail(*_payload))

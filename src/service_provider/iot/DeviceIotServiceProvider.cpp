@@ -130,10 +130,10 @@ void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_t
       }
     }else{
 
-      _response = "{\"status\":false,\"remark\":";
-      _response += "\"Device request failed. ErrCode(";
+      _response = CHARPTR_WRAP("{\"status\":false,\"remark\":");
+      _response += CHARPTR_WRAP("\"Device request failed. ErrCode(");
       _response += pdiutil::to_string(_httpCode);
-      _response += ") !\"}";
+      _response += CHARPTR_WRAP(") !\"}");
     }
 
     this->m_http_client->End(true);
@@ -282,7 +282,7 @@ void DeviceIotServiceProvider::configureMQTT(){
   // _mqtt_pubsub_configs.publish_frequency = this->m_server_configurable_sensor_data_publish_freq; // let this device iot service manage the publish events
 
   strcpy( _mqtt_lwt_configs.will_topic, this->m_server_configurable_channel_read );
-  strcpy( _mqtt_lwt_configs.will_message, RODT_ATTR("{\"duid\":\"[duid]\"}") );
+  strcpy_ro( _mqtt_lwt_configs.will_message, RODT_ATTR("{\"duid\":\"[duid]\"}") );
   _mqtt_lwt_configs.will_qos = 1;
   _mqtt_lwt_configs.will_retain = 0;
   __find_and_replace( _mqtt_lwt_configs.will_message, "[duid]", this->m_device_iot_configs.device_iot_duid, 2 );
@@ -442,11 +442,11 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
         #endif
       }
 
-      pdiutil::string payloadtoapply = "{\"data\":{\""; 
+      pdiutil::string payloadtoapply = CHARPTR_WRAP("{\"data\":{\""); 
       payloadtoapply += this->m_server_configurable_interface_read[i];
-      payloadtoapply += "\":{\"mode\":";
+      payloadtoapply += CHARPTR_WRAP("\":{\"mode\":");
       payloadtoapply += pdiutil::to_string(imode);
-      payloadtoapply += ",\"val\":\"NA\"}}}";
+      payloadtoapply += CHARPTR_WRAP(",\"val\":\"NA\"}}}");
 
       if( imode == DIGITAL_READ || imode == ANALOG_READ ){
 
@@ -501,11 +501,11 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
         #endif
       }
 
-      pdiutil::string payloadtoapply = "{\"data\":{\""; 
+      pdiutil::string payloadtoapply = CHARPTR_WRAP("{\"data\":{\""); 
       payloadtoapply += this->m_server_configurable_interface_write[i];
-      payloadtoapply += "\":{\"mode\":";
+      payloadtoapply += CHARPTR_WRAP("\":{\"mode\":");
       payloadtoapply += pdiutil::to_string(imode);
-      payloadtoapply += ",\"val\":\"NA\"}}}";
+      payloadtoapply += CHARPTR_WRAP(",\"val\":\"NA\"}}}");
 
       if( imode == DIGITAL_WRITE || imode == ANALOG_WRITE ){
 
@@ -579,11 +579,11 @@ void DeviceIotServiceProvider::initDeviceIotSensor( iDeviceIotInterface *_device
  */
 void DeviceIotServiceProvider::handleSensorData(){
 
-  LogFmtI("Handling sensor data samples: %d\n", this->m_sample_index);
-
-  if( nullptr == this->m_device_iot ){
+  if(nullptr == this->m_device_iot || !this->m_token_validity){
     return;
   }
+
+  LogFmtI("Handling sensor data samples: %d\n", this->m_sample_index);
 
   this->m_device_iot->sampleHook();
 
@@ -596,9 +596,9 @@ void DeviceIotServiceProvider::handleSensorData(){
     this->m_handle_channel_write_asap = false;
     lastpublishtimestamp = __i_dvc_ctrl.millis_now();
 
-    pdiutil::string _payload = "{\"id\":[did],\"packet_type\":\"data\",\"packet_version\":\"";
+    pdiutil::string _payload = CHARPTR_WRAP("{\"id\":[did],\"packet_type\":\"data\",\"packet_version\":\"");
     _payload += DEVICE_IOT_PACKET_VERSION;
-    _payload += "\",\"payload\":";
+    _payload += CHARPTR_WRAP("\",\"payload\":");
     this->m_device_iot->dataHook(_payload);
     _payload += "}";
 

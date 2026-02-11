@@ -409,11 +409,11 @@ void LWSSH::prepare_server_kexinit(pdiutil::vector<uint8_t> &payload){
     }
 
     // 3. Name-lists (choose algorithms you support)
-    ssh_name_list kex_algorithms; kex_algorithms.push_back("curve25519-sha256");
-    ssh_name_list server_host_key_algorithms; server_host_key_algorithms.push_back("ssh-ed25519");
-    ssh_name_list encryption_algorithms; encryption_algorithms.push_back("aes128-ctr");
-    ssh_name_list mac_algorithms; mac_algorithms.push_back("hmac-sha1");
-    ssh_name_list compression_algorithms; compression_algorithms.push_back("none");
+    ssh_name_list kex_algorithms; kex_algorithms.push_back(CHARPTR_WRAP("curve25519-sha256"));
+    ssh_name_list server_host_key_algorithms; server_host_key_algorithms.push_back(CHARPTR_WRAP("ssh-ed25519"));
+    ssh_name_list encryption_algorithms; encryption_algorithms.push_back(CHARPTR_WRAP("aes128-ctr"));
+    ssh_name_list mac_algorithms; mac_algorithms.push_back(CHARPTR_WRAP("hmac-sha1"));
+    ssh_name_list compression_algorithms; compression_algorithms.push_back(CHARPTR_WRAP("none"));
     ssh_name_list languages; // empty
 
     append_name_list(payload, kex_algorithms);
@@ -850,7 +850,7 @@ bool LWSSH::prepare_server_ecdh_reply(LWSSHSession* session,
 
     // server host key blob (as SSH string)
     pdiutil::vector<uint8_t> hostkey_blob;
-    pdiutil::string keytype = "ssh-ed25519";
+    pdiutil::string keytype = CHARPTR_WRAP("ssh-ed25519");
     append_ssh_string(hostkey_blob, pdiutil::vector<uint8_t>(keytype.begin(), keytype.end()));
     append_ssh_string(hostkey_blob, server_host_pubkey);
 
