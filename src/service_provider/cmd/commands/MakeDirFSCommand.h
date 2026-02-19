@@ -29,6 +29,15 @@ struct MakeDirFSCommand : public CommandBase {
 		setAcceptArgsOptions(true);
 	}
 
+	/**
+     * @brief Register the command.
+     */
+    static void RegisterCommand(){
+		CommandBase::RegisterCommand(CMD_NAME_MKD, [](void *arg)->void *{ 
+			return new MakeDirFSCommand(); 
+		}); 
+	}
+
 #ifdef ENABLE_AUTH_SERVICE
 	/* override the necesity of required permission */
 	bool needauth() override { return true; }

@@ -27,6 +27,15 @@ struct ClearScreenCommand : public CommandBase {
 		SetCommand(CMD_NAME_CLS);
 	}
 
+	/**
+     * @brief Register the command.
+     */
+    static void RegisterCommand(){
+		CommandBase::RegisterCommand(CMD_NAME_CLS, [](void *arg)->void *{ 
+			return new ClearScreenCommand(); 
+		}); 
+	}
+
 	/* execute command with provided options */
 	cmd_result_t execute(cmd_term_inseq_t terminputaction){
 

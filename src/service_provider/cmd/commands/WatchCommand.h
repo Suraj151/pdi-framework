@@ -34,10 +34,31 @@ struct WatchCommand : public CommandBase {
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SEMICOLON);
 	}
 
+	/* Destructor */
+	~WatchCommand(){
+		stopRunningInBackground();
+	}
+
+	/**
+     * @brief Register the command.
+     */
+    static void RegisterCommand(){
+		CommandBase::RegisterCommand(CMD_NAME_WATCH, [](void *arg)->void *{ 
+			return new WatchCommand(); 
+		}); 
+	}
+
 #ifdef ENABLE_AUTH_SERVICE
 	/* override the necesity of required permission */
 	bool needauth() override { return true; }
 #endif
+
+    bool stopRunningInBackground() override{
+
+		__task_scheduler.remove_task(m_watchtaskid);
+		m_runinbackground = false;
+        return CommandBase::stopRunningInBackground();
+    }
 
 	/* execute command with provided options */
 	cmd_result_t execute(cmd_term_inseq_t terminputaction){
@@ -105,6 +126,7 @@ struct WatchCommand : public CommandBase {
 						m_terminal->write_ro(RODT_ATTR("CmdErr : "));
 						m_terminal->writeln((int32_t)cmdres);
 						__task_scheduler.remove_task(m_watchtaskid);
+						m_watchtaskid = -1;
 					}
 				}
 				
@@ -112,6 +134,8 @@ struct WatchCommand : public CommandBase {
 
 			if( m_watchtaskid < 0 ){
 				result = CMD_RESULT_FAILED;
+			}else{
+				m_runinbackground = true;
 			}
 		}
 

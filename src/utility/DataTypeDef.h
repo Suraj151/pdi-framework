@@ -171,6 +171,7 @@ typedef uint8_t follow_redirects_t;
 typedef pdiutil::function<void(int)> CallBackIntArgFn;
 typedef pdiutil::function<void(void)> CallBackVoidArgFn;
 typedef pdiutil::function<void(void *)> CallBackVoidPointerArgFn;
+typedef pdiutil::function<void *(void *)> CallBackVoidPointerArgVoidPointerRetFn;
 
 /**
  * Logging types

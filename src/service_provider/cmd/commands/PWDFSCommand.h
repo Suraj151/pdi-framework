@@ -28,6 +28,15 @@ struct PWDFSCommand  : public CommandBase {
 		SetCommand(CMD_NAME_PWD);
 	}
 
+	/**
+     * @brief Register the command.
+     */
+    static void RegisterCommand(){
+		CommandBase::RegisterCommand(CMD_NAME_PWD, [](void *arg)->void *{ 
+			return new PWDFSCommand(); 
+		}); 
+	}
+
 #ifdef ENABLE_AUTH_SERVICE
 	/* override the necesity of required permission */
 	bool needauth() override { return true; }

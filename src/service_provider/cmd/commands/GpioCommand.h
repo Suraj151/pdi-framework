@@ -31,6 +31,15 @@ struct GpioCommand : public CommandBase {
 		AddOption(CMD_OPTION_NAME_V);
 	}
 
+	/**
+     * @brief Register the command.
+     */
+    static void RegisterCommand(){
+		CommandBase::RegisterCommand(CMD_NAME_GPIO, [](void *arg)->void *{ 
+			return new GpioCommand(); 
+		}); 
+	}
+
 #ifdef ENABLE_AUTH_SERVICE
 	/* override the necesity of required permission */
 	bool needauth() override { return true; }

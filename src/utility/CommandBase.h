@@ -122,8 +122,18 @@ typedef struct CommandBase {
         }
     };
 
+    /**
+     * @struct CommandProp
+     * @brief Represents properties for a command.
+     *
+     */
+    struct CommandProp {
+        const char* cmdname = nullptr;
+        CallBackVoidPointerArgVoidPointerRetFn cmdregistrar = nullptr;
+    };
+
     /* Members */
-    char m_cmd[CMD_SIZE_MAX];                     ///< Command name.
+    const char* m_cmd;                     ///< Command name.
     CommandOption m_options[CMD_OPTION_MAX];      ///< Array of command options.
     uint8_t m_optionindx;                         ///< Index of the current option.
     int8_t m_waitingoptionindx;                   ///< Index of the option waiting for input.
@@ -134,6 +144,8 @@ typedef struct CommandBase {
     const char* m_optionseparator;               ///< Separator for options.
     uint16_t m_iterations;
     static CommandExecutionInterface *m_cmdexecinterface;  ///< Interface for command execution.
+    static pdiutil::vector<CommandProp> m_cmd_registry;
+    bool m_runinbackground;
 
     /**
      * @brief Constructor for the CommandBase structure.
@@ -161,6 +173,51 @@ typedef struct CommandBase {
     }
 
     /**
+     * @brief Register the command.
+     * @param cmdname unique name for command.
+     * @param cmdregistrar registar for the command.
+     */
+    static void RegisterCommand(const char* cmdname, CallBackVoidPointerArgVoidPointerRetFn cmdregistrar){
+
+        if(nullptr != cmdname && nullptr != cmdregistrar)
+            m_cmd_registry.push_back({cmdname, cmdregistrar});
+    }
+
+    /**
+     * @brief Checks if the command is registered.
+     * @param cmdname The command name to check.
+     * @return True if the command registered, false otherwise.
+     */
+    static bool IsCommandRegistered(const char *cmdname){
+
+        for (uint16_t i = 0; i < m_cmd_registry.size(); i++){
+            
+            if(isCommandMatch(m_cmd_registry[i].cmdname, cmdname)){
+
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @brief Get the command if registered.
+     * @param cmdname The command name to check.
+     * @return Command instance if the command registered, nullptr otherwise.
+     */
+    static CommandBase* GetCommand(const char *cmdname){
+
+        for (uint16_t i = 0; i < m_cmd_registry.size(); i++){
+            
+            if(isCommandMatch(m_cmd_registry[i].cmdname, cmdname) && nullptr != m_cmd_registry[i].cmdregistrar){
+
+                return (CommandBase*)m_cmd_registry[i].cmdregistrar(nullptr);
+            }
+        }
+        return nullptr;
+    }
+
+    /**
      * @brief Sets the command name.
      * @param _cmd The command name to set.
      * @return True if the command name was set successfully, false otherwise.
@@ -169,7 +226,8 @@ typedef struct CommandBase {
         if(nullptr != _cmd){
             int16_t cmdsize = strlen(_cmd);
             if( cmdsize < CMD_SIZE_MAX ){
-                memcpy(m_cmd, _cmd, cmdsize);
+                // memcpy(m_cmd, _cmd, cmdsize);
+                m_cmd = _cmd;
                 return true;
             }
         }
@@ -212,11 +270,12 @@ typedef struct CommandBase {
 
     /**
      * @brief Checks if the passed argument matches the current command.
+     * @param cmdname The command name to check against.
      * @param _cmd The command to validate.
      * @param _partialmatch If true, allows partial matching of the command.
      * @return True if the command matches, false otherwise.
      */
-    bool isValidCommand(char *_cmd, bool _partialmatch = false){
+    static bool isCommandMatch(const char *cmdname, const char *_cmd, bool _partialmatch = false){
 
         if( nullptr == _cmd ){
             return false;
@@ -224,7 +283,7 @@ typedef struct CommandBase {
 
         // int16_t cmd_len = strlen(_cmd);
         int16_t cmd_max_len = pdistd::min((size_t)CMD_SIZE_MAX, strlen(_cmd));
-        int16_t cmd_start_indx = 0;//__strstr(_cmd, m_cmd, cmd_max_len);
+        int16_t cmd_start_indx = 0;//__strstr(_cmd, cmdname, cmd_max_len);
         int16_t cmd_end_indx = __strstr(_cmd+cmd_start_indx, " ");
         cmd_end_indx = cmd_end_indx < 0 ? cmd_max_len : (cmd_start_indx+cmd_end_indx);
         // cmd_end_indx = cmd_end_indx > cmd_max_len ? cmd_max_len : cmd_end_indx;
@@ -236,12 +295,16 @@ typedef struct CommandBase {
             memcpy(argcmd, _cmd + cmd_start_indx, pdistd::min((int)CMD_SIZE_MAX, (int)abs(cmd_end_indx - cmd_start_indx)));
             
             if( _partialmatch ){
-                return __are_arrays_equal(m_cmd, argcmd, pdistd::min((int)CMD_SIZE_MAX, (int)abs(cmd_end_indx - cmd_start_indx)));
+                return __are_arrays_equal(cmdname, argcmd, pdistd::min((int)CMD_SIZE_MAX, (int)abs(cmd_end_indx - cmd_start_indx)));
             }
-            return __are_str_equals(m_cmd, argcmd, pdistd::min((int)CMD_SIZE_MAX, (int)abs(cmd_end_indx - cmd_start_indx)));
+            return __are_str_equals(cmdname, argcmd, pdistd::min((int)CMD_SIZE_MAX, (int)abs(cmd_end_indx - cmd_start_indx)));
         }
         return false;
-        // return ((nullptr != _cmd) && __are_arrays_equal(m_cmd, _cmd, strlen(m_cmd)));
+        // return ((nullptr != _cmd) && __are_arrays_equal(cmdname, _cmd, strlen(cmdname)));
+    }
+
+    bool isValidCommand(const char *_cmd, bool _partialmatch = false){
+        return isCommandMatch(m_cmd, _cmd, _partialmatch);
     }
 
     /**
@@ -279,6 +342,22 @@ typedef struct CommandBase {
         }else{
             return (m_waitingoptionindx == getOptionIndex(_optn));
         }
+    }
+
+    /**
+     * @brief Checks if the command is running in background.
+     * @return True if the command is running in background, false otherwise.
+     */
+    bool isRunningInBackground(){
+        return m_runinbackground;
+    }
+
+    /**
+     * @brief Stop running in background.
+     * @return True if the command stopped running in background, false otherwise.
+     */
+    virtual bool stopRunningInBackground(){
+        return !m_runinbackground;
     }
 
     /**
@@ -459,7 +538,8 @@ typedef struct CommandBase {
      * @brief Clears the command data.
      */
     void Clear(){
-        memset(m_cmd, 0, CMD_SIZE_MAX);
+        // memset(m_cmd, 0, CMD_SIZE_MAX);
+        m_cmd = nullptr;
         ClearOptions(true);
         m_optionindx = 0;
         m_terminal = nullptr;
@@ -468,6 +548,7 @@ typedef struct CommandBase {
         m_acceptArgsOptions = false;
         m_optionseparator = CMD_OPTION_SEPERATOR_COMMA;
         m_iterations = 0;
+        m_runinbackground = false;
     }
 
     /**

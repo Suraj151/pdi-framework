@@ -37,6 +37,15 @@ struct NetworkCommand : public CommandBase {
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_COMMA);
 	}
 
+	/**
+     * @brief Register the command.
+     */
+    static void RegisterCommand(){
+		CommandBase::RegisterCommand(CMD_NAME_NETWORK, [](void *arg)->void *{ 
+			return new NetworkCommand(); 
+		}); 
+	}
+
 #ifdef ENABLE_AUTH_SERVICE
 	/* override the necesity of required permission */
 	bool needauth() override { return true; }

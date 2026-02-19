@@ -40,6 +40,15 @@ struct SSHCommand : public CommandBase {
 		AddOption(CMD_OPTION_NAME_T);
 	}
 
+	/**
+     * @brief Register the command.
+     */
+    static void RegisterCommand(){
+		CommandBase::RegisterCommand(CMD_NAME_SSH, [](void *arg)->void *{ 
+			return new SSHCommand(); 
+		}); 
+	}
+
 #ifdef ENABLE_AUTH_SERVICE
 	/* override the necesity of required permission */
 	bool needauth() override { return true; }

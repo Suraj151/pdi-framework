@@ -30,6 +30,15 @@ struct LoginCommand : public CommandBase {
 		AddOption(CMD_OPTION_NAME_P);
 	}
 
+    /**
+     * @brief Register the command.
+     */
+    static void RegisterCommand(){
+		CommandBase::RegisterCommand(CMD_NAME_LOGIN, [](void *arg)->void *{ 
+			return new LoginCommand(); 
+		}); 
+	}
+
 	/* execute command with provided options */
 	cmd_result_t execute(cmd_term_inseq_t terminputaction){
 
@@ -105,6 +114,15 @@ struct LogoutCommand : public CommandBase {
 	LogoutCommand(){
 		Clear();
 		SetCommand(CMD_NAME_LOGOUT);
+	}
+
+    /**
+     * @brief Register the command.
+     */
+    static void RegisterCommand(){
+		CommandBase::RegisterCommand(CMD_NAME_LOGOUT, [](void *arg)->void *{ 
+			return new LogoutCommand(); 
+		}); 
 	}
 
 	/* execute command with provided options */

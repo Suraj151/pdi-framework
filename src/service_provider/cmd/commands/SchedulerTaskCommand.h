@@ -28,6 +28,15 @@ struct SchedulerTaskCommand : public CommandBase {
 		setAcceptArgsOptions(true);
 	}
 
+	/**
+     * @brief Register the command.
+     */
+    static void RegisterCommand(){
+		CommandBase::RegisterCommand(CMD_NAME_SCHED_TASK, [](void *arg)->void *{ 
+			return new SchedulerTaskCommand(); 
+		}); 
+	}
+
 	/* execute command with provided options */
 	cmd_result_t execute(cmd_term_inseq_t terminputaction){
 

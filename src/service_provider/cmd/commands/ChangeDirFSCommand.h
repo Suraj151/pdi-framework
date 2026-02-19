@@ -29,6 +29,15 @@ struct ChangeDirFSCommand : public CommandBase {
 		setAcceptArgsOptions(true);
 	}
 
+	/**
+     * @brief Register the command.
+     */
+    static void RegisterCommand(){
+		CommandBase::RegisterCommand(CMD_NAME_CD, [](void *arg)->void *{ 
+			return new ChangeDirFSCommand(); 
+		}); 
+	}
+
 #ifdef ENABLE_AUTH_SERVICE
 	/* override the necesity of required permission */
 	bool needauth() override { return true; }

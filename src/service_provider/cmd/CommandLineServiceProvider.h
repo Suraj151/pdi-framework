@@ -70,7 +70,6 @@ public:
 	cmd_result_t processTerminalInput(iTerminalInterface *terminal);
 	cmd_result_t executeCommand(pdiutil::string *cmd = nullptr, cmd_term_inseq_t inseq = CMD_TERM_INSEQ_NONE) override;
 	static void startInteraction();
-	cmd_t* getCommandByName(char* _cmd);
     void useTerminal(iTerminalInterface *terminal);
 	bool getCommandExecutedFromHistory(pdiutil::string &cmdExec, int16_t index, const char* pattern = nullptr);
 
@@ -109,6 +108,8 @@ private:
     int16_t m_cmdAutoCompleteIndex;
 
 	int16_t getCommandWaitingForUserInput();
+	cmd_t* getCommandToExecute(const char *cmdname);
+	cmd_t* getActiveCommandByName(const char* _cmd);
 };
 
 extern CommandLineServiceProvider __cmd_service;

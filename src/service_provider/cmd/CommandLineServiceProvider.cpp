@@ -26,82 +26,103 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   m_cmdAutoCompleteIndex(-1),
   ServiceProvider(SERVICE_CMD, RODT_ATTR("CMD"))
 {
-  // Add commands in list  
+  // Registers commands
   #ifdef ENABLE_AUTH_SERVICE
-  LoginCommand *logincmd = new LoginCommand();
-  m_cmdlist.push_back(logincmd);
+  // LoginCommand *logincmd = new LoginCommand();
+  // m_cmdlist.push_back(logincmd);
+  LoginCommand::RegisterCommand();
 
-  LogoutCommand *logoutcmd = new LogoutCommand();
-  m_cmdlist.push_back(logoutcmd);
+  // LogoutCommand *logoutcmd = new LogoutCommand();
+  // m_cmdlist.push_back(logoutcmd);
+  LogoutCommand::RegisterCommand();
   #endif
 
   #ifdef ENABLE_GPIO_SERVICE
-  GpioCommand *gpiocmd = new GpioCommand();
-  m_cmdlist.push_back(gpiocmd);
+  // GpioCommand *gpiocmd = new GpioCommand();
+  // m_cmdlist.push_back(gpiocmd);
+  GpioCommand::RegisterCommand();
   #endif
 
-  ServiceCommand *svccmd = new ServiceCommand();
-  m_cmdlist.push_back(svccmd);
+  // ServiceCommand *svccmd = new ServiceCommand();
+  // m_cmdlist.push_back(svccmd);
+  ServiceCommand::RegisterCommand();
 
   #ifdef ENABLE_STORAGE_SERVICE
-  ListFSCommand *listfscmd = new ListFSCommand();
-  m_cmdlist.push_back(listfscmd);
+  // ListFSCommand *listfscmd = new ListFSCommand();
+  // m_cmdlist.push_back(listfscmd);
+  ListFSCommand::RegisterCommand();
 
-  ChangeDirFSCommand *chdircmd = new ChangeDirFSCommand();
-  m_cmdlist.push_back(chdircmd);
+  // ChangeDirFSCommand *chdircmd = new ChangeDirFSCommand();
+  // m_cmdlist.push_back(chdircmd);
+  ChangeDirFSCommand::RegisterCommand();
 
-  PWDFSCommand *pwdfscmd = new PWDFSCommand();
-  m_cmdlist.push_back(pwdfscmd);
+  // PWDFSCommand *pwdfscmd = new PWDFSCommand();
+  // m_cmdlist.push_back(pwdfscmd);
+  PWDFSCommand::RegisterCommand();
 
-  MakeDirFSCommand *makedircmd = new MakeDirFSCommand();
-  m_cmdlist.push_back(makedircmd);
+  // MakeDirFSCommand *makedircmd = new MakeDirFSCommand();
+  // m_cmdlist.push_back(makedircmd);
+  MakeDirFSCommand::RegisterCommand();
 
-  MakeFileFSCommand *makefilecmd = new MakeFileFSCommand();
-  m_cmdlist.push_back(makefilecmd);
+  // MakeFileFSCommand *makefilecmd = new MakeFileFSCommand();
+  // m_cmdlist.push_back(makefilecmd);
+  MakeFileFSCommand::RegisterCommand();
 
-  RemoveFSCommand *removefdcmd = new RemoveFSCommand();
-  m_cmdlist.push_back(removefdcmd);
+  // RemoveFSCommand *removefdcmd = new RemoveFSCommand();
+  // m_cmdlist.push_back(removefdcmd);
+  RemoveFSCommand::RegisterCommand();
 
-  MoveFSCommand *movefscmd = new MoveFSCommand();
-  m_cmdlist.push_back(movefscmd);
+  // MoveFSCommand *movefscmd = new MoveFSCommand();
+  // m_cmdlist.push_back(movefscmd);
+  MoveFSCommand::RegisterCommand();
 
-  CopyFSCommand *copyfscmd = new CopyFSCommand();
-  m_cmdlist.push_back(copyfscmd);
+  // CopyFSCommand *copyfscmd = new CopyFSCommand();
+  // m_cmdlist.push_back(copyfscmd);
+  CopyFSCommand::RegisterCommand();
 
-  FileReadCommand *fileReadcmd = new FileReadCommand();
-  m_cmdlist.push_back(fileReadcmd);
+  // FileReadCommand *fileReadcmd = new FileReadCommand();
+  // m_cmdlist.push_back(fileReadcmd);
+  FileReadCommand::RegisterCommand();
 
-  FileWriteCommand *fileWritecmd = new FileWriteCommand();
-  m_cmdlist.push_back(fileWritecmd);
+  // FileWriteCommand *fileWritecmd = new FileWriteCommand();
+  // m_cmdlist.push_back(fileWritecmd);
+  FileWriteCommand::RegisterCommand();
 
   m_termhistoryfile = CHARPTR_WRAP_RO(CMD_TERMINAL_HISTORY_STATIC_FILEPATH);
   #endif
 
-  ClearScreenCommand *clearscreencmd = new ClearScreenCommand();
-  m_cmdlist.push_back(clearscreencmd);
+  // ClearScreenCommand *clearscreencmd = new ClearScreenCommand();
+  // m_cmdlist.push_back(clearscreencmd);
+  ClearScreenCommand::RegisterCommand();
 
-  SchedulerTaskCommand *schtaskcmd = new SchedulerTaskCommand();
-  m_cmdlist.push_back(schtaskcmd);
+  // SchedulerTaskCommand *schtaskcmd = new SchedulerTaskCommand();
+  // m_cmdlist.push_back(schtaskcmd);
+  SchedulerTaskCommand::RegisterCommand();
 
   #ifdef ENABLE_SSH_SERVICE
-  SSHCommand *sshcmd = new SSHCommand();
-  m_cmdlist.push_back(sshcmd);
+  // SSHCommand *sshcmd = new SSHCommand();
+  // m_cmdlist.push_back(sshcmd);
+  SSHCommand::RegisterCommand();
   #endif
 
-  RebootCommand *rebootcmd = new RebootCommand();
-  m_cmdlist.push_back(rebootcmd);
+  // RebootCommand *rebootcmd = new RebootCommand();
+  // m_cmdlist.push_back(rebootcmd);
+  RebootCommand::RegisterCommand();
 
   #ifdef ENABLE_NETWORK_SERVICE
-  NetworkCommand *networkcmd = new NetworkCommand();
-  m_cmdlist.push_back(networkcmd);
+  // NetworkCommand *networkcmd = new NetworkCommand();
+  // m_cmdlist.push_back(networkcmd);
+  NetworkCommand::RegisterCommand();
   #endif
 
-  WatchCommand *watchcmd = new WatchCommand();
-  m_cmdlist.push_back(watchcmd);
+  // WatchCommand *watchcmd = new WatchCommand();
+  // m_cmdlist.push_back(watchcmd);
+  WatchCommand::RegisterCommand();
 
   #ifdef ENABLE_DEVICE_IOT
-  DeviceIotCommand *deviceiotcmd = new DeviceIotCommand();
-  m_cmdlist.push_back(deviceiotcmd);
+  // DeviceIotCommand *deviceiotcmd = new DeviceIotCommand();
+  // m_cmdlist.push_back(deviceiotcmd);
+  DeviceIotCommand::RegisterCommand();
   #endif
 
   CommandBase::SetCommandExecutionInterface(this);
@@ -115,6 +136,7 @@ CommandLineServiceProvider::~CommandLineServiceProvider()
   for (auto cmd : m_cmdlist) {
     if(cmd) delete cmd;
   }
+  m_cmdlist.clear();
 }
 
 /**
@@ -126,14 +148,14 @@ bool CommandLineServiceProvider::initService(void *arg)
 
   if( nullptr != m_terminal ){
 
-    for (int16_t i = 0; i < m_cmdlist.size(); i++){
+    // for (int16_t i = 0; i < m_cmdlist.size(); i++){
 
-      if( nullptr != m_cmdlist[i] ){
+    //   if( nullptr != m_cmdlist[i] ){
 
-        // Set default terminal at start
-        m_cmdlist[i]->SetTerminal(m_terminal);
-      }
-    }
+    //     // Set default terminal at start
+    //     m_cmdlist[i]->SetTerminal(m_terminal);
+    //   }
+    // }
 
     // startInteraction();
 
@@ -159,7 +181,7 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
 
     #ifdef ENABLE_AUTH_SERVICE
     if(!__auth_service.getAuthorized()){
-      cmd_t *logincmd = getCommandByName(CMD_NAME_LOGIN);
+      cmd_t *logincmd = getActiveCommandByName(CMD_NAME_LOGIN);
       if( nullptr != logincmd && logincmd->isWaitingForOption(CMD_OPTION_NAME_P) ){
         dontecho = true;
       }
@@ -530,11 +552,11 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
           _cmdtosearch = m_termrecvdata.substr(0, prevCmdSize);
         }
 
-        for (int16_t i = 0; i < m_cmdlist.size(); i++){
+        for (int16_t i = 0; i < CommandBase::m_cmd_registry.size(); i++){
 
-          if(nullptr != m_cmdlist[i] && m_cmdlist[i]->isValidCommand((char*)_cmdtosearch.c_str(), true)){
+          if(CommandBase::isCommandMatch(CommandBase::m_cmd_registry[i].cmdname, _cmdtosearch.c_str(), true)){
 
-            matchedCmds.push_back(pdiutil::string(m_cmdlist[i]->m_cmd));
+            matchedCmds.push_back(pdiutil::string(CommandBase::m_cmd_registry[i].cmdname));
           }
         }
 
@@ -622,19 +644,27 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
     if(is_executing_lastcommand){
 
       res = m_cmdlist[waitingCmdIndex]->executeCommand((char*)cmd->c_str(), cmd->size(), true, inseq);
-    }
+    }else{
 
-    for (int16_t i = 0; !is_executing_lastcommand && i < m_cmdlist.size(); i++){
+      cmd_t* cmd_to_exec = getCommandToExecute(cmd->c_str());
 
-      if(nullptr != m_cmdlist[i] && m_cmdlist[i]->isValidCommand((char*)cmd->c_str())){
+      if(nullptr != cmd_to_exec){
 
-        res = m_cmdlist[i]->executeCommand((char*)cmd->c_str(), cmd->size());
-
-        // if( CMD_RESULT_OK == res ){
-          break;
-        // }
+        res = cmd_to_exec->executeCommand((char*)cmd->c_str(), cmd->size());
       }
     }
+
+    // for (int16_t i = 0; !is_executing_lastcommand && i < m_cmdlist.size(); i++){
+
+    //   if(nullptr != m_cmdlist[i] && m_cmdlist[i]->isValidCommand((char*)cmd->c_str())){
+
+    //     res = m_cmdlist[i]->executeCommand((char*)cmd->c_str(), cmd->size());
+
+    //     // if( CMD_RESULT_OK == res ){
+    //       break;
+    //     // }
+    //   }
+    // }
 
     // store command in history
     #ifdef ENABLE_STORAGE_SERVICE
@@ -709,16 +739,16 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
 
   // if command aborted then remove watch task if any
   if( CMD_RESULT_ABORTED == res || CMD_RESULT_TERMINAL_ABORTED == res ){
-    cmd_t *watchcmd = __cmd_service.getCommandByName(CMD_NAME_WATCH);
+    cmd_t *watchcmd = __cmd_service.getActiveCommandByName(CMD_NAME_WATCH);
     if( nullptr != watchcmd ){
-      __task_scheduler.remove_task(((WatchCommand*)watchcmd)->m_watchtaskid);
+      watchcmd->stopRunningInBackground();
     }
   }
 
   #ifdef ENABLE_AUTH_SERVICE
   bool isWaitingForUserAuth = false;
   if(!__auth_service.getAuthorized()){
-    cmd_t *logincmd = __cmd_service.getCommandByName(CMD_NAME_LOGIN);
+    cmd_t *logincmd = __cmd_service.getActiveCommandByName(CMD_NAME_LOGIN);
     if( nullptr != logincmd && logincmd->isWaitingForOption(CMD_OPTION_NAME_U) ){
       isWaitingForUserAuth = true;
     }
@@ -738,6 +768,16 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
     startInteraction();
   }
 
+  // Clean up executed commands
+  for (int16_t i = 0; i < m_cmdlist.size(); i++){
+
+    if(nullptr != m_cmdlist[i] && !m_cmdlist[i]->isWaitingForOption() && !m_cmdlist[i]->isRunningInBackground()){
+
+      delete m_cmdlist[i];
+      m_cmdlist.erase(m_cmdlist.begin() + i);
+    }
+  }
+
   return res;
 }
 
@@ -753,7 +793,11 @@ void CommandLineServiceProvider::startInteraction()
 
     #ifdef ENABLE_AUTH_SERVICE
 
-    cmd_t *logincmd = __cmd_service.getCommandByName(CMD_NAME_LOGIN);
+    cmd_t *logincmd = __cmd_service.getActiveCommandByName(CMD_NAME_LOGIN); 
+    
+    if(nullptr == logincmd){
+      logincmd = __cmd_service.getCommandToExecute(CMD_NAME_LOGIN);
+    }
     
     if( __auth_service.getAuthorized() ){
       
@@ -789,10 +833,10 @@ void CommandLineServiceProvider::startInteraction()
 }
 
 /**
- * Return command by provided name tag 
+ * Return the active command by provided name tag 
  *
  */
-cmd_t *CommandLineServiceProvider::getCommandByName(char *_cmd)
+cmd_t *CommandLineServiceProvider::getActiveCommandByName(const char *_cmd)
 {
   for (int16_t i = 0; i < m_cmdlist.size(); i++){
 
@@ -865,6 +909,22 @@ int16_t CommandLineServiceProvider::getCommandWaitingForUserInput(){
     }
   }
   return -1;
+}
+
+/**
+ * @brief Mark command to be execute and add it in cmdlist for further operations
+ */
+cmd_t* CommandLineServiceProvider::getCommandToExecute(const char *cmdname){
+
+  cmd_t* cmd_to_exec = CommandBase::GetCommand(cmdname);
+
+  if(nullptr != cmd_to_exec){
+
+    cmd_to_exec->SetTerminal(m_terminal);
+    m_cmdlist.push_back(cmd_to_exec);
+  }
+
+  return cmd_to_exec;
 }
 
 CommandLineServiceProvider __cmd_service;

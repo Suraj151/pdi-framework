@@ -30,6 +30,15 @@ struct FileReadCommand : public CommandBase {
 		setAcceptArgsOptions(true);
 	}
 
+	/**
+     * @brief Register the command.
+     */
+    static void RegisterCommand(){
+		CommandBase::RegisterCommand(CMD_NAME_FILE_READ, [](void *arg)->void *{ 
+			return new FileReadCommand(); 
+		}); 
+	}
+
 #ifdef ENABLE_AUTH_SERVICE
 	/* override the necesity of required permission */
 	bool needauth() override { return true; }
@@ -101,6 +110,15 @@ struct FileWriteCommand : public CommandBase {
 		AddOption(CMD_OPTION_NAME_F);
 		AddOption(CMD_OPTION_NAME_V);
 		setAcceptArgsOptions(true);
+	}
+
+	/**
+     * @brief Register the command.
+     */
+    static void RegisterCommand(){
+		CommandBase::RegisterCommand(CMD_NAME_FILE_WRITE, [](void *arg)->void *{ 
+			return new FileWriteCommand(); 
+		}); 
 	}
 
 	// Local variables used in operations

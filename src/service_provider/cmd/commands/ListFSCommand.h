@@ -28,6 +28,15 @@ struct ListFSCommand : public CommandBase {
 		SetCommand(CMD_NAME_LS);
 	}
 
+	/**
+     * @brief Register the command.
+     */
+    static void RegisterCommand(){
+		CommandBase::RegisterCommand(CMD_NAME_LS, [](void *arg)->void *{ 
+			return new ListFSCommand(); 
+		}); 
+	}
+
 #ifdef ENABLE_AUTH_SERVICE
 	/* override the necesity of required permission */
 	bool needauth() override { return true; }
