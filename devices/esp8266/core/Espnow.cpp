@@ -232,7 +232,7 @@ void Espnow::scanPeers(void) {
   uint8_t number_client= wifi_softap_get_station_num(); // Count of stations which are connected to ESP8266 soft-AP
   struct station_info * stat_info = wifi_softap_get_station_info();
 
-  #ifdef ENABLE_NAPT_FEATURE
+  #ifdef ENABLE_NAPT_FEATURE_LWIP_V1
   struct ip_addr *IPaddress;
   #else
   struct ip4_addr *IPaddress;

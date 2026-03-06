@@ -760,8 +760,10 @@ void WiFiInterface::enableNetworkStatusIndication()
  */
 void WiFiInterface::enableNAPT(bool enable)
 {
+  #if defined( ENABLE_NAPT )
   bool bStatus = this->m_wifi->AP.enableNAPT(enable);
   LogFmtS("NAPT enable status : %d\n", (int)bStatus);
+  #endif
 }
 
 /**

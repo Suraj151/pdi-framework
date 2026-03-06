@@ -12,7 +12,7 @@ created Date    : 1st June 2019
 #include "LoggerInterface.h"
 #include "DeviceControlInterface.h"
 
-#if defined( ENABLE_NAPT_FEATURE )
+#if defined( ENABLE_NAPT_FEATURE_LWIP_V1 )
 #include "lwip/lwip_napt.h"
 #include "lwip/app/dhcpserver.h"
 #elif defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
@@ -66,7 +66,7 @@ wifi_status_t toWifiStatus(wl_status_t stat)
 /**
  * WiFiInterface constructor.
  */
-WiFiInterface::WiFiInterface() : m_wifi(&WiFi), m_wifi_led(0)
+WiFiInterface::WiFiInterface() : m_wifi(&WiFi), m_wifi_led(0), m_napt_status(false)
 {
   wifi_set_event_handler_cb( (wifi_event_handler_cb_t)&WiFiInterface::wifi_event_handler_cb );
 }
@@ -256,14 +256,14 @@ bool WiFiInterface::reconnect()
   bool status = false;
   if (nullptr != this->m_wifi)
   {
-    #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.critical_lock();
-    #endif
+    // #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    // m_mutex.critical_lock();
+    // #endif
     status = this->m_wifi->reconnect();
-    __i_dvc_ctrl.wait(0);
-    #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.critical_unlock();
-    #endif
+    // __i_dvc_ctrl.wait(0);
+    // #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    // m_mutex.critical_unlock();
+    // #endif
   }
   return status;
 }
@@ -276,7 +276,7 @@ bool WiFiInterface::disconnect(bool _wifioff)
   bool status = false;
   if (nullptr != this->m_wifi)
   {
-    status = this->m_wifi->disconnect(_wifioff);
+    status = this->m_wifi->disconnect(_wifioff, false);
   }
   return status;
 }
@@ -548,13 +548,13 @@ void WiFiInterface::scanNetworksAsync(pdiutil::function<void(int)> _onComplete, 
 {
   if (nullptr != this->m_wifi)
   {
-    #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.critical_lock();
-    #endif
+    // #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    // m_mutex.critical_lock();
+    // #endif
     this->m_wifi->scanNetworksAsync(_onComplete, _show_hidden);
-    #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.critical_unlock();
-    #endif
+    // #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    // m_mutex.critical_unlock();
+    // #endif
   }
 }
 
@@ -728,7 +728,11 @@ void WiFiInterface::enableNetworkStatusIndication()
  */
 void WiFiInterface::enableNAPT(bool enable)
 {
-#if defined( ENABLE_NAPT_FEATURE )
+#if defined( ENABLE_NAPT )
+  if(m_napt_status == enable) return;
+  m_napt_status = enable;
+
+#if defined( ENABLE_NAPT_FEATURE_LWIP_V1 )
   // Initialize the NAT feature
   ip_napt_init(IP_NAPT_MAX, IP_PORTMAP_MAX);
   // Enable NAT on the AP interface
@@ -764,6 +768,7 @@ void WiFiInterface::enableNAPT(bool enable)
   if (ret != ERR_OK) {
     LogE("NAPT initialization failed\n");
   }
+#endif
 #endif
 }
 

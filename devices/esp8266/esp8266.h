@@ -115,13 +115,13 @@ extern "C"
  * @define network address & port translation feature
  */
 #if IP_NAPT && LWIP_VERSION_MAJOR == 1
-  #define ENABLE_NAPT_FEATURE
+  #define ENABLE_NAPT_FEATURE_LWIP_V1
 #elif IP_NAPT && LWIP_VERSION_MAJOR >= 2
   #define ENABLE_NAPT_FEATURE_LWIP_V2
 #endif
 
 
-#if defined( ENABLE_NAPT_FEATURE ) || defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
+#if defined( ENABLE_NAPT_FEATURE_LWIP_V1 ) || defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
   #define NAPT_INIT_DURATION_AFTER_WIFI_CONNECT MILLISECOND_DURATION_5000
 #endif
 

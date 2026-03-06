@@ -295,7 +295,7 @@ void PreemptiveScheduler::run(){
 
         // Save the last interrupted context and remove task from current pointer
         current->ctx = *__isr_ctx;
-        current = nullptr;
+        // current = nullptr;
     }
 
     // If any task ready then switch to it

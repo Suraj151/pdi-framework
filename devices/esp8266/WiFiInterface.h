@@ -107,9 +107,14 @@ private:
    */
   int16_t   m_wifi_led;
 
-  #ifdef ENABLE_CONTEXTUAL_EXECUTION
-  PreemptiveMutex m_mutex;
-  #endif
+  /**
+   * @var	bool napt status
+   */
+  int16_t   m_napt_status;
+
+  // #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  // PreemptiveMutex m_mutex;
+  // #endif
 };
 
 #endif

@@ -87,7 +87,7 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
     // Allocate a new TCP protocol control block
     m_pcb = tcp_new();
     if (!m_pcb) {
-        return -99;
+        return -98;
     }
 
     // Set the connection callback
@@ -99,7 +99,7 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
     err_t err = tcp_connect(m_pcb, &serverIp, port, &TcpClientInterface::onConnected);
     if (err != ERR_OK) {
         close();
-        return err < 0 ? err : -99; // Return error code if connection fails
+        return err < 0 ? err : -97; // Return error code if connection fails
     }
     setNoDelay(true);
 
@@ -107,7 +107,10 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
         __i_dvc_ctrl.yield();
     }
 
-    if( !connected() ) return -100;  // timeout    
+    if( !connected() ) {
+        close();
+        return -96;  // timeout
+    }    
 
     return 0;
 }
