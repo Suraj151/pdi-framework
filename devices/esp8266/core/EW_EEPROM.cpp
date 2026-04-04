@@ -58,7 +58,7 @@ void EW_EEPROMClass::begin(size_t size) {
   m_size = size;
   m_copy_sector = 255;
 
-  noInterrupts();
+  CRITICAL_SECTION_ENTER
 
   spi_flash_read(m_sector * SPI_FLASH_SEC_SIZE, reinterpret_cast<uint32_t*>(m_data), m_size);
   if( m_data[0] == EEPROM_VALIDITY_BYTES[0] && m_data[1] == EEPROM_VALIDITY_BYTES[1] &&
@@ -81,7 +81,8 @@ void EW_EEPROMClass::begin(size_t size) {
         m_data[3] = EEPROM_VALIDITY_BYTES[3];
     }
   }
-  interrupts();
+
+  CRITICAL_SECTION_EXIT
 
   m_dirty = false; //make sure dirty is cleared in case begin() is called 2nd+ time
 }
@@ -139,7 +140,8 @@ bool EW_EEPROMClass::commit() {
     return false;
   }
 
-  noInterrupts();
+  CRITICAL_SECTION_ENTER
+
   if(spi_flash_erase_sector(m_sector) == SPI_FLASH_RESULT_OK) {
     if(spi_flash_write(m_sector * SPI_FLASH_SEC_SIZE, reinterpret_cast<uint32_t*>(m_data), m_size) == SPI_FLASH_RESULT_OK) {
       m_dirty = false;
@@ -151,7 +153,7 @@ bool EW_EEPROMClass::commit() {
     }
   }
 
-  interrupts();
+  CRITICAL_SECTION_EXIT
 
   return ret;
 }

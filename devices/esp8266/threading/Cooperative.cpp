@@ -122,9 +122,9 @@ void CooperativeScheduler::schedule_task(task_t* task, uint32_t stacksize){
     for (int i = 3; i <= 15; ++i) f->ctx.a[i] = 0;
 
     // Add to ready list    
-    noInterrupts();
+    CRITICAL_SECTION_ENTER
     add_to_ready(f);
-    interrupts();
+    CRITICAL_SECTION_EXIT
 }
 
 /**
@@ -132,11 +132,11 @@ void CooperativeScheduler::schedule_task(task_t* task, uint32_t stacksize){
  */
 void CooperativeScheduler::mute(){
 
-    noInterrupts(); 
+    CRITICAL_SECTION_ENTER 
 
     Cooperative* f = current;
     if (!f) {
-        interrupts();
+        CRITICAL_SECTION_EXIT
         return;
     }
 
@@ -148,7 +148,7 @@ void CooperativeScheduler::mute(){
     if(f->state == CooperativeState::Mute)
         CooperativeScheduler::exit();
 
-    interrupts();
+    CRITICAL_SECTION_EXIT
 }
 
 /**
@@ -156,11 +156,11 @@ void CooperativeScheduler::mute(){
  */
 void CooperativeScheduler::yield(){
 
-    noInterrupts(); 
+    CRITICAL_SECTION_ENTER 
 
     Cooperative* f = current;
     if (!f) {
-        interrupts();
+        CRITICAL_SECTION_EXIT
         return;
     }
 
@@ -172,7 +172,7 @@ void CooperativeScheduler::yield(){
     if(f->state == CooperativeState::Ready)
         CooperativeScheduler::exit();
 
-    interrupts();
+    CRITICAL_SECTION_EXIT
 }
 
 /**
@@ -180,11 +180,11 @@ void CooperativeScheduler::yield(){
  */
 void CooperativeScheduler::sleep(uint32_t ms){
 
-    noInterrupts(); 
+    CRITICAL_SECTION_ENTER 
 
     Cooperative* f = current;
     if (!f) {
-        interrupts();
+        CRITICAL_SECTION_EXIT
         return;
     }
 
@@ -195,7 +195,7 @@ void CooperativeScheduler::sleep(uint32_t ms){
     if(f->state == CooperativeState::Sleeping)
         CooperativeScheduler::exit();
 
-    interrupts();
+    CRITICAL_SECTION_EXIT
 }
 
 /**
@@ -207,9 +207,9 @@ void CooperativeScheduler::run(){
 
         __base_ctx_saved = true; 
         // Save the main loop context once every time run called
-        noInterrupts();
+        CRITICAL_SECTION_ENTER
         xtensa_save_context(&__base_ctx); 
-        interrupts();
+        CRITICAL_SECTION_EXIT
     }    
 
     // Wake sleepers whose time has arrived
@@ -219,12 +219,12 @@ void CooperativeScheduler::run(){
         auto si = sleepers[i];
         if (si.f && (int32_t)(now - si.wake_ms) >= 0) {
 
-            noInterrupts(); 
+            CRITICAL_SECTION_ENTER 
             add_to_ready(si.f); 
             // erase by swap-pop for O(1)
             sleepers[i] = sleepers.back();
             sleepers.pop_back();
-            interrupts();
+            CRITICAL_SECTION_EXIT
         } else {
             ++i;
         }
@@ -236,7 +236,7 @@ void CooperativeScheduler::run(){
         Cooperative* next = pick_next_ready();
         if (!next) return;
 
-        noInterrupts();
+        CRITICAL_SECTION_ENTER
         current = next;
         next->state = CooperativeState::Running;
         xtensa_restore_context(&next->ctx); // never returns        
@@ -256,13 +256,13 @@ void CooperativeScheduler::exit(){
         __i_cooperative_scheduler.destroy_cooperative(f);
     }
 
-    noInterrupts();
+    CRITICAL_SECTION_ENTER
     __i_cooperative_scheduler.current = nullptr;
     if(__base_ctx_saved){
         __base_ctx_saved = false;
         xtensa_restore_context(&__base_ctx); // jumps back main
     }
-    interrupts();
+    CRITICAL_SECTION_EXIT
 }
 
 /**
@@ -272,14 +272,14 @@ void CooperativeScheduler::destroy_cooperative(Cooperative* f) {
 
     if (f){
 
-        noInterrupts(); 
+        CRITICAL_SECTION_ENTER 
         remove_from_sleepers(f);
         remove_from_ready(f);
     
         __task_scheduler.remove_task(f->task_id);
         delete f; 
         f = nullptr;
-        interrupts();
+        CRITICAL_SECTION_EXIT
     }
 }
 
@@ -347,9 +347,9 @@ Cooperative* CooperativeScheduler::pick_next_ready() {
         best->wait_ticks = 0;
 
         // Remove from ready list
-        noInterrupts();
+        CRITICAL_SECTION_ENTER
         remove_from_ready(best);
-        interrupts();
+        CRITICAL_SECTION_EXIT
     }
 
     return best;

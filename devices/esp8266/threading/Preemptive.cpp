@@ -24,7 +24,7 @@ static uint32_t __timer_period = 1000; // in microseconds
  */
 void IRAM_ATTR __attribute__((naked)) timer1_isr_coroutine(XtensaContext* ctx){
 
-    // noInterrupts();
+    // CRITICAL_SECTION_ENTER
 
     // Capture microseconds
     uint32_t current_us = micros();
@@ -51,7 +51,7 @@ void IRAM_ATTR __attribute__((naked)) timer1_isr_coroutine(XtensaContext* ctx){
     // Tune the period at runtime
     timer1_update_us(__timer_period - spent_time_in_us);
 
-    // interrupts();
+    // CRITICAL_SECTION_EXIT
 }
 
 /**
@@ -165,9 +165,9 @@ void PreemptiveScheduler::schedule_task(task_t* task, uint32_t stacksize){
     f->ctx.excframe = 0;
 
     // Add to ready list    
-    noInterrupts();
+    CRITICAL_SECTION_ENTER
     add_to_ready(f);
-    interrupts();
+    CRITICAL_SECTION_EXIT
 
     // Start timer
     if(!preemptiveisr_active){
@@ -181,11 +181,11 @@ void PreemptiveScheduler::schedule_task(task_t* task, uint32_t stacksize){
  */
 void PreemptiveScheduler::mute(){
 
-    noInterrupts(); 
+    CRITICAL_SECTION_ENTER 
 
     Preemptive* f = current;
     if (!f) {
-        interrupts();
+        CRITICAL_SECTION_EXIT
         return;
     }
 
@@ -198,7 +198,7 @@ void PreemptiveScheduler::mute(){
     // if(f->state == PreemptiveState::Mute)
         PreemptiveScheduler::exit();
     
-    interrupts();
+    CRITICAL_SECTION_EXIT
 }
 
 /**
@@ -206,11 +206,11 @@ void PreemptiveScheduler::mute(){
  */
 void PreemptiveScheduler::yield(){
 
-    noInterrupts(); 
+    CRITICAL_SECTION_ENTER 
 
     Preemptive* f = current;
     if (!f) {
-        interrupts();
+        CRITICAL_SECTION_EXIT
         return;
     }
 
@@ -222,7 +222,7 @@ void PreemptiveScheduler::yield(){
     // if(f->state == PreemptiveState::Ready)
         PreemptiveScheduler::exit();
     
-    interrupts();
+    CRITICAL_SECTION_EXIT
 }
 
 /**
@@ -230,11 +230,11 @@ void PreemptiveScheduler::yield(){
  */
 void PreemptiveScheduler::sleep(uint32_t ms){
 
-    noInterrupts(); 
+    CRITICAL_SECTION_ENTER 
 
     Preemptive* f = current;
     if (!f) {
-        interrupts();
+        CRITICAL_SECTION_EXIT
         return;
     }
 
@@ -245,7 +245,7 @@ void PreemptiveScheduler::sleep(uint32_t ms){
     // if(f->state == PreemptiveState::Sleeping)
         PreemptiveScheduler::exit();
 
-    interrupts();
+    CRITICAL_SECTION_EXIT
 }
 
 /**
@@ -350,13 +350,13 @@ void PreemptiveScheduler::disable_sched(){
 
     if (!current) return;
     
-    noInterrupts();
+    CRITICAL_SECTION_ENTER
     if(preemptiveisr_active){
 
         timer1_clear();
         preemptiveisr_active = false;
     }
-    interrupts();
+    CRITICAL_SECTION_EXIT
 }
 
 /**
@@ -373,10 +373,10 @@ void PreemptiveScheduler::exit(){
         f = nullptr;
     }
 
-    noInterrupts();
+    CRITICAL_SECTION_ENTER
     // __i_preemptive_scheduler.current = nullptr; // can we remove pointer in ISR ?
     timer1_update_us(1);
-    interrupts();
+    CRITICAL_SECTION_EXIT
 
     while(1) // wait for context switch by ISR
     {
@@ -392,14 +392,14 @@ void PreemptiveScheduler::destroy_preemptive(Preemptive* f) {
 
     if (f){
 
-        noInterrupts(); 
+        CRITICAL_SECTION_ENTER 
         remove_from_sleepers(f);
         remove_from_ready(f);
     
         __task_scheduler.remove_task(f->task_id);
         delete f; 
         f = nullptr;
-        interrupts();
+        CRITICAL_SECTION_EXIT
     }
 }
 

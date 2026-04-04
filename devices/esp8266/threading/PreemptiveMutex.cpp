@@ -36,11 +36,11 @@ PreemptiveMutex::~PreemptiveMutex() {
  */
 void PreemptiveMutex::lock(){
 
-    noInterrupts();
+    CRITICAL_SECTION_ENTER
 
     if(!__i_preemptive_scheduler.current) {
 
-        interrupts();
+        CRITICAL_SECTION_EXIT
         return;
     }
 
@@ -48,21 +48,21 @@ void PreemptiveMutex::lock(){
 
         m_locked = true; 
         m_owner = __i_preemptive_scheduler.current;
-        interrupts();
+        CRITICAL_SECTION_EXIT
         return; 
     }
 
     // Avoid lock twice
     if (__i_preemptive_scheduler.current == m_owner) {
 
-        interrupts(); 
+        CRITICAL_SECTION_EXIT 
         return; 
     }    
 
     m_waiters.push_back(__i_preemptive_scheduler.current); 
     __i_preemptive_scheduler.mute(); // park this current preemptive 
 
-    interrupts();
+    CRITICAL_SECTION_EXIT
 }
 
 /**
@@ -72,12 +72,12 @@ void PreemptiveMutex::unlock(){
 
     // if(!__i_preemptive_scheduler.current) return;
 
-    noInterrupts(); 
+    CRITICAL_SECTION_ENTER 
 
     // Only owner can unlock
     if (__i_preemptive_scheduler.current != m_owner) {
 
-        interrupts();
+        CRITICAL_SECTION_EXIT
         return;
     }
     
@@ -93,7 +93,7 @@ void PreemptiveMutex::unlock(){
         m_owner = nullptr;
     }    
     
-    interrupts();
+    CRITICAL_SECTION_EXIT
 }
 
 /**
@@ -102,7 +102,7 @@ void PreemptiveMutex::unlock(){
 void PreemptiveMutex::critical_lock(){
 
     lock();
-    // noInterrupts();
+    // CRITICAL_SECTION_ENTER
     cli();
 }
 

@@ -50,6 +50,10 @@ namespace pdiutil {
 #define PROG_RODT_ATTR
 #define PROG_RODT_PTR
 
+// Attribute to be redefined while entering critical section
+#define CRITICAL_SECTION_ENTER
+#define CRITICAL_SECTION_EXIT
+
 // String operations api for read-write-modify string data (can be redefined in derived interfaces)
 // _ro for each of api referes to read-only data region specific api
 #define strcat strcat

@@ -23,8 +23,8 @@ CooperativeConditionVar::notify_one(){
     if (!m_waiters.empty()) {
         Cooperative* f = m_waiters.back();     // LIFO; use back for O(1)
         m_waiters.pop_back();
-        noInterrupts();
+        CRITICAL_SECTION_ENTER
         __i_cooperative_scheduler.add_to_ready(f);
-        interrupts();
+        CRITICAL_SECTION_EXIT
     }    
 }

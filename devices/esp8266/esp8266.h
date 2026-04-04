@@ -55,6 +55,16 @@ extern "C"
 #define PROG_RODT_PTR PGM_P
 #endif
 
+#ifdef CRITICAL_SECTION_ENTER
+#undef CRITICAL_SECTION_ENTER
+#define CRITICAL_SECTION_ENTER noInterrupts();
+#endif
+
+#ifdef CRITICAL_SECTION_EXIT
+#undef CRITICAL_SECTION_EXIT
+#define CRITICAL_SECTION_EXIT interrupts();
+#endif
+
 #ifdef strcat_ro
 #undef strcat_ro
 #define strcat_ro strcat_P
