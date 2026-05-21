@@ -83,7 +83,7 @@ class DashboardController : public Controller {
 			{
 				char macStr[30];
 				memset(macStr, 0, 30);
-				sprintf(
+				__sprintf(
 					macStr,
 					"%02X:%02X:%02X:%02X:%02X:%02X",
 					stations[sta_indx].bssid[0], stations[sta_indx].bssid[1], stations[sta_indx].bssid[2], stations[sta_indx].bssid[3], stations[sta_indx].bssid[4], stations[sta_indx].bssid[5]);

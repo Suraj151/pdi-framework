@@ -213,9 +213,9 @@ bool SSHServer::getSSHKeyPairs(SSHKeyAlgorithm type, pdiutil::vector<uint8_t> &p
         privkey.clear();
         int bytesRead = 0;
 
-        snprintf(sshdir, sizeof(sshdir), "%s/%s", (strlen(homedir) > 1 ? homedir : ""), SSH_DEFAULT_DIR);
-        snprintf(privkeyOrseed_path, sizeof(privkeyOrseed_path), (privkeyInSeedPlusPubkeyformat ? "%s/%s.seed" : "%s/%s"), sshdir, SSH_KEY_ALGO_ED25519_STR);
-        snprintf(pubkey_path, sizeof(pubkey_path), "%s/%s.pub", sshdir, SSH_KEY_ALGO_ED25519_STR);
+        __snprintf(sshdir, sizeof(sshdir), "%s/%s", (strlen(homedir) > 1 ? homedir : ""), SSH_DEFAULT_DIR);
+        __snprintf(privkeyOrseed_path, sizeof(privkeyOrseed_path), (privkeyInSeedPlusPubkeyformat ? "%s/%s.seed" : "%s/%s"), sshdir, SSH_KEY_ALGO_ED25519_STR);
+        __snprintf(pubkey_path, sizeof(pubkey_path), "%s/%s.pub", sshdir, SSH_KEY_ALGO_ED25519_STR);
 
         if (!__i_fs.isFileExist(privkeyOrseed_path) || !__i_fs.isFileExist(pubkey_path)) {
             return bStatus; // No SSH keys found, cannot proceed

@@ -128,8 +128,10 @@ typedef struct CommandBase {
      *
      */
     struct CommandProp {
-        const char* cmdname = nullptr;
-        CallBackVoidPointerArgVoidPointerRetFn cmdregistrar = nullptr;
+        const char* cmdname;
+        CallBackVoidPointerArgVoidPointerRetFn cmdregistrar;
+        CommandProp(const char* n = nullptr, CallBackVoidPointerArgVoidPointerRetFn r = nullptr)
+            : cmdname(n), cmdregistrar(r) {}
     };
 
     /* Members */
@@ -180,7 +182,7 @@ typedef struct CommandBase {
     static void RegisterCommand(const char* cmdname, CallBackVoidPointerArgVoidPointerRetFn cmdregistrar){
 
         if(nullptr != cmdname && nullptr != cmdregistrar)
-            m_cmd_registry.push_back({cmdname, cmdregistrar});
+            m_cmd_registry.push_back(CommandProp(cmdname, cmdregistrar));
     }
 
     /**

@@ -377,6 +377,14 @@ uint32_t DeviceControlInterface::millis_now()
 }
 
 /**
+ * return currently free heap size in bytes
+ */
+uint32_t DeviceControlInterface::get_free_heap()
+{
+    return ESP.getFreeHeap();
+}
+
+/**
  * log helper for utility
  */
 void DeviceControlInterface::log(logger_type_t log_type, const char *content)

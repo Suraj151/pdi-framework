@@ -162,7 +162,7 @@ iTerminalInterface* UARTSerial::with_timestamp()
 {
   char tembuff[15];
   memset(tembuff, 0, 15);
-  sprintf(tembuff, "%ld", millis());
+  __sprintf(tembuff, "%lu", millis());
   
   write('[');
   write_pad(tembuff, 10, true);

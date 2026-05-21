@@ -65,6 +65,7 @@ public:
   // util methods
   void wait(double timeoutms) override;
   uint32_t millis_now() override;
+  uint32_t get_free_heap() override;
   void log(logger_type_t log_type, const char *content) override;
   void yield() override;
 

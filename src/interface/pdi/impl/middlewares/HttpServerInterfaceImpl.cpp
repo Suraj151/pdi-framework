@@ -297,7 +297,7 @@ void HttpServerInterfaceImpl::sendChunk(const char *chunk){
     
         // Send the chunk in response
         char temp[20]; memset(temp, 0, 20);
-        snprintf(temp, 20, "%X\r\n", chunklen);
+        __snprintf(temp, 20, "%X\r\n", chunklen);
 
         sendPacket(m_client, (uint8_t *)temp, strlen(temp));
         __i_instance.getUtilityInstance().yield();

@@ -10,21 +10,28 @@ created Date    : 1st May 2025
 #include "TcpClientInterface.h"
 #include "DeviceControlInterface.h"
 
-struct dnsFoundResult {
-    ip_addr_t addr;
-    bool found;
-};
+void TcpClientInterface::onDnsFound(const char *name, const ip_addr_t *ipaddr, void *arg)
+{
+    TcpClientInterface* self = static_cast<TcpClientInterface*>(arg);
+    if (nullptr == self) return;
+    if (nullptr != ipaddr) {
+        self->m_dns.addr = *ipaddr;
+        self->m_dns.found = true;
+    }
+    self->m_dns.in_flight = false;
+}
 
 /**
  * @brief Constructor for TcpClientInterface.
  */
-TcpClientInterface::TcpClientInterface() : 
-    m_pcb(nullptr), 
-    m_isConnected(false), 
+TcpClientInterface::TcpClientInterface() :
+    m_pcb(nullptr),
+    m_isConnected(false),
     m_rxBuffer(nullptr),
     m_rxBufferSize(0),
     m_timeout(3000),
-    m_isLastWriteAcked(true) {}
+    m_isLastWriteAcked(true),
+    m_dns{IP4_ADDRESS_NONE, false, false} {}
 
 /**
  * @brief Parameterized Constructor for TcpClientInterface.
@@ -33,12 +40,13 @@ TcpClientInterface::TcpClientInterface() :
  * @param pcb Pointer to an existing TCP protocol control block (pcb).
  */
 TcpClientInterface::TcpClientInterface(struct tcp_pcb* pcb):
-    m_pcb(pcb), 
-    m_isConnected(true), 
+    m_pcb(pcb),
+    m_isConnected(true),
     m_rxBuffer(nullptr),
     m_rxBufferSize(0),
     m_timeout(3000),
-    m_isLastWriteAcked(true) {
+    m_isLastWriteAcked(true),
+    m_dns{IP4_ADDRESS_NONE, false, false} {
 
     if (m_pcb) {
         tcp_arg(m_pcb, this);
@@ -71,31 +79,43 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
     // Convert the host to an IP address
     if (!ipaddr_aton(hostname, &serverIp)) {
 
-        dnsFoundResult dnsresult{IP4_ADDRESS_NONE, false};
-        // It's a hostname, resolve via DNS
-        err_t err = dns_gethostbyname(hostname, &serverIp,[](const char* name, const ip_addr_t* ipaddr, void* arg) {
+        // A previous lookup may still be pending in lwIP if an earlier
+        // connect() bailed on timeout. Starting a new lookup while the
+        // old callback is still parked on &m_dns would let it overwrite
+        // the new query's result, so wait for the old one to clear.
+        if (m_dns.in_flight) {
+            return -98;
+        }
 
-            dnsFoundResult* dnsfound = static_cast<dnsFoundResult*>(arg);
-            if (ipaddr) {
-                // Connect once resolved
-                dnsfound->addr = *ipaddr;
-                dnsfound->found = true;
-            } else {
-            }
-        }, &dnsresult);
+        m_dns.in_flight = true;
+        m_dns.found = false;
+
+        err_t err = dns_gethostbyname(hostname, &serverIp, &TcpClientInterface::onDnsFound, this);
 
         if (err == ERR_OK) {
-            // Resolved immediately (cached), connect now
+            // Resolved synchronously (cached) — callback was not invoked
+            m_dns.in_flight = false;
         } else if (err == ERR_INPROGRESS) {
-            
-            while (!dnsresult.found && (__i_dvc_ctrl.millis_now() - now) < m_timeout){
+
+            while (m_dns.in_flight && (__i_dvc_ctrl.millis_now() - now) < m_timeout){
                 __i_dvc_ctrl.yield();
             }
-            if( !dnsresult.found ) return -100;  // timeout
-            serverIp = dnsresult.addr;
+
+            if (m_dns.in_flight) {
+                // Timed out before lwIP fired. Leave in_flight=true so the
+                // next connect() bails until lwIP eventually calls back.
+                return -100;
+            }
+
+            if (!m_dns.found) {
+                return -100;
+            }
+            serverIp = m_dns.addr;
         } else {
+            // lwIP rejected the request — it will not call the callback
+            m_dns.in_flight = false;
             return -99;
-        }        
+        }
     }
 
     // Allocate a new TCP protocol control block

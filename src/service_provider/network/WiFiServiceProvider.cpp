@@ -520,7 +520,7 @@ void WiFiServiceProvider::printStatusToTerminal(iTerminalInterface *terminal){
       uint8_t *bssid = this->m_wifi->BSSID();
       if(nullptr != bssid){
         char macstr[36] = {0};
-        snprintf(macstr, sizeof(macstr), "%02X:%02X:%02X:%02X:%02X:%02X", bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+        __snprintf(macstr, sizeof(macstr), "%02X:%02X:%02X:%02X:%02X:%02X", bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
         terminal->writeln(macstr);
       }else{
         terminal->putln();

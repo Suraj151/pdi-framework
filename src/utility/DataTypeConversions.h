@@ -91,6 +91,33 @@ void Int32ToString(int32_t val, char *pString, uint8_t _maxlen, uint8_t _padmax 
 void Int64ToString(int64_t val, char *pString, uint8_t _maxlen, uint8_t _padmax = 0);
 
 /**
+ * @brief Converts an unsigned 32-bit integer to a decimal string.
+ * @param val The unsigned 32-bit integer to convert.
+ * @param pString The buffer to store the resulting string.
+ * @param _maxlen The maximum length of the string buffer.
+ * @param _padmax The number of padding characters to add (default is 0).
+ */
+void Uint32ToString(uint32_t val, char *pString, uint8_t _maxlen, uint8_t _padmax = 0);
+
+/**
+ * @brief Converts an unsigned 32-bit integer to a hexadecimal string (no "0x" prefix).
+ * @param val The unsigned 32-bit integer to convert.
+ * @param pString The buffer to store the resulting string.
+ * @param _maxlen The maximum length of the string buffer.
+ * @param cap If true, uses uppercase A-F (default is false).
+ */
+void Uint32ToHexString(uint32_t val, char *pString, uint8_t _maxlen, bool cap = false);
+
+/**
+ * @brief Converts a floating-point value to a string.
+ * @param val The floating-point value to convert.
+ * @param pString The buffer to store the resulting string.
+ * @param _maxlen The maximum length of the string buffer.
+ * @param _padmax The number of padding characters to add (default is 0).
+ */
+void FloatToString(double val, char *pString, uint8_t _maxlen, uint8_t _padmax = 0);
+
+/**
  * @brief Counts the number of digits in a signed 32-bit integer.
  * @param x The signed 32-bit integer.
  * @return The number of digits in the integer.

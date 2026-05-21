@@ -12,14 +12,12 @@ created Date    : 1st Jan 2024
 #define _LOGGER_INTERFACE_H_
 
 #include "esp8266.h"
+#include "SerialInterface.h"
 #include <interface/pdi/iLoggerInterface.h>
-#ifdef ENABLE_CONTEXTUAL_EXECUTION
-#include "threading/PreemptiveMutex.h"
-#endif
 
 #if defined(LOGBEGIN) && ( defined(ENABLE_LOG_ALL) || defined(ENABLE_LOG_INFO) || defined(ENABLE_LOG_ERROR) || defined(ENABLE_LOG_WARNING) || defined(ENABLE_LOG_SUCCESS) )
 #undef LOGBEGIN
-#define LOGBEGIN __i_logger.init()
+#define LOGBEGIN __i_logger.init(&__serial_uart)
 #endif
 
 #if defined(LogI) && ( defined(ENABLE_LOG_INFO) || defined(ENABLE_LOG_ALL) )
@@ -78,13 +76,16 @@ public:
    */
   virtual ~LoggerInterface();
 
-  void init() override;
+  void init(iIOInterface *io = nullptr) override;
   void log(logger_type_t log_type, const char *content) override;
   void log_info(const char *info) override;
   void log_error(const char *error) override;
   void log_warning(const char *warning) override;
   void log_success(const char *success) override;
   void log_format(const char *format, logger_type_t log_type, ...) override;
+
+private:
+  iIOInterface *m_io;
 };
 
 #endif

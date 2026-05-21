@@ -191,9 +191,41 @@ bool __are_arrays_equal(const char *array1, const char *array2, uint16_t len)
  */
 void __appendUintToBuff(char *_str, const char *_format, uint32_t _value, int _len)
 {
+    if (nullptr == _str || nullptr == _format) return;
+
     char value[20];
-    memset(value, 0, 20);
-    sprintf(value, (const char *)_format, _value);
+    memset(value, 0, sizeof(value));
+    int pos = 0;
+    const char *p = _format;
+
+    // Copy literal prefix up to the '%' specifier.
+    while (*p && *p != '%' && pos < (int)sizeof(value) - 1) {
+        value[pos++] = *p++;
+    }
+
+    // Substitute the %d / %u specifier with the decimal form of _value.
+    // (Callers of this helper only ever use a single integer placeholder.)
+    if (*p == '%') {
+        p++;
+        if (*p == 'd' || *p == 'u') {
+            p++;
+            char num[15];
+            Uint32ToString(_value, num, sizeof(num));
+            int numlen = (int)strlen(num);
+            if (pos + numlen > (int)sizeof(value) - 1) numlen = (int)sizeof(value) - 1 - pos;
+            if (numlen > 0) {
+                memcpy(value + pos, num, numlen);
+                pos += numlen;
+            }
+        }
+    }
+
+    // Copy any literal suffix after the specifier.
+    while (*p && pos < (int)sizeof(value) - 1) {
+        value[pos++] = *p++;
+    }
+    value[pos] = '\0';
+
     strncat(_str, value, _len);
 }
 
@@ -208,8 +240,211 @@ void __appendUintToBuff(char *_str, const char *_format, uint32_t _value, int _l
  */
 void __int_ip_to_str(char *_str, uint8_t *_ip, int _len)
 {
+    if (nullptr == _str || nullptr == _ip || _len <= 0) return;
     memset(_str, 0, _len);
-    sprintf(_str, "%d.%d.%d.%d", _ip[0], _ip[1], _ip[2], _ip[3]);
+
+    int pos = 0;
+    for (int i = 0; i < 4; i++) {
+        char num[4]; // max "255" + NUL
+        Uint32ToString((uint32_t)_ip[i], num, sizeof(num));
+        int n = (int)strlen(num);
+        if (pos + n > _len - 1) n = _len - 1 - pos;
+        if (n > 0) { memcpy(_str + pos, num, n); pos += n; }
+        if (i < 3 && pos < _len - 1) _str[pos++] = '.';
+    }
+    _str[pos] = '\0';
+}
+
+/**
+ * Helper: copy `src_len` bytes from `src` into `str` at `pos`, bounded by
+ * (size - 1) so a trailing NUL slot is always preserved. Returns the new pos.
+ */
+static int __snprintf_copy(char *str, int size, int pos, const char *src, int src_len)
+{
+    if (pos >= size - 1 || src_len <= 0) return pos;
+    int room = size - 1 - pos;
+    int n = (src_len < room) ? src_len : room;
+    memcpy(str + pos, src, n);
+    return pos + n;
+}
+
+int __vsnprintf(char *str, int size, const char *format, va_list args)
+{
+    if (nullptr == str || size <= 0 || nullptr == format) return 0;
+
+    int pos = 0;
+    const char *p = format;
+
+    while (*p && pos < size - 1) {
+        if (*p != '%') {
+            str[pos++] = *p++;
+            continue;
+        }
+
+        // Consume '%'
+        p++;
+
+        // Flags: '0' (zero-pad) and '-' (left-justify)
+        bool zero_pad = false;
+        bool left_justify = false;
+        while (*p == '0' || *p == '-') {
+            if (*p == '0') zero_pad = true;
+            else left_justify = true;
+            p++;
+        }
+
+        // Width (decimal digits)
+        int width = 0;
+        while (*p >= '0' && *p <= '9') {
+            width = width * 10 + (*p - '0');
+            p++;
+        }
+
+        // Length modifier 'l'
+        bool is_long = false;
+        if (*p == 'l') { is_long = true; p++; }
+
+        char tmp[32];
+        int tmplen = 0;
+        bool valid_spec = true;
+
+        switch (*p) {
+            case 'd':
+            case 'i': {
+                int32_t v = is_long ? (int32_t)va_arg(args, long)
+                                    : (int32_t)va_arg(args, int);
+                Int32ToString(v, tmp, sizeof(tmp));
+                tmplen = (int)strlen(tmp);
+                p++;
+                break;
+            }
+            case 'u': {
+                uint32_t v = is_long ? (uint32_t)va_arg(args, unsigned long)
+                                     : (uint32_t)va_arg(args, unsigned int);
+                Uint32ToString(v, tmp, sizeof(tmp));
+                tmplen = (int)strlen(tmp);
+                p++;
+                break;
+            }
+            case 'x':
+            case 'X': {
+                bool cap = (*p == 'X');
+                uint32_t v = is_long ? (uint32_t)va_arg(args, unsigned long)
+                                     : (uint32_t)va_arg(args, unsigned int);
+                Uint32ToHexString(v, tmp, sizeof(tmp), cap);
+                tmplen = (int)strlen(tmp);
+                // Zero-pad makes no sense for negative sign here; hex is unsigned.
+                p++;
+                break;
+            }
+            case 'f': {
+                double v = va_arg(args, double);
+                FloatToString(v, tmp, sizeof(tmp));
+                tmplen = (int)strlen(tmp);
+                p++;
+                break;
+            }
+            case 's': {
+                const char *s = va_arg(args, const char *);
+                int slen = 0;
+                if (nullptr != s) {
+                    while (s[slen]) slen++;
+                }
+                // Apply width directly into the output for strings (no tmp copy).
+                if (!left_justify && width > slen) {
+                    for (int i = 0; i < width - slen && pos < size - 1; i++) {
+                        str[pos++] = ' ';
+                    }
+                }
+                for (int i = 0; i < slen && pos < size - 1; i++) {
+                    str[pos++] = s[i];
+                }
+                if (left_justify && width > slen) {
+                    for (int i = 0; i < width - slen && pos < size - 1; i++) {
+                        str[pos++] = ' ';
+                    }
+                }
+                p++;
+                valid_spec = false; // handled inline, skip the tmp-based copy below
+                break;
+            }
+            case 'c': {
+                char c = (char)va_arg(args, int);
+                tmp[0] = c;
+                tmp[1] = '\0';
+                tmplen = 1;
+                p++;
+                break;
+            }
+            case '%': {
+                tmp[0] = '%';
+                tmp[1] = '\0';
+                tmplen = 1;
+                p++;
+                break;
+            }
+            default: {
+                // Unrecognised specifier — echo it so it's visible.
+                if (pos < size - 1) str[pos++] = '%';
+                if (is_long && pos < size - 1) str[pos++] = 'l';
+                if (*p && pos < size - 1) { str[pos++] = *p; p++; }
+                valid_spec = false;
+                break;
+            }
+        }
+
+        if (!valid_spec) continue;
+
+        // Apply width padding to numeric/char/literal-% conversions.
+        if (width > tmplen && tmplen < (int)sizeof(tmp) - 1) {
+            int shift = width - tmplen;
+            if (tmplen + shift > (int)sizeof(tmp) - 1) shift = (int)sizeof(tmp) - 1 - tmplen;
+
+            if (left_justify) {
+                // Append spaces after the value (zero-pad ignored when left-justifying).
+                for (int i = 0; i < shift; i++) tmp[tmplen + i] = ' ';
+                tmplen += shift;
+                tmp[tmplen] = '\0';
+            } else {
+                char pad = zero_pad ? '0' : ' ';
+                if (zero_pad && tmplen > 0 && tmp[0] == '-') {
+                    // Keep the '-' first, pad zeros between it and the digits.
+                    memmove(tmp + 1 + shift, tmp + 1, tmplen - 1);
+                    for (int i = 0; i < shift; i++) tmp[1 + i] = '0';
+                } else {
+                    memmove(tmp + shift, tmp, tmplen);
+                    for (int i = 0; i < shift; i++) tmp[i] = pad;
+                }
+                tmplen += shift;
+                tmp[tmplen] = '\0';
+            }
+        }
+
+        pos = __snprintf_copy(str, size, pos, tmp, tmplen);
+    }
+
+    str[pos] = '\0';
+    return pos;
+}
+
+int __snprintf(char *str, int size, const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    int r = __vsnprintf(str, size, format, args);
+    va_end(args);
+    return r;
+}
+
+int __sprintf(char *str, const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    // No size bound — callers are responsible for buffer sizing. Pass a large
+    // value so __vsnprintf's internal "size - 1" bookkeeping still works.
+    int r = __vsnprintf(str, INT32_MAX, format, args);
+    va_end(args);
+    return r;
 }
 
 /**

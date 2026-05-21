@@ -28,8 +28,9 @@ LoggerInterface::~LoggerInterface()
 /**
  * begin the log config if any
  */
-void LoggerInterface::init()
+void LoggerInterface::init(iIOInterface *io)
 {
+    (void)io;
     Serial.begin(115200);
 }
 

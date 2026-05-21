@@ -174,12 +174,22 @@ public:
      */
     void flush() override;    
 private:
+    struct dnsFoundResult {
+        ip_addr_t addr;
+        bool in_flight;  // true between lookup start and callback firing
+        bool found;      // true if callback received a valid ipaddr
+    };
+
     struct tcp_pcb* m_pcb; ///< The TCP protocol control block.
     bool m_isConnected;    ///< Connection status.
     uint8_t* m_rxBuffer;   ///< Receive buffer.
     uint32_t m_rxBufferSize; ///< Size of the receive buffer.
     uint32_t m_timeout;    ///< Timeout value in milliseconds.
     bool m_isLastWriteAcked;
+
+    // Pending DNS lookup state. Embedded so its lifetime matches this client
+    // and lwIP's callback can never write into a destroyed stack frame.
+    dnsFoundResult m_dns;
 
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
     PreemptiveMutex m_mutex;
@@ -190,6 +200,7 @@ private:
     static err_t onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf* p, err_t err);
     static void onError(void* arg, err_t err);
     static err_t onSent(void* arg, struct tcp_pcb* tpcb, u16_t len);
+    static void onDnsFound(const char *name, const ip_addr_t *ipaddr, void *arg);
 };
 
 #endif // _TCP_CLIENT_INTERFACE_H_

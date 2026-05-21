@@ -231,13 +231,35 @@ uint16_t StringToHex16(const char *pString, uint8_t _strlen)
  */
 void Int32ToString(int32_t val, char *pString, uint8_t _maxlen, uint8_t _padmax)
 {
-    if (nullptr != pString)
-    {
-        memset(pString, 0, _maxlen);
-        sprintf(pString, "%d", val);
-        for (int l = strlen(pString); l < _padmax; l++)
-            pString[l] = ' ';
+    if (nullptr == pString || _maxlen == 0) return;
+    memset(pString, 0, _maxlen);
+
+    // Reverse-build digits into a local buffer. No newlib usage so this is
+    // safe to call from a preempted context.
+    char tmp[12];                   // "-2147483648" + NUL fits
+    int tpos = sizeof(tmp);
+    bool neg = (val < 0);
+    uint32_t u;
+    if (val == INT32_MIN) {
+        u = 2147483648u;            // |INT32_MIN| as unsigned
+    } else {
+        u = neg ? (uint32_t)(-val) : (uint32_t)val;
     }
+    if (u == 0) {
+        tmp[--tpos] = '0';
+    } else {
+        while (u > 0 && tpos > 0) {
+            tmp[--tpos] = '0' + (u % 10);
+            u /= 10;
+        }
+    }
+    if (neg && tpos > 0) tmp[--tpos] = '-';
+
+    int len = (int)sizeof(tmp) - tpos;
+    if (len > _maxlen - 1) len = _maxlen - 1;
+    memcpy(pString, &tmp[tpos], len);
+    for (int l = len; l < _padmax && l < _maxlen - 1; l++)
+        pString[l] = ' ';
 }
 
 /**
@@ -252,18 +274,156 @@ void Int32ToString(int32_t val, char *pString, uint8_t _maxlen, uint8_t _padmax)
  */
 void Int64ToString(int64_t val, char *pString, uint8_t _maxlen, uint8_t _padmax)
 {
-    if (nullptr != pString)
-    {
-        memset(pString, 0, _maxlen);
-        sprintf(pString, "%ld", val);
-        for (int l = strlen(pString); l < _padmax; l++)
-            pString[l] = ' ';
+    if (nullptr == pString || _maxlen == 0) return;
+    memset(pString, 0, _maxlen);
+
+    char tmp[21];                   // "-9223372036854775808" + NUL fits
+    int tpos = sizeof(tmp);
+    bool neg = (val < 0);
+    uint64_t u;
+    if (val == INT64_MIN) {
+        u = 9223372036854775808ull; // |INT64_MIN| as unsigned
+    } else {
+        u = neg ? (uint64_t)(-val) : (uint64_t)val;
     }
+    if (u == 0) {
+        tmp[--tpos] = '0';
+    } else {
+        while (u > 0 && tpos > 0) {
+            tmp[--tpos] = '0' + (u % 10);
+            u /= 10;
+        }
+    }
+    if (neg && tpos > 0) tmp[--tpos] = '-';
+
+    int len = (int)sizeof(tmp) - tpos;
+    if (len > _maxlen - 1) len = _maxlen - 1;
+    memcpy(pString, &tmp[tpos], len);
+    for (int l = len; l < _padmax && l < _maxlen - 1; l++)
+        pString[l] = ' ';
+}
+
+/**
+ * @brief Converts an unsigned 32-bit integer to a decimal string.
+ *
+ * @param val The unsigned 32-bit integer to convert.
+ * @param pString The buffer to store the resulting string.
+ * @param _maxlen The maximum length of the string buffer.
+ * @param _padmax The number of padding characters to add (default is 0).
+ */
+void Uint32ToString(uint32_t val, char *pString, uint8_t _maxlen, uint8_t _padmax)
+{
+    if (nullptr == pString || _maxlen == 0) return;
+    memset(pString, 0, _maxlen);
+
+    char tmp[11];                   // "4294967295" + NUL fits
+    int tpos = sizeof(tmp);
+    if (val == 0) {
+        tmp[--tpos] = '0';
+    } else {
+        while (val > 0 && tpos > 0) {
+            tmp[--tpos] = '0' + (val % 10);
+            val /= 10;
+        }
+    }
+
+    int len = (int)sizeof(tmp) - tpos;
+    if (len > _maxlen - 1) len = _maxlen - 1;
+    memcpy(pString, &tmp[tpos], len);
+    for (int l = len; l < _padmax && l < _maxlen - 1; l++)
+        pString[l] = ' ';
+}
+
+/**
+ * @brief Converts an unsigned 32-bit integer to a hexadecimal string (no "0x" prefix).
+ *
+ * @param val The unsigned 32-bit integer to convert.
+ * @param pString The buffer to store the resulting string.
+ * @param _maxlen The maximum length of the string buffer.
+ * @param cap If true, uses uppercase A-F.
+ */
+void Uint32ToHexString(uint32_t val, char *pString, uint8_t _maxlen, bool cap)
+{
+    if (nullptr == pString || _maxlen == 0) return;
+    memset(pString, 0, _maxlen);
+
+    char tmp[9];                    // "FFFFFFFF" + NUL fits
+    int tpos = sizeof(tmp);
+    const char base = cap ? 'A' : 'a';
+    if (val == 0) {
+        tmp[--tpos] = '0';
+    } else {
+        while (val > 0 && tpos > 0) {
+            uint32_t n = val & 0xF;
+            tmp[--tpos] = (n < 10) ? ('0' + n) : (base + (n - 10));
+            val >>= 4;
+        }
+    }
+
+    int len = (int)sizeof(tmp) - tpos;
+    if (len > _maxlen - 1) len = _maxlen - 1;
+    memcpy(pString, &tmp[tpos], len);
+}
+
+/**
+ * @brief Converts a floating-point value to a string.
+ *
+ * @param val The floating-point value to convert.
+ * @param pString The buffer to store the resulting string.
+ * @param _maxlen The maximum length of the string buffer.
+ */
+void FloatToString(double val, char *pString, uint8_t _maxlen, uint8_t _padmax)
+{
+    if (nullptr == pString || _maxlen == 0) return;
+    memset(pString, 0, _maxlen);
+
+    // Match the default "%f" form: fixed 6 decimal places, leading sign for
+    // negatives, no scientific notation. Intentionally simple — no NaN/Inf
+    // handling (callers are expected to filter those).
+    bool neg = (val < 0.0);
+    if (neg) val = -val;
+
+    uint64_t int_part = (uint64_t)val;
+    double frac = val - (double)int_part;
+    uint64_t frac_part = (uint64_t)(frac * 1000000.0 + 0.5);
+    if (frac_part >= 1000000ull) { frac_part -= 1000000ull; int_part += 1; }
+
+    int pos = 0;
+    if (neg && pos < _maxlen - 1) pString[pos++] = '-';
+
+    // Integer part via reverse-digit buffer
+    char tmp[21];
+    int tpos = sizeof(tmp);
+    if (int_part == 0) {
+        tmp[--tpos] = '0';
+    } else {
+        while (int_part > 0 && tpos > 0) {
+            tmp[--tpos] = '0' + (int_part % 10);
+            int_part /= 10;
+        }
+    }
+    int ilen = (int)sizeof(tmp) - tpos;
+    if (pos + ilen > _maxlen - 1) ilen = _maxlen - 1 - pos;
+    if (ilen > 0) { memcpy(pString + pos, &tmp[tpos], ilen); pos += ilen; }
+
+    if (pos < _maxlen - 1) pString[pos++] = '.';
+
+    // Fixed 6 fractional digits, leading zeros preserved
+    char fbuf[6];
+    for (int i = 5; i >= 0; i--) {
+        fbuf[i] = '0' + (frac_part % 10);
+        frac_part /= 10;
+    }
+    int flen = 6;
+    if (pos + flen > _maxlen - 1) flen = _maxlen - 1 - pos;
+    if (flen > 0) { memcpy(pString + pos, fbuf, flen); pos += flen; }
+
+    for (int l = pos; l < _padmax && l < _maxlen - 1; l++) pString[l] = ' ';
 }
 
 /**
  * @brief Counts the number of digits in a signed 32-bit integer.
- * 
+ *
  * This function calculates the number of digits in a signed 32-bit integer.
  *
  * @param x The signed 32-bit integer.

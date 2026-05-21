@@ -20,8 +20,12 @@ void pingResults( ping_target_id_t found_id, esp_ping_found * pf ) {
 
   if( nullptr != pf ){
 
-    LogFmtI("\nPing Result: AvgTime(%f), Sent(%d), Recv(%d), Err(%d), minms(%d), maxms(%d)\n", 
-      ((float)pf->total_time / (float)pf->recv_count), 
+    float avg = (pf->recv_count > 0)
+                  ? ((float)pf->total_time / (float)pf->recv_count)
+                  : 0.0f;
+
+    LogFmtI("\nPing Result: AvgTime(%f), Sent(%d), Recv(%d), Err(%d), minms(%d), maxms(%d)\n",
+      avg,
       pf->send_count,
       pf->recv_count,
       pf->err_count,

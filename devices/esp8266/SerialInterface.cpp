@@ -238,9 +238,9 @@ void UARTSerial::flush()
  */
 iTerminalInterface* UARTSerial::with_timestamp()
 {
-  char tembuff[25];
-  memset(tembuff, 0, 25);
-  snprintf(tembuff, sizeof(tembuff), "%lu", millis());
+  char tembuff[15];
+  memset(tembuff, 0, 15);
+  __sprintf(tembuff, "%lu", millis());
   
   write('[');
   write_pad(tembuff, 15, true);

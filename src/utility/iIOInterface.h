@@ -17,6 +17,7 @@ Created Date    : 1st Jan 2024
 #define _I_IO_INTERFACE_H_
 
 #include "DataTypeDef.h"
+#include "StringOperations.h"
 
 /**
  * @class iIOInterface
@@ -192,7 +193,7 @@ public:
   virtual int32_t write(int32_t val) {
     char tembuff[25];
     memset(tembuff, 0, 25);
-    sprintf(tembuff, "%d", val);
+    __sprintf(tembuff, "%d", val);
     return write(tembuff);
   }
 
@@ -204,7 +205,7 @@ public:
   virtual int32_t write(int64_t val) {
     char tembuff[25];
     memset(tembuff, 0, 25);
-    sprintf(tembuff, "%ld", val);
+    __sprintf(tembuff, "%ld", val);
     return write(tembuff);
   }
 
@@ -218,7 +219,7 @@ public:
   virtual int32_t write(uint32_t val, bool hex = false, bool cap = false) {
     char tembuff[25];
     memset(tembuff, 0, 25);
-    sprintf(tembuff, hex ? (cap ? "%X" : "%x") : "%u", val);
+    __sprintf(tembuff, hex ? (cap ? "%X" : "%x") : "%u", val);
     return write(tembuff);
   }
 
@@ -230,7 +231,7 @@ public:
   virtual int32_t write(double val) {
     char tembuff[25];
     memset(tembuff, 0, 25);
-    sprintf(tembuff, "%f", val);
+    __sprintf(tembuff, "%f", val);
     return write(tembuff);
   }
 

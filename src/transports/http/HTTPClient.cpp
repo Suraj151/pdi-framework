@@ -205,6 +205,7 @@ Http_Client::~Http_Client()
 void Http_Client::Begin()
 {
     End(true);
+    SetKeepAlive(false);
 }
 
 /**
@@ -274,7 +275,7 @@ void Http_Client::SetClient(iClientInterface *client)
 void Http_Client::SetKeepAlive(bool keep_alive)
 {
     m_request.reuse = keep_alive;
-    AddReqHeader(HTTP_HEADER_KEY_CONNECTION, keep_alive ? RODT_ATTR("keep-alive") : RODT_ATTR("close"));
+    AddReqHeader(HTTP_HEADER_KEY_CONNECTION, keep_alive ? "keep-alive" : "close", true);
 }
 
 /**

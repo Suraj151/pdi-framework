@@ -66,12 +66,14 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
     // Convert the host to an IP address
     if (!ipaddr_aton(hostname, &serverIp)) {
         // It's a hostname, resolve via DNS
-        struct addrinfo *res; struct addrinfo hints;
+        struct addrinfo *res = nullptr;
+        struct addrinfo hints;
+        memset(&hints, 0, sizeof(hints));
         hints.ai_family = AF_INET; // hint for inet
 
         err_t err = lwip_getaddrinfo(hostname, "0", &hints, &res);
 
-        if (err == ERR_OK) {
+        if (err == ERR_OK && nullptr != res) {
             // Resolved connect now
             if (res->ai_family == AF_INET6) {
                 // for now consider only ip4
@@ -79,9 +81,11 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
                 serverIp.type = IPADDR_TYPE_V4;
                 serverIp.u_addr.ip4.addr = ((struct sockaddr_in *)res->ai_addr)->sin_addr.s_addr;
             }
+            lwip_freeaddrinfo(res);
         } else {
+            if (nullptr != res) lwip_freeaddrinfo(res);
             return -99;
-        }        
+        }
     }
 
     // Allocate a new TCP protocol control block

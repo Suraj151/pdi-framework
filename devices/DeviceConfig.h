@@ -156,11 +156,11 @@ created Date    : 1st June 2019
 #define ENABLE_DYNAMIC_SUBNETTING
 
 /**
- * enable/disable NAPT. By default enabled.
+ * enable/disable NAPT. By default disabled.
  * Note : enabling this will increase heap memory consumption. 
  * Recommended to disable in case if not required.
  */
-#define ENABLE_NAPT
+// #define ENABLE_NAPT
 
 /**
  * enable/disable internet availability based station connections

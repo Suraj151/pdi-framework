@@ -16,6 +16,7 @@ Created Date    : 1st June 2019
 #ifndef __STRING_OPERATIONS_H__
 #define __STRING_OPERATIONS_H__
 
+#include <stdarg.h>
 #include "DataTypeDef.h"
 
 /**
@@ -142,5 +143,35 @@ void __get_iface_key_informat( const char* _iface, uint16_t _ifaceport, char* _i
  * @return True if the key-value pair was found, false otherwise.
  */
 bool __get_iface_data_fromjson( const char* _iface, uint16_t _ifaceport, char* _jsonpayload, int _jsonpayloadlen, char* _ifacejsondata, int _maxjsondatalen );
+
+/**
+ * @brief Preempt-safe replacement for vsnprintf.
+ *
+ * Uses the DataTypeConversions helpers internally instead of newlib's printf
+ * family, so it is safe to call from any context (including preempted tasks)
+ * on runtimes that do not isolate newlib's _reent per task.
+ *
+ * Supported format specifiers: %d %i %ld (signed decimal), %u %lu (unsigned
+ * decimal), %x %X %lx %lX (hex), %f (fixed 6-decimal float), %s (string),
+ * %c (char), %% (literal %). Width / precision modifiers are not supported.
+ *
+ * @param str    Destination buffer.
+ * @param size   Size of the destination buffer including space for the NUL.
+ * @param format Format string.
+ * @param args   Variadic arguments.
+ * @return Number of bytes written, excluding the trailing NUL.
+ */
+int __vsnprintf(char *str, int size, const char *format, va_list args);
+
+/**
+ * @brief Variadic wrapper around __vsnprintf. Same contract as snprintf.
+ */
+int __snprintf(char *str, int size, const char *format, ...);
+
+/**
+ * @brief Variadic wrapper that does not bound the output. Provided only for
+ * API parity; prefer __snprintf with an explicit size.
+ */
+int __sprintf(char *str, const char *format, ...);
 
 #endif

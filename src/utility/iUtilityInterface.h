@@ -68,6 +68,11 @@ public:
   virtual void yield() = 0;
 
   /**
+   * @brief Returns currently free heap size in bytes, or 0 if not supported.
+   */
+  virtual uint32_t get_free_heap(){ return 0; }
+
+  /**
    * @brief Check and start if possible of measure stack in use for next functions
    */
   virtual bool can_measure_stack(){ return false; }

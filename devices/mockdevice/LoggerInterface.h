@@ -72,7 +72,7 @@ public:
    */
   virtual ~LoggerInterface(){}
 
-  void init() override{}
+  void init(iIOInterface *io = nullptr) override{ (void)io; }
   void log(logger_type_t log_type, const char *content) override{}
   void log_info(const char *info) override{}
   void log_error(const char *error) override{}

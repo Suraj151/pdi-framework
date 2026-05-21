@@ -634,6 +634,7 @@ bool WiFiInterface::get_bssid_within_scanned_nw_ignoring_connected_stations(char
   char* _ssid_buff = new char[30];
 
   if( nullptr == _ssid_buff ){
+    wifi_softap_free_station_info();
     return false;
   }
   memset( _ssid_buff, 0, 30 );
@@ -667,6 +668,7 @@ bool WiFiInterface::get_bssid_within_scanned_nw_ignoring_connected_stations(char
         if( !__are_arrays_equal( (char*)ignorebssid, (char*)this->BSSID(i), 6 ) ){
           memcpy(bssid, this->BSSID(i), 6);
           delete[] _ssid_buff;
+          wifi_softap_free_station_info();
           return true;
         }
       }
@@ -674,6 +676,7 @@ bool WiFiInterface::get_bssid_within_scanned_nw_ignoring_connected_stations(char
   }
 
   delete[] _ssid_buff;
+  wifi_softap_free_station_info();
   return false;
 }
 
@@ -690,6 +693,10 @@ bool WiFiInterface::getApsConnectedStations(pdiutil::vector<wifi_station_info_t>
     stations.push_back(_station);
     stat_info = STAILQ_NEXT(stat_info, next);
   }
+
+  // NonOS SDK requires the caller to release the list returned by
+  // wifi_softap_get_station_info(); otherwise it leaks on every call.
+  wifi_softap_free_station_info();
 
   return true;
 }

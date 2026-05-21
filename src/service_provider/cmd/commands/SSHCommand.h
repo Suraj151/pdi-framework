@@ -112,22 +112,22 @@ struct SSHCommand : public CommandBase {
 						char pubkey_path[75]; memset(pubkey_path, 0, sizeof(pubkey_path));
 						int iStatus = 0;
 
-						snprintf(sshdir, sizeof(sshdir), "%s/%s", (strlen(homedir) > 1 ? homedir : ""), SSH_DEFAULT_DIR);
+						__snprintf(sshdir, sizeof(sshdir), "%s/%s", (strlen(homedir) > 1 ? homedir : ""), SSH_DEFAULT_DIR);
 						if (!__i_fs.isDirectory(sshdir)) {
 							iStatus = __i_fs.createDirectory(sshdir);
 						}
 
 						if( iStatus >=0 ){
 							// Save private key
-							snprintf(privkey_path, sizeof(privkey_path), "%s/%s", sshdir, SSH_KEY_ALGO_ED25519_STR);
+							__snprintf(privkey_path, sizeof(privkey_path), "%s/%s", sshdir, SSH_KEY_ALGO_ED25519_STR);
 							iStatus = __i_fs.writeFile(privkey_path, (const char*)privkey, sizeof(privkey));
 
 							// Save public key
-							snprintf(pubkey_path, sizeof(pubkey_path), "%s/%s.pub", sshdir, SSH_KEY_ALGO_ED25519_STR);
+							__snprintf(pubkey_path, sizeof(pubkey_path), "%s/%s.pub", sshdir, SSH_KEY_ALGO_ED25519_STR);
 							iStatus = __i_fs.writeFile(pubkey_path, (const char*)pubkey, sizeof(pubkey));
 
 							// Save seed
-							snprintf(seed_path, sizeof(seed_path), "%s/%s.seed", sshdir, SSH_KEY_ALGO_ED25519_STR);
+							__snprintf(seed_path, sizeof(seed_path), "%s/%s.seed", sshdir, SSH_KEY_ALGO_ED25519_STR);
 							iStatus = __i_fs.writeFile(seed_path, (const char*)seed, sizeof(seed));
 						}
 

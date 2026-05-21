@@ -101,7 +101,7 @@ struct NetworkCommand : public CommandBase {
 					uint8_t *bssid = __i_wifi.BSSID(i);
 					if(nullptr != bssid){
 						char macstr[36] = {0};
-						snprintf(macstr, sizeof(macstr), "%02X:%02X:%02X:%02X:%02X:%02X", bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+						__snprintf(macstr, sizeof(macstr), "%02X:%02X:%02X:%02X:%02X:%02X", bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
 						m_terminal->write(macstr);
 					}
 					m_terminal->write_ro(RODT_ATTR("\r\n"));
