@@ -63,6 +63,14 @@ public:
    */
   uint8_t m_temp_mac[6];
 
+  // --- WiFi reconnect state machine ---
+  // Timestamp of when the current disconnect window started (0 = connected).
+  uint32_t m_disconnect_start_ms = 0;
+  // Timestamp of the last recovery attempt (used for per-tier backoff).
+  uint32_t m_last_reconnect_attempt_ms = 0;
+  // Count of recovery attempts in the current disconnect window (for logging).
+  uint16_t m_reconnect_attempt = 0;
+
 protected:
   /**
    * @var	iWiFiInterface*|&WiFi wifi

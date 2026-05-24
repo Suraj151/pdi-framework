@@ -46,32 +46,93 @@ namespace pdiutil {
 } // namespace pdiutil
 
 // Attribute for read-only data (can be redefined in derived interfaces)
+#ifndef RODT_ATTR
 #define RODT_ATTR(x) x
+#endif
+
+#ifndef PROG_RODT_ATTR
 #define PROG_RODT_ATTR
+#endif
+
+#ifndef PROG_RODT_PTR
 #define PROG_RODT_PTR
+#endif
 
 // Attribute to be redefined while entering critical section
+#ifndef CRITICAL_SECTION_ENTER
 #define CRITICAL_SECTION_ENTER
+#endif
+
+#ifndef CRITICAL_SECTION_EXIT
 #define CRITICAL_SECTION_EXIT
+#endif
 
 // String operations api for read-write-modify string data (can be redefined in derived interfaces)
 // _ro for each of api referes to read-only data region specific api
+#ifndef strcat
 #define strcat strcat
+#endif
+
+#ifndef strcat_ro
 #define strcat_ro strcat
+#endif
+
+#ifndef strncat
 #define strncat strncat
+#endif
+
+#ifndef strncat_ro
 #define strncat_ro strncat
+#endif
+
+#ifndef strcpy
 #define strcpy strcpy
+#endif
+
+#ifndef strcpy_ro
 #define strcpy_ro strcpy
+#endif
+
+#ifndef strncpy
 #define strncpy strncpy
+#endif
+
+#ifndef strncpy_ro
 #define strncpy_ro strncpy
+#endif
+
+#ifndef strlen
 #define strlen strlen
+#endif
+
+#ifndef strlen_ro
 #define strlen_ro strlen
+#endif
+
+#ifndef strcmp
 #define strcmp strcmp
+#endif
+
+#ifndef strcmp_ro
 #define strcmp_ro strcmp
+#endif
+
+#ifndef strncmp
 #define strncmp strncmp
+#endif
+
+#ifndef strncmp_ro
 #define strncmp_ro strncmp
+#endif
+
+#ifndef memcpy
 #define memcpy memcpy
+#endif
+
+#ifndef memcpy_ro
 #define memcpy_ro memcpy
+#endif
+
 
 // define weak functions, so when the device doesn't define them,
 // the linker just sets their address to 0

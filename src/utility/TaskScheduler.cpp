@@ -110,11 +110,13 @@ int TaskScheduler::updateInterval(int _task_id, CallBackVoidArgFn _task_fn, uint
     int _registered_index = this->is_registered_task(_task_id);
     if (_registered_index > -1)
     {
+        CRITICAL_SECTION_ENTER
         this->m_tasks[_registered_index]._task = _task_fn;
         this->m_tasks[_registered_index]._duration = _duration;
         this->m_tasks[_registered_index]._task_priority = _task_priority;
         this->m_tasks[_registered_index]._last_millis = _last_millis == 0 ? this->m_tasks[_registered_index]._last_millis : _last_millis;
         this->m_tasks[_registered_index]._max_attempts = _max_attempts;
+        CRITICAL_SECTION_EXIT
         return _task_id;
     }
     else
@@ -167,7 +169,9 @@ int TaskScheduler::register_task(CallBackVoidArgFn _task_fn, uint64_t _duration,
         _new_task._max_attempts = _max_attempts;
         _new_task._task_exec_millis = 0;
         _new_task._task_id = this->get_unique_task_id();
+        CRITICAL_SECTION_ENTER
         this->m_tasks.push_back(_new_task);
+        CRITICAL_SECTION_EXIT
         return _new_task._task_id;
     }
     return -1;
@@ -306,33 +310,44 @@ void TaskScheduler::handle_tasks()
 
         if (_last_start_ms < _task._last_millis)
         {
+            CRITICAL_SECTION_ENTER
             _task._last_millis = _last_start_ms;
+            CRITICAL_SECTION_EXIT
         }
 
         if (_task._max_attempts != 0 && (_last_start_ms - _task._last_millis) >= _task._duration)
         {
             if (nullptr != _task._task)
             {
+                // User task callback — must NOT run with interrupts disabled.
                 _task._task();
             }
 
             if( 0 == _task._last_millis ){
 
+                CRITICAL_SECTION_ENTER
                 _task._last_millis = _last_start_ms;
+                CRITICAL_SECTION_EXIT
             }else{
 
                 // --- Catch-up: advance last_millis by multiples of duration ---
                 int catchupround = 0;
+                CRITICAL_SECTION_ENTER
                 while ((_last_start_ms - _task._last_millis) >= _task._duration) {
                     _task._last_millis += _task._duration; // Reduced drift
                     if (++catchupround > 3) break;  // break for max catchup rounds
                 }
+                CRITICAL_SECTION_EXIT
             }
 
+            CRITICAL_SECTION_ENTER
             _task._max_attempts = _task._max_attempts > 0 ? _task._max_attempts - 1 : _task._max_attempts;
+            CRITICAL_SECTION_EXIT
 
             uint64_t _task_end_ms = m_util->millis_now();
+            CRITICAL_SECTION_ENTER
             _task._task_exec_millis = _task_end_ms > _last_start_ms ? (_task_end_ms - _last_start_ms) : 0;
+            CRITICAL_SECTION_EXIT
         }
 
         if (nullptr != m_util)
@@ -358,7 +373,9 @@ void TaskScheduler::remove_expired_tasks()
     {
         if (this->m_tasks[i]._max_attempts == 0)
         {
+            CRITICAL_SECTION_ENTER
             this->m_tasks.erase(this->m_tasks.begin() + i);
+            CRITICAL_SECTION_EXIT
         }
     }
 }
@@ -397,10 +414,12 @@ bool TaskScheduler::remove_task(int _id)
 			// removing task create bug if this function will call inside another task
 			// hence making its max attempts to 0 which will considered as expired task
 			// this->m_tasks.erase( this->m_tasks.begin() + i );
+            CRITICAL_SECTION_ENTER
             this->m_tasks[i]._duration = 10;
             this->m_tasks[i]._task_priority = 0;
             this->m_tasks[i]._max_attempts = 0;
             this->m_tasks[i]._task = nullptr;
+            CRITICAL_SECTION_EXIT
             _removed = true;
         }
     }

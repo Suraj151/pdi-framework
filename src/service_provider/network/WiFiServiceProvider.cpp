@@ -103,8 +103,8 @@ void WiFiServiceProvider::handleInternetConnectivity(){
 
   if( !this->m_wifi->localIP().isSet() || !this->m_wifi->isConnected() ){
 
-    memset( &__status_wifi, 0, sizeof(__status_wifi_t) );
-    __status_wifi.last_internet_millis = __i_dvc_ctrl.millis_now();
+    __status_wifi.internet_available = false;
+    memset(__status_wifi.ignore_bssid, 0, 6);
   }else{
 
     bool ping_ret = __i_ping.ping();
@@ -403,6 +403,15 @@ void WiFiServiceProvider::scan_aps_and_configure_wifi_station_async( int _scanCo
 
 /**
  * check wifi connectivity after each wifi activity cycle. try to reconnect if failed
+ *
+ * Uses a tiered escalation strategy driven by how long we've been disconnected:
+ *   Tier 1: simple reconnect()                       (short outages)
+ *   Tier 2: disconnect(false) + begin()              (medium outages)
+ *   Tier 3: disconnect(false) + scan + begin(BSSID)  (long outages)
+ *   Tier 4: disconnect(true)  + re-init + begin()    (very long outages, radio reset)
+ *
+ * Within each tier a per-tier backoff (WIFI_RECONNECT_TIERn_GAP) prevents hammering
+ * the radio every connectivity-check tick during a prolonged outage.
  */
 void WiFiServiceProvider::handleWiFiConnectivity(){
 
@@ -412,32 +421,123 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
 
   LogI("\nHandeling WiFi Connectivity\n");
 
-  if( !this->m_wifi->localIP().isSet() || !this->m_wifi->isConnected() ){
+  uint32_t now = __i_dvc_ctrl.millis_now();
 
-    #ifdef IGNORE_FREE_RELAY_CONNECTIONS
+  // ---------- Connected branch ----------
+  if( this->m_wifi->localIP().isSet() && this->m_wifi->isConnected() ){
+
+    // Edge: reconnected after being down — clear state machine
+    if( !__status_wifi.wifi_connected || 0 != this->m_disconnect_start_ms ){
+      LogFmtI("WiFi recovered after %u ms (attempts=%u)\n",
+        (unsigned)(this->m_disconnect_start_ms ? (now - this->m_disconnect_start_ms) : 0),
+        (unsigned)this->m_reconnect_attempt);
+      this->m_disconnect_start_ms = 0;
+      this->m_last_reconnect_attempt_ms = 0;
+      this->m_reconnect_attempt = 0;
+    }
+    __status_wifi.wifi_connected = true;
+
+    LogFmtI("IP address: gateway(%s) : local(%s) : softap(%s)\n",
+      ((pdiutil::string)this->m_wifi->gatewayIP()).c_str(),
+      ((pdiutil::string)this->m_wifi->localIP()).c_str(),
+      ((pdiutil::string)this->m_wifi->softAPIP()).c_str());
+    return;
+  }
+
+  // ---------- Disconnected branch ----------
+  // Edge: just became disconnected — start the timer
+  if( __status_wifi.wifi_connected || 0 == this->m_disconnect_start_ms ){
+    this->m_disconnect_start_ms = now;
+    this->m_last_reconnect_attempt_ms = 0;
+    this->m_reconnect_attempt = 0;
+  }
+  __status_wifi.wifi_connected = false;
+
+  uint32_t down_ms = now - this->m_disconnect_start_ms;
+
+  // Pick tier and gap based on outage duration
+  uint8_t  tier;
+  uint32_t attempt_gap_ms;
+  if( down_ms < WIFI_RECONNECT_TIER1_DURATION ){
+    tier = 1; attempt_gap_ms = WIFI_RECONNECT_TIER1_GAP;
+  } else if( down_ms < WIFI_RECONNECT_TIER2_DURATION ){
+    tier = 2; attempt_gap_ms = WIFI_RECONNECT_TIER2_GAP;
+  } else if( down_ms < WIFI_RECONNECT_TIER3_DURATION ){
+    tier = 3; attempt_gap_ms = WIFI_RECONNECT_TIER3_GAP;
+  } else {
+    tier = 4; attempt_gap_ms = WIFI_RECONNECT_TIER4_GAP;
+  }
+
+  // Per-tier backoff: skip if last attempt was too recent
+  if( 0 != this->m_last_reconnect_attempt_ms &&
+      (now - this->m_last_reconnect_attempt_ms) < attempt_gap_ms ){
+    LogFmtI("WiFi down %u ms, tier %u backoff (%u/%u)\n",
+      (unsigned)down_ms, (unsigned)tier,
+      (unsigned)(now - this->m_last_reconnect_attempt_ms),
+      (unsigned)attempt_gap_ms);
+    return;
+  }
+
+  this->m_last_reconnect_attempt_ms = now;
+  this->m_reconnect_attempt++;
+
+  LogFmtI("WiFi down %u ms, tier %u, attempt %u\n",
+    (unsigned)down_ms, (unsigned)tier, (unsigned)this->m_reconnect_attempt);
+
+  switch( tier ){
+
+    case 1: {
+      // Cheap: ask SDK to reconnect using last session state.
     this->m_wifi->reconnect();
-    #else
+      break;
+    }
 
-    pdiutil::vector<wifi_station_info_t> stations;
-    this->m_wifi->getApsConnectedStations(stations);
+    case 2: {
+      // Medium: drop association (keep radio), then full begin() from credentials.
+      this->m_wifi->disconnect(false);
+      wifi_config_table _wifi_credentials;
+      __database_service.get_wifi_config_table(&_wifi_credentials);
+      this->configure_wifi_station(&_wifi_credentials);
+      _ClearObject(&_wifi_credentials);
+      break;
+    }
 
-    LogFmtI("Handeling WiFi Reconnect Manually : %s : Connected Stations Count : %d\n", ((pdiutil::string)this->m_wifi->softAPIP()).c_str(), stations.size());
-
-    if( stations.size() > 0 ){
+    case 3: {
+      // Heavy: drop, async-scan for the SSID, then begin() with the best BSSID.
+      #ifndef IGNORE_FREE_RELAY_CONNECTIONS
+      this->m_wifi->disconnect(false);
       this->m_wifi->scanNetworksAsync( [&](int _scanCount) {
         this->scan_aps_and_configure_wifi_station_async(_scanCount);
       }, false);
-    }else{
-      this->m_wifi->reconnect();
+      #else
+      // No scan path available — fall back to medium behavior.
+      this->m_wifi->disconnect(false);
+      wifi_config_table _wifi_credentials;
+      __database_service.get_wifi_config_table(&_wifi_credentials);
+      this->configure_wifi_station(&_wifi_credentials);
+      _ClearObject(&_wifi_credentials);
+      #endif
+      break;
     }
-    #endif
-    __status_wifi.wifi_connected = false;
-  }else{
-    __status_wifi.wifi_connected = true;
-    LogFmtI("IP address: %s : %s : %s\n", 
-    ((pdiutil::string)this->m_wifi->gatewayIP()).c_str(), 
-    ((pdiutil::string)this->m_wifi->localIP()).c_str(), 
-    ((pdiutil::string)this->m_wifi->softAPIP()).c_str());
+
+    case 4:
+    default: {
+      // Radio reset: turn off, re-init, re-bring up STA and AP.
+      // Briefly disrupts the soft-AP — accepted at this severity tier.
+      LogI("WiFi tier 4: radio reset\n");
+      this->m_wifi->disconnect(true);
+      this->m_wifi->enableSTA(false);
+      __task_scheduler.setTimeout( [&]() {
+        wifi_config_table _wifi_credentials;
+        __database_service.get_wifi_config_table(&_wifi_credentials);
+        this->m_wifi->init();
+        this->m_wifi->setAutoReconnect(false);
+        this->configure_wifi_station(&_wifi_credentials);
+        this->configure_wifi_access_point(&_wifi_credentials);
+        _ClearObject(&_wifi_credentials);
+      }, 500, __i_dvc_ctrl.millis_now() );
+      break;
+    }
   }
 }
 

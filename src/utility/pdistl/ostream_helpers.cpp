@@ -7,7 +7,7 @@
  */
 
 #include "ostream_helpers"
-#include <stdio.h>
+#include "../StringOperations.h"
 
 namespace pdistd{
 
@@ -19,14 +19,14 @@ int arduinoPrintFloat(double number, uint8_t digits, char *buffer, size_t buffer
     return 0;
 
   // todo : find below respective cmath functions
-  // if (isnan(number)) return snprintf(buffer, buffer_size, "nan");
-  // if (isinf(number)) return snprintf(buffer, buffer_size, "inf");
-  if (number > 4294967040.0) return snprintf(buffer, buffer_size, "ovf");  // constant determined empirically
-  if (number <-4294967040.0) return snprintf(buffer, buffer_size, "ovf");  // constant determined empirically
+  // if (isnan(number)) return __snprintf(buffer, buffer_size, "nan");
+  // if (isinf(number)) return __snprintf(buffer, buffer_size, "inf");
+  if (number > 4294967040.0) return __snprintf(buffer, buffer_size, "ovf");  // constant determined empirically
+  if (number <-4294967040.0) return __snprintf(buffer, buffer_size, "ovf");  // constant determined empirically
 
   // Handle negative numbers
   if (number < 0.0) {
-    n += snprintf(&buffer[n], buffer_size-n, "-");
+    n += __snprintf(&buffer[n], buffer_size-n, "-");
     number = -number;
   }
 
@@ -40,13 +40,13 @@ int arduinoPrintFloat(double number, uint8_t digits, char *buffer, size_t buffer
   // Extract the integer part of the number and print it
   unsigned long int_part = (unsigned long)number;
   double remainder = number - (double)int_part;
-  n += snprintf(&buffer[n], buffer_size-n, "%lu", int_part);
+  n += __snprintf(&buffer[n], buffer_size-n, "%lu", int_part);
   if (n >= buffer_size) 
     return n; 
 
   // Print the decimal point, but only if there are digits beyond
   if (digits > 0) {
-    n += snprintf(&buffer[n], buffer_size-n, ".");
+    n += __snprintf(&buffer[n], buffer_size-n, ".");
     if (n >= buffer_size) 
       return n; 
   }
@@ -56,7 +56,7 @@ int arduinoPrintFloat(double number, uint8_t digits, char *buffer, size_t buffer
     {
       remainder *= 10.0;
       unsigned int toPrint = (unsigned int)(remainder);
-      n += snprintf(&buffer[n], buffer_size-n, "%u", toPrint);
+      n += __snprintf(&buffer[n], buffer_size-n, "%u", toPrint);
       if (n >= buffer_size) 
 	return n; 
       remainder -= toPrint; 

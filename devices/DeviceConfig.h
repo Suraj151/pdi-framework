@@ -13,6 +13,17 @@ created Date    : 1st June 2019
 #include "DeviceSetup.h"
 
 /**
+ * include device specific config if any
+ */
+#if defined(DEVICE_ESP8266)
+#include "esp8266/esp8266_device_config.h"
+#elif defined(DEVICE_ESP32)
+#include "esp32/esp32_device_config.h"
+#elif defined(DEVICE_ARDUINOUNO)
+#include "arduinouno/arduinouno_device_config.h"
+#endif
+
+/**
  * @define task scheduler which makes use of timers
  */
 // #define ENABLE_TIMER_TASK_SCHEDULER
@@ -181,6 +192,18 @@ created Date    : 1st June 2019
 #ifdef ENABLE_INTERNET_BASED_CONNECTIONS
 #define SWITCHING_DURATION_FOR_NO_INTERNET_CONNECTION INTERNET_CONNECTIVITY_CHECK_DURATION*6
 #endif
+
+/**
+ * WiFi reconnect escalation tiers
+ */
+#define WIFI_RECONNECT_TIER1_DURATION   (MILLISECOND_DURATION_5000 * 3)    // 0 -  15 s
+#define WIFI_RECONNECT_TIER2_DURATION   (MILLISECOND_DURATION_10000 * 6)   // 15 -  60 s
+#define WIFI_RECONNECT_TIER3_DURATION   (MILLISECOND_DURATION_10000 * 12)  // 60 - 120 s
+
+#define WIFI_RECONNECT_TIER1_GAP        MILLISECOND_DURATION_5000
+#define WIFI_RECONNECT_TIER2_GAP        MILLISECOND_DURATION_10000
+#define WIFI_RECONNECT_TIER3_GAP        (MILLISECOND_DURATION_10000 * 3)
+#define WIFI_RECONNECT_TIER4_GAP        (MILLISECOND_DURATION_10000 * 6)
 
 #endif
 
