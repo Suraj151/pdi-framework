@@ -60,6 +60,16 @@ struct SSHSubsystemRequest {
         pdiutil::string handle; // Handle for the sftp, if needed. currently supporting 1 only at a time
         uint32_t fxp_write_totalrecvd = 0; // Total bytes received for current write operation
         uint32_t fxp_write_expectedrecvlen = 0; // Expected total length for current
+
+        // Directory-handle state for SSH_FXP_OPENDIR/READDIR.
+        struct Entry {
+            pdiutil::string name;
+            uint64_t size = 0;
+            bool is_dir = false;
+        };
+        bool is_dir = false;
+        uint32_t readdir_offset = 0;
+        pdiutil::vector<Entry> dir_entries;
     } sftp;
 };
 struct SSHChannelData {

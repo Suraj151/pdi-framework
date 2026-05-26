@@ -116,7 +116,7 @@ Once flashed open serial port on putty with default baud rate of 115200. It will
 How the same CLI is multiplexed across serial / telnet / SSH, the input-sequence handling (TAB autocomplete, history, CTRL+C), and how to add a new command are detailed in [§10. Command Line / Terminal](#10-command-line--terminal).
 
 #### SSH file transfer
-Framework also support file transfer over SSH tunnel. Currently is supports file upload and download over SSH using scp command with sftp protocol under the hood.
+Framework also support file transfer over SSH tunnel. Both single-file `scp` and an interactive `sftp` client session are supported, all carried by the same SFTP subsystem under the hood.
 
 For example if we want to upload the test.txt file to esp* device sorage (having pdiStack user) from our desktop over ssh. then use below command.
 
@@ -129,6 +129,28 @@ Similarely, if we want to download the test.txt file from esp* device sorage (ha
 ```
 scp -s pdiStack@<device-ip>:<dest-path-to-test.txt> <desktop-path-to-store-test.txt>
 ```
+
+You can also open an interactive SFTP shell to browse and manage the device's storage:
+
+```
+sftp -P 22 pdiStack@<device-ip>
+```
+
+The following SFTP operations are implemented (sufficient for OpenSSH `sftp` client interactive use):
+
+| Operation | sftp command | Purpose |
+|---|---|---|
+| `REALPATH` | `pwd`, `cd` | resolve relative / `.` / `..` paths to absolute |
+| `STAT` / `LSTAT` / `FSTAT` | `cd`, `ls`, `stat` | file/dir attributes (size, type) |
+| `OPENDIR` / `READDIR` / `CLOSE` | `ls`, `ls -l` | directory listing (paginated, 16 entries/response) |
+| `OPEN` / `READ` / `WRITE` / `CLOSE` | `get`, `put` | file read / create / write |
+| `MKDIR` / `RMDIR` | `mkdir`, `rmdir` | directory create / remove |
+| `REMOVE` | `rm` | delete file |
+| `RENAME` | `rename` | rename file or directory (does not overwrite) |
+| `SETSTAT` / `FSETSTAT` | `chmod`, `chown` | accepted but no-op (FS has no perm/time storage) |
+| `READLINK` / `SYMLINK` | — | reported as unsupported (no symlink layer) |
+
+Idle SFTP sessions are reaped automatically after the configured timeout (default 60 s) so a suspended or dead client never wedges the single-session slot. Interactive SSH shell sessions are NOT idle-reaped — only the SFTP subsystem is.
 
 **Note** that framework handles the ssh chunks in smaller size which can make the file transfer little bit slower. on top if we are overwriting existing file then it can adds the file edit overhead as well. So speed can be as slow as 0.2kbps and as fast as 1kbps. The reasoning and trade-offs of the SSH/SFTP design are covered in [§7.2.14 SSHServer](#7-service-providers).
 
@@ -1704,7 +1726,7 @@ Full breakdown lives in [§9. Web Server](#9-web-server-pending) — it has its 
 | Depends on | `iTcpServerInterface`, `iFileSystemInterface`, crypto primitives ([src/utility/crypto/](src/utility/crypto/)), `__auth_service` |
 | Public API | `start(port=22)`, `stop()`, `closeSession()`, `handle()`, `getSSHKeyPairs(algo, &pub, &priv, seedPlusPubFormat=false)` and per-protocol handlers (`handleVersionExchange`, `handleKeyExchange`, `handleAuthentication`, `handleChannelRequest`, `handleChannelSubsystemRequest`, `handleChannelSubsystemSftpRequest`, `handleChannelSftpBolusChunks`) |
 | Key algorithms | See `SSHKeyAlgorithm` enum in [SshConfig.h](src/config/SshConfig.h) — Ed25519 / Curve25519-based |
-| File transfer | SFTP subsystem implemented on top of the file system; SCP works via `scp -s` (see README [SSH file transfer](#ssh-file-transfer)) |
+| File transfer | SFTP subsystem implemented on top of the file system; supports interactive `sftp` (REALPATH, STAT, OPENDIR/READDIR, OPEN/READ/WRITE, MKDIR/RMDIR, REMOVE, RENAME, FSTAT; SETSTAT is no-op; READLINK/SYMLINK report unsupported) and SCP via `scp -s` (see README [SSH file transfer](#ssh-file-transfer)) |
 | Cost | **Highest of any service** — keys, hash, symmetric AES, large per-session buffers |
 
 #### 7.2.15 `CommandLineServiceProvider` — `__cmd_service`
@@ -2522,11 +2544,14 @@ One CLI instance, three doorways. The implication: at most one user at a time ha
 
 ### 10.9 SFTP / SCP file transfer
 
-The SSH service ([§7.2.14](#7-service-providers)) opens an SFTP subsystem on demand. The framework drives `scp -s …` (force SFTP) for both upload and download — see the main README [SSH file transfer](#ssh-file-transfer) section for the user-facing commands.
+The SSH service ([§7.2.14](#7-service-providers)) opens an SFTP subsystem on demand. Two clients are supported: `scp -s …` (force SFTP) for single-file copies, and interactive `sftp` for full session browsing. Both ride the same handlers in `handleChannelSubsystemSftpRequest`. See the main README [SSH file transfer](#ssh-file-transfer) section for user-facing commands and the operation table.
 
 Implementation notes:
 - Bolus chunks (the SFTP protocol's data records) are received small (≤256 B per the SSH crypto window) and streamed straight into `__i_fs` — there is no full-file RAM buffer.
 - File-edit overhead (overwriting an existing file) is significant on flash filesystems; the README's 0.2-1 kB/s figure reflects this.
+- Only **one SFTP handle at a time** is tracked per session — opening a second file/dir while one is still open reuses the slot. Sufficient for `sftp` interactive use (one operation in flight) but not for parallel transfers.
+- Directory listings are cached once at `OPENDIR` time into the session (`Sftp::dir_entries`) and paginated across multiple `READDIR` responses (16 entries per response). Memory is released on `CLOSE` or session destruction (RAII).
+- SFTP sessions only have an **idle timeout** (default 60 s, in `handle()`); plain SSH shell sessions are not idle-reaped because a human may pause at the prompt indefinitely.
 
 ### 10.10 `watch` and CTRL+C semantics
 

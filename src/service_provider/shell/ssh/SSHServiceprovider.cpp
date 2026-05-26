@@ -146,6 +146,25 @@ void SSHServer::handle() {
     // If a client is connected, handle the SSH session
     if (m_session && m_session->m_client && m_session->m_client->connected()) {
 
+        // Idle reaping for SFTP subsystem sessions only. Shell sessions are
+        // not reaped because a human may pause at the prompt for a long
+        // time; sftp clients are machine-driven and any silence past the
+        // window means the client was suspended/killed.
+        if (m_session->current_channel.req_type == "subsystem" &&
+            m_session->current_channel.subsystem_req.subsystem.find("sftp") == 0 &&
+            m_session->m_state == LWSSHSession::SESSION_STATE_CHANNEL_REQUEST) {
+
+            // Use a longer idle window for sftp; default 10s is for handshake.
+            m_session->m_session_timeout = 120000; // 2 minutes
+
+            if (m_session->m_client->available() > 0) {
+                // Activity from client: refresh idle timestamp
+                m_session->m_last_recv_timestamp = __i_dvc_ctrl.millis_now();
+            } else if (m_session->isSessionTimeout()) {
+                m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_TIMEOUT;
+            }
+        }
+
         switch (m_session->m_state)
         {
             case LWSSHSession::SESSION_STATE_WAITING_FOR_CLIENT:
@@ -694,6 +713,7 @@ void LWSSH::SSHServer::handleChannelRequest(){
 
                             if(send_server_ssh_packet(m_session, chclose, true)){
                                 m_session->current_channel.ischannelreqsuccess = -1;
+                                m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
                             }else{
                                 m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
                             }
@@ -850,6 +870,96 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                     sftp_reply.push_back(0);
                     sftp_reply.push_back(0);
                     sftp_reply.push_back(3); // version = 3
+                }else if (packettype == SSH_FXP_REALPATH){
+
+                    // Parse original-path
+                    if (payloadoffset + 4 > data.size()) {
+                        errcode = SSH_FX_BAD_MESSAGE;
+                    } else {
+                        uint32_t pathlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                        payloadoffset += 4;
+
+                        if (payloadoffset + pathlen > data.size()) {
+                            errcode = SSH_FX_BAD_MESSAGE;
+                        } else {
+                            pdiutil::string reqpath(reinterpret_cast<const char*>(&data[payloadoffset]), pathlen);
+                            payloadoffset += pathlen;
+
+                            // Build absolute starting path. SFTP path separator is always '/'.
+                            pdiutil::string abspath;
+                            if (reqpath.empty() || reqpath[0] != '/') {
+                                abspath = __i_fs.getPWD();
+                                if (abspath.empty() || abspath[abspath.length() - 1] != '/') {
+                                    abspath += '/';
+                                }
+                                abspath += reqpath;
+                            } else {
+                                abspath = reqpath;
+                            }
+
+                            // Canonicalize by collapsing "." and ".." segments. Does
+                            // not require the path to exist on the FS (sftp clients
+                            // call REALPATH on yet-to-be-created paths).
+                            pdiutil::string canonical;
+                            size_t i = 0;
+                            while (i < abspath.length()) {
+                                while (i < abspath.length() && abspath[i] == '/') i++;
+                                size_t j = i;
+                                while (j < abspath.length() && abspath[j] != '/') j++;
+                                if (j > i) {
+                                    pdiutil::string seg = abspath.substr(i, j - i);
+                                    if (seg == ".") {
+                                        // skip
+                                    } else if (seg == "..") {
+                                        size_t lastsep = canonical.find_last_of('/');
+                                        if (lastsep != pdiutil::string::npos) {
+                                            canonical = canonical.substr(0, lastsep);
+                                        }
+                                    } else {
+                                        canonical += '/';
+                                        canonical += seg;
+                                    }
+                                }
+                                i = j;
+                            }
+                            if (canonical.empty()) canonical = "/";
+
+                            // Build SSH_FXP_NAME reply with 1 entry and zero attrs
+                            uint32_t namelen = canonical.length();
+                            uint32_t reply_len = 1 + 4 + 4 + (4 + namelen) + (4 + namelen) + 4; // type + reqid + count + filename(string) + longname(string) + attrs(flags=0)
+                            sftp_reply.push_back((reply_len >> 24) & 0xFF);
+                            sftp_reply.push_back((reply_len >> 16) & 0xFF);
+                            sftp_reply.push_back((reply_len >> 8) & 0xFF);
+                            sftp_reply.push_back(reply_len & 0xFF);
+
+                            sftp_reply.push_back(SSH_FXP_NAME); // 104
+
+                            sftp_reply.push_back((request_id >> 24) & 0xFF);
+                            sftp_reply.push_back((request_id >> 16) & 0xFF);
+                            sftp_reply.push_back((request_id >> 8) & 0xFF);
+                            sftp_reply.push_back(request_id & 0xFF);
+
+                            // count = 1
+                            sftp_reply.push_back(0); sftp_reply.push_back(0); sftp_reply.push_back(0); sftp_reply.push_back(1);
+
+                            // filename string
+                            sftp_reply.push_back((namelen >> 24) & 0xFF);
+                            sftp_reply.push_back((namelen >> 16) & 0xFF);
+                            sftp_reply.push_back((namelen >> 8) & 0xFF);
+                            sftp_reply.push_back(namelen & 0xFF);
+                            sftp_reply.insert(sftp_reply.end(), canonical.begin(), canonical.end());
+
+                            // longname string (same as filename; ls-style listing not required for REALPATH)
+                            sftp_reply.push_back((namelen >> 24) & 0xFF);
+                            sftp_reply.push_back((namelen >> 16) & 0xFF);
+                            sftp_reply.push_back((namelen >> 8) & 0xFF);
+                            sftp_reply.push_back(namelen & 0xFF);
+                            sftp_reply.insert(sftp_reply.end(), canonical.begin(), canonical.end());
+
+                            // attrs: flags = 0 (no following fields)
+                            sftp_reply.push_back(0); sftp_reply.push_back(0); sftp_reply.push_back(0); sftp_reply.push_back(0);
+                        }
+                    }
                 }else if (packettype == SSH_FXP_STAT || packettype == SSH_FXP_LSTAT){ // treat both same until symlinks not supported by FS
 
                     // Parse filename length
@@ -913,8 +1023,8 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                         // Status code: SSH_FX_NO_SUCH_FILE (2)
                         errcode = SSH_FX_NO_SUCH_FILE;
                     }
-                }else if (packettype == SSH_FXP_OPEN || packettype == SSH_FXP_OPENDIR){ 
-                    
+                }else if (packettype == SSH_FXP_OPEN){
+
                     // Parse filename length
                     uint32_t fnamelen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
                     payloadoffset += 4;
@@ -933,11 +1043,11 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                     // parse attrs if present (for SSH_FXP_OPEN)
                     // currently not using until dont support attributes
 
-                    // Check if dir/file exists and get attributes 
+                    // Check if dir/file exists and get attributes
                     bool file_exists = __i_fs.isFileExist(filename.c_str());
                     bool dir_exists = __i_fs.isDirExist(filename.c_str());
 
-                    if( packettype == SSH_FXP_OPEN && (flags & SSH_FXF_READ) && !(flags & SSH_FXF_WRITE) ){
+                    if( (flags & SSH_FXF_READ) && !(flags & SSH_FXF_WRITE) ){
 
                         if (file_exists || dir_exists) {
                             // Prepare SSH_FXP_HANDLE reply
@@ -945,7 +1055,7 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                             // Status code: SSH_FX_NO_SUCH_FILE (2)
                             errcode = SSH_FX_NO_SUCH_FILE;
                         }
-                    } else if( packettype == SSH_FXP_OPEN && (flags & SSH_FXF_CREAT) ) {
+                    } else if( flags & SSH_FXF_CREAT ) {
 
                         bool createit = false;
 
@@ -980,7 +1090,7 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
 
                                 istatus = __i_fs.createFile(filename.c_str(), ""); // If it does not exist, create it
                             }
-                            
+
                             if( istatus < 0 ){
                                 errcode = SSH_FX_NO_SUCH_PATH;
                             }else{
@@ -1001,6 +1111,7 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                         char handle[handlesize + 1]; memset(handle, 0, handlesize + 1); genUniqueKey(handle, handlesize); // Generate a unique handle for this open file
                         m_session->current_channel.subsystem_req.sftp.filepath = filename;
                         m_session->current_channel.subsystem_req.sftp.handle = handle;
+                        m_session->current_channel.subsystem_req.sftp.is_dir = false;
 
                         uint32_t reply_len = 1 + 4 + 4 + handlesize; // type + reqid + handle size + handle bytes
                         sftp_reply.push_back((reply_len >> 24) & 0xFF);
@@ -1012,11 +1123,397 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
 
                         sftp_reply.push_back((request_id >> 24) & 0xFF);
                         sftp_reply.push_back((request_id >> 16) & 0xFF);
-                        sftp_reply.push_back((request_id >> 8) & 0xFF); 
+                        sftp_reply.push_back((request_id >> 8) & 0xFF);
                         sftp_reply.push_back(request_id & 0xFF);
 
                         sftp_reply.push_back(0x00); sftp_reply.push_back(0x00); sftp_reply.push_back(0x00); sftp_reply.push_back(handlesize); // handle length
                         sftp_reply.insert(sftp_reply.end(), handle, handle+handlesize);
+                    }
+
+                }else if (packettype == SSH_FXP_OPENDIR){
+
+                    // Parse path length
+                    uint32_t pathlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                    payloadoffset += 4;
+
+                    if (payloadoffset + pathlen > data.size()) {
+                        errcode = SSH_FX_BAD_MESSAGE;
+                    } else {
+                        // Parse path
+                        pdiutil::string dirpath(reinterpret_cast<const char*>(&data[payloadoffset]), pathlen);
+                        payloadoffset += pathlen;
+
+                        if (!__i_fs.isDirExist(dirpath.c_str())) {
+                            errcode = SSH_FX_NO_SUCH_FILE;
+                        } else {
+                            // List the directory now and cache the entries; READDIR
+                            // will paginate over this cache. The FS allocates each
+                            // item.name via new char[]; we copy into pdiutil::string
+                            // and free the raw buffers immediately.
+                            pdiutil::vector<file_info_t> itemlist;
+                            int rc = __i_fs.getDirFileList(dirpath.c_str(), itemlist);
+
+                            if (rc < 0) {
+                                errcode = SSH_FX_FAILURE;
+                                for (file_info_t item : itemlist) { if (item.name) delete[] item.name; }
+                                itemlist.clear();
+                            } else {
+                                auto &sftp = m_session->current_channel.subsystem_req.sftp;
+                                sftp.dir_entries.clear();
+                                sftp.readdir_offset = 0;
+                                sftp.is_dir = true;
+                                sftp.filepath = dirpath;
+
+                                for (file_info_t item : itemlist) {
+                                    SSHSubsystemRequest::Sftp::Entry e;
+                                    e.name = (item.name ? item.name : "");
+                                    e.size = item.size;
+                                    e.is_dir = (item.type == FILE_TYPE_DIR);
+                                    sftp.dir_entries.push_back(e);
+                                    if (item.name) delete[] item.name;
+                                }
+                                itemlist.clear();
+
+                                // Allocate handle and reply SSH_FXP_HANDLE
+                                uint8_t handlesize = 3;
+                                char handle[handlesize + 1]; memset(handle, 0, handlesize + 1); genUniqueKey(handle, handlesize);
+                                sftp.handle = handle;
+
+                                uint32_t reply_len = 1 + 4 + 4 + handlesize;
+                                sftp_reply.push_back((reply_len >> 24) & 0xFF);
+                                sftp_reply.push_back((reply_len >> 16) & 0xFF);
+                                sftp_reply.push_back((reply_len >> 8) & 0xFF);
+                                sftp_reply.push_back(reply_len & 0xFF);
+
+                                sftp_reply.push_back(SSH_FXP_HANDLE);
+
+                                sftp_reply.push_back((request_id >> 24) & 0xFF);
+                                sftp_reply.push_back((request_id >> 16) & 0xFF);
+                                sftp_reply.push_back((request_id >> 8) & 0xFF);
+                                sftp_reply.push_back(request_id & 0xFF);
+
+                                sftp_reply.push_back(0x00); sftp_reply.push_back(0x00); sftp_reply.push_back(0x00); sftp_reply.push_back(handlesize);
+                                sftp_reply.insert(sftp_reply.end(), handle, handle+handlesize);
+                            }
+                        }
+                    }
+
+                }else if (packettype == SSH_FXP_READDIR){
+
+                    // Parse handle length
+                    uint32_t handlelen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                    payloadoffset += 4;
+
+                    if (handlelen == 0 || payloadoffset + handlelen > data.size()) {
+                        errcode = SSH_FX_BAD_MESSAGE;
+                    } else {
+                        pdiutil::string handle(reinterpret_cast<const char*>(&data[payloadoffset]), handlelen);
+                        payloadoffset += handlelen;
+
+                        auto &sftp = m_session->current_channel.subsystem_req.sftp;
+
+                        if (sftp.handle != handle || !sftp.is_dir) {
+                            errcode = SSH_FX_INVALID_HANDLE;
+                        } else if (sftp.readdir_offset >= sftp.dir_entries.size()) {
+                            errcode = SSH_FX_EOF;
+                        } else {
+                            // Emit up to batchmax entries per response; client
+                            // will issue successive READDIRs until EOF.
+                            const uint32_t batchmax = 16;
+                            uint32_t batch = (uint32_t)sftp.dir_entries.size() - sftp.readdir_offset;
+                            if (batch > batchmax) batch = batchmax;
+
+                            // First compute payload length: 1 (type) + 4 (reqid) + 4 (count)
+                            // + per entry: 4 + namelen + 4 + longnamelen + 4 (attrs flags=0,
+                            //   we add size+perms so +4+8+4 = +16)
+                            // Use ATTR_SIZE|ATTR_PERMISSIONS so sftp client can do ls -l.
+                            uint32_t reply_len = 1 + 4 + 4;
+                            char longbuf[96];
+                            // Pre-format longnames so we know sizes
+                            pdiutil::vector<pdiutil::string> longnames;
+                            longnames.reserve(batch);
+                            for (uint32_t i = 0; i < batch; i++) {
+                                const auto &e = sftp.dir_entries[sftp.readdir_offset + i];
+                                memset(longbuf, 0, sizeof(longbuf));
+                                // longname is human-display only; clients use attrs for real data.
+                                // Include only what we actually know: type marker + size + name.
+                                // %lu (32-bit) is used because __snprintf does not support %llu.
+                                __snprintf(longbuf, sizeof(longbuf), "%c %10lu %s",
+                                    e.is_dir ? 'd' : '-',
+                                    (unsigned long)e.size, e.name.c_str());
+                                longnames.push_back(pdiutil::string(longbuf));
+                                reply_len += 4 + e.name.length();          // filename
+                                reply_len += 4 + longnames[i].length();     // longname
+                                reply_len += 4 + 8 + 4;                     // attrs: flags + size(uint64) + perms(uint32)
+                            }
+
+                            sftp_reply.push_back((reply_len >> 24) & 0xFF);
+                            sftp_reply.push_back((reply_len >> 16) & 0xFF);
+                            sftp_reply.push_back((reply_len >> 8) & 0xFF);
+                            sftp_reply.push_back(reply_len & 0xFF);
+
+                            sftp_reply.push_back(SSH_FXP_NAME); // 104
+
+                            sftp_reply.push_back((request_id >> 24) & 0xFF);
+                            sftp_reply.push_back((request_id >> 16) & 0xFF);
+                            sftp_reply.push_back((request_id >> 8) & 0xFF);
+                            sftp_reply.push_back(request_id & 0xFF);
+
+                            // count
+                            sftp_reply.push_back((batch >> 24) & 0xFF);
+                            sftp_reply.push_back((batch >> 16) & 0xFF);
+                            sftp_reply.push_back((batch >> 8) & 0xFF);
+                            sftp_reply.push_back(batch & 0xFF);
+
+                            for (uint32_t i = 0; i < batch; i++) {
+                                const auto &e = sftp.dir_entries[sftp.readdir_offset + i];
+                                const auto &ln = longnames[i];
+
+                                uint32_t nl = e.name.length();
+                                sftp_reply.push_back((nl >> 24) & 0xFF);
+                                sftp_reply.push_back((nl >> 16) & 0xFF);
+                                sftp_reply.push_back((nl >> 8) & 0xFF);
+                                sftp_reply.push_back(nl & 0xFF);
+                                sftp_reply.insert(sftp_reply.end(), e.name.begin(), e.name.end());
+
+                                uint32_t ll = ln.length();
+                                sftp_reply.push_back((ll >> 24) & 0xFF);
+                                sftp_reply.push_back((ll >> 16) & 0xFF);
+                                sftp_reply.push_back((ll >> 8) & 0xFF);
+                                sftp_reply.push_back(ll & 0xFF);
+                                sftp_reply.insert(sftp_reply.end(), ln.begin(), ln.end());
+
+                                // attrs: flags = SIZE | PERMISSIONS
+                                uint32_t flags = SSH_FILEXFER_ATTR_SIZE | SSH_FILEXFER_ATTR_PERMISSIONS;
+                                sftp_reply.push_back((flags >> 24) & 0xFF);
+                                sftp_reply.push_back((flags >> 16) & 0xFF);
+                                sftp_reply.push_back((flags >> 8) & 0xFF);
+                                sftp_reply.push_back(flags & 0xFF);
+
+                                uint64_t sz = e.size;
+                                sftp_reply.push_back((sz >> 56) & 0xFF);
+                                sftp_reply.push_back((sz >> 48) & 0xFF);
+                                sftp_reply.push_back((sz >> 40) & 0xFF);
+                                sftp_reply.push_back((sz >> 32) & 0xFF);
+                                sftp_reply.push_back((sz >> 24) & 0xFF);
+                                sftp_reply.push_back((sz >> 16) & 0xFF);
+                                sftp_reply.push_back((sz >> 8) & 0xFF);
+                                sftp_reply.push_back(sz & 0xFF);
+
+                                uint32_t perms = e.is_dir ? 0040755 : 0100644;
+                                sftp_reply.push_back((perms >> 24) & 0xFF);
+                                sftp_reply.push_back((perms >> 16) & 0xFF);
+                                sftp_reply.push_back((perms >> 8) & 0xFF);
+                                sftp_reply.push_back(perms & 0xFF);
+                            }
+
+                            sftp.readdir_offset += batch;
+                        }
+                    }
+
+                }else if (packettype == SSH_FXP_MKDIR){
+
+                    if (payloadoffset + 4 > data.size()) {
+                        errcode = SSH_FX_BAD_MESSAGE;
+                    } else {
+                        uint32_t pathlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                        payloadoffset += 4;
+
+                        if (payloadoffset + pathlen > data.size()) {
+                            errcode = SSH_FX_BAD_MESSAGE;
+                        } else {
+                            pdiutil::string dirpath(reinterpret_cast<const char*>(&data[payloadoffset]), pathlen);
+                            payloadoffset += pathlen;
+                            // Trailing ATTRS field is ignored: FS has no perm/time support.
+
+                            if (__i_fs.isDirExist(dirpath.c_str()) || __i_fs.isFileExist(dirpath.c_str())) {
+                                errcode = SSH_FX_FILE_ALREADY_EXISTS;
+                            } else if (__i_fs.createDirectory(dirpath.c_str()) < 0) {
+                                errcode = SSH_FX_FAILURE;
+                            } else {
+                                errcode = SSH_FX_OK;
+                            }
+                        }
+                    }
+
+                }else if (packettype == SSH_FXP_FSTAT){
+
+                    // Parse handle
+                    if (payloadoffset + 4 > data.size()) {
+                        errcode = SSH_FX_BAD_MESSAGE;
+                    } else {
+                        uint32_t handlelen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                        payloadoffset += 4;
+
+                        if (handlelen == 0 || payloadoffset + handlelen > data.size()) {
+                            errcode = SSH_FX_BAD_MESSAGE;
+                        } else {
+                            pdiutil::string handle(reinterpret_cast<const char*>(&data[payloadoffset]), handlelen);
+                            payloadoffset += handlelen;
+
+                            auto &sftp = m_session->current_channel.subsystem_req.sftp;
+
+                            if (sftp.handle != handle) {
+                                errcode = SSH_FX_INVALID_HANDLE;
+                            } else {
+                                // Build SSH_FXP_ATTRS reply (mirrors the STAT branch).
+                                bool dir_exists = sftp.is_dir;
+                                uint64_t filesize = dir_exists ? 0 : __i_fs.getFileSize(sftp.filepath.c_str());
+
+                                uint32_t reply_len = 1 + 4 + 4 + 8 + 4; // type + reqid + flags + size + permissions
+                                sftp_reply.push_back((reply_len >> 24) & 0xFF);
+                                sftp_reply.push_back((reply_len >> 16) & 0xFF);
+                                sftp_reply.push_back((reply_len >> 8) & 0xFF);
+                                sftp_reply.push_back(reply_len & 0xFF);
+
+                                sftp_reply.push_back(SSH_FXP_ATTRS); // 105
+
+                                sftp_reply.push_back((request_id >> 24) & 0xFF);
+                                sftp_reply.push_back((request_id >> 16) & 0xFF);
+                                sftp_reply.push_back((request_id >> 8) & 0xFF);
+                                sftp_reply.push_back(request_id & 0xFF);
+
+                                uint32_t flags = SSH_FILEXFER_ATTR_SIZE | SSH_FILEXFER_ATTR_PERMISSIONS;
+                                sftp_reply.push_back((flags >> 24) & 0xFF);
+                                sftp_reply.push_back((flags >> 16) & 0xFF);
+                                sftp_reply.push_back((flags >> 8) & 0xFF);
+                                sftp_reply.push_back(flags & 0xFF);
+
+                                sftp_reply.push_back((filesize >> 56) & 0xFF);
+                                sftp_reply.push_back((filesize >> 48) & 0xFF);
+                                sftp_reply.push_back((filesize >> 40) & 0xFF);
+                                sftp_reply.push_back((filesize >> 32) & 0xFF);
+                                sftp_reply.push_back((filesize >> 24) & 0xFF);
+                                sftp_reply.push_back((filesize >> 16) & 0xFF);
+                                sftp_reply.push_back((filesize >> 8) & 0xFF);
+                                sftp_reply.push_back(filesize & 0xFF);
+
+                                uint32_t perms = dir_exists ? 0040755 : 0100644;
+                                sftp_reply.push_back((perms >> 24) & 0xFF);
+                                sftp_reply.push_back((perms >> 16) & 0xFF);
+                                sftp_reply.push_back((perms >> 8) & 0xFF);
+                                sftp_reply.push_back(perms & 0xFF);
+                            }
+                        }
+                    }
+
+                }else if (packettype == SSH_FXP_SETSTAT){
+
+                    // Accept-and-ignore: FS has no perm/time support. We only
+                    // validate that the target exists so we don't lie about
+                    // success on a bogus path.
+                    if (payloadoffset + 4 > data.size()) {
+                        errcode = SSH_FX_BAD_MESSAGE;
+                    } else {
+                        uint32_t pathlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                        payloadoffset += 4;
+
+                        if (payloadoffset + pathlen > data.size()) {
+                            errcode = SSH_FX_BAD_MESSAGE;
+                        } else {
+                            pdiutil::string path(reinterpret_cast<const char*>(&data[payloadoffset]), pathlen);
+                            payloadoffset += pathlen;
+
+                            if (!__i_fs.isFileExist(path.c_str()) && !__i_fs.isDirExist(path.c_str())) {
+                                errcode = SSH_FX_NO_SUCH_FILE;
+                            } else {
+                                errcode = SSH_FX_OK;
+                            }
+                        }
+                    }
+
+                }else if (packettype == SSH_FXP_READLINK || packettype == SSH_FXP_SYMLINK){
+
+                    // FS has no symlink layer; report unsupported.
+                    errcode = SSH_FX_OP_UNSUPPORTED;
+
+                }else if (packettype == SSH_FXP_RENAME){
+
+                    // Parse oldpath
+                    if (payloadoffset + 4 > data.size()) {
+                        errcode = SSH_FX_BAD_MESSAGE;
+                    } else {
+                        uint32_t oldlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                        payloadoffset += 4;
+
+                        if (payloadoffset + oldlen + 4 > data.size()) {
+                            errcode = SSH_FX_BAD_MESSAGE;
+                        } else {
+                            pdiutil::string oldpath(reinterpret_cast<const char*>(&data[payloadoffset]), oldlen);
+                            payloadoffset += oldlen;
+
+                            // Parse newpath
+                            uint32_t newlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                            payloadoffset += 4;
+
+                            if (payloadoffset + newlen > data.size()) {
+                                errcode = SSH_FX_BAD_MESSAGE;
+                            } else {
+                                pdiutil::string newpath(reinterpret_cast<const char*>(&data[payloadoffset]), newlen);
+                                payloadoffset += newlen;
+
+                                if (!__i_fs.isFileExist(oldpath.c_str()) && !__i_fs.isDirExist(oldpath.c_str())) {
+                                    errcode = SSH_FX_NO_SUCH_FILE;
+                                } else if (__i_fs.isFileExist(newpath.c_str()) || __i_fs.isDirExist(newpath.c_str())) {
+                                    // SFTP v3 RENAME must fail if the target already exists.
+                                    errcode = SSH_FX_FILE_ALREADY_EXISTS;
+                                } else if (__i_fs.rename(oldpath.c_str(), newpath.c_str()) < 0) {
+                                    errcode = SSH_FX_FAILURE;
+                                } else {
+                                    errcode = SSH_FX_OK;
+                                }
+                            }
+                        }
+                    }
+
+                }else if (packettype == SSH_FXP_REMOVE){
+
+                    if (payloadoffset + 4 > data.size()) {
+                        errcode = SSH_FX_BAD_MESSAGE;
+                    } else {
+                        uint32_t pathlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                        payloadoffset += 4;
+
+                        if (payloadoffset + pathlen > data.size()) {
+                            errcode = SSH_FX_BAD_MESSAGE;
+                        } else {
+                            pdiutil::string filepath(reinterpret_cast<const char*>(&data[payloadoffset]), pathlen);
+                            payloadoffset += pathlen;
+
+                            if (!__i_fs.isFileExist(filepath.c_str())) {
+                                // REMOVE is for files only; if the path is a dir, the client should use RMDIR.
+                                errcode = __i_fs.isDirExist(filepath.c_str()) ? SSH_FX_FAILURE : SSH_FX_NO_SUCH_FILE;
+                            } else if (__i_fs.deleteFile(filepath.c_str()) < 0) {
+                                errcode = SSH_FX_FAILURE;
+                            } else {
+                                errcode = SSH_FX_OK;
+                            }
+                        }
+                    }
+
+                }else if (packettype == SSH_FXP_RMDIR){
+
+                    if (payloadoffset + 4 > data.size()) {
+                        errcode = SSH_FX_BAD_MESSAGE;
+                    } else {
+                        uint32_t pathlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                        payloadoffset += 4;
+
+                        if (payloadoffset + pathlen > data.size()) {
+                            errcode = SSH_FX_BAD_MESSAGE;
+                        } else {
+                            pdiutil::string dirpath(reinterpret_cast<const char*>(&data[payloadoffset]), pathlen);
+                            payloadoffset += pathlen;
+
+                            if (!__i_fs.isDirExist(dirpath.c_str())) {
+                                // Distinguish "exists but is a file" from "missing"
+                                errcode = __i_fs.isFileExist(dirpath.c_str()) ? SSH_FX_FAILURE : SSH_FX_NO_SUCH_FILE;
+                            } else if (__i_fs.deleteDirectory(dirpath.c_str()) < 0) {
+                                errcode = SSH_FX_FAILURE;
+                            } else {
+                                errcode = SSH_FX_OK;
+                            }
+                        }
                     }
 
                 }else if (packettype == SSH_FXP_READ){
@@ -1201,10 +1698,17 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                         payloadoffset += handlelen;
 
                         if( m_session->current_channel.subsystem_req.sftp.handle == handle ){
-                            // Successfully closed the file, send success reply
+                            // Successfully closed the file/dir, send success reply
                             errcode = SSH_FX_OK; // SSH_FX_OK (0) for successful close
 
                             m_session->current_channel.doHandleBolusChannelDataChunksCb = nullptr; // reset the bolus chunk handler if any
+
+                            // Release dir-handle state if this was an OPENDIR handle
+                            auto &sftp = m_session->current_channel.subsystem_req.sftp;
+                            sftp.is_dir = false;
+                            sftp.readdir_offset = 0;
+                            sftp.dir_entries.clear();
+                            sftp.handle.clear();
                         }else{
                             errcode = SSH_FX_INVALID_HANDLE;
                         }
