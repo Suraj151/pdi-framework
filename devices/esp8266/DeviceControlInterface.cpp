@@ -14,6 +14,9 @@ created Date    : 1st Jan 2024
 #include "core/Espnow.h"
 #include "PingInterface.h"
 #include "SerialInterface.h"
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+#include "threading/Preemptive.h"
+#endif
 
 /**
  * DeviceControlInterface constructor.
@@ -390,7 +393,17 @@ uint32_t DeviceControlInterface::get_free_heap()
 void DeviceControlInterface::log(logger_type_t log_type, const char *content)
 {
     #if defined(LOGBEGIN) && ( defined(ENABLE_LOG_ALL) || defined(ENABLE_LOG_INFO) || defined(ENABLE_LOG_ERROR) || defined(ENABLE_LOG_WARNING) || defined(ENABLE_LOG_SUCCESS) )
-    __i_logger.log(log_type, content);
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+        if (__i_preemptive_scheduler.is_task_context()) {
+            __i_logger.log(log_type, content);
+        } else if (__serial_uart.m_mutex.try_lock()) {
+            __i_logger.log(log_type, content);
+            __serial_uart.m_mutex.unlock();
+        }
+        // else: serial mutex held by another task — skip this log to avoid deadlock.
+    #else
+        __i_logger.log(log_type, content);
+    #endif
     #endif
 }
 
@@ -401,32 +414,32 @@ void DeviceControlInterface::log(logger_type_t log_type, const char *content)
  */
 void DeviceControlInterface::yield()
 {
-    #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    __i_preemptive_scheduler.disable_sched();
-    #endif
+    // #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    // __i_preemptive_scheduler.disable_sched();
+    // #endif
 
     // run_scheduled_functions();
     // run_scheduled_recurrent_functions();
     // esp_schedule();
     esp_yield();
 
-    #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    __i_preemptive_scheduler.enable_sched();
-    __i_preemptive_scheduler.disable_sched();
-    #endif
+    // #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    // __i_preemptive_scheduler.enable_sched();
+    // __i_preemptive_scheduler.disable_sched();
+    // #endif
 
     optimistic_yield(1000);
 
-    #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    __i_preemptive_scheduler.enable_sched();
-    __i_preemptive_scheduler.disable_sched();
-    #endif
+    // #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    // __i_preemptive_scheduler.enable_sched();
+    // __i_preemptive_scheduler.disable_sched();
+    // #endif
 
     delay(0);
 
-    #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    __i_preemptive_scheduler.enable_sched();
-    #endif
+    // #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    // __i_preemptive_scheduler.enable_sched();
+    // #endif
 }
 
 /**

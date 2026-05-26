@@ -14,6 +14,8 @@ Created Date    : 1st June 2025
  * Constructor
  */
 PreemptiveMutex::PreemptiveMutex() : m_locked(false), m_owner(nullptr) {
+    // Pre-reserve waiters so push_back() in lock() never reallocates.
+    m_waiters.reserve(MAX_SCHEDULABLE_TASKS);
 }
 
 /**
@@ -102,7 +104,6 @@ void PreemptiveMutex::unlock(){
 void PreemptiveMutex::critical_lock(){
 
     lock();
-    // CRITICAL_SECTION_ENTER
     cli();
 }
 
@@ -111,6 +112,39 @@ void PreemptiveMutex::critical_lock(){
  */
 void PreemptiveMutex::critical_unlock(){
 
-    unlock();
     sei();
+    unlock();
+}
+
+/**
+ * Best-effort acquire. Returns true if we got the mutex, false otherwise.
+ * Never calls mute() — safe in SDK / lwIP / NMI callback contexts where
+ * mute() would park the wrong task and deadlock. Caller must unlock() iff
+ * this returns true.
+ */
+bool PreemptiveMutex::try_lock(){
+
+    CRITICAL_SECTION_ENTER
+
+    if(!__i_preemptive_scheduler.current) {
+        CRITICAL_SECTION_EXIT
+        return false;
+    }
+
+    if (!m_locked) {
+        m_locked = true;
+        m_owner = __i_preemptive_scheduler.current;
+        CRITICAL_SECTION_EXIT
+        return true;
+    }
+
+    // Re-entrant: already own it. Treat as success so caller's matching
+    // unlock() pairing stays correct. (Mirrors regular lock() behavior.)
+    if (__i_preemptive_scheduler.current == m_owner) {
+        CRITICAL_SECTION_EXIT
+        return true;
+    }
+
+    CRITICAL_SECTION_EXIT
+    return false;
 }

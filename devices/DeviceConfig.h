@@ -176,7 +176,7 @@ created Date    : 1st June 2019
 /**
  * enable/disable internet availability based station connections
  */
-// #define ENABLE_INTERNET_BASED_CONNECTIONS
+#define ENABLE_INTERNET_BASED_CONNECTIONS
 
 /**
  * @define wifi & internet connectivity check cycle durations
@@ -186,24 +186,30 @@ created Date    : 1st June 2019
 #define INTERNET_CONNECTIVITY_CHECK_DURATION  WIFI_CONNECTIVITY_CHECK_DURATION
 
 /**
- * define connection switch duration once device recognise internet unavailability on current network
- * it should be multiple of INTERNET_CONNECTIVITY_CHECK_DURATION
- */
-#ifdef ENABLE_INTERNET_BASED_CONNECTIONS
-#define SWITCHING_DURATION_FOR_NO_INTERNET_CONNECTION INTERNET_CONNECTIVITY_CHECK_DURATION*6
-#endif
-
-/**
  * WiFi reconnect escalation tiers
  */
+#define ALLOW_DEVICE_RESET_ON_WIFI_CONNECT_FAILURES
+
 #define WIFI_RECONNECT_TIER1_DURATION   (MILLISECOND_DURATION_5000 * 3)    // 0 -  15 s
 #define WIFI_RECONNECT_TIER2_DURATION   (MILLISECOND_DURATION_10000 * 6)   // 15 -  60 s
 #define WIFI_RECONNECT_TIER3_DURATION   (MILLISECOND_DURATION_10000 * 12)  // 60 - 120 s
+#ifdef ALLOW_DEVICE_RESET_ON_WIFI_CONNECT_FAILURES
+#define WIFI_RECONNECT_TIER4_DURATION   (MILLISECOND_DURATION_10000 * 30)  // > 300 s. final restart device
+#endif
 
 #define WIFI_RECONNECT_TIER1_GAP        MILLISECOND_DURATION_5000
 #define WIFI_RECONNECT_TIER2_GAP        MILLISECOND_DURATION_10000
 #define WIFI_RECONNECT_TIER3_GAP        (MILLISECOND_DURATION_10000 * 3)
 #define WIFI_RECONNECT_TIER4_GAP        (MILLISECOND_DURATION_10000 * 6)
+
+/**
+ * define connection switch duration once device recognise internet unavailability on current network
+ * it should be at least WIFI_RECONNECT_TIER2_DURATION
+ */
+#ifdef ENABLE_INTERNET_BASED_CONNECTIONS
+#define SWITCHING_DURATION_FOR_NO_INTERNET_CONNECTION WIFI_RECONNECT_TIER2_DURATION + WIFI_RECONNECT_TIER2_GAP
+#endif
+
 
 #endif
 

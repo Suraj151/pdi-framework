@@ -10,23 +10,44 @@ created Date    : 1st June 2019
 
 #include "PingInterface.h"
 #include "LoggerInterface.h"
+#include "SerialInterface.h"
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+#include "threading/Preemptive.h"
+#endif
 
 volatile bool _host_resp = false;
 static const char _pinghostname[] = "google.com";
 // IPAddress PING_TARGET(8,8,8,8);
 
-// This function is called when a ping is received or the request times out:
+// This function is called when a ping is received or the request times out.
 static void ICACHE_FLASH_ATTR ping_recv_cb (void* arg, void *pdata){
 
   struct ping_resp *pingrsp = (struct ping_resp *)pdata;
+  _host_resp = (pingrsp->bytes > 0);
 
-  if (pingrsp->bytes > 0) {
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+  if (__i_preemptive_scheduler.is_task_context()) {
+    if (_host_resp) {
+      LogFmtI("\nPing: Reply bytes=%d time=%dms\n", pingrsp->bytes, pingrsp->resp_time);
+    } else {
+      LogI("\nPing: Request timed out\n");
+    }
+  } else if (__serial_uart.m_mutex.try_lock()) {
+    if (_host_resp) {
+      LogFmtI("\nPing: Reply bytes=%d time=%dms\n", pingrsp->bytes, pingrsp->resp_time);
+    } else {
+      LogI("\nPing: Request timed out\n");
+    }
+    __serial_uart.m_mutex.unlock();
+  }
+  // else: serial mutex held by another task — skip this log to avoid deadlock.
+#else
+  if (_host_resp) {
     LogFmtI("\nPing: Reply bytes=%d time=%dms\n", pingrsp->bytes, pingrsp->resp_time);
-    _host_resp = true;
   } else {
     LogI("\nPing: Request timed out\n");
-    _host_resp = false;
   }
+#endif
 }
 
 // This function is called when a ping is sent

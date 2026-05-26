@@ -11,6 +11,10 @@ created Date    : 1st June 2019
 #include "WiFiInterface.h"
 #include "LoggerInterface.h"
 #include "DeviceControlInterface.h"
+#include "SerialInterface.h"
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+#include "threading/Preemptive.h"
+#endif
 
 #if defined( ENABLE_NAPT_FEATURE_LWIP_V1 )
 #include "lwip/lwip_napt.h"
@@ -787,7 +791,18 @@ void WiFiInterface::wifi_event_handler_cb(System_Event_t *_event)
 {
   if( nullptr != _event ){
 
-    LogFmtI("\nwifi event : %d\n", (int)_event->event);
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+        if (__i_preemptive_scheduler.is_task_context()) {
+          LogFmtI("\nwifi event : %d\n", (int)_event->event);
+        } else if (__serial_uart.m_mutex.try_lock()) {
+          LogFmtI("\nwifi event : %d\n", (int)_event->event);
+          __serial_uart.m_mutex.unlock();
+        }
+        // else: serial mutex held by another task — skip this log to avoid deadlock.
+    #else
+        LogFmtI("\nwifi event : %d\n", (int)_event->event);
+    #endif
+
     event_name_t e = EVENT_NAME_MAX;
 
     if ( EVENT_STAMODE_CONNECTED == _event->event ) {

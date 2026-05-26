@@ -21,6 +21,8 @@ public:
 
     virtual void critical_lock() = 0;
     virtual void critical_unlock() = 0;
+
+    virtual bool try_lock() { return true; }
 };
 
 #endif

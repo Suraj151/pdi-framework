@@ -128,7 +128,7 @@ void WiFiServiceProvider::handleInternetConnectivity(){
         __utl_event.execute_event(EVENT_WIFI_INTERNET_DOWN);
         LogI("WiFi Internet Down\n");
         __task_scheduler.setTimeout( [&]() { this->m_wifi->enableNAPT(false); }, MILLISECOND_DURATION_1000, __i_dvc_ctrl.millis_now() );
-      }  
+      }
     }
 
     __status_wifi.internet_available = ping_success;
@@ -136,11 +136,11 @@ void WiFiServiceProvider::handleInternetConnectivity(){
     #ifdef ENABLE_INTERNET_BASED_CONNECTIONS
     if( !__status_wifi.internet_available && (__i_dvc_ctrl.millis_now()-__status_wifi.last_internet_millis) >= SWITCHING_DURATION_FOR_NO_INTERNET_CONNECTION ){
 
-      memcpy( __status_wifi.ignore_bssid, this->m_wifi->BSSID(), 6 );
-      this->m_wifi->disconnect(false);
+      this->m_wifi->disconnect(true);
       __status_wifi.last_internet_millis = __i_dvc_ctrl.millis_now();
 
       #ifndef IGNORE_FREE_RELAY_CONNECTIONS
+      memcpy( __status_wifi.ignore_bssid, this->m_wifi->BSSID(), 6 );
       __task_scheduler.setTimeout( [&]() {
         this->m_wifi->scanNetworksAsync( [&](int _scanCount) {
           this->scan_aps_and_configure_wifi_station_async(_scanCount);
@@ -148,16 +148,17 @@ void WiFiServiceProvider::handleInternetConnectivity(){
       }, 500, __i_dvc_ctrl.millis_now() );
       #endif
 
-      __task_scheduler.setTimeout( [&]() {
-        LogI("\nHandle station reconnecting...\n");
-        memset( __status_wifi.ignore_bssid, 0, 6 );
-        if( !this->m_wifi->localIP().isSet() || !this->m_wifi->isConnected() ){
-          wifi_config_table _wifi_credentials;
-          __database_service.get_wifi_config_table( &_wifi_credentials );
-          this->configure_wifi_station( &_wifi_credentials );
-          _ClearObject(&_wifi_credentials);
-        }
-      }, 2*INTERNET_CONNECTIVITY_CHECK_DURATION, __i_dvc_ctrl.millis_now() );
+      // Commenting here since wifi connection task will take care of reconnect cycle
+      // __task_scheduler.setTimeout( [&]() {
+      //   LogI("\nHandle station reconnecting...\n");
+      //   memset( __status_wifi.ignore_bssid, 0, 6 );
+      //   if( !this->m_wifi->localIP().isSet() || !this->m_wifi->isConnected() ){
+      //     wifi_config_table _wifi_credentials;
+      //     __database_service.get_wifi_config_table( &_wifi_credentials );
+      //     this->configure_wifi_station( &_wifi_credentials );
+      //     _ClearObject(&_wifi_credentials);
+      //   }
+      // }, 2*INTERNET_CONNECTIVITY_CHECK_DURATION, __i_dvc_ctrl.millis_now() );
     }
     #endif
   }
@@ -420,6 +421,7 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
   }
 
   LogI("\nHandeling WiFi Connectivity\n");
+  LogFmtI("FreeHeap: %u\n", (unsigned)__i_dvc_ctrl.get_free_heap());
 
   uint32_t now = __i_dvc_ctrl.millis_now();
 
@@ -464,12 +466,20 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
     tier = 2; attempt_gap_ms = WIFI_RECONNECT_TIER2_GAP;
   } else if( down_ms < WIFI_RECONNECT_TIER3_DURATION ){
     tier = 3; attempt_gap_ms = WIFI_RECONNECT_TIER3_GAP;
+#ifdef ALLOW_DEVICE_RESET_ON_WIFI_CONNECT_FAILURES    
+  } else if( down_ms < WIFI_RECONNECT_TIER4_DURATION ){
+    tier = 4; attempt_gap_ms = WIFI_RECONNECT_TIER4_GAP;
+  } else {
+    tier = 5;
+  }
+#else
   } else {
     tier = 4; attempt_gap_ms = WIFI_RECONNECT_TIER4_GAP;
   }
+#endif
 
   // Per-tier backoff: skip if last attempt was too recent
-  if( 0 != this->m_last_reconnect_attempt_ms &&
+  if( tier != 5 && 0 != this->m_last_reconnect_attempt_ms &&
       (now - this->m_last_reconnect_attempt_ms) < attempt_gap_ms ){
     LogFmtI("WiFi down %u ms, tier %u backoff (%u/%u)\n",
       (unsigned)down_ms, (unsigned)tier,
@@ -527,6 +537,7 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
       LogI("WiFi tier 4: radio reset\n");
       this->m_wifi->disconnect(true);
       this->m_wifi->enableSTA(false);
+      this->m_wifi->enableAP(false);
       __task_scheduler.setTimeout( [&]() {
         wifi_config_table _wifi_credentials;
         __database_service.get_wifi_config_table(&_wifi_credentials);
@@ -538,6 +549,15 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
       }, 500, __i_dvc_ctrl.millis_now() );
       break;
     }
+
+#ifdef ALLOW_DEVICE_RESET_ON_WIFI_CONNECT_FAILURES
+    case 5: {
+
+      LogI("WiFi tier 5: device reset\n");
+      __i_dvc_ctrl.resetDevice();
+      break;
+    }
+#endif
   }
 }
 

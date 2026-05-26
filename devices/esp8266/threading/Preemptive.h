@@ -52,6 +52,14 @@ public:
     void remove_from_sleepers(Preemptive* f) override;
 
     Preemptive* pick_next_ready() override;
+
+    // Returns true if we're currently executing on a preemptive task's own
+    // stack (i.e. on `current`'s stack range, or on the main-loop / cont
+    // stack tracked as __non_preemptive). Returns false in SDK / lwIP / ISR
+    // callback contexts where the running code is not the task pointed to
+    // by `current` — in those contexts, calling mute() would park an
+    // unrelated task and the spin in exit() would deadlock.
+    bool is_task_context() const;
 };
 
 #endif

@@ -26,7 +26,9 @@ public:
     void unlock() override;
 
     void critical_lock() override;
-    void critical_unlock() override;    
+    void critical_unlock() override;
+
+    bool try_lock() override;
 };
 
 

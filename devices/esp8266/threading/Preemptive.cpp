@@ -14,6 +14,8 @@ Created Date    : 1st June 2025
 static XtensaContext* __isr_ctx; 
 static Preemptive __non_preemptive;
 static volatile bool __non_preemptive_saved = false;
+static volatile bool __preemptive_sched_active = true;
+static volatile uint32_t __last_time_spent_in_isr = 0; // in microseconds
 
 // Context switch period required to set in timer
 // Real time tuning requires period < 1ms - ISR context switch period/cycles in microseconds
@@ -26,8 +28,12 @@ void IRAM_ATTR __attribute__((naked)) timer1_isr_coroutine(XtensaContext* ctx){
 
     // CRITICAL_SECTION_ENTER
 
+    // Tune the period at runtime
+    timer1_update_us(__timer_period - __last_time_spent_in_isr);
+    if(!__preemptive_sched_active) return;
+
     // Capture microseconds
-    uint32_t current_us = micros();
+    uint32_t entry_us = micros();
 
     // Keep copy of interrupted context
     __isr_ctx = ctx;
@@ -36,7 +42,9 @@ void IRAM_ATTR __attribute__((naked)) timer1_isr_coroutine(XtensaContext* ctx){
     if (!__non_preemptive_saved) {
         __non_preemptive_saved = true;
         __non_preemptive.ctx = *__isr_ctx;
+        CRITICAL_SECTION_ENTER
         __i_preemptive_scheduler.add_to_ready(&__non_preemptive);
+        CRITICAL_SECTION_EXIT
     }
 
     // Switch tasks
@@ -45,11 +53,8 @@ void IRAM_ATTR __attribute__((naked)) timer1_isr_coroutine(XtensaContext* ctx){
     // Calculate spent time in ISR in microseconds.
     // These are not approximates as we are not considering the rest time spent outside measured boundaries
     // Make sure that spent time in ISR should be less than period
-    uint32_t spent_time_in_us = micros() - current_us;
-    if( spent_time_in_us > __timer_period ) spent_time_in_us = 0;
-
-    // Tune the period at runtime
-    timer1_update_us(__timer_period - spent_time_in_us);
+    __last_time_spent_in_isr = micros() - entry_us;
+    if( __last_time_spent_in_isr > __timer_period ) __last_time_spent_in_isr = 0;
 
     // CRITICAL_SECTION_EXIT
 }
@@ -88,6 +93,9 @@ Preemptive::~Preemptive(){
  * PreemptiveScheduler constructor.
  */
 PreemptiveScheduler::PreemptiveScheduler(){
+    // Pre-reserve so push_back() never reallocates at runtime.
+    ready.reserve(MAX_SCHEDULABLE_TASKS + 2);
+    sleepers.reserve(MAX_SCHEDULABLE_TASKS + 2);
 }
 
 /**
@@ -263,9 +271,11 @@ void PreemptiveScheduler::run(){
         auto si = sleepers[i];
         if (si.f && (int32_t)(now - si.wake_ms) >= 0) {
 
+            CRITICAL_SECTION_ENTER
             add_to_ready(si.f); 
             sleepers[i] = sleepers.back();
             sleepers.pop_back();
+            CRITICAL_SECTION_EXIT
         } else {
             ++i;
         }
@@ -280,7 +290,9 @@ void PreemptiveScheduler::run(){
                 return; // continue same task
             }
 
+            CRITICAL_SECTION_ENTER
             add_to_ready(current);
+            CRITICAL_SECTION_EXIT
         }else if(current->state == PreemptiveState::Ready){ // yielded task
 
             if( ready.empty() ){
@@ -304,13 +316,14 @@ void PreemptiveScheduler::run(){
         Preemptive* next = pick_next_ready();
         if (!next) return;
 
+        CRITICAL_SECTION_ENTER
         // Assign running ISR exc frame 
         next->ctx.excframe = __isr_ctx->excframe;
-
         next->state = PreemptiveState::Running;
         current = next;
 
-        xtensa_restore_context_isr(&next->ctx); 
+        xtensa_restore_context_isr(&next->ctx);
+        CRITICAL_SECTION_EXIT 
 
         // Serial.printf("[restore_context] ps=%08x, pc=%08x, sp=%08x, sar=%08x, frame=%08x, a0=%08x, a1=%08x, a2=%08x, a3=%08x, a4=%08x, a5=%08x, a6=%08x, a7=%08x, a8=%08x, a9=%08x, a10=%08x, a11=%08x, a12=%08x, a13=%08x, a14=%08x, a15=%08x, t0=%08x, t1=%08x, t2=%08x, t3=%08x, t4=%08x, t5=%08x, t6=%08x, t7=%08x, t8=%08x, t9=%08x, t10=%08x, t11=%08x, t12=%08x, t13=%08x, t14=%08x, t15=%08x\n", 
         //     next->ctx.ps, next->ctx.pc, next->ctx.sp, next->ctx.sar, next->ctx.excframe,
@@ -334,11 +347,9 @@ void PreemptiveScheduler::enable_sched(){
 
     if (!current) return;
 
-    if(!preemptiveisr_active){
-
-        preemptiveisr_active = true;
-        timer1_start_us(__timer_period);
-    }
+    CRITICAL_SECTION_ENTER
+    __preemptive_sched_active = true;
+    
     yield();
 }
 
@@ -351,11 +362,7 @@ void PreemptiveScheduler::disable_sched(){
     if (!current) return;
     
     CRITICAL_SECTION_ENTER
-    if(preemptiveisr_active){
-
-        timer1_clear();
-        preemptiveisr_active = false;
-    }
+    __preemptive_sched_active = false;
     CRITICAL_SECTION_EXIT
 }
 
@@ -372,6 +379,18 @@ void PreemptiveScheduler::exit(){
         __i_preemptive_scheduler.current = nullptr; 
         f = nullptr;
     }
+
+    // Fast path: voluntary yield where we're the only ready entry.
+    // No other task to switch to → just resume ourselves, no ISR
+    // round-trip, no spin.
+    // if (f && f->state == PreemptiveState::Ready
+    //       && __i_preemptive_scheduler.ready.size() == 1 && __i_preemptive_scheduler.ready[0] == f) {
+    //     CRITICAL_SECTION_ENTER
+    //     __i_preemptive_scheduler.ready.pop_back();
+    //     f->state = PreemptiveState::Running;
+    //     CRITICAL_SECTION_EXIT
+    //     return;
+    // }
 
     CRITICAL_SECTION_ENTER
     // __i_preemptive_scheduler.current = nullptr; // can we remove pointer in ISR ?
@@ -408,6 +427,12 @@ void PreemptiveScheduler::destroy_preemptive(Preemptive* f) {
  */
 void PreemptiveScheduler::add_to_ready(Preemptive* f) {
     if(f){
+
+        // Idempotency guard — never push a task that's already in ready.
+        for (auto* r : ready) {
+            if (r == f) return;
+        }
+
         // f->wait_ticks = 0;
         f->state = PreemptiveState::Ready;
         ready.push_back(f);
@@ -451,7 +476,10 @@ Preemptive* PreemptiveScheduler::pick_next_ready() {
         task_t* t = __task_scheduler.get_task(f->task_id);
 
         if(t) p = t->_task_priority;
-        if (!t && f != nonpreemptive) continue;
+        if (!t && f != nonpreemptive) {
+            // todo: think on this dangling pointer ?
+            continue;
+        }
 
         // Aging: score(effective priority) = base_priority + wait_ticks
         int score = p + f->wait_ticks;
@@ -470,10 +498,57 @@ Preemptive* PreemptiveScheduler::pick_next_ready() {
         best->wait_ticks = 0;
 
         // Remove from ready list
+        CRITICAL_SECTION_ENTER
         remove_from_ready(best);
+        CRITICAL_SECTION_EXIT
     }
 
     return best;
+}
+
+/**
+ * Returns true if the current CPU execution context is actually a preemptive
+ * task (or the tracked main-loop wrapper). Returns false when called from an
+ * SDK / lwIP / NMI callback that happens to run on top of whichever task we
+ * last context-switched to.
+ *
+ * Why this matters: PreemptiveMutex::lock() / mute() use `current` as the
+ * task to park. When called from an SDK callback, `current` is NOT the code
+ * actually running — it's whichever preemptive task we last switched to. If
+ * we park `current` in that scenario, exit()'s spin waits for a state
+ * transition that never matches the executing code → deadlock → soft WDT.
+ *
+ * Detection method: read the live stack pointer and check whether it falls
+ * inside any preemptive task's allocated stack range. SDK / lwIP / cont
+ * callbacks run on their own (different) stacks, so SP will be outside.
+ * __non_preemptive has no allocated stack range of its own — it shares the
+ * main-loop cont stack — so we accept it as a task context only when the
+ * scheduler hasn't yet been preempted (i.e. ISR has not yet captured
+ * __non_preemptive's context). Practically: if `current == &__non_preemptive`
+ * and the caller is on the cont stack, we accept it. We can't perfectly
+ * distinguish "main loop on cont stack" from "SDK callback on cont stack" —
+ * but SDK callbacks reach our code via lwIP / event paths that don't share
+ * SP range with main loop's `loop()`, so SP comparison is a reasonable proxy.
+ */
+bool PreemptiveScheduler::is_task_context() const {
+    uint32_t sp_now;
+    asm volatile("mov %0, a1" : "=a"(sp_now));
+
+    // If running on a preemptive task's allocated stack range, we're a task.
+    if (current && current->stack_raw && current->stack) {
+        uintptr_t lo = reinterpret_cast<uintptr_t>(current->stack_raw);
+        uintptr_t hi = reinterpret_cast<uintptr_t>(current->stack); // top
+        if (sp_now >= lo && sp_now < hi) return true;
+    }
+    // __non_preemptive has no `stack_raw` of its own — it lives on the
+    // cont/main-loop stack. We can't bound-check it reliably from here, so
+    // accept it only if no other Preemptive's range matches. This means SDK
+    // callbacks running on the cont stack will still be (mis)accepted as
+    // task context — caller-side audit (don't log from SDK callbacks) is
+    // still required for those, but this guard catches the case where SDK
+    // callbacks fire while `current` is a different preemptive task on its
+    // own stack (the most common deadlock we've observed).
+    return false;
 }
 
 PreemptiveScheduler __i_preemptive_scheduler;
