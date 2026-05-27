@@ -100,12 +100,30 @@ private:
 	 * @var	int16_t	m_cmdHistoryIndex
 	 */
     int16_t m_cmdHistoryIndex;
+
+	/**
+	 * @var	int16_t	m_prevHistorySize
+	 * Size of the in-buffer pattern captured when up/down history walk began.
+	 */
+    int16_t m_prevHistorySize;
+
+	/**
+	 * @var	int16_t	m_prevArgSize
+	 * Size of the argument fragment captured when tab-completing a filename arg.
+	 */
+    int16_t m_prevArgSize;
 	#endif
 
 	/**
 	 * @var	int16_t	m_cmdAutoCompleteIndex
 	 */
     int16_t m_cmdAutoCompleteIndex;
+
+	/**
+	 * @var	int16_t	m_prevCmdSize
+	 * Size of the command fragment captured when tab-completion began.
+	 */
+    int16_t m_prevCmdSize;
 
 	int16_t getCommandWaitingForUserInput();
 	cmd_t* getCommandToExecute(const char *cmdname);
