@@ -33,6 +33,14 @@ created Date    : 1st June 2019
 #include "commands/NetworkCommand.h"
 #include "commands/WatchCommand.h"
 #include "commands/DeviceIotCommand.h"
+#include "commands/HelpCommand.h"
+#include "commands/UptimeCommand.h"
+#include "commands/HexdumpCommand.h"
+#include "commands/DfFSCommand.h"
+#include "commands/WcFSCommand.h"
+#include "commands/HeadFSCommand.h"
+#include "commands/TailFSCommand.h"
+#include "commands/GrepFSCommand.h"
 
 
 #ifdef ENABLE_STORAGE_SERVICE
@@ -106,6 +114,14 @@ private:
 	 * Size of the in-buffer pattern captured when up/down history walk began.
 	 */
     int16_t m_prevHistorySize;
+
+	/**
+	 * @var	pdiutil::string	m_origTypedPrefix
+	 * Original prefix the user typed before pressing up/down. Preserved through
+	 * the walk so the search pattern doesn't drift to the first char of the
+	 * currently displayed history entry.
+	 */
+    pdiutil::string m_origTypedPrefix;
 
 	/**
 	 * @var	int16_t	m_prevArgSize

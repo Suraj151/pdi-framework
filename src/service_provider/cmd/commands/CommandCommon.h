@@ -57,7 +57,7 @@ created Date    : 1st June 2019
 #define CMD_NAME_RM 				"rm"
 #define CMD_NAME_MOVE 			    "mv"
 #define CMD_NAME_COPY 			    "cp"
-#define CMD_NAME_FILE_READ 			"fread"
+#define CMD_NAME_FILE_READ 			"cat"
 #define CMD_NAME_FILE_WRITE 		"fwrite"
 #define CMD_NAME_CLS 			    "cls"
 #define CMD_NAME_SCHED_TASK 		"scht"
@@ -66,6 +66,14 @@ created Date    : 1st June 2019
 #define CMD_NAME_NETWORK			"net"
 #define CMD_NAME_WATCH  			"watch"
 #define CMD_NAME_IOT  			    "iot"
+#define CMD_NAME_HELP  			    "help"
+#define CMD_NAME_UPTIME  		    "uptime"
+#define CMD_NAME_HEXDUMP  		    "hexdump"
+#define CMD_NAME_DF  			    "df"
+#define CMD_NAME_WC  			    "wc"
+#define CMD_NAME_HEAD  			    "head"
+#define CMD_NAME_TAIL  			    "tail"
+#define CMD_NAME_GREP  			    "grep"
 
 /* command options */
 #define CMD_OPTION_NAME_P			"p"

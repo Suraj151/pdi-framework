@@ -290,83 +290,344 @@ int LittleFSWrapper::readFile(const char* path, uint64_t size, pdiutil::function
 }
 
 /**
+ * @brief Set a custom attribute on a file or directory.
+ * @param path The path of the file or directory.
+ * @param type User-defined attribute identifier (0-255).
+ * @param buffer Pointer to the attribute data to write.
+ * @param size Size of the attribute data in bytes.
+ * @return 0 on success, or a negative error code on failure.
+ */
+int LittleFSWrapper::setFileAttr(const char *path, uint8_t type, const void *buffer, uint32_t size){
+    return lfs_setattr(&m_lfs, path, type, buffer, (lfs_size_t)size);
+}
+
+/**
+ * @brief Get a custom attribute from a file or directory.
+ * @param path The path of the file or directory.
+ * @param type User-defined attribute identifier (0-255).
+ * @param buffer Pointer to the buffer to receive the attribute data.
+ * @param size Capacity of the buffer in bytes.
+ * @return The size of the attribute on success, or a negative error code on failure.
+ */
+int LittleFSWrapper::getFileAttr(const char *path, uint8_t type, void *buffer, uint32_t size){
+    return lfs_getattr(&m_lfs, path, type, buffer, (lfs_size_t)size);
+}
+
+/**
+ * @brief Remove a custom attribute from a file or directory.
+ * @param path The path of the file or directory.
+ * @param type User-defined attribute identifier (0-255).
+ * @return 0 on success, or a negative error code on failure.
+ */
+int LittleFSWrapper::removeFileAttr(const char *path, uint8_t type){
+    return lfs_removeattr(&m_lfs, path, type);
+}
+
+/**
  * @brief Find the string in file.
  * @param path The path of the file to find in.
  * @param findStr Pointer to the find sring.
  * @param findindices A vector to store the indices of found occurrences.
+ * @param maxindices Maximum indices of found occurrences. default unlimited i.e. -1.
+ * @param everynthindice Get only nth indices of found occurrences. default every i.e. 1.
+ * @param offset Optional Offset from where to read the file content.
  * @param yield Optional callback function to yield control during long operations.
  * @return The number of finding, or -1 on failure.
  */
-int LittleFSWrapper::findInFile(const char* path, const char* findStr, pdiutil::vector<uint32_t> &findindices, CallBackVoidArgFn yield){
+int LittleFSWrapper::findInFile(const char* path, const char* findStr, pdiutil::vector<uint32_t> *findindices, int maxindices, int everynthindice, int64_t offset, CallBackVoidArgFn yield){
 
-    findindices.clear();
+    int foundcount = 0;
+    if(findindices) findindices->clear();
 
     if( nullptr != findStr ){
 
-        int bytesReadOrErr = 0;
-        int offset = 0;
-        int findstrlen = strlen(findStr);
         int filesize = getFileSize(path);
+        if(filesize < 0) return filesize;
+        
+        int bytesReadOrErr = 0;
+        int64_t endoffset = (offset < 0) ? -offset : -1;
+        uint64_t offsetindex = (offset < 0) ? 0 : offset;
+        int findstrlen = strlen(findStr);
         bool didmatchfound = false;
+        uint64_t chunksizetoread = (endoffset < 0 || endoffset > 250) ? 250 : (uint64_t)endoffset;
+        if(maxindices > 0 && everynthindice > 1){
+            maxindices = maxindices / everynthindice;
+        }
+
+        int nextPushAt = everynthindice;
+        if(offset < 0 && everynthindice > 1){
+            int foundmatches = findInFile(path, findStr, nullptr, -1, 1, offset, yield);
+            nextPushAt = (foundmatches % everynthindice) + 1;
+        }
 
         do{
 
-            bytesReadOrErr = readFile(path, 100, [&](char *data, uint32_t size) -> bool {
+            bytesReadOrErr = readFile(path, chunksizetoread, [&](char *data, uint32_t size) -> bool {
                 // Continue reading
                 return true;
-            }, offset, findStr, &didmatchfound);
+            }, offsetindex, findStr, &didmatchfound);
 
             if( bytesReadOrErr < 0 ){
                 return bytesReadOrErr; // error
             }
 
-            offset += bytesReadOrErr + 1; // move to next char to continue search
+            offsetindex += bytesReadOrErr + 1; // move to next char to continue search
             if( didmatchfound ){
-                findindices.push_back(offset - findstrlen); // store the index where found
                 didmatchfound = false; // reset for next read
+                foundcount++;
+                if(foundcount == nextPushAt){
+                    if(findindices){
+                        if(offset < 0 && maxindices > 0 && (int)findindices->size() >= maxindices){
+                            findindices->erase(findindices->begin());
+                        }
+                        findindices->push_back(offsetindex - findstrlen); // store the index where found
+                    }
+                    nextPushAt += everynthindice;
+                }
             }
 
             if( yield ){
                 yield();
             }
-        }while( offset < filesize );
+
+            if( endoffset > 0 ){
+                
+                if( offsetindex > endoffset ){
+                    break;
+                }
+
+                if( (offsetindex + chunksizetoread) > endoffset ){
+                    chunksizetoread = endoffset - offsetindex + 1;
+                }
+            }
+        }while( offsetindex < filesize && ( maxindices == -1 || offset < 0 || (findindices ? findindices->size() : foundcount) < maxindices  ) );
     }else{
         return -99;
     }
 
-    return findindices.size();
+    return foundcount;
+}
+
+/**
+ * @brief Find the offset in file if line number given.
+ * @param path The path of the file to find in.
+ * @param linenumber line number to count offset till.
+ * @param yield Optional callback function to yield control during long operations.
+ * @return The offset found, or -1 on failure.
+ */
+int64_t LittleFSWrapper::getOffsetFromLineNumber(const char* path, int linenumber, CallBackVoidArgFn yield){
+
+    int64_t offset = 0;
+
+    if( linenumber < 0 ){
+
+        uint32_t totalnumberoflines = 0;
+        int iStatus = readFile(path, 250, [&](char *data, uint32_t size)->bool{
+            for(uint32_t i = 0; i < size; i++){
+                if(data[i] == '\n') totalnumberoflines++;
+            }
+            return true;
+        });
+        if( iStatus < 0 ) return iStatus; // error
+
+        int64_t fs = getFileSize(path);
+        if( fs > 0 ){
+            char lastChar = '\n';
+            readFile(path, 1, [&](char *data, uint32_t size) -> bool {
+                if(size > 0) lastChar = data[0];
+                return true;
+            }, (uint64_t)(fs - 1));
+            if( lastChar != '\n' ){
+                totalnumberoflines++;
+            }
+        }
+
+        linenumber = totalnumberoflines + linenumber;
+        if( linenumber < 0 ) return -1;
+    }
+
+    // Find the file content offset from line number offset
+    if( linenumber > 0 ){
+
+        int newlinesFound = 0;
+
+        int iStatus = readFile(path, 250, [&](char *data, uint32_t size)->bool{
+
+            for(uint32_t i = 0; i < size; i++){
+
+                if(data[i] == '\n') {
+
+                    newlinesFound++;
+
+                    if(newlinesFound >= linenumber){
+
+                        offset += i + 1;
+                        return false;
+                    }
+                }
+            }
+
+            offset += size;
+
+            if(yield){
+                yield();
+            }
+
+            return true;
+        });
+
+        if( iStatus < 0 ) return iStatus; // error
+
+        // int filesize = getFileSize(path);
+        // if(filesize < 0){
+        //     return filesize;
+        // }
+
+        // int newlinesFound = 0;
+        // bool didmatchfound = false;
+
+        // do
+        // {
+        //     int bytesReadOrErr = readFile(path, 250, [&](char *data, uint32_t size) -> bool {
+        //         return true;
+        //     }, offset, "\n", &didmatchfound);
+
+        //     if(bytesReadOrErr < 0){
+        //         return bytesReadOrErr;
+        //     }
+
+        //     offset += bytesReadOrErr + 1;
+        //     if(didmatchfound){
+        //         newlinesFound++;
+        //         didmatchfound = false;
+        //     }
+
+        //     if(yield){
+        //         yield();
+        //     }
+        // } while (offset < (uint64_t)filesize && newlinesFound < linenumber);
+    }
+
+    return offset;
+}
+
+/**
+ * @brief Find the line in file if offset given.
+ * @param path The path of the file to find in.
+ * @param offset offset to find line number for.
+ * @param yield Optional callback function to yield control during long operations.
+ * @return The line number found, or -1 on failure.
+ */
+int64_t LittleFSWrapper::getLineNumberFromOffset(const char* path, int64_t offset, CallBackVoidArgFn yield){
+    
+    int64_t linenumber = 0;
+    int64_t filesize = getFileSize(path);
+    if( filesize < 0 ){
+        return filesize; // error
+    }
+
+    if( offset < 0 ){
+        offset = filesize + offset;
+    }
+
+    // Find the line number from offset
+    if( offset > 0 ){
+
+        int64_t offsetcount = 0;
+        int iStatus = readFile(path, 250, [&](char *data, uint32_t size)->bool{
+
+            for(uint32_t i = 0; i < size; i++){
+                
+                if(offset <= (offsetcount + i)){
+                    return false;
+                }
+
+                if(data[i] == '\n') {
+                    linenumber++;
+                }
+            }
+
+            offsetcount += size;
+            
+            if(yield){
+                yield();
+            }
+
+            return true;
+        });
+        if( iStatus < 0 ) return iStatus; // error
+
+        // int64_t offsetcount = 0;
+        // bool didmatchfound = false;
+
+        // do
+        // {
+        //     int bytesReadOrErr = readFile(path, 250, [&](char *data, uint32_t size) -> bool {
+        //         return true;
+        //     }, offsetcount, "\n", &didmatchfound);
+
+        //     if(bytesReadOrErr < 0){
+        //         return bytesReadOrErr;
+        //     }
+
+        //     offsetcount += bytesReadOrErr + 1;
+        //     if(didmatchfound){
+        //         if((offsetcount - 1) < (uint64_t)offset){
+        //             linenumber++;
+        //         }else{
+        //             break;
+        //         }
+        //         didmatchfound = false;
+        //     }
+
+        //     if(yield){
+        //         yield();
+        //     }
+        // } while (offsetcount < (uint64_t)offset && offsetcount < (uint64_t)filesize);
+    }
+
+    return linenumber;
 }
 
 /**
  * @brief Find the number of lines in file.
  * @param path The path of the file to find in.
- * @param linenumbers A vector to store the line numbers found.
+ * @param linenumberindices A vector to store the line numbers found.
+ * @param maxlinenumbers Optional to provide max limit for line number indices to get in linenumbers vector.
+ * @param linenumberoffset Offset from which line number to count.
  * @param yield Optional callback function to yield control during long operations.
  * @return The number of line found, or -1 on failure.
  */
-int LittleFSWrapper::getLineNumbersInFile(const char* path, pdiutil::vector<uint32_t> &linenumbers, CallBackVoidArgFn yield){
+int LittleFSWrapper::getLineNumbersInFile(const char* path, pdiutil::vector<uint32_t> &linenumberindices, int maxlinenumbers, int linenumberoffset, CallBackVoidArgFn yield){
 
-    int status = findInFile(path, "\n", linenumbers, yield);
+    // Find the file content offset from line number offset
+    int64_t offset = getOffsetFromLineNumber(path, linenumberoffset);
+
+    if( offset < 0 ){
+        offset = 0;
+    }
+
+    int status = findInFile(path, "\n", &linenumberindices, maxlinenumbers, 1, offset, yield);
 
     if( status < 0 ){
         return status; // error
     }
 
-    if( linenumbers.size() > 0 ){
+    if( linenumberindices.size() > 0 ){
 
         int64_t filesize = getFileSize(path);
-        linenumbers.insert(linenumbers.begin(), 0); // add start of file as first line index
+        linenumberindices.insert(linenumberindices.begin(), (uint32_t)offset); // add start of first counted line as first index
 
-        for (size_t i = 1; i < linenumbers.size(); i++){
-            linenumbers[i] = linenumbers[i] + 1; // move to next char after \n
+        for (size_t i = 1; i < linenumberindices.size(); i++){
+            linenumberindices[i] = linenumberindices[i] + 1; // move to next char after \n
         }  
 
-        if( (linenumbers.back() + 1) > (uint32_t)filesize ){
-            linenumbers.pop_back(); // remove last index if it exceeds file size
+        if( (linenumberindices.back() + 1) > (uint32_t)filesize ){
+            linenumberindices.pop_back(); // remove last index if it exceeds file size
         }
     }
 
-    return linenumbers.size();
+    return linenumberindices.size();
 }
 
 /**
@@ -381,64 +642,73 @@ int LittleFSWrapper::getLineNumbersInFile(const char* path, pdiutil::vector<uint
 int LittleFSWrapper::readLineInFile(const char* path, int32_t linenumber, pdiutil::string &linedata, const char* pattern, CallBackVoidArgFn yield){
 
     linedata.clear();
-    pdiutil::vector<uint32_t> linenumbersvec;
-    int bytesReadedOrError = getLineNumbersInFile(path, linenumbersvec, yield);
 
-    if( pattern != nullptr && bytesReadedOrError > 0 ){
+    int64_t filesize = getFileSize(path);
+    if(filesize < 0) return (int)filesize;
+
+    int64_t lineoffset = -1;
+
+    if(pattern == nullptr){
+
+        lineoffset = getOffsetFromLineNumber(path, linenumber, yield);
+        if(lineoffset < 0) return (int)lineoffset;
+        if(lineoffset >= filesize) return -99;
+
+    }else{
+
+        const int CAP = (linenumber > 0) ? linenumber : ((linenumber < 0) ? -linenumber : 1);
 
         pdiutil::vector<uint32_t> patternindices;
-        int status = findInFile(path, pattern, patternindices, yield);
+        int rc = findInFile(path, pattern, &patternindices, CAP, CAP,
+                            (linenumber < 0) ? -filesize : 0, yield);
+        if(rc < 0) return rc;
+        if(patternindices.size() == 0) return -99;
 
-        if( status < 0 ){
-            return status; // error
-        }
+        int64_t anchorLine = getLineNumberFromOffset(path, patternindices[0], yield);
+        if(anchorLine < 0) return -99;
 
-        pdiutil::vector<uint32_t> filteredlinenumbersvec;
+        const int WINDOW = 50;
+        int windowStartLine = (int)anchorLine - WINDOW;
+        if(windowStartLine < 0) windowStartLine = 0;
 
-        if( patternindices.size() > 0 ){
+        pdiutil::vector<uint32_t> linenumbersvec;
+        rc = getLineNumbersInFile(path, linenumbersvec, 2 * WINDOW + 1, windowStartLine, yield);
+        if(rc < 0) return rc;
+        if(linenumbersvec.size() == 0) return -99;
 
-            for (size_t i = 0; i < linenumbersvec.size(); i++){
+        pdiutil::vector<uint32_t> winpatternindices;
+        rc = findInFile(path, pattern, &winpatternindices, -1, 1, (int64_t)linenumbersvec[0], yield);
+        if(rc < 0) return rc;
 
-                for (size_t j = 0; j < patternindices.size(); j++){
-
-                    if( linenumbersvec[i] == patternindices[j] ){
-
-                        filteredlinenumbersvec.push_back(linenumbersvec[i]);
-                        break;
-                    }
+        pdiutil::vector<uint32_t> filtered;
+        for(size_t i = 0; i < linenumbersvec.size(); i++){
+            uint32_t lineStart = linenumbersvec[i];
+            uint32_t lineEnd = (i+1 < linenumbersvec.size()) ? linenumbersvec[i+1] : (uint32_t)filesize;
+            for(size_t j = 0; j < winpatternindices.size(); j++){
+                if(winpatternindices[j] >= lineStart && winpatternindices[j] < lineEnd){
+                    filtered.push_back(lineStart);
+                    break;
                 }
             }
         }
 
-        if( filteredlinenumbersvec.size() > 0 ){
-            linenumbersvec = filteredlinenumbersvec;
-            bytesReadedOrError = linenumbersvec.size();
-        }
+        if(filtered.size() == 0) return -99;
+
+        int32_t idx = (linenumber < 0) ? ((int32_t)filtered.size() + linenumber) : linenumber;
+        if(idx < 0 || (size_t)idx >= filtered.size()) return -99;
+
+        lineoffset = (int64_t)filtered[idx];
+        if(lineoffset >= filesize) return -99;
     }
 
-    if( linenumber < 0 ){
-        linenumber = linenumbersvec.size() + linenumber; // support negative index
-    }
+    int bytesReadedOrError = readFile(path, 250, [&](char *data, uint32_t size) -> bool {
+        linedata += pdiutil::string(data, size);
+        return true;
+    }, (uint64_t)lineoffset, "\n");
 
-    if( bytesReadedOrError > 0 ){
-
-        if( linenumber < linenumbersvec.size() ){
-
-            uint32_t offset = linenumbersvec[linenumber];
-            bytesReadedOrError = readFile(path, 100, [&](char *data, uint32_t size) -> bool {
-                linedata += pdiutil::string(data, size);
-                // Continue reading
-                return true;
-            }, offset, "\n");
-            
-            if( linedata.back() == '\r' ){
-                linedata.pop_back(); // remove \r if present
-                bytesReadedOrError--;
-            }
-        }else{
-
-            bytesReadedOrError = -99;
-        }
+    if( !linedata.empty() && linedata.back() == '\r' ){
+        linedata.pop_back();
+        bytesReadedOrError--;
     }
 
     return bytesReadedOrError;

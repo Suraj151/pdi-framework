@@ -91,6 +91,13 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   // m_cmdlist.push_back(fileWritecmd);
   FileWriteCommand::RegisterCommand();
 
+  HexdumpCommand::RegisterCommand();
+  DfFSCommand::RegisterCommand();
+  WcFSCommand::RegisterCommand();
+  HeadFSCommand::RegisterCommand();
+  TailFSCommand::RegisterCommand();
+  GrepFSCommand::RegisterCommand();
+
   m_termhistoryfile = CHARPTR_WRAP_RO(CMD_TERMINAL_HISTORY_STATIC_FILEPATH);
   #endif
 
@@ -127,6 +134,9 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   // m_cmdlist.push_back(deviceiotcmd);
   DeviceIotCommand::RegisterCommand();
   #endif
+
+  HelpCommand::RegisterCommand();
+  UptimeCommand::RegisterCommand();
 
   CommandBase::SetCommandExecutionInterface(this);
 }
@@ -483,15 +493,13 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
       #ifdef ENABLE_STORAGE_SERVICE
       // fetch command from history
       pdiutil::string cmdExec;
-      pdiutil::string _patterntosearch = m_termrecvdata;
 
       if( m_cmdHistoryIndex == -1 ){
         m_prevHistorySize = m_termrecvdata.size();
+        m_origTypedPrefix = m_termrecvdata;
       }
 
-      if( m_prevHistorySize != (int16_t)m_termrecvdata.size() ){
-        _patterntosearch = m_prevHistorySize > 0 ? m_termrecvdata.substr(0, m_prevHistorySize) : "";
-      }
+      pdiutil::string _patterntosearch = m_origTypedPrefix;
 
       if( inseq == CMD_TERM_INSEQ_UP_ARROW ){
         // up arrow
@@ -671,7 +679,7 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
 
         // keep only last CMD_TERMINAL_HISTORY_MAX_LINES lines in history
         pdiutil::vector<uint32_t> newlineindices;
-        __i_instance.getFileSystemInstance().findInFile(m_termhistoryfile.c_str(), "\r\n", newlineindices, [&](void){
+        __i_instance.getFileSystemInstance().findInFile(m_termhistoryfile.c_str(), "\r\n", &newlineindices, -1, 1, 0, [&](void){
           // yield function to avoid watchdog reset
           __i_dvc_ctrl.yield();
         });

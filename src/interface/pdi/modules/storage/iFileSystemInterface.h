@@ -95,23 +95,46 @@ public:
     virtual int readFile(const char* path, uint64_t size, pdiutil::function<bool(char *, uint32_t)> readbackfn, uint64_t offset = 0, const char* readUntilMatchStr=nullptr, bool *didmatchfound=nullptr) = 0;
 
     /**
+     * @brief Find the offset in file if line number given.
+     * @param path The path of the file to find in.
+     * @param linenumber line number to count offset till.
+     * @param yield Optional callback function to yield control during long operations.
+     * @return The offset found, or -1 on failure.
+     */
+    virtual int64_t getOffsetFromLineNumber(const char* path, int linenumber, CallBackVoidArgFn yield = nullptr) = 0;
+
+    /**
+     * @brief Find the line in file if offset given.
+     * @param path The path of the file to find in.
+     * @param offset offset to find line number for.
+     * @param yield Optional callback function to yield control during long operations.
+     * @return The line number found, or -1 on failure.
+     */
+    virtual int64_t getLineNumberFromOffset(const char* path, int64_t offset, CallBackVoidArgFn yield = nullptr) = 0;
+
+    /**
      * @brief Find the string in file.
      * @param path The path of the file to find in.
      * @param findStr Pointer to the find sring.
      * @param findindices A vector to store the indices of found occurrences.
+     * @param maxindices Maximum indices of found occurrences. default unlimited i.e. -1.
+     * @param everynthindice Get only nth indices of found occurrences. default every i.e. 1.
+     * @param offset Offset from where to read the file content.
      * @param yield Optional callback function to yield control during long operations.
      * @return The number of finding, or -1 on failure.
      */
-    virtual int findInFile(const char* path, const char* findStr, pdiutil::vector<uint32_t> &findindices, CallBackVoidArgFn yield = nullptr) = 0;
+    virtual int findInFile(const char* path, const char* findStr, pdiutil::vector<uint32_t> *findindices, int maxindices = -1, int everynthindice = 1, int64_t offset = 0, CallBackVoidArgFn yield = nullptr) = 0;
 
     /**
      * @brief Get the number of lines in file.
      * @param path The path of the file.
-     * @param linenumbers A vector to store the line numbers found.
+     * @param linenumberindices A vector to store the line numbers found.
+     * @param maxlinenumbers Optional to provide max limit for line number indices to get in linenumbers vector.
+     * @param linenumberoffset Offset from which line number to count.
      * @param yield Optional callback function to yield control during long operations.
      * @return The number of line found, or -1 on failure.
      */
-    virtual int getLineNumbersInFile(const char* path, pdiutil::vector<uint32_t> &linenumbers, CallBackVoidArgFn yield = nullptr) = 0;
+    virtual int getLineNumbersInFile(const char* path, pdiutil::vector<uint32_t> &linenumberindices, int maxlinenumbers = -1, int linenumberoffset = 0, CallBackVoidArgFn yield = nullptr) = 0;
 
     /**
      * @brief Read the line in file.
@@ -312,6 +335,33 @@ public:
      */
     virtual void applyFileSizeLimit(pdiutil::string &name, uint32_t sizelimit = FILE_NAME_MAX_SIZE) = 0;
 
+    /**
+     * @brief Set a custom attribute on a file or directory.
+     * @param path The path of the file or directory.
+     * @param type User-defined attribute identifier (0-255).
+     * @param buffer Pointer to the attribute data to write.
+     * @param size Size of the attribute data in bytes.
+     * @return 0 on success, or a negative error code on failure.
+     */
+    virtual int setFileAttr(const char *path, uint8_t type, const void *buffer, uint32_t size) = 0;
+
+    /**
+     * @brief Get a custom attribute from a file or directory.
+     * @param path The path of the file or directory.
+     * @param type User-defined attribute identifier (0-255).
+     * @param buffer Pointer to the buffer to receive the attribute data.
+     * @param size Capacity of the buffer in bytes.
+     * @return The size of the attribute on success, or a negative error code on failure.
+     */
+    virtual int getFileAttr(const char *path, uint8_t type, void *buffer, uint32_t size) = 0;
+
+    /**
+     * @brief Remove a custom attribute from a file or directory.
+     * @param path The path of the file or directory.
+     * @param type User-defined attribute identifier (0-255).
+     * @return 0 on success, or a negative error code on failure.
+     */
+    virtual int removeFileAttr(const char *path, uint8_t type) = 0;
 protected:
     iStorageInterface& m_istorage; ///< Reference to the storage interface used for file operations.
 };
