@@ -493,6 +493,13 @@ int16_t Http_Client::SendRequest(const char *type, const char *url, const char *
 
         m_request.print();
 
+        if (bStatus && m_request.isHttps && !m_client->isSecure())
+        {
+            LogE("Http_Client: https URL requires a secure client\n");
+            respStatus = HTTP_RESP_MAX;
+            bStatus = false;
+        }
+
         if (bStatus)
         {
             if (m_request.reuse && m_client->connected())
@@ -573,6 +580,10 @@ int16_t Http_Client::SendRequest(const char *type, const char *url, const char *
         }
 
     } while (bStatus);
+
+    if (!m_request.reuse && nullptr != m_client && m_client->connected()) {
+        m_client->disconnect();
+    }
 
     return respStatus;
 }

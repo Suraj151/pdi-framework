@@ -26,7 +26,10 @@ static void ICACHE_FLASH_ATTR ping_recv_cb (void* arg, void *pdata){
   _host_resp = (pingrsp->bytes > 0);
 
 #ifdef ENABLE_CONTEXTUAL_EXECUTION
-  if (__i_preemptive_scheduler.is_task_context()) {
+  if (
+    __i_preemptive_scheduler.is_task_context() || 
+    !__i_preemptive_scheduler.is_sched_active()
+  ) {
     if (_host_resp) {
       LogFmtI("\nPing: Reply bytes=%d time=%dms\n", pingrsp->bytes, pingrsp->resp_time);
     } else {

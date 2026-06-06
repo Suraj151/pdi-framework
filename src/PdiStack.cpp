@@ -24,7 +24,20 @@ PDIStack::PDIStack()
 #endif
 {
 #ifdef ENABLE_WIFI_SERVICE
-  m_client = new TcpClientInterface;
+  #ifdef ENABLE_TLS_SERVICE
+  m_client = __i_instance.getNewTlsClientInstance();
+  if (m_client && m_client->isSecure()) {
+      // To verify the servers this client connects to, point the line
+      // below at a CA bundle on the device filesystem and comment out
+      // the setVerifyPeer(false) call. Default here is encrypted-but-
+      // unverified TLS so no cert needs to be provisioned for testing.
+      // static_cast<iTlsClientInterface*>(m_client)
+      //     ->setCertificateAuthorityPath(TLS_DEFAULT_OUTBOUND_CA_BUNDLE_PATH);
+      static_cast<iTlsClientInterface*>(m_client)->setVerifyPeer(false);
+  }
+  #else
+  m_client = __i_instance.getNewTcpClientInstance();
+  #endif
 #endif
   __utl_event.begin(&__i_dvc_ctrl);
   __task_scheduler.setUtilityInterface(&__i_dvc_ctrl);
@@ -160,8 +173,7 @@ void PDIStack::serve(){
   __i_dvc_ctrl.handleEvents();
 
   #ifdef ENABLE_CONTEXTUAL_EXECUTION
-  // Run Cooperative tasks
-  __i_cooperative_scheduler.run();
+  __i_cooperative_scheduler.tick_from_loop();
   #endif
 }
 

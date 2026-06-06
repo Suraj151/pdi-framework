@@ -33,6 +33,10 @@ public:
   iUtilityInterface& getUtilityInstance() override;
   iTcpServerInterface* getNewTcpServerInstance() override;
   iTcpClientInterface* getNewTcpClientInstance() override;
+  #ifdef ENABLE_TLS_SERVICE
+  iTlsServerInterface* getNewTlsServerInstance() override;
+  iTlsClientInterface* getNewTlsClientInstance() override;
+  #endif
   iFileSystemInterface& getFileSystemInstance() override;
 };
 

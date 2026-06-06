@@ -87,7 +87,16 @@ bool HttpServer::initService(void *arg)
   this->m_server->collectHeaders(headerkeys, headerkeyssize);
 
   // Start the server
-  this->m_server->begin();
+  #if defined(ENABLE_HTTPS_SERVER) && defined(ENABLE_TLS_SERVICE)
+  this->m_server->setServerCertificatePath(TLS_DEFAULT_SERVER_CERT_PATH);
+  this->m_server->setServerPrivateKeyPath(TLS_DEFAULT_SERVER_KEY_PATH);
+  #ifdef ENABLE_HTTPS_SERVER_MTLS
+  this->m_server->setClientCertificateAuthorityPath(TLS_DEFAULT_CLIENT_CA_PATH);
+  #endif
+  this->m_server->begin(HTTPS_DEFAULT_PORT, true);
+  #else
+  this->m_server->begin(HTTP_DEFAULT_PORT);
+  #endif
 
   // LogI("HTTP server started!\n");
 

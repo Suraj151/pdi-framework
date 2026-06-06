@@ -82,10 +82,7 @@ void preemptive_trampoline(void *arg) {
  * Preemptive destructor.
  */
 Preemptive::~Preemptive(){
-    if( stack_raw != nullptr ){
-        delete[] stack_raw;
-        stack_raw = nullptr;
-    }
+    pdiutil::safe_delete_array(stack_raw);
     stack = nullptr;
 }
 
@@ -103,8 +100,8 @@ PreemptiveScheduler::PreemptiveScheduler(){
  */
 PreemptiveScheduler::~PreemptiveScheduler(){
 
-    for (auto p : sleepers) { if(p.f) delete p.f; p.f = nullptr; }
-    for (auto p : ready) { if(p) delete p; p = nullptr; }
+    for (auto p : sleepers) { pdiutil::safe_delete(p.f); }
+    for (auto p : ready) { pdiutil::safe_delete(p); }
     sleepers.clear();
     ready.clear();
 }
@@ -112,18 +109,24 @@ PreemptiveScheduler::~PreemptiveScheduler(){
 /**
  * Schedule the task.
  */
-void PreemptiveScheduler::schedule_task(task_t* task, uint32_t stacksize){
+int PreemptiveScheduler::schedule_task(task_t* task, uint32_t stacksize){
 
     // Init new Preemptive
     // if(task->_task_exec) { delete task->_task_exec; }
-    if(task->_task_mode != TASK_MODE_PREEMPTIVE) return;
-    Preemptive* f = new Preemptive;
+    if(task->_task_mode != TASK_MODE_PREEMPTIVE) return -1;
+    Preemptive* f = pdiutil::safe_new<Preemptive>();
+    if (!f) return -2;
     task->_task_exec = f;
 
     // Allocate with padding to guarantee a 16-byte aligned top-of-stack
     const uint32_t raw_bytes = stacksize + 64;
-    if (f->stack_raw) { delete[] f->stack_raw; }
-    f->stack_raw = new uint8_t[raw_bytes];
+    pdiutil::safe_delete_array(f->stack_raw);
+    f->stack_raw = pdiutil::safe_new_array<uint8_t>(raw_bytes);
+    if (!f->stack_raw) {
+        pdiutil::safe_delete(f);
+        task->_task_exec = nullptr;
+        return -2;
+    }
     memset(f->stack_raw, 0, raw_bytes);
 
     // 16-byte aligned top
@@ -182,6 +185,8 @@ void PreemptiveScheduler::schedule_task(task_t* task, uint32_t stacksize){
         preemptiveisr_active = true;
         timer1_start_us(__timer_period);
     }
+
+    return 0;
 }
 
 /**
@@ -416,8 +421,7 @@ void PreemptiveScheduler::destroy_preemptive(Preemptive* f) {
         remove_from_ready(f);
     
         __task_scheduler.remove_task(f->task_id);
-        delete f; 
-        f = nullptr;
+        pdiutil::safe_delete(f);
         CRITICAL_SECTION_EXIT
     }
 }

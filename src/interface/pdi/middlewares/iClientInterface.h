@@ -91,6 +91,84 @@ public:
 };
 
 
+#ifdef ENABLE_TLS_SERVICE
+
+/**
+ * iTlsClientInterface class
+ *
+ * A TLS-secured TCP client. Inherits the full iTcpClientInterface contract so
+ * that any consumer written against iTcpClientInterface (HTTP, MQTT, SMTP, ...)
+ * works transparently over TLS once the cert material is configured.
+ */
+class iTlsClientInterface : public iTcpClientInterface
+{
+
+public:
+  /**
+   * iTlsClientInterface constructor.
+   */
+  iTlsClientInterface() {}
+
+  /**
+   * iTlsClientInterface destructor.
+   */
+  virtual ~iTlsClientInterface() {}
+
+  /**
+   * @brief Set the path to the trusted Certificate Authority used to verify the server.
+   * @param path Filesystem path to a PEM/DER-encoded CA certificate.
+   * @return True on success, false otherwise.
+   */
+  virtual bool setCertificateAuthorityPath(const char* path) = 0;
+
+  /**
+   * @brief Set the path to the client certificate for mutual TLS (optional).
+   * @param path Filesystem path to a PEM/DER-encoded client certificate.
+   * @return True on success, false otherwise.
+   */
+  virtual bool setClientCertificatePath(const char* path) { return false; }
+
+  /**
+   * @brief Set the path to the client private key for mutual TLS (optional).
+   * @param path Filesystem path to a PEM/DER-encoded private key.
+   * @return True on success, false otherwise.
+   */
+  virtual bool setClientPrivateKeyPath(const char* path) { return false; }
+
+  /**
+   * @brief Is secure flasg to identify client is secure.
+   */
+  virtual bool isSecure() { return true; }
+
+  /**
+   * @brief Set the SNI hostname presented during the TLS handshake.
+   * @param hostname Null-terminated server name.
+   */
+  virtual void setSNIHostname(const char* hostname) {}
+
+  /**
+   * @brief Toggle peer certificate verification at runtime.
+   *
+   * Note: this does not change whether the transport itself is TLS -
+   * isSecure() still reports the transport capability. This flag controls
+   * only whether the peer's certificate chain is validated against the
+   * configured trust anchors. The handshake always runs the full key
+   * exchange and the bulk cipher is always negotiated, so traffic stays
+   * encrypted in either mode.
+   *
+   * @param verify true  - verify the peer cert chain (default; recommended
+   *                       for production and any path that crosses an
+   *                       untrusted network).
+   *               false - accept any cert without validation. Suitable
+   *                       only for development / bench testing - leaves
+   *                       the session vulnerable to active MITM attacks.
+   */
+  virtual void setVerifyPeer(bool verify) {}
+};
+
+#endif
+
+
 // Using typedefs for easier reference
 using iUdpClientInterface = iClientInterface;
 

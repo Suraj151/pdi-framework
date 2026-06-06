@@ -30,7 +30,7 @@ public:
     PreemptiveScheduler();
     virtual ~PreemptiveScheduler();
 
-    void schedule_task(task_t* task, uint32_t stacksize) override;
+    int schedule_task(task_t* task, uint32_t stacksize) override;
     void mute() override;
     void yield() override;
     void sleep(uint32_t ms) override;
@@ -60,6 +60,9 @@ public:
     // by `current` — in those contexts, calling mute() would park an
     // unrelated task and the spin in exit() would deadlock.
     bool is_task_context() const;
+    bool is_sched_active() const {
+        return current != nullptr && preemptiveisr_active;
+    }
 };
 
 #endif

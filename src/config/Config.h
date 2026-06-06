@@ -39,6 +39,10 @@ created Date    : 1st June 2019
 #include "NetworkConfig.h"
 #endif
 
+#ifdef ENABLE_TLS_SERVICE
+#include "TlsConfig.h"
+#endif
+
 #ifdef ENABLE_SSH_SERVICE
 #include "SshConfig.h"
 #endif

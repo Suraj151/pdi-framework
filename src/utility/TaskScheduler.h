@@ -226,7 +226,7 @@ public:
     /**
      * @brief Schedule task under context based execution scheduler
      */
-    void scheduleUnderExecSched(iExecutionScheduler* _exec_sched, int _task_id, task_mode_t _task_mode, uint32_t _stackdepth);
+    int scheduleUnderExecSched(iExecutionScheduler* _exec_sched, int _task_id, task_mode_t _task_mode, uint32_t _stackdepth);
 
     #endif
 

@@ -587,8 +587,10 @@ void TaskScheduler::run()
 /**
  * @brief Schedule task under context based execution scheduler
  */
-void TaskScheduler::scheduleUnderExecSched(iExecutionScheduler* _exec_sched, int _task_id, task_mode_t _task_mode, uint32_t _stackdepth)
+int TaskScheduler::scheduleUnderExecSched(iExecutionScheduler* _exec_sched, int _task_id, task_mode_t _task_mode, uint32_t _stackdepth)
 {
+    int ret = -99;
+
     if( _exec_sched ){
 
         task_t* t = __task_scheduler.get_task(_task_id);
@@ -600,9 +602,10 @@ void TaskScheduler::scheduleUnderExecSched(iExecutionScheduler* _exec_sched, int
         ){
 
             t->_task_mode = _task_mode;
-            _exec_sched->schedule_task(t, _stackdepth);
+            ret = _exec_sched->schedule_task(t, _stackdepth);
         }
     }
+    return ret;
 }
 
 #endif

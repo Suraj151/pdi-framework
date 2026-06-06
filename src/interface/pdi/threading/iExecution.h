@@ -68,11 +68,12 @@ class iExecutionScheduler {
 public:
     virtual ~iExecutionScheduler() {}
 
-    virtual void schedule_task(task_t* task, uint32_t stacksize) {}
+    virtual int schedule_task(task_t* task, uint32_t stacksize) { return -99; }
     virtual void mute() = 0;
     virtual void yield() = 0;
     virtual void sleep(uint32_t ms) = 0;
     virtual void run() = 0;
+    virtual void tick_from_loop() {}
 
     // API to pause and run scheduler at runtime if supported
     virtual void enable_sched() {}

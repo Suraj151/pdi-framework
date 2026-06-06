@@ -30,11 +30,12 @@ public:
     CooperativeScheduler();
     virtual ~CooperativeScheduler();
 
-    void schedule_task(task_t* task, uint32_t stacksize) override;
+    int schedule_task(task_t* task, uint32_t stacksize) override;
     void mute() override;
     void yield() override;
     void sleep(uint32_t ms) override;
     void run() override;
+    void tick_from_loop() override { run(); }
 
     static IRAM_ATTR void exit();
 

@@ -17,6 +17,8 @@ Created Date    : 1st Jan 2024
 // Forward declaration of interfaces
 class iTcpServerInterface;
 class iTcpClientInterface;
+class iTlsServerInterface;
+class iTlsClientInterface;
 class iFileSystemInterface;
 
 // forward declaration of derived class for this interface
@@ -43,6 +45,11 @@ public:
   #ifdef ENABLE_NETWORK_SERVICE
   virtual iTcpServerInterface* getNewTcpServerInstance() { return nullptr; }      // get new TCP server instance
   virtual iTcpClientInterface* getNewTcpClientInstance() { return nullptr; }      // get new TCP client instance
+  #endif
+
+  #ifdef ENABLE_TLS_SERVICE
+  virtual iTlsServerInterface* getNewTlsServerInstance() { return nullptr; }      // get new TLS server instance
+  virtual iTlsClientInterface* getNewTlsClientInstance() { return nullptr; }      // get new TLS client instance
   #endif
 
   #ifdef ENABLE_STORAGE_SERVICE

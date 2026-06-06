@@ -73,6 +73,10 @@ typedef enum {
 #define HTTP_DEFAULT_PORT 80
 #endif
 
+#ifndef HTTPS_DEFAULT_PORT
+#define HTTPS_DEFAULT_PORT 443
+#endif
+
 #ifndef HTTP_DEFAULT_VERSION
 #define HTTP_DEFAULT_VERSION HTTP_VERSION_1_1
 #endif
@@ -98,6 +102,11 @@ typedef enum {
 #define HTTP_HEADER_KEY_KEEP_ALIVE      "Keep-Alive"
 #define HTTP_HEADER_KEY_ACCESS_CONTROL_ALLOW_ORIGIN CHARPTR_WRAP("Access-Control-Allow-Origin")
 #define HTTP_HEADER_KEY_CONTENT_DISPOSITION "Content-Disposition"
+#define HTTP_HEADER_KEY_STRICT_TRANSPORT_SECURITY CHARPTR_WRAP("Strict-Transport-Security")
+
+#ifndef HTTPS_HSTS_MAX_AGE_SECONDS
+#define HTTPS_HSTS_MAX_AGE_SECONDS 31536000
+#endif
 
 // #define HTTP_VERSION_1_0_STR            "HTTP/1.0"
 // #define HTTP_VERSION_1_1_STR            "HTTP/1.1"

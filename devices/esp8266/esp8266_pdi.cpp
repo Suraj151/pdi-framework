@@ -30,6 +30,11 @@ created Date    : 1st Jan 2024
 #include "TcpClientInterface.cpp"
 #include "TcpServerInterface.cpp"
 #endif
+#ifdef ENABLE_TLS_SERVICE
+#include "BearSSLCertLoader.cpp"
+#include "TlsClientInterface.cpp"
+#include "TlsServerInterface.cpp"
+#endif
 #include "ExceptionsNotifier.cpp"
 #include "core/Espnow.cpp"
 #include "core/EW_EEPROM.cpp"

@@ -394,7 +394,7 @@ void DeviceControlInterface::log(logger_type_t log_type, const char *content)
 {
     #if defined(LOGBEGIN) && ( defined(ENABLE_LOG_ALL) || defined(ENABLE_LOG_INFO) || defined(ENABLE_LOG_ERROR) || defined(ENABLE_LOG_WARNING) || defined(ENABLE_LOG_SUCCESS) )
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        if (__i_preemptive_scheduler.is_task_context()) {
+        if (__i_preemptive_scheduler.is_task_context() || !__i_preemptive_scheduler.is_sched_active()) {
             __i_logger.log(log_type, content);
         } else if (__serial_uart.m_mutex.try_lock()) {
             __i_logger.log(log_type, content);

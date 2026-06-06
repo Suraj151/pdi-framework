@@ -25,6 +25,7 @@ Created Date    : 1st June 2019
 
 #include "iUtilityInterface.h"
 #include "iInstanceInterface.h"
+#include "SafeAlloc.h"
 #include "EventUtil.h"
 #include "DataTypeConversions.h"
 #include "StringOperations.h"

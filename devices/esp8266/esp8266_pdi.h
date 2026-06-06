@@ -26,6 +26,11 @@ created Date    : 1st Jan 2024
 #include "TcpClientInterface.h"
 #include "TcpServerInterface.h"
 #endif
+#ifdef ENABLE_TLS_SERVICE
+#include "BearSSLCertLoader.h"
+#include "TlsClientInterface.h"
+#include "TlsServerInterface.h"
+#endif
 #include "core/Espnow.h"
 #ifdef ENABLE_SERIAL_SERVICE
 #include "SerialInterface.h"

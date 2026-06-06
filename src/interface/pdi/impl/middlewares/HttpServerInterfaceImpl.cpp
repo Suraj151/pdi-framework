@@ -26,6 +26,9 @@ HttpServerInterfaceImpl::HttpServerInterfaceImpl() :
     m_server(nullptr),
     m_client(nullptr),
     m_currentclient_lastactivity_timestamp(0)
+#ifdef ENABLE_TLS_SERVICE
+    , m_secure(false)
+#endif
 {
     m_clientRequest.clear();
     m_uriHandlerMap.clear();
@@ -46,10 +49,29 @@ HttpServerInterfaceImpl::~HttpServerInterfaceImpl(){
 /**
  * begin with provided port
  */
-void HttpServerInterfaceImpl::begin(uint16_t port){
+void HttpServerInterfaceImpl::begin(uint16_t port, bool secure){
 
     if( nullptr == m_server ){
+        #ifdef ENABLE_TLS_SERVICE
+        if(secure){
+            iTlsServerInterface* tls = __i_instance.getNewTlsServerInstance();
+            if(tls){
+                tls->setServerCertificatePath(m_serverCertPath.c_str());
+                tls->setServerPrivateKeyPath(m_serverKeyPath.c_str());
+                if(!m_clientCaPath.empty()){
+                    tls->setClientCertificateAuthorityPath(m_clientCaPath.c_str());
+                }
+            }
+            m_server = tls;
+            m_secure = true;
+        } else {
+            m_server = __i_instance.getNewTcpServerInstance();
+            m_secure = false;
+        }
+        #else
+        (void)secure;
         m_server = __i_instance.getNewTcpServerInstance();
+        #endif
     }
 
     if( nullptr != m_server ){
@@ -73,6 +95,20 @@ void HttpServerInterfaceImpl::begin(uint16_t port){
     __i_instance.getFileSystemInstance().createDirectory(m_storagePath.c_str());
     #endif
 }
+
+#ifdef ENABLE_TLS_SERVICE
+void HttpServerInterfaceImpl::setServerCertificatePath(const char* path){
+    m_serverCertPath = path ? path : "";
+}
+
+void HttpServerInterfaceImpl::setServerPrivateKeyPath(const char* path){
+    m_serverKeyPath = path ? path : "";
+}
+
+void HttpServerInterfaceImpl::setClientCertificateAuthorityPath(const char* path){
+    m_clientCaPath = path ? path : "";
+}
+#endif
 
 /**
  * handleClient if any connects
@@ -673,6 +709,14 @@ void HttpServerInterfaceImpl::prepareResponseHeader(pdiutil::string& _header, in
     }
 
     addHeader(HTTP_HEADER_KEY_ACCESS_CONTROL_ALLOW_ORIGIN, "*"); // Allow CORS
+
+    #ifdef ENABLE_TLS_SERVICE
+    if(m_secure){
+        pdiutil::string hsts = CHARPTR_WRAP("max-age=");
+        hsts += pdiutil::to_string((int)(HTTPS_HSTS_MAX_AGE_SECONDS));
+        addHeader(HTTP_HEADER_KEY_STRICT_TRANSPORT_SECURITY, hsts);
+    }
+    #endif
 
     _header += m_responseHeaders;
     _header += "\r\n";

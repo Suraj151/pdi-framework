@@ -59,6 +59,55 @@ public:
 };
 
 
+#ifdef ENABLE_TLS_SERVICE
+
+/**
+ * iTlsServerInterface class
+ *
+ * A TLS-secured TCP server. accept() returns iClientInterface* whose dynamic
+ * type is a TLS-capable client, so the existing HTTP/SSH/MQTT server code
+ * paths require no transport-specific changes once the cert material is set.
+ *
+ * Configure certificate material BEFORE calling begin(port).
+ */
+class iTlsServerInterface : public iTcpServerInterface
+{
+
+public:
+  /**
+   * iTlsServerInterface constructor.
+   */
+  iTlsServerInterface() {}
+  /**
+   * iTlsServerInterface destructor.
+   */
+  virtual ~iTlsServerInterface() {}
+
+  /**
+   * @brief Set the path to the server certificate presented to connecting clients.
+   * @param path Filesystem path to a PEM/DER-encoded server certificate.
+   * @return True on success, false otherwise.
+   */
+  virtual bool setServerCertificatePath(const char* path) = 0;
+
+  /**
+   * @brief Set the path to the server private key matching the configured certificate.
+   * @param path Filesystem path to a PEM/DER-encoded private key.
+   * @return True on success, false otherwise.
+   */
+  virtual bool setServerPrivateKeyPath(const char* path) = 0;
+
+  /**
+   * @brief Set the path to the CA used to verify client certificates (mutual TLS, optional).
+   * @param path Filesystem path to a PEM/DER-encoded CA certificate.
+   * @return True on success, false otherwise.
+   */
+  virtual bool setClientCertificateAuthorityPath(const char* path) { return false; }
+};
+
+#endif
+
+
 /**
  * iHttpServerInterface class
  */
@@ -75,9 +124,29 @@ public:
    */
   virtual ~iHttpServerInterface() {}
 
-  virtual void begin(uint16_t port=80) = 0;
+  virtual void begin(uint16_t port=80, bool secure=false) = 0;
   virtual void handleClient() = 0;
   virtual void close() = 0;
+
+  #ifdef ENABLE_TLS_SERVICE
+  /**
+   * @brief Set the path to the server certificate used for HTTPS. Must be called before begin(port, true).
+   * @param path Filesystem path to a PEM/DER-encoded server certificate.
+   */
+  virtual void setServerCertificatePath(const char* path) {}
+  /**
+   * @brief Set the path to the server private key used for HTTPS. Must be called before begin(port, true).
+   * @param path Filesystem path to a PEM/DER-encoded private key.
+   */
+  virtual void setServerPrivateKeyPath(const char* path) {}
+  /**
+   * @brief Set the path to the CA used to verify client certificates (mutual TLS).
+   *        When configured, the HTTPS server will send a CertificateRequest and
+   *        reject clients that fail validation. Must be called before begin(port, true).
+   * @param path Filesystem path to a PEM/DER-encoded CA bundle.
+   */
+  virtual void setClientCertificateAuthorityPath(const char* path) {}
+  #endif
 
   virtual void on(const pdiutil::string &uri, CallBackVoidArgFn handler) = 0;
   virtual void onNotFound(CallBackVoidArgFn fn) = 0;   // called when handler is not assigned

@@ -792,7 +792,7 @@ void WiFiInterface::wifi_event_handler_cb(System_Event_t *_event)
   if( nullptr != _event ){
 
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        if (__i_preemptive_scheduler.is_task_context()) {
+        if (__i_preemptive_scheduler.is_task_context() || !__i_preemptive_scheduler.is_sched_active()) {
           LogFmtI("\nwifi event : %d\n", (int)_event->event);
         } else if (__serial_uart.m_mutex.try_lock()) {
           LogFmtI("\nwifi event : %d\n", (int)_event->event);

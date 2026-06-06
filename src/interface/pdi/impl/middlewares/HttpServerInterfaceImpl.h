@@ -29,9 +29,15 @@ public:
    */
   virtual ~HttpServerInterfaceImpl();
 
-  virtual void begin(uint16_t port=80) override;
+  virtual void begin(uint16_t port=80, bool secure=false) override;
   virtual void handleClient() override;
   virtual void close() override;
+
+  #ifdef ENABLE_TLS_SERVICE
+  virtual void setServerCertificatePath(const char* path) override;
+  virtual void setServerPrivateKeyPath(const char* path) override;
+  virtual void setClientCertificateAuthorityPath(const char* path) override;
+  #endif
 
   virtual void on(const pdiutil::string &uri, CallBackVoidArgFn handler) override;
   virtual void onNotFound(CallBackVoidArgFn fn) override;   // called when handler is not assigned
@@ -54,6 +60,15 @@ protected:
   iTcpServerInterface* m_server;
   iClientInterface* m_client;
   uint64_t m_currentclient_lastactivity_timestamp;
+  #ifdef ENABLE_TLS_SERVICE
+  bool m_secure;
+  #endif
+
+  #ifdef ENABLE_TLS_SERVICE
+  pdiutil::string m_serverCertPath;
+  pdiutil::string m_serverKeyPath;
+  pdiutil::string m_clientCaPath;
+  #endif
 
   struct UriToHandlerMap{
     pdiutil::string uri;

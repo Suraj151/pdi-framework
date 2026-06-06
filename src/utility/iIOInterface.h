@@ -372,7 +372,12 @@ public:
   /**
    * @brief Flushes the I/O buffer.
    */
-  virtual void flush() {};
+  virtual void flush() {}
+
+  /**
+   * @brief Is secure flag.
+   */
+  virtual bool isSecure() { return false; }
 
   /**
    * @brief Commit IO operations in case if queued.

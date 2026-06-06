@@ -12,6 +12,10 @@ created Date    : 1st Jan 2024
 #include "DeviceControlInterface.h"
 #include "TcpServerInterface.h"
 #include "TcpClientInterface.h"
+#ifdef ENABLE_TLS_SERVICE
+#include "TlsServerInterface.h"
+#include "TlsClientInterface.h"
+#endif
 #include "FileSystemInterface.h"
 
 /**
@@ -40,6 +44,18 @@ iTcpClientInterface *InstanceInterface::getNewTcpClientInstance()
 {
     return new TcpClientInterface();
 }
+
+#ifdef ENABLE_TLS_SERVICE
+iTlsServerInterface *InstanceInterface::getNewTlsServerInstance()
+{
+    return new TlsServerInterface();
+}
+
+iTlsClientInterface *InstanceInterface::getNewTlsClientInstance()
+{
+    return new TlsClientInterface();
+}
+#endif
 
 iFileSystemInterface &InstanceInterface::getFileSystemInstance()
 {

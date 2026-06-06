@@ -53,7 +53,8 @@ created Date    : 1st June 2019
  * By default will kept disabled. use only if you aware on the task context handling.
  */
 #if defined(DEVICE_ESP8266)
-// #define ENABLE_CONTEXTUAL_EXECUTION
+#define ENABLE_CONTEXTUAL_EXECUTION
+#define ENABLE_TLS_SERVICE
 #endif
 
 /**
@@ -155,6 +156,7 @@ created Date    : 1st June 2019
  * enable/disable http server feature here
  */
 #define ENABLE_HTTP_SERVER
+#define ENABLE_HTTPS_SERVER
 
 /**
  * enable/disable http client
@@ -227,9 +229,9 @@ created Date    : 1st June 2019
  * enable/disable logs here
  */
 // #define ENABLE_LOG_ALL
-// #define ENABLE_LOG_INFO
+#define ENABLE_LOG_INFO
 // #define ENABLE_LOG_WARNING
-// #define ENABLE_LOG_ERROR
+#define ENABLE_LOG_ERROR
 // #define ENABLE_LOG_SUCCESS
 
 /**
