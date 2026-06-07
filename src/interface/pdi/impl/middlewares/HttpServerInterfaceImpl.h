@@ -60,6 +60,7 @@ protected:
   iTcpServerInterface* m_server;
   iClientInterface* m_client;
   uint64_t m_currentclient_lastactivity_timestamp;
+  volatile bool m_handlingclientfromcb;
   #ifdef ENABLE_TLS_SERVICE
   bool m_secure;
   #endif

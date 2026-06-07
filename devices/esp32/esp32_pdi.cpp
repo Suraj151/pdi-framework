@@ -30,6 +30,14 @@ created Date    : 1st Jan 2024
 #include "TcpClientInterface.cpp"
 #include "TcpServerInterface.cpp"
 #endif
+#ifdef ENABLE_TLS_SERVICE
+#include "MbedTLSCertLoader.cpp"
+#include "TlsClientInterface.cpp"
+#include "TlsServerInterface.cpp"
+#endif
+#ifdef ENABLE_TLS_CERT_GENERATION
+#include "TlsCertProvisioner.cpp"
+#endif
 #include "ExceptionsNotifier.cpp"
 #include "core/EEPROM.cpp"
 #ifdef ENABLE_SERIAL_SERVICE
@@ -40,6 +48,13 @@ created Date    : 1st Jan 2024
 #include "FileSystemInterface.cpp"
 #endif
 #include "InstanceInterface.cpp"
+
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+portMUX_TYPE __pdi_critical_mux = portMUX_INITIALIZER_UNLOCKED;
+#include "threading/Cooperative.cpp"
+#include "threading/Preemptive.cpp"
+#include "threading/PreemptiveMutex.cpp"
+#endif
 
 // This function converts a read-only string (PGM_P) to a dynamically allocated char pointer.
 // The caller is responsible for deleting the allocated memory to avoid memory leaks.

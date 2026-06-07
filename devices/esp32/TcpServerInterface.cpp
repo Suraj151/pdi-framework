@@ -10,8 +10,16 @@ created Date    : 1st May 2025
 #include "TcpServerInterface.h"
 #include "DeviceControlInterface.h"
 
+#define TCP_GUARD_BEGIN
+#define TCP_GUARD_END
+// #define TCP_GUARD_BEGIN \
+//     bool _pdi_need_lock = !sys_thread_tcpip(LWIP_CORE_LOCK_QUERY_HOLDER); \
+//     if (_pdi_need_lock) { LOCK_LWIP_TCPIP_CORE; }
+// #define TCP_GUARD_END \
+//     if (_pdi_need_lock) { UNLOCK_LWIP_TCPIP_CORE; }
 
-TcpServerInterface::TcpServerInterface(): 
+
+TcpServerInterface::TcpServerInterface():
     m_serverPcb(nullptr), 
     m_clientPcb(nullptr), 
     m_timeout(30000), 
@@ -31,23 +39,32 @@ TcpServerInterface::~TcpServerInterface() {
 int32_t TcpServerInterface::begin(uint16_t port) {
     close();
 
+    TCP_GUARD_BEGIN
     m_serverPcb = tcp_new();
-    if (!m_serverPcb) return -99;
+    if (!m_serverPcb) {
+        TCP_GUARD_END
+        return -99;
+    }
 
     err_t err = tcp_bind(m_serverPcb, IP_ADDR_ANY, port);
     if (err != ERR_OK) {
         tcp_close(m_serverPcb);
         m_serverPcb = nullptr;
+        TCP_GUARD_END
         return err;
     }
 
     m_serverPcb = tcp_listen(m_serverPcb);
-    if (!m_serverPcb) return -99;
+    if (!m_serverPcb) {
+        TCP_GUARD_END
+        return -99;
+    }
 
     tcp_arg(m_serverPcb, this);
     tcp_accept(m_serverPcb, &TcpServerInterface::onAccept);
     m_hasClient = false;
     m_clientPcb = nullptr;
+    TCP_GUARD_END
     return 0;
 }
 
@@ -55,6 +72,7 @@ int32_t TcpServerInterface::begin(uint16_t port) {
  * @brief Closes the server and all connected clients.
  */
 void TcpServerInterface::close() {
+    TCP_GUARD_BEGIN
     if (m_clientPcb) {
         tcp_arg(m_clientPcb, nullptr);
         tcp_sent(m_clientPcb, nullptr);
@@ -70,6 +88,7 @@ void TcpServerInterface::close() {
         m_serverPcb = nullptr;
     }
     m_hasClient = false;
+    TCP_GUARD_END
 }
 
 /**
@@ -85,7 +104,10 @@ void TcpServerInterface::setOnAcceptClientEventCallback(CallBackVoidPointerArgFn
  * @return true if a client is connected, false otherwise.
  */
 bool TcpServerInterface::hasClient() const {
-    return m_hasClient && m_clientPcb;
+    TCP_GUARD_BEGIN
+    bool v = m_hasClient && m_clientPcb;
+    TCP_GUARD_END
+    return v;
 }
 
 /**
@@ -93,12 +115,15 @@ bool TcpServerInterface::hasClient() const {
  * @return Pointer to the accepted client interface, or nullptr if no client is connected.
  */
 iClientInterface* TcpServerInterface::accept() {
-    if (hasClient()) {
+    TCP_GUARD_BEGIN
+    if (m_hasClient && m_clientPcb) {
         m_hasClient = false;
-        TcpClientInterface *client = new TcpClientInterface(m_clientPcb);
-        m_clientPcb = nullptr; // Clear the client PCB after accepting
-        return client;
+        struct tcp_pcb* pcb = m_clientPcb;
+        m_clientPcb = nullptr;
+        TCP_GUARD_END
+        return new TcpClientInterface(pcb);
     }
+    TCP_GUARD_END
     return nullptr;
 }
 

@@ -808,6 +808,8 @@ void WiFiInterface::wifi_event_handler_cb(System_Event_t *_event)
     if ( EVENT_STAMODE_CONNECTED == _event->event ) {
       __task_scheduler.setTimeout( [&]() { __i_wifi.enableNAPT(); }, NAPT_INIT_DURATION_AFTER_WIFI_CONNECT, __i_dvc_ctrl.millis_now() );
       e = EVENT_WIFI_STA_CONNECTED;
+    }else if( EVENT_STAMODE_GOT_IP == _event->event ){
+      e = EVENT_WIFI_STA_GOT_IP;
     }else if( EVENT_STAMODE_DISCONNECTED == _event->event ){
       e = EVENT_WIFI_STA_DISCONNECTED;
     }else if( EVENT_SOFTAPMODE_STACONNECTED == _event->event ){

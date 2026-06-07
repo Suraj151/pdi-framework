@@ -25,7 +25,8 @@ CallBackVoidArgFn HttpServerInterfaceImpl::UriToHandlerMap::notFoundHandler = nu
 HttpServerInterfaceImpl::HttpServerInterfaceImpl() :
     m_server(nullptr),
     m_client(nullptr),
-    m_currentclient_lastactivity_timestamp(0)
+    m_currentclient_lastactivity_timestamp(0),
+    m_handlingclientfromcb(false)
 #ifdef ENABLE_TLS_SERVICE
     , m_secure(false)
 #endif
@@ -80,12 +81,14 @@ void HttpServerInterfaceImpl::begin(uint16_t port, bool secure){
             m_server->setOnAcceptClientEventCallback([](void* arg){
                 HttpServerInterfaceImpl *ihttpserver = reinterpret_cast<HttpServerInterfaceImpl*>(arg);
 
-                static bool handlingclientfromcb = false;
-                if(!handlingclientfromcb && ihttpserver){
+                if(ihttpserver && !ihttpserver->m_handlingclientfromcb && !ihttpserver->m_client){
 
-                    handlingclientfromcb = true;
-                    ihttpserver->handleClient();
-                    handlingclientfromcb = false;
+                    ihttpserver->m_handlingclientfromcb = true;
+
+                    ihttpserver->m_client = ihttpserver->m_server->accept();
+                    ihttpserver->m_currentclient_lastactivity_timestamp = __i_instance.getUtilityInstance().millis_now();
+
+                    ihttpserver->m_handlingclientfromcb = false;
                 }
             }, this);
         }
@@ -119,11 +122,16 @@ void HttpServerInterfaceImpl::handleClient(){
         return; // Server not initialized
     }
 
-    // Check if there is a new client connection
-    if (!m_client && m_server->hasClient()) {
-        m_client = m_server->accept();
-        m_currentclient_lastactivity_timestamp = __i_instance.getUtilityInstance().millis_now();
+    // Skip if the lwIP callback is currently mid-accept; avoids racing on m_client.
+    if (m_handlingclientfromcb) {
+        return;
     }
+
+    // Client acceptance now happens in the lwIP onAccept callback only.
+    // if (!m_client && m_server->hasClient()) {
+    //     m_client = m_server->accept();
+    //     m_currentclient_lastactivity_timestamp = __i_instance.getUtilityInstance().millis_now();
+    // }
 
     if (m_client && m_client->connected()) {
 
@@ -711,7 +719,7 @@ void HttpServerInterfaceImpl::prepareResponseHeader(pdiutil::string& _header, in
     addHeader(HTTP_HEADER_KEY_ACCESS_CONTROL_ALLOW_ORIGIN, "*"); // Allow CORS
 
     #ifdef ENABLE_TLS_SERVICE
-    if(m_secure){
+    if(m_secure && HTTPS_HSTS_MAX_AGE_SECONDS > 0){
         pdiutil::string hsts = CHARPTR_WRAP("max-age=");
         hsts += pdiutil::to_string((int)(HTTPS_HSTS_MAX_AGE_SECONDS));
         addHeader(HTTP_HEADER_KEY_STRICT_TRANSPORT_SECURITY, hsts);

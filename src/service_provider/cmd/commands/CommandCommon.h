@@ -62,6 +62,7 @@ created Date    : 1st June 2019
 #define CMD_NAME_CLS 			    "cls"
 #define CMD_NAME_SCHED_TASK 		"scht"
 #define CMD_NAME_SSH 				"ssh"
+#define CMD_NAME_TLS 				"tls"
 #define CMD_NAME_REBOOT				"reboot"
 #define CMD_NAME_NETWORK			"net"
 #define CMD_NAME_WATCH  			"watch"

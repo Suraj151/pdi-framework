@@ -105,7 +105,11 @@ typedef enum {
 #define HTTP_HEADER_KEY_STRICT_TRANSPORT_SECURITY CHARPTR_WRAP("Strict-Transport-Security")
 
 #ifndef HTTPS_HSTS_MAX_AGE_SECONDS
-#define HTTPS_HSTS_MAX_AGE_SECONDS 31536000
+// HSTS pins the origin to HTTPS-only for the configured age; with a
+// self-signed cert it disables the browser click-through and hard-fails.
+// Set non-zero (e.g. 31536000) only when a trusted CA-signed cert is used.
+#define HTTPS_HSTS_MAX_AGE_SECONDS 0
+// #define HTTPS_HSTS_MAX_AGE_SECONDS 31536000
 #endif
 
 // #define HTTP_VERSION_1_0_STR            "HTTP/1.0"

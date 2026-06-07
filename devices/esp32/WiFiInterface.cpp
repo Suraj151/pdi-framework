@@ -780,6 +780,8 @@ void WiFiInterface::wifi_event_handler_cb(arduino_event_t *_event)
     if ( ARDUINO_EVENT_WIFI_STA_CONNECTED == _event->event_id ) {
       __task_scheduler.setTimeout( [&]() { __i_wifi.enableNAPT(true); }, NAPT_INIT_DURATION_AFTER_WIFI_CONNECT, __i_dvc_ctrl.millis_now() );
       e = EVENT_WIFI_STA_CONNECTED;
+    }else if( ARDUINO_EVENT_WIFI_STA_GOT_IP == _event->event_id ){
+      e = EVENT_WIFI_STA_GOT_IP;
     }else if( ARDUINO_EVENT_WIFI_STA_DISCONNECTED == _event->event_id ){
       __task_scheduler.setTimeout( [&]() { __i_wifi.enableNAPT(false); }, MILLISECOND_DURATION_1000, __i_dvc_ctrl.millis_now() );
       e = EVENT_WIFI_STA_DISCONNECTED;

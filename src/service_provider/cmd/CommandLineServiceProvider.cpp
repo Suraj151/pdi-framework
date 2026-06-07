@@ -115,6 +115,10 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   SSHCommand::RegisterCommand();
   #endif
 
+  #ifdef ENABLE_TLS_CERT_GENERATION
+  TlsCommand::RegisterCommand();
+  #endif
+
   // RebootCommand *rebootcmd = new RebootCommand();
   // m_cmdlist.push_back(rebootcmd);
   RebootCommand::RegisterCommand();

@@ -56,9 +56,18 @@ typedef enum {
 } cmd_status_t;
 
 /* Command constants */
+#ifndef CMD_SIZE_MAX
 #define CMD_SIZE_MAX                8   ///< Maximum size of a command.
+#endif
+
+#ifndef CMD_OPTION_MAX
 #define CMD_OPTION_MAX              3   ///< Maximum number of options for a command.
+#endif
+
+#ifndef CMD_OPTION_SIZE_MAX
 #define CMD_OPTION_SIZE_MAX         3   ///< Maximum size of an option.
+#endif
+
 #define CMD_OPTION_SEPERATOR_COMMA  "," ///< Comma as a Separator for options.
 #define CMD_OPTION_SEPERATOR_SPACE  " " ///< Space as a Separator for options.
 #define CMD_OPTION_SEPERATOR_SEMICOLON  ";" ///< Semicolon as a Separator for options.

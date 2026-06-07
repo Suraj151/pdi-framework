@@ -361,7 +361,11 @@ void DeviceControlInterface::wait(double timeoutms)
     // Since preemptive tasks will get the scheduled slots soon if scheduled
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
     if(_timeoutms > 0){
-        __i_cooperative_scheduler.sleep_from_othersched(_timeoutms);
+        if (__i_cooperative_scheduler.can_sleep_from_othersched()) {
+            __i_cooperative_scheduler.sleep_from_othersched(_timeoutms);
+        } else {
+            __i_cooperative_scheduler.sleep(_timeoutms);
+        }
     }
     delay(0);
     #else

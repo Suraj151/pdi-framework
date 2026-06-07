@@ -1,14 +1,22 @@
 /************************* TLS Server Interface *******************************
 This file is part of the pdi stack.
 
-This is free software. you can redistribute it and/or modify it but without any
+This is free software. You can redistribute it and/or modify it but without any
 warranty.
 
 Author          : Suraj I.
-created Date    : 2nd June 2026
+created Date    : 7th June 2026
 ******************************************************************************/
 #include "TlsServerInterface.h"
 #include "DeviceControlInterface.h"
+
+#define TCP_GUARD_BEGIN \
+    bool _pdi_need_lock = !sys_thread_tcpip(LWIP_CORE_LOCK_QUERY_HOLDER); \
+    if (_pdi_need_lock) { LOCK_LWIP_TCPIP_CORE; }
+#define TCP_GUARD_END \
+    if (_pdi_need_lock) { UNLOCK_LWIP_TCPIP_CORE; }
+// #define TCP_GUARD_BEGIN
+// #define TCP_GUARD_END
 
 
 TlsServerInterface::TlsServerInterface() :
@@ -24,34 +32,44 @@ TlsServerInterface::~TlsServerInterface() {
 }
 
 int32_t TlsServerInterface::begin(uint16_t port) {
+
     close();
 
     if (m_serverCertPath.empty() || m_serverKeyPath.empty()) {
         return -1;
     }
 
+    TCP_GUARD_BEGIN
     m_serverPcb = tcp_new();
-    if (!m_serverPcb) return -99;
+    if (!m_serverPcb) {
+        TCP_GUARD_END
+        return -99;
+    }
 
     err_t err = tcp_bind(m_serverPcb, IP_ADDR_ANY, port);
     if (err != ERR_OK) {
         tcp_close(m_serverPcb);
         m_serverPcb = nullptr;
+        TCP_GUARD_END
         return err;
     }
 
-    // m_serverPcb = tcp_listen(m_serverPcb);
     m_serverPcb = tcp_listen_with_backlog(m_serverPcb, 1);
-    if (!m_serverPcb) return -99;
+    if (!m_serverPcb) {
+        TCP_GUARD_END
+        return -99;
+    }
 
     tcp_arg(m_serverPcb, this);
     tcp_accept(m_serverPcb, &TlsServerInterface::onAccept);
     m_hasClient = false;
     m_clientPcb = nullptr;
+    TCP_GUARD_END
     return 0;
 }
 
 void TlsServerInterface::close() {
+    TCP_GUARD_BEGIN
     if (m_clientPcb) {
         tcp_arg(m_clientPcb, nullptr);
         tcp_sent(m_clientPcb, nullptr);
@@ -67,6 +85,7 @@ void TlsServerInterface::close() {
         m_serverPcb = nullptr;
     }
     m_hasClient = false;
+    TCP_GUARD_END
 }
 
 void TlsServerInterface::setOnAcceptClientEventCallback(CallBackVoidPointerArgFn callbk, void* arg) {
@@ -75,20 +94,30 @@ void TlsServerInterface::setOnAcceptClientEventCallback(CallBackVoidPointerArgFn
 }
 
 bool TlsServerInterface::hasClient() const {
-    return m_hasClient && m_clientPcb;
+    TCP_GUARD_BEGIN
+    bool v = m_hasClient && m_clientPcb;
+    TCP_GUARD_END
+    return v;
 }
 
 iClientInterface* TlsServerInterface::accept() {
-    if (!hasClient()) return nullptr;
 
+    TCP_GUARD_BEGIN
+    if (!(m_hasClient && m_clientPcb)) {
+        TCP_GUARD_END
+        return nullptr;
+    }
     m_hasClient = false;
     struct tcp_pcb* acceptedPcb = m_clientPcb;
     m_clientPcb = nullptr;
+    TCP_GUARD_END
 
     TlsClientInterface* client = pdiutil::safe_new<TlsClientInterface>(acceptedPcb);
     if (!client) {
         LogE("TLS accept: OOM TlsClientInterface\n");
+        TCP_GUARD_BEGIN
         tcp_abort(acceptedPcb);
+        TCP_GUARD_END
         return nullptr;
     }
 
@@ -97,7 +126,6 @@ iClientInterface* TlsServerInterface::accept() {
         pdiutil::safe_delete(client);
         return nullptr;
     }
-
     return client;
 }
 
@@ -127,7 +155,7 @@ void TlsServerInterface::onPendingError(void* arg, err_t /*err*/) {
     server->m_hasClient = false;
 }
 
-err_t TlsServerInterface::onAccept(void* arg, struct tcp_pcb* newpcb, err_t err) {
+err_t TlsServerInterface::onAccept(void* arg, struct tcp_pcb* newpcb, err_t /*err*/) {
     TlsServerInterface* server = static_cast<TlsServerInterface*>(arg);
     if (!server || !newpcb) return ERR_VAL;
 

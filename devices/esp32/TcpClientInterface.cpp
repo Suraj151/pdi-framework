@@ -10,6 +10,14 @@ created Date    : 1st May 2025
 #include "TcpClientInterface.h"
 #include "DeviceControlInterface.h"
 
+#define TCP_GUARD_BEGIN
+#define TCP_GUARD_END
+// #define TCP_GUARD_BEGIN \
+//     bool _pdi_need_lock = !sys_thread_tcpip(LWIP_CORE_LOCK_QUERY_HOLDER); \
+//     if (_pdi_need_lock) { LOCK_LWIP_TCPIP_CORE; }
+// #define TCP_GUARD_END \
+//     if (_pdi_need_lock) { UNLOCK_LWIP_TCPIP_CORE; }
+
 /**
  * @brief Constructor for TcpClientInterface.
  */
@@ -28,18 +36,20 @@ TcpClientInterface::TcpClientInterface() :
  * @param pcb Pointer to an existing TCP protocol control block (pcb).
  */
 TcpClientInterface::TcpClientInterface(struct tcp_pcb* pcb):
-    m_pcb(pcb), 
-    m_isConnected(true), 
+    m_pcb(pcb),
+    m_isConnected(true),
     m_rxBuffer(nullptr),
     m_rxBufferSize(0),
     m_timeout(3000),
     m_isLastWriteAcked(true) {
 
     if (m_pcb) {
+        TCP_GUARD_BEGIN
         tcp_arg(m_pcb, this);
         tcp_err(m_pcb, &TcpClientInterface::onError);
         tcp_recv(m_pcb, &TcpClientInterface::onReceive);
         tcp_sent(m_pcb, &TcpClientInterface::onSent);
+        TCP_GUARD_END
 
         setNoDelay(true);
     }
@@ -88,22 +98,22 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
         }
     }
 
-    // Allocate a new TCP protocol control block
+    TCP_GUARD_BEGIN
     m_pcb = tcp_new();
     if (!m_pcb) {
+        TCP_GUARD_END
         return -98;
     }
 
-    // Set the connection callback
     tcp_arg(m_pcb, this);
     tcp_err(m_pcb, &TcpClientInterface::onError);
     tcp_sent(m_pcb, &TcpClientInterface::onSent);
 
-    // Connect to the server
     err_t err = tcp_connect(m_pcb, &serverIp, port, &TcpClientInterface::onConnected);
+    TCP_GUARD_END
     if (err != ERR_OK) {
         close();
-        return err < 0 ? err : -97; // Return error code if connection fails
+        return err < 0 ? err : -97;
     }
     setNoDelay(true);
 
@@ -123,6 +133,7 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
  * @brief Disconnect from the remote server.
  */
 int16_t TcpClientInterface::disconnect() {
+    TCP_GUARD_BEGIN
     if (m_pcb) {
         tcp_arg(m_pcb, NULL);
         tcp_sent(m_pcb, NULL);
@@ -130,11 +141,12 @@ int16_t TcpClientInterface::disconnect() {
         tcp_err(m_pcb, NULL);
         err_t err = tcp_close(m_pcb);
         if( err != ERR_OK ){
-            tcp_abort(m_pcb); // Forcefully abort if close fails
+            tcp_abort(m_pcb);
         }
         m_pcb = nullptr;
     }
     m_isConnected = false;
+    TCP_GUARD_END
     return 0;
 }
 
@@ -159,14 +171,16 @@ int8_t TcpClientInterface::connected() {
  */
 int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
 
+    TCP_GUARD_BEGIN
     if (!m_isConnected || !m_pcb) {
+        TCP_GUARD_END
         return -99;
     }
 
     uint8_t flags = TCP_WRITE_FLAG_COPY;
 
     if (!m_isLastWriteAcked){
-        flags |= TCP_WRITE_FLAG_MORE; // do not tcp-PuSH (yet)
+        flags |= TCP_WRITE_FLAG_MORE;
     }
 
     err_t err = ERR_OK;
@@ -175,31 +189,30 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
     while (total_sent < size) {
 
         int32_t remaining = size - total_sent;
-        int32_t chunk = std::min(remaining, (int32_t)TCP_SND_BUF); // TCP_SND_BUF is lwIP's max send size
+        int32_t chunk = std::min(remaining, (int32_t)TCP_SND_BUF);
 
-        // uint8_t flags = TCP_WRITE_FLAG_COPY;
         if (chunk < remaining)
-            flags |= TCP_WRITE_FLAG_MORE; // do not tcp-PuSH (yet)
+            flags |= TCP_WRITE_FLAG_MORE;
 
         err = tcp_write(m_pcb, c_str + total_sent, chunk, flags);
         if (err != ERR_OK) {
-            return err < 0 ? err : -99; // Return error code if write fails
+            TCP_GUARD_END
+            return err < 0 ? err : -99;
         }
 
         total_sent += chunk;
     }
 
-    // Ensure last write has been ackowledged
     if (m_isLastWriteAcked){
 
         m_isLastWriteAcked = false;
-        err = tcp_output(m_pcb); // Ensure the data is sent
+        err = tcp_output(m_pcb);
         if (err != ERR_OK) {
-            return err < 0 ? err : -99; // Return error code if write fails
+            TCP_GUARD_END
+            return err < 0 ? err : -99;
         }
     }
-
-    // m_isLastWriteAcked = !(size > 0);
+    TCP_GUARD_END
 
     __i_dvc_ctrl.yield();
 
@@ -218,21 +231,22 @@ int32_t TcpClientInterface::write_ro(const char *c_str)
  * @brief Read data from the server.
  */
 int32_t TcpClientInterface::read(uint8_t* buffer, uint32_t size) {
+    TCP_GUARD_BEGIN
     if (!m_rxBuffer || m_rxBufferSize == 0) {
+        TCP_GUARD_END
         return -99;
     }
 
     int32_t bytesToRead = (size < m_rxBufferSize) ? size : m_rxBufferSize;
-    memset(buffer, 0, size); // Clear the buffer
-    // Copy data from the receive buffer to the provided buffer
+    memset(buffer, 0, size);
     memcpy(buffer, m_rxBuffer, bytesToRead);
 
-    // Adjust the receive buffer
     memmove(m_rxBuffer, m_rxBuffer + bytesToRead, m_rxBufferSize - bytesToRead);
     m_rxBufferSize -= bytesToRead;
 
     if(m_pcb != nullptr)
-        tcp_recved(m_pcb, bytesToRead); // Notify the TCP stack that data has been read
+        tcp_recved(m_pcb, bytesToRead);
+    TCP_GUARD_END
 
     return bytesToRead;
 }
@@ -241,7 +255,10 @@ int32_t TcpClientInterface::read(uint8_t* buffer, uint32_t size) {
  * @brief Check the number of bytes available to read.
  */
 int32_t TcpClientInterface::available() {
-    return m_rxBufferSize;
+    TCP_GUARD_BEGIN
+    int32_t v = m_rxBufferSize;
+    TCP_GUARD_END
+    return v;
 }
 
 /**
@@ -269,16 +286,13 @@ err_t TcpClientInterface::onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf
 
     if( client && tpcb ){
 
-        if (!p) { // Connection closed
-
+        if (!p) {
             if( err == ERR_OK ){
-                client->disconnect();    
-            }else{
+                client->disconnect();
             }
             return err;
         }
 
-        // Append the received data to the receive buffer
         uint32_t newSize = client->m_rxBufferSize + p->tot_len;
         uint8_t* newBuffer = new uint8_t[newSize];
         if (client->m_rxBuffer) {
@@ -288,8 +302,8 @@ err_t TcpClientInterface::onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf
         pbuf_copy_partial(p, newBuffer + client->m_rxBufferSize, p->tot_len, 0);
         client->m_rxBuffer = newBuffer;
         client->m_rxBufferSize = newSize;
-    
-        pbuf_free(p); // Free the pbuf
+
+        pbuf_free(p);
     }
 
     return ERR_OK;
@@ -331,73 +345,63 @@ err_t TcpClientInterface::onSent(void* arg, struct tcp_pcb* tpcb, u16_t len) {
  * @brief Get the local IP address.
  */
 ipaddress_t TcpClientInterface::getLocalIp() const {
-    // if (!m_pcb) {
-    //     return "";
-    // }
-    // char ipStr[16];
-    // ipaddr_ntoa_r(&m_pcb->local_ip, ipStr, sizeof(ipStr));
-    // return std::string(ipStr);
-
-    if (!m_pcb) {
-        return 0;
-    }
-    return (m_pcb->local_ip.u_addr.ip4.addr);
+    TCP_GUARD_BEGIN
+    ipaddress_t v = m_pcb ? m_pcb->local_ip.u_addr.ip4.addr : 0;
+    TCP_GUARD_END
+    return v;
 }
 
 /**
  * @brief Get the local port.
  */
 uint16_t TcpClientInterface::getLocalPort() const {
-    if (!m_pcb) {
-        return 0;
-    }
-    return m_pcb->local_port;
+    TCP_GUARD_BEGIN
+    uint16_t v = m_pcb ? m_pcb->local_port : 0;
+    TCP_GUARD_END
+    return v;
 }
 
 /**
  * @brief Get the remote IP address.
  */
 ipaddress_t TcpClientInterface::getRemoteIp() const {
-    if (!m_pcb) {
-        return 0;
-    }
-    return (m_pcb->remote_ip.u_addr.ip4.addr);
+    TCP_GUARD_BEGIN
+    ipaddress_t v = m_pcb ? m_pcb->remote_ip.u_addr.ip4.addr : 0;
+    TCP_GUARD_END
+    return v;
 }
 
 /**
  * @brief Get the remote port.
  */
 uint16_t TcpClientInterface::getRemotePort() const {
-    if (!m_pcb) {
-        return 0;
-    }
-    return m_pcb->remote_port;
+    TCP_GUARD_BEGIN
+    uint16_t v = m_pcb ? m_pcb->remote_port : 0;
+    TCP_GUARD_END
+    return v;
 }
 
 /**
  * @brief Enable TCP keep-alive and configure its parameters.
  */
 bool TcpClientInterface::setKeepAlive(uint16_t idleTime, uint16_t interval, uint16_t count) {
+    TCP_GUARD_BEGIN
     if (!m_pcb) {
-        return false; // No active connection
+        TCP_GUARD_END
+        return false;
     }
 
     if (0 == idleTime || 0 == interval || 0 == count) {
         m_pcb->so_options &= ~SOF_KEEPALIVE;
+        TCP_GUARD_END
         return true;
     }
 
-    // Enable TCP keep-alive
     m_pcb->so_options |= SOF_KEEPALIVE;
-
-    // Set the keep-alive idle time (in seconds)
-    m_pcb->keep_idle = idleTime * 1000; // Convert to milliseconds
-
-    // Set the keep-alive interval (in seconds)
-    m_pcb->keep_intvl = interval * 1000; // Convert to milliseconds
-
-    // Set the number of keep-alive probes
+    m_pcb->keep_idle = idleTime * 1000;
+    m_pcb->keep_intvl = interval * 1000;
     m_pcb->keep_cnt = count;
+    TCP_GUARD_END
 
     return true;
 }
@@ -407,15 +411,15 @@ bool TcpClientInterface::setKeepAlive(uint16_t idleTime, uint16_t interval, uint
  * @param noDelay If true, disables Nagle's algorithm (reducing latency).
  */
 void TcpClientInterface::setNoDelay(bool noDelay) {
-    if (!m_pcb) {
-        return; // No active connection
+    TCP_GUARD_BEGIN
+    if (m_pcb) {
+        if (noDelay) {
+            m_pcb->so_options |= TF_NODELAY;
+        } else {
+            m_pcb->so_options &= ~TF_NODELAY;
+        }
     }
-
-    if (noDelay) {
-        m_pcb->so_options |= TF_NODELAY; // Disable Nagle's algorithm
-    } else {
-        m_pcb->so_options &= ~TF_NODELAY; // Enable Nagle's algorithm
-    }
+    TCP_GUARD_END
 }
 
 /**
@@ -431,59 +435,57 @@ void TcpClientInterface::setTimeout(uint32_t timeout) {
  */
 bool TcpClientInterface::availableforwrite(uint32_t size) {
 
-    // err_t err = tcp_write_checks(m_pcb, size);
     err_t err = ERR_OK;
+    bool isConn, isAcked;
 
+    TCP_GUARD_BEGIN
     if ( m_pcb &&
         (m_pcb->state != ESTABLISHED) &&
         (m_pcb->state != CLOSE_WAIT) &&
         (m_pcb->state != SYN_SENT) &&
         (m_pcb->state != SYN_RCVD)) {
 
-        // m_isConnected = false;
         err = ERR_CONN;
     }
 
     if(m_pcb && err == ERR_OK) {
 
-        err_t tcpout_err = tcp_output(m_pcb);  // Ensure the data is sent
+        tcp_output(m_pcb);
         uint32_t availablebuff = tcp_sndbuf(m_pcb);
         uint32_t queuelen = tcp_sndqueuelen(m_pcb);
 
         if((availablebuff < size) || (queuelen >= TCP_SND_QUEUELEN) || (queuelen > TCP_SNDQUEUELEN_OVERFLOW)){
-
             err = ERR_MEM;
         }
-
-        // if(!m_isLastWriteAcked && err == ERR_OK && tcpout_err == ERR_OK){
-            
-        //     m_isLastWriteAcked = true;
-        // }
     }
+    isConn = m_isConnected;
+    isAcked = m_isLastWriteAcked;
+    TCP_GUARD_END
 
     __i_dvc_ctrl.yield();
 
-    return m_isConnected && m_isLastWriteAcked && err == ERR_OK;
+    return isConn && isAcked && err == ERR_OK;
 }
 
 /**
  * @brief Flush the buffer.
  */
 void TcpClientInterface::flush() {
+    TCP_GUARD_BEGIN
     if (m_rxBuffer) {
 
         if(nullptr != m_pcb && m_rxBufferSize > 0)
-            tcp_recved(m_pcb, m_rxBufferSize); // Notify the TCP stack that data has been read
-        
+            tcp_recved(m_pcb, m_rxBufferSize);
+
         delete[] m_rxBuffer;
         m_rxBuffer = nullptr;
         m_rxBufferSize = 0;
     }
 
     if(nullptr != m_pcb){
-
         tcp_output(m_pcb);
     }
 
     m_isLastWriteAcked = true;
+    TCP_GUARD_END
 }

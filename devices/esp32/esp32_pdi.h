@@ -26,6 +26,13 @@ created Date    : 1st Jan 2024
 #include "TcpClientInterface.h"
 #include "TcpServerInterface.h"
 #endif
+#ifdef ENABLE_TLS_SERVICE
+#include "TlsClientInterface.h"
+#include "TlsServerInterface.h"
+#endif
+#ifdef ENABLE_TLS_CERT_GENERATION
+#include "TlsCertProvisioner.h"
+#endif
 #ifdef ENABLE_SERIAL_SERVICE
 #include "SerialInterface.h"
 #endif
@@ -34,5 +41,10 @@ created Date    : 1st Jan 2024
 #include "FileSystemInterface.h"
 #endif
 #include "InstanceInterface.h"
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+#include "threading/Cooperative.h"
+#include "threading/Preemptive.h"
+#include "threading/PreemptiveMutex.h"
+#endif
 
 #endif  // _ESP32_PORTABLE_DEVICE_INTERFACE_H_

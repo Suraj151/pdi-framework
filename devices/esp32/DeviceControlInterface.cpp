@@ -13,6 +13,11 @@ created Date    : 1st Jan 2024
 #include "LoggerInterface.h"
 #include "PingInterface.h"
 #include "SerialInterface.h"
+#ifdef ENABLE_TLS_CERT_GENERATION
+#include "TlsCertProvisioner.h"
+#include "WiFiInterface.h"
+#include <utility/EventUtil.h>
+#endif
 
 /**
  * DeviceControlInterface constructor.
@@ -194,6 +199,18 @@ void DeviceControlInterface::initDeviceSpecificFeatures()
     if( nullptr != getTerminal(TERMINAL_TYPE_SERIAL) ){
         getTerminal(TERMINAL_TYPE_SERIAL)->open();
     }
+
+    #ifdef ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME
+    __utl_event.add_event_listener(EVENT_WIFI_STA_GOT_IP, [](void* arg) {
+        uint32_t ip = __i_wifi.localIP();
+        if (ip == 0) return;
+        TlsCertProvisioner::ensureServerCert(
+            TLS_DEFAULT_SERVER_CERT_PATH,
+            TLS_DEFAULT_SERVER_KEY_PATH,
+            ip,
+            nullptr);
+    });
+    #endif
 }
 
 /**
@@ -300,7 +317,19 @@ void DeviceControlInterface::wait(double timeoutms)
 {
     uint32_t _timeoutms = (uint32_t)timeoutms;
     uint32_t _remainingtimeoutus = (uint32_t)((timeoutms - _timeoutms) * 1000.0); // convert to microseconds
+
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    if(_timeoutms > 0){
+        if (__i_cooperative_scheduler.can_sleep_from_othersched()) {
+            __i_cooperative_scheduler.sleep_from_othersched(_timeoutms);
+        } else {
+            __i_cooperative_scheduler.sleep(_timeoutms);
+        }
+    }
+    delay(0);
+    #else
     delay(_timeoutms); // delay in milliseconds
+    #endif
     if( _remainingtimeoutus > 0 )
         delayMicroseconds(_remainingtimeoutus); // delay in microseconds
 }

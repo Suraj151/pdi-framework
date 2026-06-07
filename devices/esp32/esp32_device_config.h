@@ -26,4 +26,17 @@ created Date    : 1st Jan 2026
 #define strncmp_ro strncmp_P
 #define memcpy_ro memcpy_P
 
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+extern portMUX_TYPE __pdi_critical_mux;
+#define CRITICAL_SECTION_ENTER portENTER_CRITICAL(&__pdi_critical_mux);
+#define CRITICAL_SECTION_EXIT  portEXIT_CRITICAL(&__pdi_critical_mux);
+#else
+#define CRITICAL_SECTION_ENTER noInterrupts();
+#define CRITICAL_SECTION_EXIT  interrupts();
+#endif
+
+#define CMD_SIZE_MAX                8   ///< Maximum size of a command.
+#define CMD_OPTION_MAX              6   ///< Maximum number of options for a command.
+#define CMD_OPTION_SIZE_MAX         3   ///< Maximum size of an option.
+
 #endif // _ESP32_DEVICE_CONFIG_H_

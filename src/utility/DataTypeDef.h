@@ -303,6 +303,39 @@ struct ipaddress_t {
         ip4[3] = fourth_octet;
     }
 
+    explicit ipaddress_t(const char* str) : type(IP_ADDR_TYPE_V4) {
+        ip4[0] = ip4[1] = ip4[2] = ip4[3] = 0;
+        if (!str) return;
+
+        uint8_t octets[4] = {0,0,0,0};
+        uint8_t oct_i = 0;
+        uint32_t cur = 0;
+        bool seen_digit = false;
+        bool valid = true;
+        for (uint16_t k = 0; ; ++k) {
+            char c = str[k];
+            if (c == '.' || c == 0) {
+                if (!seen_digit || cur > 255 || oct_i >= 4) { valid = false; break; }
+                octets[oct_i++] = (uint8_t)cur;
+                cur = 0;
+                seen_digit = false;
+                if (c == 0) break;
+            } else if (c >= '0' && c <= '9') {
+                cur = cur * 10 + (uint32_t)(c - '0');
+                seen_digit = true;
+            } else {
+                valid = false;
+                break;
+            }
+        }
+        if (valid && oct_i == 4) {
+            ip4[0] = octets[0];
+            ip4[1] = octets[1];
+            ip4[2] = octets[2];
+            ip4[3] = octets[3];
+        }
+    }
+
     operator pdiutil::string() {
         return (pdiutil::to_string(ip4[0]) + "." + pdiutil::to_string(ip4[1]) + "." + pdiutil::to_string(ip4[2]) + "." + pdiutil::to_string(ip4[3]));
     }

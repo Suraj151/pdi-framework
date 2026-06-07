@@ -24,11 +24,6 @@ created Date    : 1st June 2019
 #endif
 
 /**
- * @define task scheduler which makes use of timers
- */
-// #define ENABLE_TIMER_TASK_SCHEDULER
-
-/**
  * enable/disable gpio service here
  */
 #define ENABLE_GPIO_SERVICE
@@ -44,17 +39,45 @@ created Date    : 1st June 2019
 /**
  * enable/disable storage service
  */
-#if !defined(DEVICE_ARDUINOUNO)
 #define ENABLE_STORAGE_SERVICE
+
+/**
+ * enable/disable concurrency in task scheduling. By default kept disabled. 
+ * use only if you aware on the task context handling.
+ * 
+ */
+// #define ENABLE_CONTEXTUAL_EXECUTION
+
+/**
+ * enable/disable tls service which provides the tls server and client instance to be use.
+ * NOTE : tls service require more memory for its operations. which leaves minimal memory
+ * to use it for app logic so keep this in mind while enabling the tls service.
+ * By default kept disabled.
+ */
+// #define ENABLE_TLS_SERVICE
+#if defined(ENABLE_TLS_SERVICE)
+#define ENABLE_CONTEXTUAL_EXECUTION
 #endif
 
 /**
- * enable/disable concurrency in task scheduling. currently implemented for esp8266 only.
- * By default will kept disabled. use only if you aware on the task context handling.
+ * enable/disable tls certificate generation. Currently supported for esp32 only
  */
-#if defined(DEVICE_ESP8266)
-#define ENABLE_CONTEXTUAL_EXECUTION
-#define ENABLE_TLS_SERVICE
+#if defined(ENABLE_TLS_SERVICE) && defined(DEVICE_ESP32)
+#define ENABLE_TLS_CERT_GENERATION
+#endif
+
+/**
+ * Build-time gate for on-device generation of the HTTPS server certificate.
+ * By default disabled.
+ */
+#ifdef ENABLE_TLS_CERT_GENERATION
+// #define ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME
+#endif
+
+#if defined(DEVICE_ARDUINOUNO)
+#undef ENABLE_STORAGE_SERVICE
+#undef ENABLE_CONTEXTUAL_EXECUTION
+#undef ENABLE_TLS_SERVICE
 #endif
 
 /**
@@ -153,10 +176,15 @@ created Date    : 1st June 2019
 #define IGNORE_FREE_RELAY_CONNECTIONS
 
 /**
- * enable/disable http server feature here
+ * enable/disable http & https server feature here. by default https kept disabled. 
+ * you can enable it if required. 
+ * Note : make sure you make server certificates available at /etc/http/ filesystem path 
+ * of device to use https.
  */
 #define ENABLE_HTTP_SERVER
-#define ENABLE_HTTPS_SERVER
+#if defined(ENABLE_TLS_SERVICE)
+// #define ENABLE_HTTPS_SERVER
+#endif
 
 /**
  * enable/disable http client
@@ -172,6 +200,9 @@ created Date    : 1st June 2019
  * enable/disable NAPT. By default disabled.
  * Note : enabling this will increase heap memory consumption. 
  * Recommended to disable in case if not required.
+ * 
+ * esp8266 device specific note : Can not be used parallally in case if tls services 
+ * are enabled in devices like esp8266 where memory is limited.
  */
 // #define ENABLE_NAPT
 
@@ -229,9 +260,9 @@ created Date    : 1st June 2019
  * enable/disable logs here
  */
 // #define ENABLE_LOG_ALL
-#define ENABLE_LOG_INFO
+// #define ENABLE_LOG_INFO
 // #define ENABLE_LOG_WARNING
-#define ENABLE_LOG_ERROR
+// #define ENABLE_LOG_ERROR
 // #define ENABLE_LOG_SUCCESS
 
 /**
