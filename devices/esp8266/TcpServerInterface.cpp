@@ -41,7 +41,7 @@ int32_t TcpServerInterface::begin(uint16_t port) {
         return err;
     }
 
-    m_serverPcb = tcp_listen(m_serverPcb);
+    m_serverPcb = tcp_listen_with_backlog(m_serverPcb, 1);//tcp_listen(m_serverPcb);
     if (!m_serverPcb) return -99;
 
     tcp_arg(m_serverPcb, this);
@@ -110,6 +110,13 @@ void TcpServerInterface::setTimeout(uint32_t timeout_ms) {
     m_timeout = timeout_ms;
 }
 
+void TcpServerInterface::onPendingError(void* arg, err_t /*err*/) {
+    TcpServerInterface* server = static_cast<TcpServerInterface*>(arg);
+    if (!server) return;
+    server->m_clientPcb = nullptr;
+    server->m_hasClient = false;
+}
+
 /**
  * @brief Callback for when a new client connection is accepted.
  * @param arg User-defined argument (this instance).
@@ -123,9 +130,8 @@ err_t TcpServerInterface::onAccept(void* arg, struct tcp_pcb* newpcb, err_t err)
 
     // Only allow one client at a time for simplicity
     if (server->m_clientPcb) {
-        // tcp_abort(newpcb);
-        // return ERR_ABRT;
-        // Abort waiting client and continue to onboard new client
+        tcp_arg(server->m_clientPcb, nullptr);
+        tcp_err(server->m_clientPcb, nullptr);
         tcp_abort(server->m_clientPcb);
     }
 
@@ -134,6 +140,9 @@ err_t TcpServerInterface::onAccept(void* arg, struct tcp_pcb* newpcb, err_t err)
 
     // Optionally set keepalive or other options here
     // newpcb->so_options |= SOF_KEEPALIVE;
+
+    tcp_arg(newpcb, server);
+    tcp_err(newpcb, &TcpServerInterface::onPendingError);
 
     // trigger the callback if registered
     if( server->m_onAcceptCallbk ){

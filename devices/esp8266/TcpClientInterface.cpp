@@ -357,23 +357,31 @@ err_t TcpClientInterface::onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf
 
         // Append the received data to the receive buffer
         uint32_t newSize = client->m_rxBufferSize + p->tot_len;
-        uint8_t* newBuffer = new uint8_t[newSize];
-        if (client->m_rxBuffer) {
-            memcpy(newBuffer, client->m_rxBuffer, client->m_rxBufferSize);
-            delete[] client->m_rxBuffer;
-        }
 
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
         client->m_mutex.critical_lock();
         #endif
+        uint8_t* newBuffer = pdiutil::safe_new_array<uint8_t>(newSize);
+        if (!newBuffer) {
+            #ifdef ENABLE_CONTEXTUAL_EXECUTION
+            client->m_mutex.critical_unlock();
+            #endif
+            LogFmtE("TCP onReceive: alloc fail, in=%u rxQ=%u\n",
+                (unsigned)p->tot_len, (unsigned)client->m_rxBufferSize);
+            return ERR_MEM;
+        }
+        if (client->m_rxBuffer) {
+            memcpy(newBuffer, client->m_rxBuffer, client->m_rxBufferSize);
+            pdiutil::safe_delete_array(client->m_rxBuffer);
+        }
         pbuf_copy_partial(p, newBuffer + client->m_rxBufferSize, p->tot_len, 0);
         client->m_rxBuffer = newBuffer;
         client->m_rxBufferSize = newSize;
-    
-        pbuf_free(p); // Free the pbuf
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
         client->m_mutex.critical_unlock();
         #endif
+
+        pbuf_free(p);
     }
 
     return ERR_OK;
@@ -581,8 +589,7 @@ void TcpClientInterface::flush() {
             #endif
         }
 
-        delete[] m_rxBuffer;
-        m_rxBuffer = nullptr;
+        pdiutil::safe_delete_array(m_rxBuffer);
         m_rxBufferSize = 0;
     }
 

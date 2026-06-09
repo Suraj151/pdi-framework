@@ -146,7 +146,7 @@ public:
    SMTPClient();
    ~SMTPClient();
 
-   bool begin(iClientInterface *_client, char *_host, uint16_t _port);
+   bool begin(iClientInterface *_client, char *_host, uint16_t _port, bool _isSecure = false);
    void readResponse(void);
    void flushClient(void);
    void startReadResponse(uint16_t _timeOut = SMTP_DEFAULT_TIMEOUT);
@@ -178,6 +178,9 @@ protected:
    smtp_command_status m_responseReaderStatus;
    char *m_responseBuffer;
    char *m_host;
+   char m_crlfBuf[2];
+   char m_crlfFound;
+   bool m_isSecure;
 };
 
 #endif

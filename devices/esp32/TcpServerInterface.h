@@ -63,6 +63,7 @@ private:
      * @return Error code.
      */
     static err_t onAccept(void* arg, struct tcp_pcb* newpcb, err_t err);
+    static void  onPendingError(void* arg, err_t err);
 
     struct tcp_pcb* m_serverPcb;
     struct tcp_pcb* m_clientPcb;

@@ -40,7 +40,12 @@ bool isConnected(iClientInterface *client)
 
 bool disconnect(iClientInterface *client)
 {
-  return isConnected(client) ? client->disconnect() : true;
+  return (nullptr != client) ? (client->disconnect() == 0) : false;
+}
+
+bool close(iClientInterface *client)
+{
+  return (nullptr != client) ? (client->close() == 0) : false;
 }
 
 bool sendPacket(iClientInterface *client, uint8_t *buffer, uint16_t len, uint16_t max_bytes_in_one_write, uint32_t timeout)

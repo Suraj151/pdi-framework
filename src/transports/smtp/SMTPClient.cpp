@@ -26,9 +26,12 @@ SMTPClient::SMTPClient() :
   m_timeOut(0),
   m_responseReaderStatus(SMTP_RESPONSE_MAX),
   m_responseBuffer(nullptr),
-  m_host(nullptr)
+  m_host(nullptr),
+  m_crlfFound(0),
+  m_isSecure(false)
 {
-
+  this->m_crlfBuf[0] = 0;
+  this->m_crlfBuf[1] = 0;
 }
 
 /**
@@ -38,21 +41,26 @@ SMTPClient::~SMTPClient(){
   this->end();
 }
 
-bool SMTPClient::begin( iClientInterface *_client, char *_host, uint16_t _port ){
+bool SMTPClient::begin( iClientInterface *_client, char *_host, uint16_t _port, bool _isSecure ){
 
   this->m_client = _client;
+  this->m_isSecure = _isSecure;
+
+  if( this->m_isSecure && nullptr != this->m_client && !this->m_client->isSecure() ){
+    LogE("SMTP: secure mode requested but client is not TLS-capable\n");
+    return false;
+  }
 
   int _host_len = strlen(_host);
-  this->m_host = new char[_host_len + 1];
+  this->m_host = pdiutil::safe_new_array<char>( _host_len + 1 );
   if( nullptr != this->m_host ){
 
-    this->m_host[_host_len] = 0;
     memset( this->m_host, 0, _host_len + 1 );
     strcpy( this->m_host, _host );
   }
   this->m_port = _port;
 
-  this->m_responseBuffer = new char[SMTP_RESPONSE_BUFFER_SIZE];
+  this->m_responseBuffer = pdiutil::safe_new_array<char>( SMTP_RESPONSE_BUFFER_SIZE );
   if( nullptr != this->m_responseBuffer ){
 
     memset( this->m_responseBuffer, 0, SMTP_RESPONSE_BUFFER_SIZE );
@@ -70,13 +78,7 @@ bool SMTPClient::begin( iClientInterface *_client, char *_host, uint16_t _port )
 
 void SMTPClient::readResponse(){
 
-	char _crlfBuf[2];
-	char _crlfFound, crlfCount=1;
-  bool _bufferFull = false;
-
   if( SMTP_RESPONSE_STARTING == this->m_responseReaderStatus ){
-		_crlfFound = 0;
-		memset(_crlfBuf, 0, 2);
 		this->m_responseReaderStatus = SMTP_RESPONSE_WAITING;
 	}
 
@@ -92,42 +94,42 @@ void SMTPClient::readResponse(){
 
   		char nextChar = (char)this->m_client->read();
   		--availableBytes;
+		this->m_lastReceive = __i_dvc_ctrl.millis_now();
       if(this->m_responseBufferIndex < SMTP_RESPONSE_BUFFER_SIZE) {
   			this->m_responseBuffer[this->m_responseBufferIndex++] = nextChar;
   		}else{
-        _bufferFull = true;
-      }
-
-      if( _bufferFull ) {
         this->m_responseReaderStatus = SMTP_RESPONSE_BUFFER_FULL;
         return;
       }
 
-  		memmove(_crlfBuf, _crlfBuf + 1, 1);
-  		_crlfBuf[1] = nextChar;
+  		this->m_crlfBuf[0] = this->m_crlfBuf[1];
+  		this->m_crlfBuf[1] = nextChar;
 
-  		if(!strncmp(_crlfBuf, "\r\n", 2)) {
+  		if( '\r' == this->m_crlfBuf[0] && '\n' == this->m_crlfBuf[1] ) {
 
-  			if(++_crlfFound == crlfCount) {
+  			if(++this->m_crlfFound == 1) {
 
           while ( this->m_client->available() ) {
             if(this->m_responseBufferIndex < SMTP_RESPONSE_BUFFER_SIZE) {
         			this->m_responseBuffer[this->m_responseBufferIndex++] = (char)this->m_client->read();
+              this->m_lastReceive = __i_dvc_ctrl.millis_now();
+            }else{
+              (void)this->m_client->read();
             }
             if( (__i_dvc_ctrl.millis_now() - this->m_lastReceive) >= this->m_timeOut ){
           		this->m_responseReaderStatus = SMTP_RESPONSE_TIMEOUT;
           		return;
           	}
-            __i_dvc_ctrl.wait(0);
+            __i_dvc_ctrl.wait(1);
           }
   				this->m_responseReaderStatus = SMTP_RESPONSE_FINISHED;
   				return;
   			}
   		}
-      __i_dvc_ctrl.wait(0);
+      __i_dvc_ctrl.wait(1);
   	}
   }
-  __i_dvc_ctrl.wait(0);
+  __i_dvc_ctrl.wait(1);
 }
 
 void SMTPClient::flushClient(){
@@ -146,6 +148,9 @@ void SMTPClient::startReadResponse( uint16_t _timeOut ) {
 	this->m_lastReceive = __i_dvc_ctrl.millis_now();
 	this->m_responseReaderStatus = SMTP_RESPONSE_STARTING;
 	this->m_timeOut = _timeOut;
+  this->m_crlfBuf[0] = 0;
+  this->m_crlfBuf[1] = 0;
+  this->m_crlfFound = 0;
   if( nullptr != this->m_responseBuffer ){
     memset(this->m_responseBuffer, 0, SMTP_RESPONSE_BUFFER_SIZE);
   }
@@ -277,23 +282,30 @@ bool SMTPClient::sendHello( char *domain ){
 
 bool SMTPClient::sendAuthLogin( char *username, char *password ){
 
-  char *_username = (char *) malloc(400  *sizeof(char));
-  char *_password = (char *) malloc(400  *sizeof(char));
+  char *_username = pdiutil::safe_new_array<char>(400);
+  char *_password = pdiutil::safe_new_array<char>(400);
+  int respcode = SMTP_STATUS_MAX;
 
-  base64Encode( username, strlen(username), _username );
-  base64Encode( password, strlen(password), _password );
+  if( nullptr != _username && nullptr != _password ){
 
-  int respcode = this->sendCommandAndGetCode( SMTP_COMMAND_AUTH );
+    memset( _username, 0, 400 );
+    memset( _password, 0, 400 );
+    base64Encode( username, strlen(username), _username );
+    base64Encode( password, strlen(password), _password );
 
-  if( nullptr != _username && respcode < SMTP_STATUS_SERVICE_UNAVAILABLE ){
-    respcode = this->sendCommandAndGetCode( _username );
-    free(_username);
+    respcode = this->sendCommandAndGetCode( SMTP_COMMAND_AUTH );
+
+    if( respcode < SMTP_STATUS_SERVICE_UNAVAILABLE ){
+      respcode = this->sendCommandAndGetCode( _username );
+    }
+
+    if( respcode < SMTP_STATUS_SERVICE_UNAVAILABLE ){
+      respcode = this->sendCommandAndGetCode( _password );
+    }
   }
 
-  if( nullptr != _password && respcode < SMTP_STATUS_SERVICE_UNAVAILABLE ){
-    respcode = this->sendCommandAndGetCode( _password );
-    free(_password);
-  }
+  pdiutil::safe_delete_array( _username );
+  pdiutil::safe_delete_array( _password );
 
 	return ( respcode < SMTP_STATUS_SERVICE_UNAVAILABLE );
 }
@@ -413,15 +425,11 @@ bool SMTPClient::sendQuit(){
 void SMTPClient::end(){
 
   if( nullptr != this->m_client ){
-    disconnect( this->m_client );
+    close( this->m_client );
     this->m_client = nullptr;
   }
-  if(  nullptr != this->m_host ){
-    delete[] this->m_host;
-  }
-  if(  nullptr != this->m_responseBuffer ){
-    delete[] this->m_responseBuffer;
-  }
+  pdiutil::safe_delete_array( this->m_host );
+  pdiutil::safe_delete_array( this->m_responseBuffer );
 }
 
 #endif

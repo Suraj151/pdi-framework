@@ -294,14 +294,23 @@ err_t TcpClientInterface::onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf
         }
 
         uint32_t newSize = client->m_rxBufferSize + p->tot_len;
-        uint8_t* newBuffer = new uint8_t[newSize];
+
+        TCP_GUARD_BEGIN
+        uint8_t* newBuffer = pdiutil::safe_new_array<uint8_t>(newSize);
+        if (!newBuffer) {
+            TCP_GUARD_END
+            LogFmtE("TCP onReceive: alloc fail, in=%u rxQ=%u\n",
+                (unsigned)p->tot_len, (unsigned)client->m_rxBufferSize);
+            return ERR_MEM;
+        }
         if (client->m_rxBuffer) {
             memcpy(newBuffer, client->m_rxBuffer, client->m_rxBufferSize);
-            delete[] client->m_rxBuffer;
+            pdiutil::safe_delete_array(client->m_rxBuffer);
         }
         pbuf_copy_partial(p, newBuffer + client->m_rxBufferSize, p->tot_len, 0);
         client->m_rxBuffer = newBuffer;
         client->m_rxBufferSize = newSize;
+        TCP_GUARD_END
 
         pbuf_free(p);
     }
@@ -477,8 +486,7 @@ void TcpClientInterface::flush() {
         if(nullptr != m_pcb && m_rxBufferSize > 0)
             tcp_recved(m_pcb, m_rxBufferSize);
 
-        delete[] m_rxBuffer;
-        m_rxBuffer = nullptr;
+        pdiutil::safe_delete_array(m_rxBuffer);
         m_rxBufferSize = 0;
     }
 
