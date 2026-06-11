@@ -113,7 +113,45 @@ gpio_id_t DeviceControlInterface::gpioFromPinMap(gpio_id_t pin, bool isAnalog)
 {
   gpio_id_t mapped_pin;
 
-  // Map
+#if defined(CONFIG_IDF_TARGET_ESP32C3)
+  switch ( pin ) {
+    case 0:
+      mapped_pin = isAnalog ? 0 : 2;
+      break;
+    case 1:
+      mapped_pin = isAnalog ? 1 : 3;
+      break;
+    case 2:
+      mapped_pin = isAnalog ? 4 : 4;
+      break;
+    case 3:
+      mapped_pin = 5;
+      break;
+    case 4:
+      mapped_pin = 6;
+      break;
+    case 5:
+      mapped_pin = 7;
+      break;
+    case 6:
+      mapped_pin = 21;
+      break;
+    case 7:
+      mapped_pin = 20;
+      break;
+    case 8:
+      mapped_pin = 8;
+      break;
+    case 9:
+      mapped_pin = 9;
+      break;
+    case 10:
+      mapped_pin = 10;
+      break;
+    default:
+      mapped_pin = 0;
+  }
+#else
   switch ( pin ) {
 
     case 0:
@@ -149,6 +187,7 @@ gpio_id_t DeviceControlInterface::gpioFromPinMap(gpio_id_t pin, bool isAnalog)
     default:
       mapped_pin = 0;
   }
+#endif
 
   return mapped_pin;
 }
@@ -158,9 +197,10 @@ gpio_id_t DeviceControlInterface::gpioFromPinMap(gpio_id_t pin, bool isAnalog)
  */
 bool DeviceControlInterface::isExceptionalGpio(gpio_id_t pin)
 {
+  gpio_id_t hw = gpioFromPinMap(pin);
   for (uint8_t j = 0; j < sizeof(EXCEPTIONAL_GPIO_PINS); j++) {
 
-    if( EXCEPTIONAL_GPIO_PINS[j] == pin )return true;
+    if( EXCEPTIONAL_GPIO_PINS[j] == hw )return true;
   }
   return false;
 }
@@ -227,6 +267,17 @@ void DeviceControlInterface::resetDevice()
 void DeviceControlInterface::restartDevice()
 {
     ESP.restart();
+}
+
+/**
+ * handle device specific events
+ */
+void DeviceControlInterface::handleEvents()
+{
+    if (__serial_uart.available()) {
+        serial_event_t e(SERIAL_IFACE_UART, SERIAL_IFACE_CMD, &__serial_uart);
+        __utl_event.execute_event(EVENT_SERIAL_AVAILABLE, &e);
+    }
 }
 
 /**

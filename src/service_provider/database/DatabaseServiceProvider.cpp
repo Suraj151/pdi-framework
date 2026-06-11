@@ -73,6 +73,16 @@ EmailTable __email_table;
 DeviceIotTable __device_iot_table;
 #endif
 
+#ifdef AUTO_FACTORY_RESET_ON_INVALID_CONFIGS
+static void factoryResetOnInvalidConfigs(){
+    if ( !__i_db.isValidConfigs() ){
+      LogE("\n\nFound invalid configs.. starting factory reset..!\n\n");
+      // __database_service.clear_default_tables();
+      __factory_reset.factory_reset();
+    }
+}
+#endif
+
 /**
  * Constructor
  */
@@ -95,22 +105,17 @@ bool DatabaseServiceProvider::initService(void *arg)
   __i_db.beginConfigs(__i_db.getMaxDBSize());
   __database.init_database(__i_db.getMaxDBSize());
 
-  #ifdef AUTO_FACTORY_RESET_ON_INVALID_CONFIGS
-  __task_scheduler.setInterval( [&]() {
-    if ( !__i_db.isValidConfigs() ){
-      LogE("\n\nFound invalid configs.. starting factory reset..!\n\n");
-      __database_service.clear_default_tables();
-      __factory_reset.factory_reset();
-    }
-  }, MILLISECOND_DURATION_5000, __i_dvc_ctrl.millis_now() );
-  #endif
-
   // clear config to default on factory reset event if enabled
   #ifdef CONFIG_CLEAR_TO_DEFAULT_ON_FACTORY_RESET
   __utl_event.add_event_listener(EVENT_FACTORY_RESET, [&](void *e){
       LogI("\n\nClearing configs to default on factory reset event!\n\n");
     __database_service.clear_default_tables();
   });
+  #endif
+
+  #ifdef AUTO_FACTORY_RESET_ON_INVALID_CONFIGS
+  factoryResetOnInvalidConfigs();
+  __task_scheduler.setInterval( factoryResetOnInvalidConfigs, MILLISECOND_DURATION_5000, __i_dvc_ctrl.millis_now() );
   #endif
 
   return ServiceProvider::initService(arg);

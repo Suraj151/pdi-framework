@@ -1,4 +1,6 @@
-/src/database/tables
+/src/database/tables/*
+!/src/database/tables/.gitignore
+!/src/database/tables/*.h
 /devices/DeviceSetup.h
 /scripts/__pycache__/
 .vscode/

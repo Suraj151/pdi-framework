@@ -26,4 +26,25 @@ created Date    : 1st Jan 2026
 #define strncmp_ro strncmp_P
 #define memcpy_ro memcpy_P
 
+/**
+ * gpio pin counts
+ */
+#define MAX_DIGITAL_GPIO_PINS         14
+#define MAX_ANALOG_GPIO_PINS          5
+
+/**
+ * log2 might not available for uno
+ */
+#define log2(x) (log(x)/log(2.0))
+
+/**
+ * define max number of tables in database
+ */
+#define MAX_DB_TABLES 5
+
+/**
+ * enable basic gpio only on uno
+ */
+#define ENABLE_GPIO_BASIC_ONLY
+
 #endif // _ARDUINOUNO_DEVICE_CONFIG_H_

@@ -15,9 +15,23 @@ created Date    : 1st Jan 2024
 #include <interface/pdi/middlewares/iDeviceControlInterface.h>
 
 /**
- * Gpio's that should not be touched
+ * Gpio's that should not be touched (flash / PSRAM / USB-JTAG / strapping)
  */
+#if defined(CONFIG_IDF_TARGET_ESP32C3)
+const uint8_t EXCEPTIONAL_GPIO_PINS[] = { 11, 12, 13, 14, 15, 16, 17, 18, 19 };
+#elif defined(CONFIG_IDF_TARGET_ESP32C6)
+const uint8_t EXCEPTIONAL_GPIO_PINS[] = { 24, 25, 26, 27, 28, 29, 30 };
+#elif defined(CONFIG_IDF_TARGET_ESP32H2)
+const uint8_t EXCEPTIONAL_GPIO_PINS[] = { 15, 16, 17, 18, 19, 20, 21 };
+#elif defined(CONFIG_IDF_TARGET_ESP32S2)
+const uint8_t EXCEPTIONAL_GPIO_PINS[] = { 26, 27, 28, 29, 30, 31, 32 };
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+const uint8_t EXCEPTIONAL_GPIO_PINS[] = { 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37 };
+#elif defined(CONFIG_IDF_TARGET_ESP32)
+const uint8_t EXCEPTIONAL_GPIO_PINS[] = { 6, 7, 8, 9, 10, 11 };
+#else
 const uint8_t EXCEPTIONAL_GPIO_PINS[] = {};
+#endif
 
 /**
  * DeviceControlInterface class
@@ -49,6 +63,7 @@ public:
   void initDeviceSpecificFeatures() override;
   void resetDevice() override;
   void restartDevice() override;
+  void handleEvents() override;
 
   // wdt methods
   void enableWdt(uint8_t mode_if_any=0) override;

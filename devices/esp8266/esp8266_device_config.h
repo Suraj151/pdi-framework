@@ -30,5 +30,37 @@ created Date    : 1st Jan 2026
 #define strncmp_ro strncmp_P
 #define memcpy_ro memcpy_P
 
+/**
+ * gpio pin counts
+ */
+#define MAX_DIGITAL_GPIO_PINS         9
+#define MAX_ANALOG_GPIO_PINS          1
+
+/**
+ * define max number of tables in database
+ */
+#define MAX_DB_TABLES 15
+
+/**
+ * enable/disable storage service
+ */
+#define ENABLE_STORAGE_SERVICE
+
+/**
+ * enable/disable network service here
+ */
+#define ENABLE_NETWORK_SERVICE
+
+/**
+ * enable/disable auth service here
+ */
+#define ENABLE_AUTH_SERVICE
+
+/**
+ * device capabilities (read by common config to gate optional features)
+ */
+#define DEVICE_SUPPORTS_TLS
+#define DEVICE_SUPPORTS_CONTEXTUAL_EXECUTION
+
 
 #endif // _ESP8266_DEVICE_CONFIG_H_

@@ -25,6 +25,12 @@ public:
    * UARTSerial constructor.
    */
   UARTSerial(HardwareSerial& hwserial);
+#if ARDUINO_USB_CDC_ON_BOOT
+  /**
+   * UARTSerial constructor for USB CDC backed Serial (S2/S3/C3/C6/H2 with CDC on boot).
+   */
+  UARTSerial(HWCDC& cdcserial);
+#endif
   /**
    * UARTSerial destructor.
    */
@@ -58,6 +64,9 @@ private:
   uint16_t m_port;
   uint64_t m_speed;
   HardwareSerial& m_hwserial;
+#if ARDUINO_USB_CDC_ON_BOOT
+  HWCDC* m_cdcserial;
+#endif
 };
 
 extern UARTSerial __serial_uart;

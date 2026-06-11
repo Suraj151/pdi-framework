@@ -1,0 +1,7 @@
+# Ignore everything in this specific folder
+*
+
+# Prevent Git from ignoring esp32 placeholder files
+!.gitignore
+!.gitkeep
+!*.h

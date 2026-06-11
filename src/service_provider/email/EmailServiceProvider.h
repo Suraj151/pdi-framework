@@ -15,6 +15,7 @@ created Date    : 1st June 2019
 #ifdef ENABLE_GPIO_SERVICE
 #include <service_provider/device/GpioServiceProvider.h>
 #endif
+#include <service_provider/database/DatabaseServiceProvider.h>
 #include <transports/smtp/SMTPClient.h>
 
 /**

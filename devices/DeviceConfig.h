@@ -10,7 +10,11 @@ created Date    : 1st June 2019
 #ifndef _DEVICES_COMMON_CONFIG_H_
 #define _DEVICES_COMMON_CONFIG_H_
 
+#if __has_include("DeviceSetup.h")
 #include "DeviceSetup.h"
+#else
+#define DEVICE_ESP32
+#endif
 
 /**
  * include device specific config if any
@@ -21,15 +25,14 @@ created Date    : 1st June 2019
 #include "esp32/esp32_device_config.h"
 #elif defined(DEVICE_ARDUINOUNO)
 #include "arduinouno/arduinouno_device_config.h"
+#else
+#include "esp32/esp32_device_config.h"
 #endif
 
 /**
  * enable/disable gpio service here
  */
 #define ENABLE_GPIO_SERVICE
-#if defined(DEVICE_ARDUINOUNO)
-#define ENABLE_GPIO_BASIC_ONLY
-#endif
 
 /**
  * enable/disable serial service
@@ -37,16 +40,14 @@ created Date    : 1st June 2019
 #define ENABLE_SERIAL_SERVICE
 
 /**
- * enable/disable storage service
- */
-#define ENABLE_STORAGE_SERVICE
-
-/**
- * enable/disable concurrency in task scheduling. By default kept disabled. 
+ * enable/disable concurrency in task scheduling. By default kept disabled.
  * use only if you aware on the task context handling.
- * 
+ *
  */
 // #define ENABLE_CONTEXTUAL_EXECUTION
+#if defined(ENABLE_CONTEXTUAL_EXECUTION) && !defined(DEVICE_SUPPORTS_CONTEXTUAL_EXECUTION)
+#undef ENABLE_CONTEXTUAL_EXECUTION
+#endif
 
 /**
  * enable/disable tls service which provides the tls server and client instance to be use.
@@ -55,14 +56,18 @@ created Date    : 1st June 2019
  * By default kept disabled.
  */
 // #define ENABLE_TLS_SERVICE
+#if defined(ENABLE_TLS_SERVICE) && !defined(DEVICE_SUPPORTS_TLS)
+#undef ENABLE_TLS_SERVICE
+#endif
 #if defined(ENABLE_TLS_SERVICE)
 #define ENABLE_CONTEXTUAL_EXECUTION
 #endif
 
 /**
- * enable/disable tls certificate generation. Currently supported for esp32 only
+ * enable/disable tls certificate generation. Supported only on devices
+ * that declare DEVICE_SUPPORTS_TLS_CERT_GENERATION.
  */
-#if defined(ENABLE_TLS_SERVICE) && defined(DEVICE_ESP32)
+#if defined(ENABLE_TLS_SERVICE) && defined(DEVICE_SUPPORTS_TLS_CERT_GENERATION)
 #define ENABLE_TLS_CERT_GENERATION
 #endif
 
@@ -72,57 +77,6 @@ created Date    : 1st June 2019
  */
 #ifdef ENABLE_TLS_CERT_GENERATION
 // #define ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME
-#endif
-
-#if defined(DEVICE_ARDUINOUNO)
-#undef ENABLE_STORAGE_SERVICE
-#undef ENABLE_CONTEXTUAL_EXECUTION
-#undef ENABLE_TLS_SERVICE
-#endif
-
-/**
- * Device specific stuff
- */
-#if defined(DEVICE_ARDUINOUNO)
-
-#define MAX_DIGITAL_GPIO_PINS         14
-#define MAX_ANALOG_GPIO_PINS          5
-
-#define log2(x) (log(x)/log(2.0))   // log2 might not available for uno
-
-#elif defined(DEVICE_ESP32)
-
-#define MAX_DIGITAL_GPIO_PINS         9
-#define MAX_ANALOG_GPIO_PINS          4
-
-#else
-
-#define MAX_DIGITAL_GPIO_PINS         9
-#define MAX_ANALOG_GPIO_PINS          1
-
-#endif
-
-/**
- * define max number of tables in database
- */
-#if defined(DEVICE_ARDUINOUNO)
-#define MAX_DB_TABLES 5
-#else
-#define MAX_DB_TABLES 15
-#endif
-
-/**
- * enable/disable network service here
- */
-#if !defined(DEVICE_ARDUINOUNO)
-#define ENABLE_NETWORK_SERVICE
-#endif
-
-/**
- * enable/disable auth service here
- */
-#if !defined(DEVICE_ARDUINOUNO)
-#define ENABLE_AUTH_SERVICE
 #endif
 
 /**
@@ -176,9 +130,9 @@ created Date    : 1st June 2019
 #define IGNORE_FREE_RELAY_CONNECTIONS
 
 /**
- * enable/disable http & https server feature here. by default https kept disabled. 
- * you can enable it if required. 
- * Note : make sure you make server certificates available at /etc/http/ filesystem path 
+ * enable/disable http & https server feature here. by default https kept disabled.
+ * you can enable it if required.
+ * Note : make sure you make server certificates available at /etc/http/ filesystem path
  * of device to use https.
  */
 #define ENABLE_HTTP_SERVER
@@ -198,10 +152,10 @@ created Date    : 1st June 2019
 
 /**
  * enable/disable NAPT. By default disabled.
- * Note : enabling this will increase heap memory consumption. 
+ * Note : enabling this will increase heap memory consumption.
  * Recommended to disable in case if not required.
- * 
- * esp8266 device specific note : Can not be used parallally in case if tls services 
+ *
+ * esp8266 device specific note : Can not be used parallally in case if tls services
  * are enabled in devices like esp8266 where memory is limited.
  */
 // #define ENABLE_NAPT

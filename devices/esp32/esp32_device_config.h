@@ -39,4 +39,37 @@ extern portMUX_TYPE __pdi_critical_mux;
 #define CMD_OPTION_MAX              6   ///< Maximum number of options for a command.
 #define CMD_OPTION_SIZE_MAX         3   ///< Maximum size of an option.
 
+/**
+ * gpio pin counts
+ */
+#define MAX_DIGITAL_GPIO_PINS         9
+#define MAX_ANALOG_GPIO_PINS          4
+
+/**
+ * define max number of tables in database
+ */
+#define MAX_DB_TABLES 15
+
+/**
+ * enable/disable storage service
+ */
+#define ENABLE_STORAGE_SERVICE
+
+/**
+ * enable/disable network service here
+ */
+#define ENABLE_NETWORK_SERVICE
+
+/**
+ * enable/disable auth service here
+ */
+#define ENABLE_AUTH_SERVICE
+
+/**
+ * device capabilities (read by common config to gate optional features)
+ */
+#define DEVICE_SUPPORTS_TLS
+#define DEVICE_SUPPORTS_CONTEXTUAL_EXECUTION
+#define DEVICE_SUPPORTS_TLS_CERT_GENERATION
+
 #endif // _ESP32_DEVICE_CONFIG_H_

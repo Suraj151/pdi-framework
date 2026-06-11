@@ -8,6 +8,8 @@ import os
 import sys
 import argparse
 import shutil
+import glob
+import subprocess
 
 # consts
 IsPython3 = ( sys.version_info[0] >= 3 )
@@ -47,7 +49,20 @@ if __name__ == "__main__":
 
     schema = args.schema
     outpath = args.outpath
-    cleanpath(outpath)
+
+    tracked_headers = glob.glob(os.path.join(outpath, '*.h'))
+    if tracked_headers:
+        subprocess.run(
+            ['git', 'update-index', '--skip-worktree'] + tracked_headers,
+            check=False,
+        )
+
+    if os.path.isdir(outpath):
+        for h in glob.glob(os.path.join(outpath, '*.h')):
+            os.remove(h)
+    else:
+        os.makedirs(outpath)
+
     os.system('python3 JsonToCpp.py -s ' + schema + ' -o ' + outpath)
     
     # except Exception as ex:
