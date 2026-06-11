@@ -122,7 +122,7 @@ created Date    : 1st June 2019
 /**
  * enable/disable device iot feature here
  */
-#define ENABLE_DEVICE_IOT
+// #define ENABLE_DEVICE_IOT
 
 /**
  * ignore free relay connections created by same ssid

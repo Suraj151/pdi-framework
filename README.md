@@ -23,7 +23,7 @@ For a deeper architectural breakdown — layered model, the device/interface/ser
 
 # Installation
 
-***installation from Arduino library manager for this library is not supported due to autogen scripts which required to generate the device specific config and DB table sources. Also the external libraries this framework depends on which is part of git submodules config in this repository.*** The reasons and the planned fixes are detailed in [§14.7 Why the Arduino Library Manager isn't supported](#147-why-the-arduino-library-manager-isnt-supported).
+**Arduino Library Manager:** the framework can be installed directly from the Arduino Library Manager. By default it builds for ESP32 (so installing through the Library Manager and selecting an ESP32 board works out of the box). To build for another supported board (ESP8266 / Arduino UNO), run the device-setup script the usual way: `python3 scripts/DeviceSetup.py -d <board>`.
 
 
 **install manually**
@@ -34,11 +34,6 @@ To install manually, clone this repo to devices libraries path. for example with
 ( in Ubuntu generally path is like ==> ~/Arduino/libraries).
 
 Follow device official docs to install device specific toolchains. for example to install esp32 device specific toolchains you can follow https://docs.espressif.com/projects/arduino-esp32/en/latest/installing.html#linux link. similarely for other devices if provided.
-
-**install external dependency**
-
-Currently for some devices, this library is using external dependencies which are added in git submodule config. To install this submodule, open a terminal in this framework library root directory path and execute command ``git submodule update --init --recursive`` 
-
 
 **AutoGen Script**
 
@@ -58,7 +53,7 @@ For example if we want to build for arduino uno then command will be
 
 **Note :** Above script will create DeviceSetup.h file in devices folder contains the device macro in uppercase format prepended with DEVICE_ word. for example if we are using arduinouno as per mentioned in above command then it will generate DEVICE_ARDUINOUNO macro which has been used in framework to enable or disable device specific features.
 
-The full build flow — what every script does, what's git-ignored, submodule handling, board-package versions, and how to add a new device port — is covered in [§14. Build & Toolchain](#14-build--toolchain) and [§2. Device Layer & Porting Guide](#2-device-layer--porting-guide).
+The full build flow — what every script does, what's git-ignored, vendored externals, board-package versions, and how to add a new device port — is covered in [§14. Build & Toolchain](#14-build--toolchain) and [§2. Device Layer & Porting Guide](#2-device-layer--porting-guide).
 
 Currently below devices has been supported
 
@@ -684,7 +679,7 @@ This produces a **single translation unit** per device, which has two practical 
 1. **Symbol uniqueness across `.cpp` files matters less** — anything you mark `static` is per-port, not per-file.
 2. **Headers must still guard against double-include**, but `.cpp` files in the device folder must **not** be referenced from anywhere else (doing so would link them twice).
 
-This is the dominant reason the framework cannot be installed unmodified via the Arduino Library Manager today — fixing it cleanly requires either moving sources under `src/` or switching to a build system that does recursive compilation. See [section 14. Build & Toolchain] for the full discussion.
+See [§14. Build & Toolchain](#14-build--toolchain) for the full discussion of the layout and how it interacts with the Arduino build pipeline.
 
 ### 2.5 Device selection flow
 
@@ -3289,7 +3284,7 @@ Three handles for runtime visibility:
 
 ## 14. Build & Toolchain
 
-PDI Framework targets the **Arduino IDE / arduino-cli** build system. This is the supported path, and it dictates almost every structural quirk you've read about so far — most notably the `.cpp`-include trick ([§2.4](#2-device-layer--porting-guide)) and the codegen step ([§6.5](#6-database-layer)). This section is the integrator's reference: install, board versions, what the scripts do, what `library.properties` declares, and the open issues that keep the library off the Arduino Library Manager.
+PDI Framework targets the **Arduino IDE / arduino-cli** build system. This is the supported path, and it dictates almost every structural quirk you've read about so far — most notably the `.cpp`-include trick ([§2.4](#2-device-layer--porting-guide)) and the codegen step ([§6.5](#6-database-layer)). This section is the integrator's reference: install, board versions, what the scripts do, what `library.properties` declares, and the Arduino Library Manager flow.
 
 ### 14.1 Supported boards
 
@@ -3319,30 +3314,39 @@ Two values worth understanding:
 
 ### 14.3 Installation flow
 
-End-user steps (the "happy path"):
+Two paths — Library Manager (recommended) or manual git clone.
+
+**Library Manager (default target: ESP32):**
 
 1. **Install the device's Arduino board package** at the version above through the Boards Manager.
-2. **Clone the framework** into the device's `libraries/` directory:
+2. **Install pdi-framework** from Tools → Manage Libraries → search for `pdi-framework`.
+3. **Open the bundled example** in the IDE: File → Examples → pdi-framework → PdiStack. Select an **ESP32** board, compile, flash.
+
+That's it for ESP32. The library ships with placeholder DB-table headers and a [`__has_include("DeviceSetup.h")`](devices/DeviceConfig.h) guard in `devices/DeviceConfig.h` that falls back to ESP32 when no `DeviceSetup.h` is present, so a fresh Library Manager install builds out of the box for ESP32 with no extra steps.
+
+**To build for ESP8266 or Arduino UNO** (or any other supported device), generate the per-device setup files first:
+
+```
+cd <your-Arduino-libraries-path>/pdi-framework/scripts
+python3 DeviceSetup.py -d esp8266        # or arduinouno
+```
+
+This writes [devices/DeviceSetup.h](devices/DeviceSetup.h) with `#define DEVICE_<NAME>` and regenerates [src/database/tables/](src/database/tables/) for the target. Switching boards later is the same one-liner against the new device name.
+
+**Manual git clone (development / contributor install):**
+
+1. Install the board package (as above).
+2. Clone into your Arduino `libraries/` directory:
    ```
    cd ~/Arduino/libraries
    git clone https://github.com/Suraj151/pdi-framework.git
    cd pdi-framework
    ```
    Linux/macOS: `~/Arduino/libraries/`. Windows: `%USERPROFILE%\AppData\Local\Arduino15\packages\<vendor>\hardware\<arch>\<ver>\libraries\` (cross-arch install) **or** `Documents\Arduino\libraries\` (per-user).
-3. **Pull submodules:**
-   ```
-   git submodule update --init --recursive
-   ```
-   This fetches LittleFS into [external/littlefs/](external/littlefs/) — required for `ENABLE_STORAGE_SERVICE` and everything that depends on it (SSH, SFTP, history).
-4. **Run the setup script** for the chosen device:
-   ```
-   cd scripts
-   python3 DeviceSetup.py -d esp8266        # or esp32 / arduinouno
-   ```
-   This writes [devices/DeviceSetup.h](devices/DeviceSetup.h) and regenerates [src/database/tables/](src/database/tables/).
-5. **Open the bundled example** in the IDE: File → Examples → pdi-framework → PdiStack. Select the matching board, compile, flash.
+3. (Optional) `python3 scripts/DeviceSetup.py -d <board>` if you need a non-ESP32 target.
+4. Open the bundled example, select your board, compile, flash.
 
-That's the whole install. Step 4 is the one that prevents Library Manager distribution — see §14.7.
+LittleFS is now vendored in-tree under [external/littlefs/](external/littlefs/) — no submodules to pull.
 
 ### 14.4 What the scripts do
 
@@ -3361,29 +3365,24 @@ Generated output goes through `clang-format --style=Microsoft -i` if `clang-form
 [.gitignore](.gitignore):
 
 ```
-/src/database/tables           # entirely autogenerated by CreateDBSourceFromJson
-/devices/DeviceSetup.h         # autogenerated by DeviceSetup
+/src/database/tables/*         # generated artefacts ignored, but checked-in
+!/src/database/tables/.gitignore  #   placeholders (.h) are tracked so a fresh
+!/src/database/tables/*.h         #   install builds without the script
+/devices/DeviceSetup.h         # autogenerated by DeviceSetup (optional)
 /scripts/__pycache__/
 .vscode/
 ```
 
-This is why a fresh clone has no `DeviceSetup.h` and an empty `database/tables` — the setup script is mandatory before the first build.
+The checked-in `.h` files under `src/database/tables/` are **ESP32 placeholders** that ship with the library so an out-of-the-box Library Manager install compiles for ESP32 without running the setup script. Running `DeviceSetup.py -d <board>` regenerates them for the target board — at which point the regenerated files are once again git-ignored (since they're now derived for *your* target, not the placeholder default). A fresh checkout therefore always has a buildable ESP32 stack; switching targets requires the script.
 
-### 14.6 Submodules
+### 14.6 Vendored externals
 
-[.gitmodules](.gitmodules) declares one:
+The framework no longer carries any git submodules. Two external bodies of code are vendored directly in the repo:
 
-```
-[submodule "external/littlefs"]
-    path = external/littlefs
-    url = https://github.com/littlefs-project/littlefs.git
-```
+- [external/littlefs/](external/littlefs/) — the LittleFS filesystem (vendored, not a submodule). Used by the storage interface on esp8266/esp32 for `ENABLE_STORAGE_SERVICE` and everything downstream of it (SSH/SFTP, CLI history, file commands). AVR builds skip storage so they don't reach this code.
+- [lwip/](lwip/) — a vendored copy of customised lwIP 1.4 for the legacy NAPT path documented in the main README's [Features → NAT](#features) section. The modern path uses the lwIP shipped with the ESP8266 core; this folder is opt-in by manually replacing the board-package's lwIP.
 
-LittleFS is the on-device filesystem the storage interface wraps for esp8266/esp32. Without it pulled in, any `ENABLE_STORAGE_SERVICE` build fails at link time with missing `lfs_*` symbols. AVR builds skip storage entirely so the submodule isn't strictly required there.
-
-The [lwip/](lwip/) folder is **not** a submodule — it's a vendored copy of customised lwIP 1.4 for the legacy NAPT path documented in the main README's [Features → NAT](#features) section. The modern path uses the lwIP shipped with the ESP8266 core; this folder is opt-in by manually replacing the board-package's lwIP.
-
-### 14.6 The Arduino "src-only" rule and why it matters
+### 14.7 The Arduino "src-only" rule and why it matters
 
 The Arduino IDE / `arduino-cli` build only compiles `.cpp` / `.c` files that live **directly inside `<library>/src/`** (subdirectories of `src/` are recursed; siblings of `src/` are not). This is what forces the [§2.4](#2-device-layer--porting-guide) trick:
 
@@ -3392,17 +3391,39 @@ The Arduino IDE / `arduino-cli` build only compiles `.cpp` / `.c` files that liv
 
 The practical consequence: every device translation unit ends up flattened into a **single big object file** per build. That's why `static` symbols inside `devices/<board>/*.cpp` are file-scope-of-the-aggregator, not file-scope-of-the-source. Don't reference `devices/<board>/*.cpp` from outside that chain — it would link twice.
 
-### 14.7 Why the Arduino Library Manager isn't supported
+### 14.8 Library Manager: how the ESP32 default works
 
-Three blockers, in priority order:
+The library installs cleanly through Arduino Library Manager because three things hold true at first build:
 
-1. **The codegen step.** Library Manager publishes a static zip of the repo; it can't run `python3 DeviceSetup.py -d <name>` before the user's first build. `devices/DeviceSetup.h` and `src/database/tables/*.h` would be missing. Fix paths: ship pre-generated headers for all supported boards plus auto-select via `#if defined(ESP32)` / `#if defined(ESP8266)` / `#if defined(__AVR_ATmega328P__)`; **or** move the table generation to a `constexpr` table-descriptor pattern at compile time.
-2. **The git submodule.** Library Manager fetches a tarball, not a `git clone --recursive`. `external/littlefs/` would be empty on Library Manager installs. Fix path: vendor the LittleFS sources into `src/` directly under a license-compatible drop, or switch to a single-file LittleFS port.
-3. **The `.cpp`-include layout.** Even with #1 and #2 fixed, the device adapters live outside `src/` and rely on the aggregator trick. The Library Manager catalogue tolerates this — but only because `src/`-resident files transitively include the device `.cpp`s. Any future Arduino tooling that enforces "no `#include` of `.cpp`" would break us. Fix path: move `devices/<board>/` into `src/devices/<board>/` and delete the aggregator includes — at the cost of slightly less obvious project layout.
+1. **`devices/DeviceSetup.h` is optional.** [`devices/DeviceConfig.h`](devices/DeviceConfig.h) starts with:
+   ```c
+   #if __has_include("DeviceSetup.h")
+   #include "DeviceSetup.h"
+   #else
+   #define DEVICE_ESP32
+   #endif
+   ```
+   so a fresh install (no setup script run) builds as if `DEVICE_ESP32` were set.
+2. **The per-port platform header falls back to ESP32.** The cascade right after the `DEVICE_*` selector ends with `#else #include "esp32/esp32_device_config.h"`, so any unrecognised `DEVICE_*` (or no `DEVICE_*` at all) lands on ESP32's `RODT_ATTR` / `strcat_ro` / `CRITICAL_SECTION_*` definitions.
+3. **DB table headers ship as ESP32 placeholders.** [`src/database/tables/`](src/database/tables/) is no longer wiped at install time — the checked-in `*.h` placeholders are ESP32-shaped and let `DatabaseServiceProvider` link without running the codegen.
 
-None of these are conceptual blockers, just engineering work. The README's Installation section calls this out: "***installation from Arduino library manager for this library is not supported due to autogen scripts which required to generate the device specific config and DB table sources***."
+To build for a non-default board (ESP8266 / Arduino UNO / any future port), run the setup script — the regenerated `DeviceSetup.h` overrides the fallback, and the regenerated table headers replace the placeholders. Switching back to ESP32 later either means re-running `DeviceSetup.py -d esp32` or deleting `devices/DeviceSetup.h` (the `__has_include` fallback then takes over again).
 
-### 14.8 Defines the build relies on
+#### 14.8.1 Per-port capability flags
+
+The new `DEVICE_SUPPORTS_*` gates in the per-port `<board>_device_config.h` files keep the device-selection logic in `DeviceConfig.h` board-agnostic:
+
+| Macro | Defined by | Effect |
+|---|---|---|
+| `DEVICE_SUPPORTS_TLS` | esp8266 / esp32 device-config | Allows `ENABLE_TLS_SERVICE` to actually take effect — DeviceConfig auto-`#undef`s it on ports without this flag |
+| `DEVICE_SUPPORTS_CONTEXTUAL_EXECUTION` | esp8266 / esp32 device-config | Same shape as TLS — auto-undef when the port can't host cooperative/preemptive lanes |
+| `DEVICE_SUPPORTS_TLS_CERT_GENERATION` | esp32 device-config only | Gates `ENABLE_TLS_CERT_GENERATION` instead of the older `DEVICE_ESP32` hard-coding |
+| `MAX_DIGITAL_GPIO_PINS`, `MAX_ANALOG_GPIO_PINS`, `MAX_DB_TABLES` | each per-port device-config | Per-board limits, previously inlined in `DeviceConfig.h`'s `DEVICE_*` cascade |
+| `ENABLE_NETWORK_SERVICE`, `ENABLE_AUTH_SERVICE`, `ENABLE_STORAGE_SERVICE`, `ENABLE_GPIO_BASIC_ONLY` | each per-port device-config | Per-board defaults (e.g. AVR omits network/auth/storage; esp* enable them) |
+
+The contract: anything that's *truly* per-board lives in the per-port `<board>_device_config.h`; the central [DeviceConfig.h](devices/DeviceConfig.h) only carries cross-board feature flags and the `DEVICE_SUPPORTS_*` auto-undef chains. A new port just needs to set the right `DEVICE_SUPPORTS_*` macros and the framework's optional services fall in line.
+
+### 14.9 Defines the build relies on
 
 A handful of macros must reach every translation unit; the toolchain provides them:
 
@@ -3417,11 +3438,11 @@ A handful of macros must reach every translation unit; the toolchain provides th
 
 If you build outside Arduino IDE (PlatformIO, raw `make`), reproduce these defines and you'll be fine — the framework has no hidden compiler-flag dependencies beyond standard `-std=c++14` (or newer) with GCC variadic-macro extensions enabled.
 
-### 14.9 Editor support
+### 14.10 Editor support
 
 [.vscode/settings.json](.vscode/settings.json) ships only language associations so the PdiSTL headers (`vector`, `algorithm`, `basic_definitions`, …) are recognised as C++. No build tasks. If you want IntelliSense for the active device, add a `compile_commands.json` via `arduino-cli compile --output-dir ...` or use the Arduino IDE 2.0's built-in C++ language server.
 
-### 14.10 Reproducible builds and CI
+### 14.11 Reproducible builds and CI
 
 There is no CI configuration in the repo today. A minimal CI matrix would be:
 
@@ -3430,7 +3451,6 @@ matrix:
   device: [arduinouno, esp8266, esp32]
   flags:  [minimal, full]
 steps:
-  - git submodule update --init --recursive
   - python3 scripts/DeviceSetup.py -d ${{ matrix.device }}
   - sed flag edits into devices/DeviceConfig.h for "minimal"/"full"
   - arduino-cli compile --fqbn <fqbn for device> examples/PdiStack
@@ -3438,12 +3458,11 @@ steps:
 
 The framework is deterministic per `(device × flag-set)` — the codegen produces byte-identical output, and the `library.properties` `architectures` list bounds the matrix.
 
-### 14.11 Gotchas
+### 14.12 Gotchas
 
-- **Forgetting `git submodule update --init --recursive`** is the #1 build error reported by new contributors. The link error names `lfs_*` symbols; the fix is always the submodule.
-- **Forgetting the setup script** produces a missing-`DEVICE_*` error that surfaces as the mock device being selected, which then misses any header `ENABLE_NETWORK_SERVICE` references. Re-run `DeviceSetup.py -d <board>`.
-- **Switching boards without re-running setup.** `devices/DeviceSetup.h` keeps the *previous* device macro. Always re-run the script when changing target.
-- **Library installed from a tarball.** Some users download the GitHub "Code → Download ZIP". This skips submodules. Either clone with git, or download LittleFS separately and drop it under `external/littlefs/`.
+- **The default install is ESP32-only.** Without running the setup script, `devices/DeviceConfig.h`'s `__has_include` fallback selects `DEVICE_ESP32` and the ESP32 placeholder DB tables. If you flash an ESP8266 or AVR build without first running `DeviceSetup.py -d <board>`, the binary still compiles but contains ESP32-shaped table addresses and feature flags — and will misbehave at runtime against the actual hardware. Always run the script when switching off the ESP32 default.
+- **Switching boards without re-running setup.** `devices/DeviceSetup.h` keeps the *previous* device macro. Either re-run `DeviceSetup.py -d <new-board>`, or delete `devices/DeviceSetup.h` to fall back to the ESP32 default.
+- **Stale generated table headers after a board switch.** `CreateDBSourceFromJson.py` wipes and rewrites `src/database/tables/` for the active target. If you switch from a custom port back to ESP32 and forget to re-run the script, the previously generated headers stay in place — they're git-ignored at that point and won't be restored by `git pull`. Re-run the script (or `git checkout src/database/tables/` to restore the ESP32 placeholders).
 - **`dot_a_linkage=true` masks weak-symbol bugs.** If two TUs define the same global non-`weak` symbol, the linker error is friendly with object-file linkage and obscure with archive linkage. When you see "multiple definition" only on a release build, it's usually from `.a` linkage hiding a one-instance-per-device singleton violation.
 - **`clang-format` is optional but recommended.** Without it, generated tables look ugly but compile; with it, they match the rest of the repo.
 - **The IDE bundles its own arduino-cli.** If you `pip install` or `brew install` a separate `arduino-cli` for scripting, the version mismatch can produce different binary output between the IDE and CI. Pin both.
@@ -3853,30 +3872,22 @@ This section bundles the most common problems contributors and integrators hit, 
 ### 17.1 Build & flash problems
 
 **`undefined reference to lfs_*` at link time.**
-You skipped the LittleFS submodule. From the repo root:
-```
-git submodule update --init --recursive
-```
-See [§14.11](#14-build--toolchain).
+You're on an old checkout that still expects the LittleFS submodule. LittleFS is now vendored under [external/littlefs/](external/littlefs/) — pull `main` to get the in-tree sources. See [§14.6](#146-vendored-externals).
 
 **`fatal error: DeviceSetup.h: No such file or directory`.**
-The setup script hasn't been run. From the [scripts/](scripts/) directory:
-```
-python3 DeviceSetup.py -d <board>      # esp8266 / esp32 / arduinouno
-```
-See [§14.3](#14-build--toolchain).
+You're on an old checkout that still hard-required `DeviceSetup.h`. The current header uses `#if __has_include("DeviceSetup.h")` to fall back to ESP32. Pull `main`, or run the setup script if you want a non-default target: `python3 DeviceSetup.py -d <board>`. See [§14.3](#14-build--toolchain).
+
+**Build succeeds against ESP8266 / UNO but device misbehaves at runtime.**
+You installed via Library Manager (or copied a fresh repo) without running `DeviceSetup.py -d <board>` for the actual target. The ESP32 fallback in `DeviceConfig.h` produced an ESP32-shaped binary. Run the setup script for your target board. See [§14.12](#1412-gotchas).
 
 **Build succeeds, but `srvc l` lists no services and the AP never appears.**
-`devices/DeviceSetup.h` still points at the wrong device — usually because you switched boards without re-running the setup script. Re-run with the new `-d <board>`. See [§14.11](#14-build--toolchain).
+`devices/DeviceSetup.h` still points at the wrong device — usually because you switched boards without re-running the setup script. Re-run with the new `-d <board>`, or `rm devices/DeviceSetup.h` to fall back to ESP32. See [§14.12](#1412-gotchas).
 
 **`multiple definition of __i_<x>` link error.**
 Two ports defined the same singleton, or you referenced a `devices/<board>/*.cpp` from somewhere other than its aggregator. Per [§2.4](#2-device-layer--porting-guide), each device translation unit must be reached through exactly one `.cpp`-include chain.
 
 **`fatal error: esp_wifi.h: No such file or directory` building for AVR.**
 A vendor-specific header leaked above the device layer. The fix is to push that include down into `devices/<board>/`. See [§16.11](#16-extending-the-framework).
-
-**Library Manager rejects the install or compiles for the wrong arch.**
-Library Manager isn't supported today — only manual clone + submodule + script. The three blockers are detailed in [§14.7](#14-build--toolchain).
 
 **Compile error mentioning `pdiutil::function` / `pdiutil::vector` on an obscure target.**
 The host compiler is missing GCC's variadic-macro / variadic-template extensions used in [PdiSTL](src/utility/pdistl/). Switch to a GCC-based toolchain. See [§12.9](#12-logger), [§11.11](#11-utility-library).
