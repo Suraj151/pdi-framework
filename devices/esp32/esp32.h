@@ -21,16 +21,11 @@ created Date    : 1st Jan 2024
 #include <ping/ping.h>
 #include <esp_event.h>
 #include <Print.h>
-#include <SPIFFS.h>
 
 
-#include <FS.h>
 #include <Ticker.h>
-#include <HTTPClient.h>
 #include <IPAddress.h>
-#include <WiFiClient.h>
 #include <WiFi.h>
-#include <HTTPUpdate.h>
 #include <utility/DataTypeDef.h>
 #include "esp_partition.h" // Include ESP32 partition API
 

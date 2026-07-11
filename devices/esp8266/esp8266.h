@@ -17,12 +17,10 @@ created Date    : 1st Jan 2024
 
 #include <FS.h>
 #include <Ticker.h>
-#include <ESP8266HTTPClient.h>
 #include <IPAddress.h>
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include <ESP8266WiFi.h>
-#include <ESP8266httpUpdate.h>
 #include <utility/DataTypeDef.h>
 #include "flash_hal.h"
 

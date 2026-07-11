@@ -46,6 +46,7 @@ class OtaServiceProvider : public ServiceProvider{
     bool initService(void *arg = nullptr) override;
     void handleOta();
     http_ota_status handle();
+    void setHttpHost(const char* _host);
     void printConfigToTerminal(iTerminalInterface *terminal) override;
 
     /**

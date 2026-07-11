@@ -14,6 +14,10 @@ created Date    : 1st June 2019
 
 #include "GpioServiceProvider.h"
 
+#ifdef ENABLE_DEVICE_IOT
+#include <service_provider/iot/DeviceIotServiceProvider.h>
+#endif
+
 
 #ifndef ENABLE_GPIO_BASIC_ONLY
 __gpio_event_track_t __gpio_event_track = {
@@ -109,11 +113,13 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isEventPost ){
       posturl.replace( mac_index, 5, __i_dvc_ctrl.getDeviceMac().c_str() );
     }
 
+#ifdef ENABLE_DEVICE_IOT
     pdiutil::string::size_type duid_index = posturl.find("[duid]");
     if( pdiutil::string::npos != duid_index )
     {
-      posturl.replace( duid_index, 6, m_device_id.c_str() );
+      posturl.replace( duid_index, 6, __device_iot_service.getDeviceId() );
     }
+#endif
 
     pdiutil::string *_payload = new pdiutil::string();
 
@@ -169,12 +175,13 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
 
 #ifdef ENABLE_DEVICE_IOT
 
-  if( m_device_id.size() > 0 ){
+  const char* _duid = __device_iot_service.getDeviceId();
+  if( _duid && _duid[0] != '\0' ){
 
     _payload += "\"";
     _payload += GPIO_PAYLOAD_DUID_KEY;
     _payload += CHARPTR_WRAP("\":\"");
-    _payload += m_device_id.c_str();
+    _payload += _duid;
     _payload += CHARPTR_WRAP("\",");
   }
 #endif
@@ -466,16 +473,6 @@ void GpioServiceProvider::applyGpioEventJsonPayload( char* _payload, uint16_t _p
 }
 #endif
 
-/**
- * Set the device id
- *
- * @param const char* _id
- */
-void GpioServiceProvider::setDeviceId(const char* _id){
-
-  m_device_id = _id;
-}
-
 #ifndef ENABLE_GPIO_BASIC_ONLY
 /**
  * Set the Http host for gpio data/events
@@ -484,9 +481,12 @@ void GpioServiceProvider::setDeviceId(const char* _id){
  */
 void GpioServiceProvider::setHttpHost(const char* _host){
 
-  if( strlen(_host) < GPIO_HOST_BUF_SIZE ){
+  int16_t len = strlen(_host);
 
-    memcpy( this->m_gpio_config_copy.gpio_host, _host, strlen(_host) );
+  if( len < GPIO_HOST_BUF_SIZE ){
+
+    memset(this->m_gpio_config_copy.gpio_host, 0, GPIO_HOST_BUF_SIZE);
+    memcpy( this->m_gpio_config_copy.gpio_host, _host, len );
     this->m_update_gpio_table_from_copy = true;
   }
 }

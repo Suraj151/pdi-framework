@@ -23,6 +23,7 @@ TlsServerInterface::TlsServerInterface() :
     m_serverPcb(nullptr),
     m_clientPcb(nullptr),
     m_timeout(30000),
+    m_pendingSince(0),
     m_hasClient(false),
     m_onAcceptCallbk(nullptr),
     m_onAcceptCallbkArg(nullptr) {}
@@ -74,6 +75,7 @@ void TlsServerInterface::close() {
         tcp_arg(m_clientPcb, nullptr);
         tcp_sent(m_clientPcb, nullptr);
         tcp_recv(m_clientPcb, nullptr);
+        tcp_poll(m_clientPcb, nullptr, 0);
         tcp_err(m_clientPcb, nullptr);
         tcp_close(m_clientPcb);
         m_clientPcb = nullptr;
@@ -107,9 +109,15 @@ iClientInterface* TlsServerInterface::accept() {
         TCP_GUARD_END
         return nullptr;
     }
-    m_hasClient = false;
     struct tcp_pcb* acceptedPcb = m_clientPcb;
-    m_clientPcb = nullptr;
+    m_clientPcb    = nullptr;
+    m_hasClient    = false;
+    m_pendingSince = 0;
+
+    tcp_arg (acceptedPcb, nullptr);
+    tcp_recv(acceptedPcb, nullptr);
+    tcp_err (acceptedPcb, nullptr);
+    tcp_poll(acceptedPcb, nullptr, 0);
     TCP_GUARD_END
 
     TlsClientInterface* client = pdiutil::safe_new<TlsClientInterface>(acceptedPcb);
@@ -151,8 +159,51 @@ bool TlsServerInterface::setClientCertificateAuthorityPath(const char* path) {
 void TlsServerInterface::onPendingError(void* arg, err_t /*err*/) {
     TlsServerInterface* server = static_cast<TlsServerInterface*>(arg);
     if (!server) return;
-    server->m_clientPcb = nullptr;
-    server->m_hasClient = false;
+    server->m_clientPcb    = nullptr;
+    server->m_hasClient    = false;
+    server->m_pendingSince = 0;
+}
+
+err_t TlsServerInterface::onPendingRecv(void* arg, struct tcp_pcb* pcb, struct pbuf* p, err_t /*err*/) {
+    TlsServerInterface* server = static_cast<TlsServerInterface*>(arg);
+    if (!server || !pcb) return ERR_ARG;
+
+    if (p == nullptr) {
+        if (server->m_clientPcb == pcb) {
+            server->m_clientPcb    = nullptr;
+            server->m_hasClient    = false;
+            server->m_pendingSince = 0;
+        }
+        tcp_arg (pcb, nullptr);
+        tcp_recv(pcb, nullptr);
+        tcp_err (pcb, nullptr);
+        tcp_poll(pcb, nullptr, 0);
+        tcp_close(pcb);
+        return ERR_OK;
+    }
+
+    return ERR_MEM;
+}
+
+err_t TlsServerInterface::onPendingPoll(void* arg, struct tcp_pcb* pcb) {
+    TlsServerInterface* server = static_cast<TlsServerInterface*>(arg);
+    if (!server || !pcb) return ERR_ABRT;
+
+    if (server->m_clientPcb == pcb &&
+        server->m_timeout > 0 &&
+        (millis() - server->m_pendingSince) > server->m_timeout) {
+
+        server->m_clientPcb    = nullptr;
+        server->m_hasClient    = false;
+        server->m_pendingSince = 0;
+        tcp_arg (pcb, nullptr);
+        tcp_recv(pcb, nullptr);
+        tcp_err (pcb, nullptr);
+        tcp_poll(pcb, nullptr, 0);
+        tcp_abort(pcb);
+        return ERR_ABRT;
+    }
+    return ERR_OK;
 }
 
 err_t TlsServerInterface::onAccept(void* arg, struct tcp_pcb* newpcb, err_t /*err*/) {
@@ -160,16 +211,25 @@ err_t TlsServerInterface::onAccept(void* arg, struct tcp_pcb* newpcb, err_t /*er
     if (!server || !newpcb) return ERR_VAL;
 
     if (server->m_clientPcb) {
-        tcp_arg(server->m_clientPcb, nullptr);
-        tcp_err(server->m_clientPcb, nullptr);
-        tcp_abort(server->m_clientPcb);
+        struct tcp_pcb* old = server->m_clientPcb;
+        server->m_clientPcb    = nullptr;
+        server->m_hasClient    = false;
+        server->m_pendingSince = 0;
+        tcp_arg (old, nullptr);
+        tcp_recv(old, nullptr);
+        tcp_err (old, nullptr);
+        tcp_poll(old, nullptr, 0);
+        tcp_abort(old);
     }
 
-    server->m_clientPcb = newpcb;
-    server->m_hasClient = true;
+    server->m_clientPcb    = newpcb;
+    server->m_hasClient    = true;
+    server->m_pendingSince = millis();
 
-    tcp_arg(newpcb, server);
-    tcp_err(newpcb, &TlsServerInterface::onPendingError);
+    tcp_arg (newpcb, server);
+    tcp_err (newpcb, &TlsServerInterface::onPendingError);
+    tcp_recv(newpcb, &TlsServerInterface::onPendingRecv);
+    tcp_poll(newpcb, &TlsServerInterface::onPendingPoll, 4);
 
     if (server->m_onAcceptCallbk) {
         server->m_onAcceptCallbk(server->m_onAcceptCallbkArg);

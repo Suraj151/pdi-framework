@@ -83,10 +83,13 @@ public:
 private:
     static err_t onAccept(void* arg, struct tcp_pcb* newpcb, err_t err);
     static void  onPendingError(void* arg, err_t err);
+    static err_t onPendingRecv(void* arg, struct tcp_pcb* pcb, struct pbuf* p, err_t err);
+    static err_t onPendingPoll(void* arg, struct tcp_pcb* pcb);
 
     struct tcp_pcb* m_serverPcb;
     struct tcp_pcb* m_clientPcb;
     uint32_t m_timeout;
+    uint32_t m_pendingSince;
     bool     m_hasClient;
 
     pdiutil::string m_serverCertPath;

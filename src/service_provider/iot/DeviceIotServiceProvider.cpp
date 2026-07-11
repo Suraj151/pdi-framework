@@ -13,6 +13,10 @@ created Date    : 1st June 2019
 
 #include "DeviceIotServiceProvider.h"
 
+#ifdef ENABLE_OTA_SERVICE
+#include <service_provider/device/OtaServiceProvider.h>
+#endif
+
 /**
  * DeviceIotServiceProvider constructor.
  */
@@ -524,10 +528,13 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
     allowed_interface_list.insert(allowed_interface_list.end(), this->m_server_configurable_interface_write.begin(), this->m_server_configurable_interface_write.end());
 
     #if defined( ENABLE_GPIO_SERVICE )
-    __gpio_service.setDeviceId(this->m_device_iot_configs.device_iot_duid);
     __gpio_service.setHttpHost(this->m_device_iot_configs.device_iot_host);
     __gpio_service.m_gpio_config_copy.clearAllGpioEvents();
     __gpio_service.applyGpioEventJsonPayload(_value_buff, strlen(_value_buff), &allowed_interface_list);
+    #endif
+
+    #if defined( ENABLE_OTA_SERVICE )
+    __ota_service.setHttpHost(this->m_device_iot_configs.device_iot_host);
     #endif
   }
 
@@ -572,6 +579,10 @@ void DeviceIotServiceProvider::initDeviceIotSensor( iDeviceIotInterface *_device
   if( nullptr != this->m_device_iot ){
     this->beginSensorData();
   }
+}
+
+const char* DeviceIotServiceProvider::getDeviceId() const {
+  return this->m_device_iot_configs.device_iot_duid;
 }
 
 /**

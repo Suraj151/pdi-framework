@@ -18,6 +18,16 @@ created Date    : 1st Jan 2024
 #include "threading/Preemptive.h"
 #endif
 
+#ifdef ENABLE_HTTP_CLIENT
+#include <transports/http/HTTPClient.h>
+#endif
+
+#if defined(MAKE_STORAGE_DEPENDENT_OTA_UPGRADE)
+#else
+#include <ESP8266HTTPClient.h>
+#include <ESP8266httpUpdate.h>
+#endif
+
 /**
  * DeviceControlInterface constructor.
  */
@@ -451,6 +461,48 @@ void DeviceControlInterface::yield()
  */
 upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *version)
 {
+    (void)version;
+
+    if (nullptr == path) {
+        return UPGRADE_STATUS_FAILED;
+    }
+    
+#if defined(MAKE_STORAGE_DEPENDENT_OTA_UPGRADE)
+
+    int64_t file_size = __i_fs.getFileSize(path);
+    if (file_size <= 0) {
+        LogFmtE("DEVICE_UPGRADE_FILE_MISSING : %d\n", (int)file_size);
+        return UPGRADE_STATUS_FAILED;
+    }
+
+    if (!Update.begin((size_t)file_size, U_FLASH)) {
+        LogFmtE("DEVICE_UPGRADE_BEGIN_FAILED : %d\n", (int)Update.getError());
+        return UPGRADE_STATUS_FAILED;
+    }
+
+    bool write_ok = true;
+    int64_t bytes_read = __i_fs.readFile(path, 1024, [&](char *data, uint32_t sz) -> bool {
+        __i_dvc_ctrl.yield();
+        size_t written = Update.write((uint8_t*)data, sz);
+        if (written != sz) { write_ok = false; return false; }
+        return true;
+    });
+
+    if (bytes_read != file_size) {
+        LogFmtE("DEVICE_UPGRADE_READ_SHORT : %d/%d\n", (int)bytes_read, (int)file_size);
+        write_ok = false;
+    }
+
+    if (!write_ok || !Update.end(false)) {
+        LogFmtE("DEVICE_UPGRADE_END_FAILED : %d\n", (int)Update.getError());
+        return UPGRADE_STATUS_FAILED;
+    }
+
+    LogS("DEVICE_UPGRADE_OK\n");
+    return UPGRADE_STATUS_SUCCESS;
+
+#else
+
     String binary_path = path;
     upgrade_status_t status = UPGRADE_STATUS_MAX;
     WiFiClient _wifi_client;
@@ -458,7 +510,15 @@ upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *v
 #ifdef ENABLE_WIFI_SERVICE
     ESPhttpUpdate.rebootOnUpdate(false);
     ESPhttpUpdate.followRedirects(true);
-    ESPhttpUpdate.setAuthorization("ota", __i_dvc_ctrl.getDeviceMac().c_str());
+
+    char *base64_encoded_auth = new char[300];
+    if(nullptr != base64_encoded_auth)
+    {
+        Http_Client::BuildBasicAuthorization("ota", __i_dvc_ctrl.getDeviceMac().c_str(), base64_encoded_auth, 300);
+        ESPhttpUpdate.setAuthorization((const char*)base64_encoded_auth);
+        delete []base64_encoded_auth;
+    }
+
     t_httpUpdate_return ret = ESPhttpUpdate.update( _wifi_client, binary_path );
 
     if( ret == HTTP_UPDATE_FAILED ){
@@ -481,6 +541,8 @@ upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *v
 #endif
 
     return status;
+
+#endif
 }
 
 DeviceControlInterface __i_dvc_ctrl;

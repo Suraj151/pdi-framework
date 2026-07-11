@@ -46,7 +46,6 @@ public:
   #ifndef ENABLE_GPIO_BASIC_ONLY
   void applyGpioEventJsonPayload(char *_payload, uint16_t _payload_length, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);
   #endif
-  void setDeviceId(const char* _id);
   #ifndef ENABLE_GPIO_BASIC_ONLY
   void setHttpHost(const char* _host);
   #endif
@@ -84,11 +83,6 @@ protected:
 #endif
 
   iGpioBlinkerInterface *m_digital_blinker[MAX_DIGITAL_GPIO_PINS];
-
-  /**
-   * @var	device unique id
-   */
-  pdiutil::string m_device_id;
 };
 
 extern GpioServiceProvider __gpio_service;

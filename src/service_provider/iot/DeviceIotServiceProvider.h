@@ -46,6 +46,7 @@ class DeviceIotServiceProvider : public ServiceProvider {
     void beginSensorData( void );
     void handleSensorData( void );
     void initDeviceIotSensor( iDeviceIotInterface *_device );
+    const char* getDeviceId() const;
     void printConfigToTerminal(iTerminalInterface *terminal) override;
 
     /**

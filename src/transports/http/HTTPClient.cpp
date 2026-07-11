@@ -183,7 +183,12 @@ void http_resp_t::clear()
 /**
  * Constructor
  */
-Http_Client::Http_Client() : m_client(nullptr)
+Http_Client::Http_Client() :
+    m_client(nullptr)
+#ifdef ENABLE_STORAGE_SERVICE
+    , m_stream_to_file(false)
+    , m_stream_bytes_written(0)
+#endif
 {
 }
 
@@ -762,6 +767,7 @@ int16_t Http_Client::handleResponse()
         // Process the response
         if (m_response.resp_length)
         {
+            max_timeout = HTTP_CLIENT_MAX_READ_MS;
             // LogFmtI("ReadResponse (%d) : %s\r\n", m_response.resp_length, m_response.response);
             // trim response
             char* line = __strtrim(buf);
@@ -802,6 +808,14 @@ int16_t Http_Client::handleResponse()
             if (-1 == headerSeperatorIndex && line_len == 0)
             {
                 header_ends = true;
+
+#ifdef ENABLE_STORAGE_SERVICE
+                if (m_stream_to_file && HTTP_RESP_OK == m_response.status_code)
+                {
+                    streamBodyToFile(max_timeout);
+                    break;
+                }
+#endif
 
                 char *transferencoding = nullptr;
                 if(GetHeader(HTTP_HEADER_KEY_TRANSFER_ENCODING, transferencoding, false)){
@@ -845,5 +859,149 @@ int16_t Http_Client::handleResponse()
 
     return m_response.status_code;
 }
+
+#ifdef ENABLE_STORAGE_SERVICE
+
+int64_t Http_Client::DownloadFile(const char *url, const char *dest_path)
+{
+    if (nullptr == url || nullptr == dest_path) return -1;
+    if (m_stream_to_file) return -1;
+
+    m_stream_to_file       = true;
+    m_stream_dest_path     = dest_path;
+    m_stream_bytes_written = 0;
+
+    int16_t status = SendRequest("GET", url);
+
+    m_stream_to_file = false;
+    m_stream_dest_path.clear();
+
+    if (HTTP_RESP_OK == status) return m_stream_bytes_written;
+    if (HTTP_RESP_MAX == status) return -1;
+    return -(int64_t)status;
+}
+
+bool Http_Client::streamBodyToFile(int32_t &max_timeout)
+{
+    const uint16_t scratch_size = 1024;
+    uint8_t *scratch = new uint8_t[scratch_size];
+    if (nullptr == scratch) return false;
+
+    const char *path = m_stream_dest_path.c_str();
+
+    char *content_length_hdr = nullptr;
+    int64_t content_length = -1;
+    if (GetHeader(HTTP_HEADER_KEY_CONTENT_LENGTH, content_length_hdr, false) && nullptr != content_length_hdr) {
+        content_length = (int64_t)StringToUint64(content_length_hdr);
+    }
+
+    if (content_length > 0) {
+        uint64_t free_size = __i_fs.getFreeSize();
+        if ((uint64_t)content_length > free_size) {
+            LogFmtE("Http_Client: download %u exceeds fs free %u\n", (unsigned)content_length, (unsigned)free_size);
+            delete[] scratch;
+            return false;
+        }
+    }
+
+    char *transferencoding = nullptr;
+    bool is_chunked = false;
+    if (GetHeader(HTTP_HEADER_KEY_TRANSFER_ENCODING, transferencoding, false) && nullptr != transferencoding) {
+        is_chunked = __are_arrays_equal(transferencoding, "chunked", strlen(transferencoding));
+    }
+
+    bool ok = true;
+    int last_logged_pct = 0;
+
+    if (is_chunked) {
+
+        while (ok && m_client && Connected() && max_timeout > 0) {
+
+            __i_dvc_ctrl.yield();
+
+            char sizeLine[32];
+            int slen = readPacket(m_client, (uint8_t*)sizeLine, sizeof(sizeLine) - 1, max_timeout, '\n');
+            if (slen <= 0) { ok = false; break; }
+            max_timeout = HTTP_CLIENT_MAX_READ_MS;
+            sizeLine[slen] = '\0';
+            uint32_t chunk_size = StringToHex16(sizeLine, slen >= 2 ? slen - 2 : slen);
+            if (chunk_size == 0) break;
+
+            uint32_t remaining = chunk_size;
+            while (remaining > 0 && ok) {
+                __i_dvc_ctrl.yield();
+                uint16_t want = remaining > scratch_size ? scratch_size : (uint16_t)remaining;
+                uint16_t got  = readPacket(m_client, scratch, want, max_timeout, 0);
+                if (got == 0) { ok = false; break; }
+                max_timeout = HTTP_CLIENT_MAX_READ_MS;
+                int written = __i_fs.writeFile(path, (const char*)scratch, got, true);
+                if (written != (int)got) {
+                    LogFmtE("Http_Client: writeFile failed (%d/%u)\n", written, (unsigned)got);
+                    ok = false;
+                    break;
+                }
+                m_stream_bytes_written += got;
+                remaining -= got;
+
+                if (content_length > 0) {
+                    int pct = (int)((m_stream_bytes_written * 100) / content_length);
+                    if (pct >= last_logged_pct + 10) {
+                        LogFmtI("Http_Client: download %u%\n", (unsigned)pct);
+                        last_logged_pct = pct;
+                    }
+                }
+            }
+
+            uint8_t crlf[2];
+            readPacket(m_client, crlf, 2, max_timeout, 0);
+        }
+
+    } else {
+
+        int64_t remaining = (content_length >= 0) ? content_length : INT64_MAX;
+
+        while (ok && remaining > 0 && m_client && max_timeout > 0) {
+
+            __i_dvc_ctrl.yield();
+            uint32_t iter_start = __i_dvc_ctrl.millis_now();
+
+            uint16_t want = (uint64_t)remaining > scratch_size ? scratch_size : (uint16_t)remaining;
+            uint16_t got  = readPacket(m_client, scratch, want, max_timeout, 0);
+
+            if (got == 0) {
+                if (content_length < 0) break;
+                if (!Connected()) break;
+                max_timeout -= (int32_t)(__i_dvc_ctrl.millis_now() - iter_start);
+                continue;
+            }
+            max_timeout = HTTP_CLIENT_MAX_READ_MS;
+
+            int written = __i_fs.writeFile(path, (const char*)scratch, got, true);
+            if (written != (int)got) {
+                LogFmtE("Http_Client: writeFile failed (%d/%u)\n", written, (unsigned)got);
+                ok = false;
+                break;
+            }
+            m_stream_bytes_written += got;
+            if (content_length >= 0) remaining -= got;
+
+            if (content_length > 0) {
+                int pct = (int)((m_stream_bytes_written * 100) / content_length);
+                if (pct >= last_logged_pct + 10) {
+                    LogFmtI("Http_Client: download %u%\n", (unsigned)pct);
+                    last_logged_pct = pct;
+                }
+            }
+        }
+    }
+
+    delete[] scratch;
+
+    if (ok && content_length >= 0 && m_stream_bytes_written < content_length) ok = false;
+
+    return ok;
+}
+
+#endif
 
 #endif

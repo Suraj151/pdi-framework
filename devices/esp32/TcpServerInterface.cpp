@@ -20,9 +20,10 @@ created Date    : 1st May 2025
 
 
 TcpServerInterface::TcpServerInterface():
-    m_serverPcb(nullptr), 
-    m_clientPcb(nullptr), 
-    m_timeout(30000), 
+    m_serverPcb(nullptr),
+    m_clientPcb(nullptr),
+    m_timeout(30000),
+    m_pendingSince(0),
     m_hasClient(false),
     m_onAcceptCallbk(nullptr),
     m_onAcceptCallbkArg(nullptr) {}
@@ -77,6 +78,7 @@ void TcpServerInterface::close() {
         tcp_arg(m_clientPcb, nullptr);
         tcp_sent(m_clientPcb, nullptr);
         tcp_recv(m_clientPcb, nullptr);
+        tcp_poll(m_clientPcb, nullptr, 0);
         tcp_err(m_clientPcb, nullptr);
         tcp_close(m_clientPcb);
         m_clientPcb = nullptr;
@@ -117,9 +119,16 @@ bool TcpServerInterface::hasClient() const {
 iClientInterface* TcpServerInterface::accept() {
     TCP_GUARD_BEGIN
     if (m_hasClient && m_clientPcb) {
-        m_hasClient = false;
         struct tcp_pcb* pcb = m_clientPcb;
-        m_clientPcb = nullptr;
+        m_clientPcb    = nullptr;
+        m_hasClient    = false;
+        m_pendingSince = 0;
+
+        tcp_arg (pcb, nullptr);
+        tcp_recv(pcb, nullptr);
+        tcp_err (pcb, nullptr);
+        tcp_poll(pcb, nullptr, 0);
+
         TCP_GUARD_END
         return new TcpClientInterface(pcb);
     }
@@ -138,8 +147,51 @@ void TcpServerInterface::setTimeout(uint32_t timeout_ms) {
 void TcpServerInterface::onPendingError(void* arg, err_t /*err*/) {
     TcpServerInterface* server = static_cast<TcpServerInterface*>(arg);
     if (!server) return;
-    server->m_clientPcb = nullptr;
-    server->m_hasClient = false;
+    server->m_clientPcb    = nullptr;
+    server->m_hasClient    = false;
+    server->m_pendingSince = 0;
+}
+
+err_t TcpServerInterface::onPendingRecv(void* arg, struct tcp_pcb* pcb, struct pbuf* p, err_t /*err*/) {
+    TcpServerInterface* server = static_cast<TcpServerInterface*>(arg);
+    if (!server || !pcb) return ERR_ARG;
+
+    if (p == nullptr) {
+        if (server->m_clientPcb == pcb) {
+            server->m_clientPcb    = nullptr;
+            server->m_hasClient    = false;
+            server->m_pendingSince = 0;
+        }
+        tcp_arg (pcb, nullptr);
+        tcp_recv(pcb, nullptr);
+        tcp_err (pcb, nullptr);
+        tcp_poll(pcb, nullptr, 0);
+        tcp_close(pcb);
+        return ERR_OK;
+    }
+
+    return ERR_MEM;
+}
+
+err_t TcpServerInterface::onPendingPoll(void* arg, struct tcp_pcb* pcb) {
+    TcpServerInterface* server = static_cast<TcpServerInterface*>(arg);
+    if (!server || !pcb) return ERR_ABRT;
+
+    if (server->m_clientPcb == pcb &&
+        server->m_timeout > 0 &&
+        (millis() - server->m_pendingSince) > server->m_timeout) {
+
+        server->m_clientPcb    = nullptr;
+        server->m_hasClient    = false;
+        server->m_pendingSince = 0;
+        tcp_arg (pcb, nullptr);
+        tcp_recv(pcb, nullptr);
+        tcp_err (pcb, nullptr);
+        tcp_poll(pcb, nullptr, 0);
+        tcp_abort(pcb);
+        return ERR_ABRT;
+    }
+    return ERR_OK;
 }
 
 /**
@@ -153,23 +205,27 @@ err_t TcpServerInterface::onAccept(void* arg, struct tcp_pcb* newpcb, err_t err)
     TcpServerInterface* server = static_cast<TcpServerInterface*>(arg);
     if (!server || !newpcb) return ERR_VAL;
 
-    // Only allow one client at a time for simplicity
     if (server->m_clientPcb) {
-        tcp_arg(server->m_clientPcb, nullptr);
-        tcp_err(server->m_clientPcb, nullptr);
-        tcp_abort(server->m_clientPcb);
+        struct tcp_pcb* old = server->m_clientPcb;
+        server->m_clientPcb    = nullptr;
+        server->m_hasClient    = false;
+        server->m_pendingSince = 0;
+        tcp_arg (old, nullptr);
+        tcp_recv(old, nullptr);
+        tcp_err (old, nullptr);
+        tcp_poll(old, nullptr, 0);
+        tcp_abort(old);
     }
 
-    server->m_clientPcb = newpcb;
-    server->m_hasClient = true;
+    server->m_clientPcb    = newpcb;
+    server->m_hasClient    = true;
+    server->m_pendingSince = millis();
 
-    // Optionally set keepalive or other options here
-    // newpcb->so_options |= SOF_KEEPALIVE;
+    tcp_arg (newpcb, server);
+    tcp_err (newpcb, &TcpServerInterface::onPendingError);
+    tcp_recv(newpcb, &TcpServerInterface::onPendingRecv);
+    tcp_poll(newpcb, &TcpServerInterface::onPendingPoll, 4);
 
-    tcp_arg(newpcb, server);
-    tcp_err(newpcb, &TcpServerInterface::onPendingError);
-
-    // trigger the callback if registered
     if( server->m_onAcceptCallbk ){
         server->m_onAcceptCallbk(server->m_onAcceptCallbkArg);
     }
