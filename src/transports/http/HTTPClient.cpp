@@ -184,11 +184,9 @@ void http_resp_t::clear()
  * Constructor
  */
 Http_Client::Http_Client() :
-    m_client(nullptr)
-#ifdef ENABLE_STORAGE_SERVICE
-    , m_stream_to_file(false)
-    , m_stream_bytes_written(0)
-#endif
+    m_client(nullptr),
+    m_stream_writer(nullptr),
+    m_stream_bytes_written(0)
 {
 }
 
@@ -809,13 +807,11 @@ int16_t Http_Client::handleResponse()
             {
                 header_ends = true;
 
-#ifdef ENABLE_STORAGE_SERVICE
-                if (m_stream_to_file && HTTP_RESP_OK == m_response.status_code)
+                if (m_stream_writer && HTTP_RESP_OK == m_response.status_code)
                 {
-                    streamBodyToFile(max_timeout);
+                    streamBodyTo(max_timeout);
                     break;
                 }
-#endif
 
                 char *transferencoding = nullptr;
                 if(GetHeader(HTTP_HEADER_KEY_TRANSFER_ENCODING, transferencoding, false)){
@@ -860,34 +856,28 @@ int16_t Http_Client::handleResponse()
     return m_response.status_code;
 }
 
-#ifdef ENABLE_STORAGE_SERVICE
-
-int64_t Http_Client::DownloadFile(const char *url, const char *dest_path)
+int64_t Http_Client::DownloadStream(const char *url, CallBackBytesArgBoolRetFn writer)
 {
-    if (nullptr == url || nullptr == dest_path) return -1;
-    if (m_stream_to_file) return -1;
+    if (nullptr == url || !writer) return -1;
+    if (m_stream_writer) return -1;
 
-    m_stream_to_file       = true;
-    m_stream_dest_path     = dest_path;
+    m_stream_writer        = writer;
     m_stream_bytes_written = 0;
 
     int16_t status = SendRequest("GET", url);
 
-    m_stream_to_file = false;
-    m_stream_dest_path.clear();
+    m_stream_writer = nullptr;
 
     if (HTTP_RESP_OK == status) return m_stream_bytes_written;
     if (HTTP_RESP_MAX == status) return -1;
     return -(int64_t)status;
 }
 
-bool Http_Client::streamBodyToFile(int32_t &max_timeout)
+bool Http_Client::streamBodyTo(int32_t &max_timeout)
 {
     const uint16_t scratch_size = 1024;
     uint8_t *scratch = new uint8_t[scratch_size];
-    if (nullptr == scratch) return false;
-
-    const char *path = m_stream_dest_path.c_str();
+    if (nullptr == scratch || !m_stream_writer) return false;
 
     char *content_length_hdr = nullptr;
     int64_t content_length = -1;
@@ -895,19 +885,16 @@ bool Http_Client::streamBodyToFile(int32_t &max_timeout)
         content_length = (int64_t)StringToUint64(content_length_hdr);
     }
 
-    if (content_length > 0) {
-        uint64_t free_size = __i_fs.getFreeSize();
-        if ((uint64_t)content_length > free_size) {
-            LogFmtE("Http_Client: download %u exceeds fs free %u\n", (unsigned)content_length, (unsigned)free_size);
-            delete[] scratch;
-            return false;
-        }
-    }
-
     char *transferencoding = nullptr;
     bool is_chunked = false;
     if (GetHeader(HTTP_HEADER_KEY_TRANSFER_ENCODING, transferencoding, false) && nullptr != transferencoding) {
         is_chunked = __are_arrays_equal(transferencoding, "chunked", strlen(transferencoding));
+    }
+
+    uint32_t size_hint = (content_length > 0) ? (uint32_t)content_length : 0;
+    if (!m_stream_writer(nullptr, size_hint)) {
+        delete[] scratch;
+        return false;
     }
 
     bool ok = true;
@@ -934,9 +921,8 @@ bool Http_Client::streamBodyToFile(int32_t &max_timeout)
                 uint16_t got  = readPacket(m_client, scratch, want, max_timeout, 0);
                 if (got == 0) { ok = false; break; }
                 max_timeout = HTTP_CLIENT_MAX_READ_MS;
-                int written = __i_fs.writeFile(path, (const char*)scratch, got, true);
-                if (written != (int)got) {
-                    LogFmtE("Http_Client: writeFile failed (%d/%u)\n", written, (unsigned)got);
+                if (!m_stream_writer(scratch, got)) {
+                    LogFmtE("Http_Client: writer rejected %u bytes\n", (unsigned)got);
                     ok = false;
                     break;
                 }
@@ -945,7 +931,7 @@ bool Http_Client::streamBodyToFile(int32_t &max_timeout)
 
                 if (content_length > 0) {
                     int pct = (int)((m_stream_bytes_written * 100) / content_length);
-                    if (pct >= last_logged_pct + 10) {
+                    if (pct >= last_logged_pct + 1) {
                         LogFmtI("Http_Client: download %u%\n", (unsigned)pct);
                         last_logged_pct = pct;
                     }
@@ -976,9 +962,8 @@ bool Http_Client::streamBodyToFile(int32_t &max_timeout)
             }
             max_timeout = HTTP_CLIENT_MAX_READ_MS;
 
-            int written = __i_fs.writeFile(path, (const char*)scratch, got, true);
-            if (written != (int)got) {
-                LogFmtE("Http_Client: writeFile failed (%d/%u)\n", written, (unsigned)got);
+            if (!m_stream_writer(scratch, got)) {
+                LogFmtE("Http_Client: writer rejected %u bytes\n", (unsigned)got);
                 ok = false;
                 break;
             }
@@ -987,7 +972,7 @@ bool Http_Client::streamBodyToFile(int32_t &max_timeout)
 
             if (content_length > 0) {
                 int pct = (int)((m_stream_bytes_written * 100) / content_length);
-                if (pct >= last_logged_pct + 10) {
+                if (pct >= last_logged_pct + 1) {
                     LogFmtI("Http_Client: download %u%\n", (unsigned)pct);
                     last_logged_pct = pct;
                 }
@@ -1000,6 +985,30 @@ bool Http_Client::streamBodyToFile(int32_t &max_timeout)
     if (ok && content_length >= 0 && m_stream_bytes_written < content_length) ok = false;
 
     return ok;
+}
+
+#ifdef ENABLE_STORAGE_SERVICE
+
+int64_t Http_Client::DownloadFile(const char *url, const char *dest_path)
+{
+    if (nullptr == url || nullptr == dest_path) return -1;
+
+    pdiutil::string path = dest_path;
+
+    // stream call will make first call of size hint. so avoid that while downloading file
+    bool hint_called = false;
+    return DownloadStream(url, [path, &hint_called](const uint8_t *buf, uint32_t sz) -> bool {
+        if(!hint_called){
+            hint_called = true;
+            return true;
+        }
+        int written = __i_fs.writeFile(path.c_str(), (const char*)buf, sz, true);
+        if (written != (int)sz) {
+            LogFmtE("Http_Client: writeFile failed (%d/%u)\n", written, (unsigned)sz);
+            return false;
+        }
+        return true;
+    });
 }
 
 #endif

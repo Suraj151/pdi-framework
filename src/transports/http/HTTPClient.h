@@ -130,6 +130,10 @@ public:
 	// request api's
 	int16_t Get(const char *url);
 	int16_t Post(const char *url, const char *payload);
+	// Streams response body via writer callback. First call is a size hint:
+	// writer(nullptr, content_length) — 0 if unknown. Subsequent calls deliver
+	// body chunks: writer(buf, sz). Writer returns false to abort at any point.
+	int64_t DownloadStream(const char *url, CallBackBytesArgBoolRetFn writer);
 #ifdef ENABLE_STORAGE_SERVICE
 	int64_t DownloadFile(const char *url, const char *dest_path);
 #endif
@@ -146,19 +150,14 @@ protected:
 	void AddHeader(const char *name, const char *value, bool inReqHeader = true);
 	bool GetHeader(const char *name, char *&value, bool fromReqHeader = true);
 	int16_t handleResponse();
-#ifdef ENABLE_STORAGE_SERVICE
-	bool streamBodyToFile(int32_t &max_timeout);
-#endif
+	bool streamBodyTo(int32_t &max_timeout);
 
 	iClientInterface *m_client;
 	http_req_t m_request;
 	http_resp_t m_response;
 
-#ifdef ENABLE_STORAGE_SERVICE
-	bool m_stream_to_file;
-	pdiutil::string m_stream_dest_path;
+	CallBackBytesArgBoolRetFn m_stream_writer;
 	int64_t m_stream_bytes_written;
-#endif
 };
 
 #endif

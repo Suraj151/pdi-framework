@@ -29,8 +29,9 @@ public:
    */
   virtual ~iUpgradeInterface() {}
 
-  // upgrade api
-  virtual upgrade_status_t Upgrade(const char *path, const char *version) = 0;
+  // upgrade api. Optional client is an opaque pointer the device port may cast
+  // to a framework Http_Client when it needs to fetch bytes over HTTP.
+  virtual upgrade_status_t Upgrade(const char *path, const char *version, void *client = nullptr) = 0;
 };
 
 #endif

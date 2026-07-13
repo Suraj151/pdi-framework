@@ -63,11 +63,12 @@ created Date    : 1st Jan 2026
 #define DEVICE_SUPPORTS_CONTEXTUAL_EXECUTION
 
 /**
- * enable/disable storage dependent ota upgrade upgrade
+ * enable/disable ota upgrade strategies
  */
-#ifdef ENABLE_STORAGE_SERVICE
-#define MAKE_STORAGE_DEPENDENT_OTA_UPGRADE
-#endif
+#define MAKE_STREAM_DIRECT_OTA_UPGRADE
+// #ifdef ENABLE_STORAGE_SERVICE
+// #define MAKE_STORAGE_DEPENDENT_OTA_UPGRADE
+// #endif
 
 
 #endif // _ESP8266_DEVICE_CONFIG_H_

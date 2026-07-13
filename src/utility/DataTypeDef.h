@@ -237,6 +237,7 @@ typedef pdiutil::function<void(int)> CallBackIntArgFn;
 typedef pdiutil::function<void(void)> CallBackVoidArgFn;
 typedef pdiutil::function<void(void *)> CallBackVoidPointerArgFn;
 typedef pdiutil::function<void *(void *)> CallBackVoidPointerArgVoidPointerRetFn;
+typedef pdiutil::function<bool(const uint8_t *, uint32_t)> CallBackBytesArgBoolRetFn;
 
 /**
  * Logging types

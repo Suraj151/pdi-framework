@@ -382,11 +382,12 @@ int64_t DeviceControlInterface::measure_lastfn_stack(){
 /**
  * Upgrade device with provided binary path and new version
  */
-upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *version)
+upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *version, void *client)
 {
-    upgrade_status_t status = UPGRADE_STATUS_MAX;
-
-    return status;
+    (void)path;
+    (void)version;
+    (void)client;
+    return UPGRADE_STATUS_MAX;
 }
 
 DeviceControlInterface __i_dvc_ctrl;

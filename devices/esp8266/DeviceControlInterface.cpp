@@ -22,7 +22,7 @@ created Date    : 1st Jan 2024
 #include <transports/http/HTTPClient.h>
 #endif
 
-#if defined(MAKE_STORAGE_DEPENDENT_OTA_UPGRADE)
+#if defined(MAKE_STORAGE_DEPENDENT_OTA_UPGRADE) || defined(MAKE_STREAM_DIRECT_OTA_UPGRADE)
 #else
 #include <ESP8266HTTPClient.h>
 #include <ESP8266httpUpdate.h>
@@ -459,39 +459,93 @@ void DeviceControlInterface::yield()
 /**
  * Upgrade device with provided binary path and new version
  */
-upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *version)
+upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *version, void *client)
 {
     (void)version;
 
     if (nullptr == path) {
         return UPGRADE_STATUS_FAILED;
     }
-    
-#if defined(MAKE_STORAGE_DEPENDENT_OTA_UPGRADE)
 
-    int64_t file_size = __i_fs.getFileSize(path);
-    if (file_size <= 0) {
-        LogFmtE("DEVICE_UPGRADE_FILE_MISSING : %d\n", (int)file_size);
+#if defined(MAKE_STREAM_DIRECT_OTA_UPGRADE)
+
+    Http_Client *http = (Http_Client *)client;
+    if (nullptr == http) {
+        LogE("DEVICE_UPGRADE_NO_CLIENT\n");
         return UPGRADE_STATUS_FAILED;
     }
 
-    if (!Update.begin((size_t)file_size, U_FLASH)) {
+    bool begin_called = false;
+    int64_t got = http->DownloadStream(path, [&begin_called](const uint8_t *buf, uint32_t sz) -> bool {
+        if (!begin_called) {
+            begin_called = true;
+            LogFmtI("OTA Size  : %u\n", sz);
+            size_t begin_size = (nullptr == buf && sz > 0) ? (size_t)sz : (size_t)ESP.getFreeSketchSpace();
+            if (!Update.begin(begin_size, U_FLASH)) {
+                LogFmtE("DEVICE_UPGRADE_BEGIN_FAILED : %d\n", (int)Update.getError());
+                return false;
+            }
+            if (nullptr == buf) return true;
+        }
+        __i_dvc_ctrl.yield();
+        size_t written = Update.write((uint8_t*)buf, sz);
+        if (written != sz) {
+            LogFmtE("DEVICE_UPGRADE_WRITE_SHORT : %u/%u err=%d\n",
+                    (unsigned)written, (unsigned)sz, (int)Update.getError());
+            return false;
+        }
+        return true;
+    });
+
+    if (got <= 0 || !Update.end(false)) {
+        LogFmtE("DEVICE_UPGRADE_END_FAILED : got=%d err=%d\n", (int)got, (int)Update.getError());
+        return UPGRADE_STATUS_FAILED;
+    }
+
+    LogFmtS("DEVICE_UPGRADE_OK size=%d\n", (int)got);
+    return UPGRADE_STATUS_SUCCESS;
+
+#elif defined(MAKE_STORAGE_DEPENDENT_OTA_UPGRADE)
+
+    Http_Client *http = (Http_Client *)client;
+    if (nullptr == http) {
+        LogE("DEVICE_UPGRADE_NO_CLIENT\n");
+        return UPGRADE_STATUS_FAILED;
+    }
+
+    pdiutil::string tmp_path = __i_fs.getTempDirectory();
+    if (tmp_path.size() == 0 || tmp_path[tmp_path.size()-1] != '/') tmp_path += '/';
+    tmp_path += "fw.bin";
+
+    __i_fs.deleteFile(tmp_path.c_str());
+
+    int64_t got = http->DownloadFile(path, tmp_path.c_str());
+    if (got <= 0) {
+        LogFmtE("DEVICE_UPGRADE_DOWNLOAD_FAILED : %d\n", (int)got);
+        __i_fs.deleteFile(tmp_path.c_str());
+        return UPGRADE_STATUS_FAILED;
+    }
+
+    if (!Update.begin((size_t)got, U_FLASH)) {
         LogFmtE("DEVICE_UPGRADE_BEGIN_FAILED : %d\n", (int)Update.getError());
+        __i_fs.deleteFile(tmp_path.c_str());
         return UPGRADE_STATUS_FAILED;
     }
 
     bool write_ok = true;
-    int64_t bytes_read = __i_fs.readFile(path, 1024, [&](char *data, uint32_t sz) -> bool {
+    int64_t bytes_read = __i_fs.readFile(tmp_path.c_str(), 1024, [&](char *data, uint32_t sz) -> bool {
         __i_dvc_ctrl.yield();
         size_t written = Update.write((uint8_t*)data, sz);
         if (written != sz) { write_ok = false; return false; }
         return true;
     });
 
-    if (bytes_read != file_size) {
-        LogFmtE("DEVICE_UPGRADE_READ_SHORT : %d/%d\n", (int)bytes_read, (int)file_size);
+    if (bytes_read != got) {
+        LogFmtE("DEVICE_UPGRADE_READ_SHORT : %d/%d\n", (int)bytes_read, (int)got);
         write_ok = false;
     }
+
+    __i_fs.deleteFile(tmp_path.c_str());
 
     if (!write_ok || !Update.end(false)) {
         LogFmtE("DEVICE_UPGRADE_END_FAILED : %d\n", (int)Update.getError());
@@ -503,6 +557,7 @@ upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *v
 
 #else
 
+    (void)client;
     String binary_path = path;
     upgrade_status_t status = UPGRADE_STATUS_MAX;
     WiFiClient _wifi_client;

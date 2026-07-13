@@ -85,7 +85,7 @@ public:
   void yield() override;
 
   // upgrade api
-  upgrade_status_t Upgrade(const char *path, const char *version) override;
+  upgrade_status_t Upgrade(const char *path, const char *version, void *client = nullptr) override;
 };
 
 /**

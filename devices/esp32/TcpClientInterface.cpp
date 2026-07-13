@@ -10,13 +10,13 @@ created Date    : 1st May 2025
 #include "TcpClientInterface.h"
 #include "DeviceControlInterface.h"
 
-#define TCP_GUARD_BEGIN
-#define TCP_GUARD_END
-// #define TCP_GUARD_BEGIN \
-//     bool _pdi_need_lock = !sys_thread_tcpip(LWIP_CORE_LOCK_QUERY_HOLDER); \
-//     if (_pdi_need_lock) { LOCK_LWIP_TCPIP_CORE; }
-// #define TCP_GUARD_END \
-//     if (_pdi_need_lock) { UNLOCK_LWIP_TCPIP_CORE; }
+// #define TCP_GUARD_BEGIN
+// #define TCP_GUARD_END
+#define TCP_GUARD_BEGIN \
+    bool _pdi_need_lock = !sys_thread_tcpip(LWIP_CORE_LOCK_QUERY_HOLDER); \
+    if (_pdi_need_lock) { LOCK_LWIP_TCPIP_CORE; }
+#define TCP_GUARD_END \
+    if (_pdi_need_lock) { UNLOCK_LWIP_TCPIP_CORE; }
 
 /**
  * @brief Constructor for TcpClientInterface.

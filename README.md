@@ -201,18 +201,26 @@ To configure and test MQTT go on device local server and select MQTT section und
 
 
 * **OTA Service:**
-Over The Air (OTA) feature has ability to update the device firmware remotely. By default OTA configurations are accessible with local server. OTA service is uses firmware version to decide whether start to update or not. OTA server can be set in OTA configuration which is accesible through local server.
+Over-the-Air (OTA) updates the device firmware from a remote server. The device polls a version endpoint at a configurable frequency; if the reported `latest` is newer than the device's `FIRMWARE_VERSION` ([GlobalConfig.h](src/config/GlobalConfig.h)), it downloads and applies the new `.bin`. Host, port and poll frequency are set through the local web portal ("OTA" section) or the `ota_config_table`.
 
-    we need to set below route at server
+    Server routes the device calls (paths defined in [OtaConfig.h](src/config/OtaConfig.h)):
 
-    GET route format as ==> http://server.com/ota?mac_id=xx:xx:xx:xx:xx:xx&version=2019041100 --// this link is called by device on every x seconds provided in OTA configuration with its mac_id and current version ( available in global configuration ) as parameters. Response should be in json as ==> { latest : 2019041101 } which returns latest firmware version available on server
+    - Version check (polled): `GET <host>:<port>/api/fordevice/ota-version?mac_id=<mac>&duid=<duid>`
+      Response JSON must include a `latest` field, e.g. `{ "latest": 2026071323 }`. Additional fields such as `checksum` and `size` are accepted and ignored by the current parser.
+    - Binary download (only when `latest > current`): `GET <host>:<port>/api/fordevice/ota-bin?mac_id=<mac>&duid=<duid>&version=<latest>`
+      Response is the raw firmware image (`Content-Type: application/octet-stream`).
 
-    by default update start only if device current firmware version is older than received firmware version from server.
+    Both requests use HTTP Basic auth (`ota:<mac>`, base64-encoded) and the `pdistack` User-Agent header. When `ENABLE_TLS_SERVICE` is on both hops travel over HTTPS through the shared TLS client — no service-side changes needed.
 
-    when device start the update process after knowing its current firmware version is older it looks for the downloadable file from the same server in format given below
+    The `Upgrade()` step is device-implemented and selectable at compile time via one of three strategies (default on esp8266/esp32: `MAKE_STREAM_DIRECT_OTA_UPGRADE`, defined in the per-device config header):
 
-    server address / bin / device mac address / latest firmware version .bin file
-    e.g. http://server.com/bin/xx:xx:xx:xx:xx:xx/2019041101.bin
+    | Strategy macro | How it works | Requires | Trade-offs |
+    |---|---|---|---|
+    | `MAKE_STREAM_DIRECT_OTA_UPGRADE` | Body bytes flow straight into `Update.write()` as they're received from the socket | Just the OTA partition | Lowest heap and no filesystem needed; the download and flash writes are interleaved |
+    | `MAKE_STORAGE_DEPENDENT_OTA_UPGRADE` | Download is saved to `<tempdir>/fw.bin` first, then read back and fed into `Update` | `ENABLE_STORAGE_SERVICE` + free filesystem space for the full firmware | Separates network I/O from flash writes; easier to isolate corruption issues; costs one firmware-size on the filesystem |
+    | *(neither defined)* | Falls back to the SDK's built-in `httpUpdate` (`ESPhttpUpdate` on esp8266, `httpUpdate` on esp32) | SDK | Legacy path; kept for compatibility — the two strategies above are the maintained ones |
+
+    Update fires only when `latest > FIRMWARE_VERSION`, so bumping `FIRMWARE_VERSION` before publishing is what marks a build as newer.
 
 
 * **ESPNOW Service:**
@@ -1694,7 +1702,8 @@ Fully documented in [§6. Database Layer](#6-database-layer).
 | Depends on | `iTcpClientInterface`, `iUpgradeInterface` (via `__i_dvc_ctrl`), `iHttpClientHelper`, OTA config table |
 | Init does | `setInterval(handleOta, ota_freq_ms)` from `ota_config_table::ota_request_freq` |
 | Public API | `handle()` → `http_ota_status`; `handleOta()` — periodic driver |
-| Wire protocol | `GET /ota?mac_id=<mac>&version=<current>` → JSON `{ "latest": <ver> }`; if newer, `GET /bin/<mac>/<ver>.bin` and apply via `iUpgradeInterface::Upgrade` |
+| Wire protocol | `GET /api/fordevice/ota-version?mac_id=<mac>&duid=<duid>` → JSON `{ "latest": <ver>, … }`; if newer, `GET /api/fordevice/ota-bin?mac_id=<mac>&duid=<duid>&version=<latest>` and apply via `iUpgradeInterface::Upgrade`. HTTP Basic auth (`ota:<mac>` b64), User-Agent `pdistack`; over TLS when `ENABLE_TLS_SERVICE` is on |
+| Upgrade strategy | Compile-time selector in the per-device config header: `MAKE_STREAM_DIRECT_OTA_UPGRADE` (default) streams body bytes into `Update.write()`; `MAKE_STORAGE_DEPENDENT_OTA_UPGRADE` downloads to `<tempdir>/fw.bin` first (needs `ENABLE_STORAGE_SERVICE`), then feeds the file into `Update`; neither ⇒ SDK `httpUpdate` / `ESPhttpUpdate` fallback |
 | Config knobs | `ALLOW_OTA_CONFIG_MODIFICATION`; `ota_config_table` (host, port, version, frequency) |
 | CLI surface | `srvc` config print |
 | Web surface | "OTA" section |
@@ -3179,7 +3188,7 @@ Approximate incremental cost on **ESP8266** (the binding constraint for most use
 | `+ ENABLE_WIFI_SERVICE` | ~+60 KB | ~+8 KB | — | Includes scan buffers |
 | `+ ENABLE_NETWORK_SERVICE` (NTP, ping, TCP) | ~+15 KB | ~+2 KB | — | |
 | `+ ENABLE_MQTT_SERVICE` | ~+30 KB | ~+1 KB | +1-2 KB per pub burst | Includes 3 config tables |
-| `+ ENABLE_OTA_SERVICE` | ~+10 KB | small | +6 KB during download | The upgrade path also reserves flash region |
+| `+ ENABLE_OTA_SERVICE` | ~+10 KB | small | +6 KB during download in `MAKE_STREAM_DIRECT_OTA_UPGRADE` (default). `MAKE_STORAGE_DEPENDENT_OTA_UPGRADE` also needs full-firmware-size free on the filesystem for `<tempdir>/fw.bin` | The upgrade path also reserves a flash OTA slot; strategy chosen in the per-device config header |
 | `+ ENABLE_EMAIL_SERVICE` | ~+15 KB | small | +1 KB per send | SMTPClient + Base64 of credentials |
 | `+ ENABLE_HTTP_SERVER` | ~+50 KB | ~+3 KB | +PAGE_HTML_MAX_SIZE (1.8 KB) per request | The 12 controllers + page fragments |
 | `+ ENABLE_GPIO_SERVICE` | ~+10 KB | ~+0.5 KB | small | Plus event-channel HTTP-post buffer if used |

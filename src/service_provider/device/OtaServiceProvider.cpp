@@ -187,34 +187,18 @@ http_ota_status OtaServiceProvider::handle()
           firmware_url += pdiutil::to_string(_firm_version);
         }
 
-        upgrade_status_t upgrd_status;
-#if defined(MAKE_STORAGE_DEPENDENT_OTA_UPGRADE)
-        pdiutil::string tmp_path = __i_fs.getTempDirectory();
-        if (tmp_path.size() == 0 || tmp_path[tmp_path.size()-1] != '/') tmp_path += '/';
-        tmp_path += "fw.bin";
-
-        __i_fs.deleteFile(tmp_path.c_str());
-
-        LogI("Starting OTA Download...\n");
+        LogI("Starting OTA...\n");
 
         this->m_http_client->Begin();
         this->m_http_client->SetUserAgent("pdistack");
         this->m_http_client->SetBasicAuthorization("ota", __i_dvc_ctrl.getDeviceMac().c_str());
         this->m_http_client->SetTimeout(120 * MILLISECOND_DURATION_1000);
-        int64_t got = this->m_http_client->DownloadFile(firmware_url.c_str(), tmp_path.c_str());
+        upgrade_status_t upgrd_status = __i_dvc_ctrl.Upgrade(
+            firmware_url.c_str(),
+            pdiutil::to_string(_global_configs.firmware_version).c_str(),
+            this->m_http_client
+        );
         this->m_http_client->End(true);
-
-        if (got <= 0) {
-          LogFmtE("OTA download failed : %d\n", (int)got);
-          upgrd_status = UPGRADE_STATUS_FAILED;
-        } else {
-          LogFmtS("OTA download success size : %d, Starting Upgrade...\n", (int)got);
-          upgrd_status = __i_dvc_ctrl.Upgrade(tmp_path.c_str(), pdiutil::to_string(_global_configs.firmware_version).c_str());
-        }
-        __i_fs.deleteFile(tmp_path.c_str());
-#else
-        upgrd_status = __i_dvc_ctrl.Upgrade(firmware_url.c_str(), pdiutil::to_string(_global_configs.firmware_version).c_str());
-#endif
 
         if (upgrd_status == UPGRADE_STATUS_FAILED)
         {

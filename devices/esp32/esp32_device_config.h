@@ -72,4 +72,12 @@ extern portMUX_TYPE __pdi_critical_mux;
 #define DEVICE_SUPPORTS_CONTEXTUAL_EXECUTION
 #define DEVICE_SUPPORTS_TLS_CERT_GENERATION
 
+/**
+ * enable/disable ota upgrade strategies
+ */
+#define MAKE_STREAM_DIRECT_OTA_UPGRADE
+// #ifdef ENABLE_STORAGE_SERVICE
+// #define MAKE_STORAGE_DEPENDENT_OTA_UPGRADE
+// #endif
+
 #endif // _ESP32_DEVICE_CONFIG_H_

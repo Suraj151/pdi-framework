@@ -70,7 +70,7 @@ public:
   void yield() override{}
 
   // upgrade api
-  upgrade_status_t Upgrade(const char *path, const char *version) override{return UPGRADE_STATUS_IGNORE;}
+  upgrade_status_t Upgrade(const char *path, const char *version, void *client = nullptr) override{(void)path;(void)version;(void)client;return UPGRADE_STATUS_IGNORE;}
 };
 
 
