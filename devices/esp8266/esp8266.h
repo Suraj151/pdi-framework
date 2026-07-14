@@ -16,7 +16,6 @@ created Date    : 1st Jan 2024
 #include <Print.h>
 
 #include <FS.h>
-#include <Ticker.h>
 #include <IPAddress.h>
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>

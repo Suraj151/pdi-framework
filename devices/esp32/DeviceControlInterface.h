@@ -98,14 +98,15 @@ private:
 
   gpio_id_t m_pin;
   gpio_val_t m_duration;
-  Ticker m_ticker;
+  int m_ticker_id;
 
 public:
   /**
    * GpioBlinkerInterface constructor.
    */
   GpioBlinkerInterface(gpio_id_t pin, gpio_val_t duration) : m_pin(pin),
-                                                             m_duration(duration)
+                                                             m_duration(duration),
+                                                             m_ticker_id(-1)
   {
     pinMode(this->m_pin, OUTPUT);
     this->start();
@@ -160,7 +161,10 @@ public:
   {
     if (!this->isRunning() && GPIO_DIGITAL_BLINK_MIN_DURATION_MS <= this->m_duration)
     {
-      this->m_ticker.attach_ms(this->m_duration, std::bind(&GpioBlinkerInterface::blink, this));
+      this->m_ticker_id = __task_scheduler.updateInterval( this->m_ticker_id, [&]() {
+        this->blink();
+        }, this->m_duration, DEFAULT_TASK_PRIORITY, __i_dvc_ctrl.millis_now()
+      );
     }
   }
 
@@ -169,7 +173,8 @@ public:
    */
   void stop()
   {
-    this->m_ticker.detach();
+    __task_scheduler.clearInterval(this->m_ticker_id);
+    this->m_ticker_id = -1;
   }
 
   /**
@@ -177,7 +182,7 @@ public:
    */
   bool isRunning()
   {
-    return this->m_ticker.active();
+    return ( this->m_ticker_id != -1 );
   }
 };
 

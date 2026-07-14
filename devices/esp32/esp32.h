@@ -23,7 +23,6 @@ created Date    : 1st Jan 2024
 #include <Print.h>
 
 
-#include <Ticker.h>
 #include <IPAddress.h>
 #include <WiFi.h>
 #include <utility/DataTypeDef.h>

@@ -22,12 +22,6 @@ created Date    : 1st Jan 2024
 #include <transports/http/HTTPClient.h>
 #endif
 
-#if defined(MAKE_STORAGE_DEPENDENT_OTA_UPGRADE) || defined(MAKE_STREAM_DIRECT_OTA_UPGRADE)
-#else
-#include <ESP8266HTTPClient.h>
-#include <ESP8266httpUpdate.h>
-#endif
-
 /**
  * DeviceControlInterface constructor.
  */
@@ -554,48 +548,6 @@ upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *v
 
     LogS("DEVICE_UPGRADE_OK\n");
     return UPGRADE_STATUS_SUCCESS;
-
-#else
-
-    (void)client;
-    String binary_path = path;
-    upgrade_status_t status = UPGRADE_STATUS_MAX;
-    WiFiClient _wifi_client;
-
-#ifdef ENABLE_WIFI_SERVICE
-    ESPhttpUpdate.rebootOnUpdate(false);
-    ESPhttpUpdate.followRedirects(true);
-
-    char *base64_encoded_auth = new char[300];
-    if(nullptr != base64_encoded_auth)
-    {
-        Http_Client::BuildBasicAuthorization("ota", __i_dvc_ctrl.getDeviceMac().c_str(), base64_encoded_auth, 300);
-        ESPhttpUpdate.setAuthorization((const char*)base64_encoded_auth);
-        delete []base64_encoded_auth;
-    }
-
-    t_httpUpdate_return ret = ESPhttpUpdate.update( _wifi_client, binary_path );
-
-    if( ret == HTTP_UPDATE_FAILED ){
-
-        LogE("DEVICE_UPGRADE_FAILD\n");
-        status = UPGRADE_STATUS_FAILED;
-    }else if( ret == HTTP_UPDATE_NO_UPDATES ){
-
-        LogI("DEVICE_UPGRADE_NO_UPDATES\n");
-        status = UPGRADE_STATUS_IGNORE;
-    }else if( ret == HTTP_UPDATE_OK ){
-
-        LogS("DEVICE_UPGRADE_OK\n");
-        status = UPGRADE_STATUS_SUCCESS;
-    }else{
-
-        LogW("DEVICE_UPGRADE_UNKNOWN_RETURN\n");
-        status = UPGRADE_STATUS_MAX;
-    }
-#endif
-
-    return status;
 
 #endif
 }
