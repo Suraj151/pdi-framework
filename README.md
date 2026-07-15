@@ -59,29 +59,20 @@ Full command reference in [§7.7 Built-in command inventory](#77-built-in-comman
 
 ## A Peek at the UI
 
-<p align="center">
-  <img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/portal_home_menu.png">
-</p>
-
-<p align="center">
-  <img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/gpio-control-menu.png">
-</p>
-
-<p align="center">
-  <img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/mqtt-submenu.png">
-</p>
-
-<p align="center">
-  <img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/storage-home.png">
-</p>
-
-<p align="center">
-  <img width="500" src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal.png">
-</p>
-
-<p align="center">
-  <img width="500" src="https://github.com/Suraj151/pdi-framework/blob/master/doc/ssh-telnet-terminal.png">
-</p>
+<table>
+  <tr>
+    <td width="50%"><img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/portal_home_menu.png" width="100%"></td>
+    <td width="50%"><img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/gpio-control-menu.png" width="100%"></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/mqtt-submenu.png" width="100%"></td>
+    <td width="50%"><img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/storage-home.png" width="100%"></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal.png" width="100%"></td>
+    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/ssh-telnet-terminal.png" width="100%"></td>
+  </tr>
+</table>
 
 ## Want to Dig Deeper?
 
@@ -107,7 +98,7 @@ The **[Detailed Documentation](#detailed-documentation)** below is an in-tree re
 
 # Detailed Documentation
 
-The sections below are an in-tree reference for contributors and porters. Each section is self-contained but cross-links to source paths so you can jump straight to the code.
+Each section below is self-contained but cross-links to source paths so you can jump straight to the code.
 
 ---
 
@@ -335,7 +326,7 @@ LittleFS is now vendored in-tree under [external/littlefs/](external/littlefs/) 
 | [`scripts/CreateDBSourceFromJson.py`](scripts/CreateDBSourceFromJson.py) | Wipes [src/database/tables/](src/database/tables/) and regenerates it from the per-device `DBTableSchema.json` by calling `JsonToCpp.py` ([§5.5](#5-database-layer)) | When changing the schema for the active device |
 | [`scripts/JsonToCpp.py`](scripts/JsonToCpp.py) | Generic JSON-to-C++ codegen used by the table generator | Always indirectly |
 | [`scripts/Util.py`](scripts/Util.py) | Shared helpers: template substitution, kebab-to-PascalCase, `clang-format` invocation, device-folder path resolution | Library — not invoked directly |
-| [`scripts/GenTlsCerts.py`](scripts/GenTlsCerts.py) | OpenSSL-backed off-device TLS cert generator — EC or RSA keypair, multi-DNS / multi-IP SANs, optional CA mode, signing CSRs against a stored CA. Output to `certs/`, then upload via SFTP to the device FS at the `TLS_DEFAULT_*_PATH` defaults. The on-device equivalent for esp32 is the `tls` CLI command. | When provisioning HTTPS on esp8266 (no on-device gen), or seeding an esp32 cert that needs to be signed by a stable dev CA |
+| [`scripts/GenTlsCerts.py`](scripts/GenTlsCerts.py) | OpenSSL-backed off-device TLS cert generator: EC/RSA keypair, multi-DNS/multi-IP SANs, optional CA mode, CSR signing. Output to `certs/`; upload via SFTP to the `TLS_DEFAULT_*_PATH` defaults. On-device equivalent for esp32 is the `tls` CLI command. | When provisioning HTTPS on esp8266 (no on-device gen), or seeding an esp32 cert signed by a stable dev CA |
 
 Generated output goes through `clang-format --style=Microsoft -i` if `clang-format` is on `PATH`, so generated headers look hand-written. If the formatter is missing, files are written un-formatted and still compile fine.
 
@@ -415,7 +406,7 @@ The configuration system has three distinct tiers, each addressing a different c
 
 | Tier | Lives in | Owns | Audience |
 |---|---|---|---|
-| **Device tier** | [devices/DeviceSetup.h](devices/DeviceSetup.h) (autogen) + [devices/DeviceConfig.h](devices/DeviceConfig.h) + each port's `devices/<board>/<board>_device_config.h` | `DEVICE_*` selector (DeviceSetup), `ENABLE_*` feature flags + per-board limits (DeviceConfig), per-port platform macros — `RODT_ATTR`, `PROG_RODT_ATTR`, `strcat_ro` family, `CRITICAL_SECTION_ENTER/EXIT` (`<board>_device_config.h`, included by DeviceConfig.h based on `DEVICE_*`) | Integrator: "what board, what features"; porter: "how the board names flash / interrupts" |
+| **Device tier** | [devices/DeviceSetup.h](devices/DeviceSetup.h) (autogen) + [devices/DeviceConfig.h](devices/DeviceConfig.h) + each port's `devices/<board>/<board>_device_config.h` | `DEVICE_*` selector, `ENABLE_*` feature flags + per-board limits, and per-port platform macros (`RODT_ATTR`, `PROG_RODT_ATTR`, `strcat_ro` family, `CRITICAL_SECTION_ENTER/EXIT`) | Integrator: "what board, what features"; porter: "how the board names flash / interrupts" |
 | **Common tier** | [src/config/Common.h](src/config/Common.h), [src/config/GlobalConfig.h](src/config/GlobalConfig.h) | Cross-cutting constants (`MAX_SCHEDULABLE_TASKS`, default user/pass, base time durations), the always-present `global_config` table | Framework author + integrator |
 | **Service tier** | One `*Config.h` per service under [src/config/](src/config/) | Per-service tuning knobs **and** the runtime config struct(s) persisted to NVM | Service author + advanced integrator |
 
@@ -552,7 +543,7 @@ Each persisted table is wrapped on NVM with a small framing record (table id + c
 | [WifiConfig.h](src/config/WifiConfig.h) | `wifi_config_table` (STA+AP creds, IPs) | `WIFI_CONFIGS_BUF_SIZE`, default IPs, modification policies |
 | [ServerConfig.h](src/config/ServerConfig.h) | `login_credential_table` (web/CLI user) | `SERVER_SESSION_NAME`, `SERVER_COOKIE_MAX_AGE` (300 s) |
 | [HttpConfig.h](src/config/HttpConfig.h) | — (transient `http_param_t`) | `HTTP_CLIENT_BUF_SIZE`, request size limits, `HTTPS_DEFAULT_PORT`, `HTTPS_HSTS_MAX_AGE_SECONDS` |
-| [TlsConfig.h](src/config/TlsConfig.h) | — | `TLS_IBUF_SIZE` / `TLS_OBUF_SIZE` (per-session TLS record buffers, default 2 KB / 1 KB), `TLS_TASK_STACK_SIZE` (default 6500 B for the dedicated cooperative TLS task on esp8266), `TLS_TASK_POLL_MS`, plus default FS paths `TLS_DEFAULT_SERVER_CERT_PATH` (`/etc/http/server.crt`), `TLS_DEFAULT_SERVER_KEY_PATH`, `TLS_DEFAULT_CLIENT_CA_PATH`, `TLS_DEFAULT_OUTBOUND_CA_BUNDLE_PATH` (`/etc/ssl/ca-bundle.crt`) |
+| [TlsConfig.h](src/config/TlsConfig.h) | — | `TLS_IBUF_SIZE` / `TLS_OBUF_SIZE` (per-session record buffers, 2 KB / 1 KB), `TLS_TASK_STACK_SIZE` (6500 B on esp8266 cooperative TLS task), `TLS_TASK_POLL_MS`; default FS paths `TLS_DEFAULT_SERVER_CERT_PATH`, `TLS_DEFAULT_SERVER_KEY_PATH`, `TLS_DEFAULT_CLIENT_CA_PATH`, `TLS_DEFAULT_OUTBOUND_CA_BUNDLE_PATH` |
 | [OtaConfig.h](src/config/OtaConfig.h) | `ota_config_table` (host, port, version, freq) | OTA check cadence |
 | [MqttConfig.h](src/config/MqttConfig.h) | `mqtt_general_config_table`, `mqtt_lwt_config_table`, `mqtt_pubsub_config_table` | Broker, LWT, publish/subscribe slots, `MQTT_CONFIG_TYPE` selector |
 | [GpioConfig.h](src/config/GpioConfig.h) | `gpio_config_table` | Pin map, `GPIO_MODE` enum, event conditions/channels, graph dimensions |
@@ -1052,8 +1043,8 @@ Fully documented in [§5. Database Layer](#5-database-layer).
 | Source | [device/OtaServiceProvider.{h,cpp}](src/service_provider/device/OtaServiceProvider.h) |
 | Depends on | `iTcpClientInterface`, `iUpgradeInterface` (via `__i_dvc_ctrl`), `iHttpClientHelper`, OTA config table |
 | Init does | `setInterval(handleOta, ota_freq_ms)` from `ota_config_table::ota_request_freq` |
-| Wire protocol | `GET /api/fordevice/ota-version?mac_id=<mac>&duid=<duid>` → JSON `{ "latest": <ver>, … }`; if newer, `GET /api/fordevice/ota-bin?mac_id=<mac>&duid=<duid>&version=<latest>` and apply via `iUpgradeInterface::Upgrade`. HTTP Basic auth (`ota:<mac>` b64), User-Agent `pdistack`; over TLS when `ENABLE_TLS_SERVICE` is on |
-| Upgrade strategy | Compile-time selector in the per-device config header: `MAKE_STREAM_DIRECT_OTA_UPGRADE` (default) streams body bytes into `Update.write()`; `MAKE_STORAGE_DEPENDENT_OTA_UPGRADE` downloads to `<tempdir>/fw.bin` first (needs `ENABLE_STORAGE_SERVICE`), then feeds the file into `Update`; neither ⇒ SDK `httpUpdate` / `ESPhttpUpdate` fallback |
+| Wire protocol | `GET /api/fordevice/ota-version?mac_id=<mac>&duid=<duid>` → JSON `{ "latest": <ver>, … }`; if newer, `GET /api/fordevice/ota-bin?...&version=<latest>` and apply via `iUpgradeInterface::Upgrade`. HTTP Basic auth (`ota:<mac>` b64), User-Agent `pdistack`; TLS when `ENABLE_TLS_SERVICE` is on |
+| Upgrade strategy | Compile-time selector: `MAKE_STREAM_DIRECT_OTA_UPGRADE` (default) streams body bytes into `Update.write()`; `MAKE_STORAGE_DEPENDENT_OTA_UPGRADE` downloads to `<tempdir>/fw.bin` first (needs `ENABLE_STORAGE_SERVICE`); neither ⇒ SDK `httpUpdate` / `ESPhttpUpdate` fallback |
 | Config knobs | `ALLOW_OTA_CONFIG_MODIFICATION`; `ota_config_table` (host, port, version, frequency) |
 | CLI surface | `srvc` config print |
 | Web surface | "OTA" section |
@@ -1171,7 +1162,7 @@ Full breakdown lives in [§8. Web Server](#8-web-server) — it has its own rout
 |---|---|
 | Source | [transport/TelnetServiceProvider.{h,cpp}](src/service_provider/transport/TelnetServiceProvider.h) |
 | Depends on | `iTcpServerInterface`, `__cmd_service`, `__auth_service` |
-| Init does | Binds port 23 (configurable via `initService(&port)`), accepts one client at a time, hands its `iClientInterface*` to the CLI as a terminal |
+| Init does | Binds port 23 (configurable via `initService(&port)`); accepts one client, hands its `iClientInterface*` to the CLI |
 | Loop tick | Driven by `PdiStack::serve` indirectly through the scheduler |
 
 #### 6.2.14 `SSHServer` — `__sshserver_service`
@@ -1202,13 +1193,13 @@ Full breakdown lives in [§8. Web Server](#8-web-server) — it has its own rout
 
 | Flag | `ENABLE_TLS_SERVICE` (+ `ENABLE_HTTPS_SERVER`, `ENABLE_HTTPS_SERVER_MTLS`, `ENABLE_TLS_CERT_GENERATION`, `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME`) |
 |---|---|
-| Backends | esp8266 → BearSSL ([devices/esp8266/TlsClientInterface.{h,cpp}](devices/esp8266/TlsClientInterface.h), [TlsServerInterface.{h,cpp}](devices/esp8266/TlsServerInterface.h), [BearSSLCertLoader.{h,cpp}](devices/esp8266/BearSSLCertLoader.h)). esp32 → mbedTLS ([devices/esp32/TlsClientInterface.{h,cpp}](devices/esp32/TlsClientInterface.h), [TlsServerInterface.{h,cpp}](devices/esp32/TlsServerInterface.h), [MbedTLSCertLoader.{h,cpp}](devices/esp32/MbedTLSCertLoader.h)) |
-| Cert / key paths | All loaded from the FS at runtime via the per-port `*CertLoader` namespace. Defaults from [TlsConfig.h](src/config/TlsConfig.h): `/etc/http/server.crt`, `/etc/http/server.key`, `/etc/http/client-ca.crt`, `/etc/ssl/ca-bundle.crt`. |
-| Threading | TLS handshakes (especially EC keygen / ECDSA sign) overflow the default Arduino cont_t stack on esp8266, so `ENABLE_TLS_SERVICE` forces `ENABLE_CONTEXTUAL_EXECUTION` and runs the BearSSL work on a dedicated cooperative task sized by `TLS_TASK_STACK_SIZE` (default 6500 B). |
-| Outbound default | `PdiStack::PDIStack()` calls `setVerifyPeer(false)` on the bundled client so encrypted-but-unverified TLS works out-of-the-box. For production paths that cross an untrusted network, override with `setCertificateAuthorityPath(TLS_DEFAULT_OUTBOUND_CA_BUNDLE_PATH)` and remove the `setVerifyPeer(false)` line. |
-| HTTPS server | [HttpServerInterfaceImpl](src/interface/pdi/impl/middlewares/HttpServerInterfaceImpl.h) carries a TLS branch (`begin(port, secure=true)`) that wraps each accepted client in the port's TLS server interface. Headers like `Strict-Transport-Security` are emitted when `HTTPS_HSTS_MAX_AGE_SECONDS` is non-zero. |
-| Cert provisioning (esp32 only) | [devices/esp32/TlsCertProvisioner.{h,cpp}](devices/esp32/TlsCertProvisioner.h). `generateCert(certPath, keyPath, params)` issues a self-signed EC/RSA cert with optional CA bit, IPv4 / DNS SANs, custom validity. `ensureServerCert(certPath, keyPath, ip, dns)` creates the cert only if missing — wired to `EVENT_WIFI_STA_GOT_IP` when `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` is on. |
-| Off-device cert generation | [scripts/GenTlsCerts.py](scripts/GenTlsCerts.py) — OpenSSL-backed alternative for boards without on-device generation (esp8266). Supports EC / RSA, multiple DNS / IP SANs, optional CA generation, and re-signing existing CSRs. Output goes under `certs/` and is uploadable to the device FS at the `TLS_DEFAULT_*_PATH` paths. |
+| Backends | **esp8266** → BearSSL: [TlsClientInterface](devices/esp8266/TlsClientInterface.h), [TlsServerInterface](devices/esp8266/TlsServerInterface.h), [BearSSLCertLoader](devices/esp8266/BearSSLCertLoader.h). **esp32** → mbedTLS: [TlsClientInterface](devices/esp32/TlsClientInterface.h), [TlsServerInterface](devices/esp32/TlsServerInterface.h), [MbedTLSCertLoader](devices/esp32/MbedTLSCertLoader.h) |
+| Cert / key paths | Loaded from FS at runtime via the per-port `*CertLoader` namespace. Defaults from [TlsConfig.h](src/config/TlsConfig.h): `/etc/http/server.crt`, `/etc/http/server.key`, `/etc/http/client-ca.crt`, `/etc/ssl/ca-bundle.crt` |
+| Threading | TLS handshakes (EC keygen / ECDSA sign) overflow the default cont_t stack on esp8266, so `ENABLE_TLS_SERVICE` forces `ENABLE_CONTEXTUAL_EXECUTION` and runs BearSSL on a dedicated cooperative task sized by `TLS_TASK_STACK_SIZE` (default 6500 B) |
+| Outbound default | `PdiStack::PDIStack()` calls `setVerifyPeer(false)` on the bundled client so encrypted-but-unverified TLS works out of the box. For production, use `setCertificateAuthorityPath(TLS_DEFAULT_OUTBOUND_CA_BUNDLE_PATH)` and drop the `setVerifyPeer(false)` line |
+| HTTPS server | [HttpServerInterfaceImpl](src/interface/pdi/impl/middlewares/HttpServerInterfaceImpl.h) has a TLS branch (`begin(port, secure=true)`) that wraps each accepted client in the port's TLS server. `Strict-Transport-Security` is emitted when `HTTPS_HSTS_MAX_AGE_SECONDS` is non-zero |
+| Cert provisioning (esp32) | [devices/esp32/TlsCertProvisioner.{h,cpp}](devices/esp32/TlsCertProvisioner.h). `generateCert(...)` issues a self-signed EC/RSA cert with optional CA bit, IPv4/DNS SANs, custom validity. `ensureServerCert(...)` creates one only if missing — wired to `EVENT_WIFI_STA_GOT_IP` when `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` is on |
+| Off-device cert generation | [scripts/GenTlsCerts.py](scripts/GenTlsCerts.py) — OpenSSL-backed alternative for boards without on-device gen (esp8266). EC/RSA, multi-DNS/IP SANs, CA mode, CSR re-signing. Output under `certs/`; upload to the `TLS_DEFAULT_*_PATH` paths |
 | CLI | `tls q=1,t=<EC|RSA>,l=<bits>,n=<CN/DNS>,i=<IPv4>` — generates a server cert on-device (esp32 only). See [§7.7](#77-built-in-command-inventory). |
 
 ### 6.3 Init order and why it matters
@@ -1423,36 +1414,36 @@ Names come from [CommandCommon.h](src/service_provider/cmd/commands/CommandCommo
 
 #### User-facing command table
 
-| Command                                  | Options                             | Brief                                                                                                                                                                                                                                                                                                                                                                                                                       |
-|------------------------------------------|-------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| ls                                       |                                     | List the file's or dir's in current directory. e.g. **ls**                                                                                                                                                                                                                                                                                                                                                                               |
-| mkd \<directory_name>                     |                                     | Make directory with name provided in terminal. space are not allowed in name. e.g. **mkd /home/scripts**                                                                                                                                                                                                                                                                                                                                                |
-| mkf \<file_name>                          |                                     | Make file with name provided in terminal. space are not allowed in name. e.g. **mkf /home/notes.txt**                                                                                                                                                                                                                                                                                                                                                     |
-| mv \<old_path_name> \<new_path_name>     |                                     | Move/Rename the file/dir. space not allowed in name. e.g. **mv /home/a.txt /home/b.txt**                                                                                                                                                                                                                                                                                                                                                                         |
-| cp \<old_path_name> \<new_path_name>     |                                     | Copy the file. e.g. **cp /home/a.txt /home/b.txt**                                                                                                                                                                                                                                                                                                                                                                          |
-| pwd                                      |                                     | It will print present working directory path. e.g. **pwd**                                                                                                                                                                                                                                                                                                                                                                                |
-| rm \<file_or_dir_name>                    |                                     | Remove the file or directory provided. e.g. **rm /home/notes.txt**                                                                                                                                                                                                                                                                                                                                                                                       |
-| cat \<filename>                             |                                     | Read and print the file content of given filename over terminal. (Renamed from `fread`.) e.g. **cat /home/notes.txt**                                                                                                                                                                                                                                                                                                                                    |
-| fwrite \<filename>                           | f=\<filename> v=\<value>             | Open file for write. Note that this command will not show file existing content, rather it will open file to append the content we write. once writing done we can use ESC key to write and quite or cancel the writing. The filename can also be supplied positionally; once the file is open, content is read line-by-line until ESC. e.g. **fwrite /home/notes.txt** or **fwrite f=/home/notes.txt v=hello**                                                                                                                                                                                                                       |
-| head \<filename> [N]                        |                                     | Print the first N lines of the file (default 10). Walks the file forward in a single pass — fast even on large files. e.g. **head /home/log.txt 5**                                                                                                                                                                                                                                                                                                       |
-| tail \<filename> [N]                        |                                     | Print the last N lines of the file (default 10). One offset lookup then forward read; constant memory regardless of file size. e.g. **tail /home/log.txt 5**                                                                                                                                                                                                                                                                                              |
-| wc \<filename>                              |                                     | Print line, word and byte counts of the file in `LINES WORDS BYTES filename` order, matching Linux `wc`. e.g. **wc /home/log.txt**                                                                                                                                                                                                                                                                                                                    |
-| df                                          |                                     | Print filesystem total / used (with %) / free in bytes. e.g. **df**                                                                                                                                                                                                                                                                                                                                                                     |
-| hexdump \<filename>                         |                                     | Hex view of a file: offset, 16 bytes hex, ASCII column — `hexdump -C` layout. Streams via 16-byte readFile chunks. e.g. **hexdump /home/bin.dat**                                                                                                                                                                                                                                                                                                          |
-| grep \<pattern> \<file_or_dir>              |                                     | Search for pattern in file(s). If a directory is given, walks recursively. Output `path:line:col:content` matches the `file:line:col:` jump format used by vim/vscode/emacs. Supports a small regex subset: `.` `*` `+` `?` `^` `$` `[abc]` `[a-z]` `[^abc]` `\\<char>`. No alternation, grouping, or backreferences. e.g. **grep ^ERROR /home/log.txt**                                                                                                                                |
-| cls                                      |                                     | Clear screen command. e.g. **cls**                                                                                                                                                                                                                                                                                                                                                                                                        |
-| cd \<directory_path>                      |                                     | Change Directory to the provided directory path. e.g. **cd /home/scripts**                                                                                                                                                                                                                                                                                                                                                                             |
-| gpio p=\<pin>,m=\<mode>,v=\<value>          | p=\<pin> m=\<mode> v=\<value>          | To perform gpio operations we can use this command. p\<pin> option can be the GPIO pin number to operate with. m\<mode> is the GPIO mode number we want to use. available GPIO modes are OFF=0 DIGITAL_WRITE=1 DIGITAL_READ=2 DIGITAL_BLINK=3 ANALOG_WRITE=4 ANALOG_READ=5 . v\<value> is the value respective to the mode used.  e.g. If we want to blink GPIO 4 with 500ms the we can use command like:  gpio p=4,m=3,v=500  |
-| srvc s=\<service_number>,q=\<query_number> | s=\<service_number> q=\<query_number> | Services related command. currently supporting to get running service config and status.  service number can be get from srvc l command which will list the running services with their id numbers below are the query number we can use in command QUERY_CONFIG=1 QUERY_STATUS=2. e.g. **srvc s=1,q=2**                                                                                                                                           |
-| scht                                     | l\<list>                             | List the running Scheduler tasks. e.g. **scht l**                                                                                                                                                                                                                                                                                                                                                                                            |
-| ssh q=\<query_number>,t=\<algo_type> | q=\<query_number>  t=\<algo_type>  | SSH command according to provided query and options. e.g. if Query number is 1 (SSH_COMMAND_QUERY_KEYGEN) then it wwill create the key pairs of provided algo_type option. e.g. **ssh q=1,t=2**                                                                                                                                                                                                                                                                                                                                                                                           |
-| net \<options> | ip, scansta, connsta | Network command to query the network parameters. we can provide options to query parameters. e.g if we provide **ip** option we may get the info of station to which device is connected and its ip as well as access point name and ip. If we provide **scansta** option it will list out the available station networks. Then we have **connsta** command which can be used to connect with station provided station name and its password e.g. **net connsta,\<stationname>,\<stationpassword>**                                                                                                                                                                                |
-| reboot |  | Reboot the Device. e.g. **reboot**                                                                                                                                                                                 |
-| watch | c=\<command_to_execute_with_its_options_periodically> i=\<interval_in_milliseconds>  n=<number_of_iterations> | Watch command will bring functionality where user need to execute provided command with their options peridically. optionally we can provide the interval and iterations for within which command shall run periodically. default interval is 1 second and infinite iterations. we can stop running watch command with ctrl + c key combination. options should be seperated with semicolon. for example we want to print the network ip every 3 second upto 10 iterations then we can use watch command as: watch c=net ip; i=3000; n=10 |
-| iot \<options> | setid, getid, sethost, gethost | Device iot command to setup iot config. To set/get Device Unique ID we can use **setid/getid** command respectively. To set/get HTTP Host of IOT we can use **sethost/gethost** commands respectively. Let say if we want to set id then we have to use command as : **iot setid,\<DeviceuniqueID>**, similar way when we want to set host we can use command as : **iot sethost,\<IotHTTPHostAddress>**                                                                                                                                                                                |
-| help                                        |                                     | List every registered command. Available before login so the user can discover commands (including `login`). Tab-completion also works on partial names. e.g. **help**                                                                                                                                                                                                                                                                    |
-| uptime                                      |                                     | Print time since boot in the format `up Xd Yh Zm Ws` (days, hours, minutes, seconds). Backed by `__i_dvc_ctrl.millis_now()`; wraps at ~49.7 days. e.g. **uptime**                                                                                                                                                                                                                                                                            |
-| tls q=\<query>,t=\<algo>,l=\<bits>,n=\<CN/DNS>,i=\<IPv4> | q (1=CERTGEN), t (0=EC, 1=RSA), l (key bits / curve size), n (subject CN or DNS SAN), i (IPv4 SAN) | TLS cert generation on-device. Only available on esp32 builds with `ENABLE_TLS_CERT_GENERATION`. Output goes to `TLS_DEFAULT_SERVER_CERT_PATH` / `TLS_DEFAULT_SERVER_KEY_PATH` (`/etc/http/server.{crt,key}` by default). e.g. **tls q=1,t=0,l=256,n=device.local,i=192.168.1.50**                                                                                                                                                       |
+| Command | Options | Brief |
+|---|---|---|
+| ls | | List files/dirs in current directory. e.g. **ls** |
+| mkd \<dir> | | Create directory (no spaces in name). e.g. **mkd /home/scripts** |
+| mkf \<file> | | Create file (no spaces in name). e.g. **mkf /home/notes.txt** |
+| mv \<src> \<dst> | | Move / rename file or dir. e.g. **mv /home/a.txt /home/b.txt** |
+| cp \<src> \<dst> | | Copy file. e.g. **cp /home/a.txt /home/b.txt** |
+| pwd | | Print current working directory. e.g. **pwd** |
+| rm \<file_or_dir> | | Remove file or directory. e.g. **rm /home/notes.txt** |
+| cat \<file> | | Print file contents to terminal (renamed from `fread`). e.g. **cat /home/notes.txt** |
+| fwrite \<file> | f=\<file> v=\<value> | Open file in append mode; type content line by line. Press **ESC** to save & exit. e.g. **fwrite /home/notes.txt** or **fwrite f=/home/notes.txt v=hello** |
+| head \<file> [N] | | Print first N lines (default 10); constant memory. e.g. **head /home/log.txt 5** |
+| tail \<file> [N] | | Print last N lines (default 10); constant memory. e.g. **tail /home/log.txt 5** |
+| wc \<file> | | Print line / word / byte counts (Linux `wc` order). e.g. **wc /home/log.txt** |
+| df | | Print filesystem total / used (%) / free in bytes. e.g. **df** |
+| hexdump \<file> | | `hexdump -C` layout: offset, 16 hex bytes, ASCII. e.g. **hexdump /home/bin.dat** |
+| grep \<pattern> \<file_or_dir> | | Search a file or dir (recursive). Output `path:line:col:content` (vim/vscode jump format). Regex subset: `.` `*` `+` `?` `^` `$` `[abc]` `[a-z]` `[^abc]` `\\<char>`. No alternation / groups / backrefs. e.g. **grep ^ERROR /home/log.txt** |
+| cls | | Clear screen. e.g. **cls** |
+| cd \<dir> | | Change directory. e.g. **cd /home/scripts** |
+| gpio p=\<pin>,m=\<mode>,v=\<value> | p=\<pin> m=\<mode> v=\<value> | Perform GPIO operations. Modes: OFF=0, DIGITAL_WRITE=1, DIGITAL_READ=2, DIGITAL_BLINK=3, ANALOG_WRITE=4, ANALOG_READ=5. e.g. blink GPIO 4 at 500 ms: **gpio p=4,m=3,v=500** |
+| srvc s=\<service>,q=\<query> | s=\<service> q=\<query> | Query running services. Use `srvc l` to list ids. Queries: QUERY_CONFIG=1, QUERY_STATUS=2. e.g. **srvc s=1,q=2** |
+| scht | l\<list> | List active scheduler tasks. e.g. **scht l** |
+| ssh q=\<query>,t=\<algo> | q=\<query> t=\<algo> | SSH command. q=1 (SSH_COMMAND_QUERY_KEYGEN) creates keypair of given algo. e.g. **ssh q=1,t=2** |
+| net \<options> | ip, scansta, connsta | Query network params. **ip** shows STA/AP info; **scansta** lists nearby SSIDs; **connsta** joins one. e.g. **net connsta,\<ssid>,\<password>** |
+| reboot | | Reboot the device. e.g. **reboot** |
+| watch | c=\<command> i=\<interval_ms> n=\<iterations> | Run a command periodically. Default interval 1 s, infinite iterations. Stop with Ctrl+C. Options separated by `;`. e.g. **watch c=net ip; i=3000; n=10** |
+| iot \<options> | setid, getid, sethost, gethost | Manage IoT config. **setid/getid** for device unique ID; **sethost/gethost** for IoT HTTP host. e.g. **iot setid,\<DeviceID>** or **iot sethost,\<HostAddress>** |
+| help | | List every registered command. Available before login. Tab-completion works on partial names. e.g. **help** |
+| uptime | | Time since boot as `up Xd Yh Zm Ws`. Wraps at ~49.7 days. e.g. **uptime** |
+| tls q=\<query>,t=\<algo>,l=\<bits>,n=\<CN/DNS>,i=\<IPv4> | q (1=CERTGEN), t (0=EC, 1=RSA), l (key bits / curve size), n (CN or DNS SAN), i (IPv4 SAN) | On-device TLS cert generation. esp32 builds with `ENABLE_TLS_CERT_GENERATION` only. Output at `TLS_DEFAULT_SERVER_CERT_PATH` / `TLS_DEFAULT_SERVER_KEY_PATH`. e.g. **tls q=1,t=0,l=256,n=device.local,i=192.168.1.50** |
 
 Each command's implementation lives in [src/service_provider/cmd/commands/](src/service_provider/cmd/commands/) — one `<Name>Command.h` per verb, with names registered in [CommandCommon.h](src/service_provider/cmd/commands/CommandCommon.h). The newer file-system commands (`head`, `tail`, `wc`, `grep`, `hexdump`) use the **positional-arg** style (`setAcceptArgsOptions(true)` + space separator) instead of the `key=value` form — closer to the shell idiom users expect.
 
@@ -2376,7 +2367,7 @@ __task_scheduler.scheduleUnderExecSched(
 
 Maps directly to [§4. Task Scheduler](#4-task-scheduler) — particularly §4.4 (API by use case) and §4.8 (contextual scheduling).
 
-The comment at line 76-77 is worth heeding: **disable `ENABLE_LOG_*`** before running, or the framework's own log output will interleave with the demo prints and obscure the schedule.
+**Disable `ENABLE_LOG_*`** before running this example, or the framework's own log output will interleave with the demo prints and obscure the schedule.
 
 ### 11.3 `AddingDatabaseTable` — app-side persistence without codegen
 
@@ -2702,7 +2693,7 @@ Each row below: what the interface models, who implements it on a typical port, 
 
 | Interface | Path | Implementer | Consumers | Key methods |
 |---|---|---|---|---|
-| `iGpioInterface` | [drivers/iGpioInterface.h](src/interface/pdi/drivers/iGpioInterface.h) | Device (folded into `DeviceControlInterface`) | `GpioServiceProvider`, `gpio` CLI | `gpioMode`, `gpioWrite`, `gpioRead`, `gpioFromPinMap`, `isExceptionalGpio`, `createGpioBlinkerInstance` / `releaseGpioBlinkerInstance` |
+| `iGpioInterface` | [drivers/iGpioInterface.h](src/interface/pdi/drivers/iGpioInterface.h) | Device (via `DeviceControlInterface`) | `GpioServiceProvider`, `gpio` CLI | `gpioMode`, `gpioWrite`, `gpioRead`, `gpioFromPinMap`, `isExceptionalGpio`, blink instance create/release |
 | `iGpioBlinkerInterface` | same file | Device | GPIO service for blink mode | `setConfig`, `updateConfig`, `start`, `stop`, `isRunning` |
 | `iWdtInterface` | [drivers/iWdtInterface.h](src/interface/pdi/drivers/iWdtInterface.h) | Device (folded into `DeviceControlInterface`) | Long-running services, scheduler | `enableWdt(mode)`, `disableWdt`, `feedWdt` |
 
@@ -2726,7 +2717,7 @@ Each row below: what the interface models, who implements it on a typical port, 
 |---|---|---|---|---|
 | `iSerialInterface` | [modules/serial/iSerialInterface.h](src/interface/pdi/modules/serial/iSerialInterface.h) | Device | `SerialServiceProvider`, logger, CLI | Derives from `iClientInterface`; serial is just another stream |
 | `iStorageInterface` | [modules/storage/iStorageInterface.h](src/interface/pdi/modules/storage/iStorageInterface.h) | Device (EEPROM / flash / SD adapter) | `iFileSystemInterface`, `littlefs` | Byte-addressable: `read`, `write`, `erase`, `size` |
-| `iFileSystemInterface` | [modules/storage/iFileSystemInterface.h](src/interface/pdi/modules/storage/iFileSystemInterface.h) | Device (often via [`FileSystemInterfaceImpl`](src/interface/pdi/impl/modules/storage/FileSystemInterfaceImpl.h)) | SSH/SFTP, `cat`/`fwrite`/`ls`/`cd`/`mv`/`cp`/`rm`/`mkd`/`mkf`/`head`/`tail`/`wc`/`df`/`grep`/`hexdump` CLI | 42 virtuals: file & directory CRUD, traversal, line/offset lookup, search (`findInFile`, `getLineNumbersInFile`, `getOffsetFromLineNumber`, `getLineNumberFromOffset`), and custom file attributes (`setFileAttr` / `getFileAttr` / `removeFileAttr`). Constructed with an `iStorageInterface&` |
+| `iFileSystemInterface` | [modules/storage/iFileSystemInterface.h](src/interface/pdi/modules/storage/iFileSystemInterface.h) | Device (often via [`FileSystemInterfaceImpl`](src/interface/pdi/impl/modules/storage/FileSystemInterfaceImpl.h)) | SSH/SFTP + file-oriented CLI commands | 42 virtuals: file/dir CRUD, traversal, line/offset lookup, search (`findInFile`, `getLineNumbersInFile`, offset⇄line), custom file attributes. Constructed with an `iStorageInterface&` |
 | `iWiFiInterface` | [modules/wifi/iWiFiInterface.h](src/interface/pdi/modules/wifi/iWiFiInterface.h) | Device (esp8266/esp32) | `WiFiServiceProvider`, `net` CLI | STA + AP, scan (sync/async), `enableNAPT`, `setMode`/`getMode` |
 
 #### 13.3.5 Optional helpers
@@ -3016,7 +3007,7 @@ Most of these have appeared in passing in earlier sections. This section is the 
 | **Data type conversions** | `DataTypeConversions.{h,cpp}` | int/string/BCD/hex conversions without `printf` |
 | **Base64** | `Base64.{h,cpp}` | Encoding + 16-byte unique key generator |
 | **Regex match** | `RegexMatch.{h,cpp}` | Minimal regex engine — `.` `*` `+` `?` `^` `$` `[abc]` `[a-z]` `[^abc]` `\<char>`. No alternation or grouping. Powers the `grep` CLI |
-| **Safe alloc** | `SafeAlloc.{h,cpp}` | Heap-checked `pdiutil::safe_new<T>(args...)` / `safe_new_array<T>(n)` plus `safe_delete` / `safe_delete_array` (null-safe, ref-param sets pointer to `nullptr`). Refuses allocations that would breach `PDI_SAFE_ALLOC_HEAP_MARGIN` (default 2 KB headroom). Used by the TLS path to bail cleanly when handshakes can't safely allocate |
+| **Safe alloc** | `SafeAlloc.{h,cpp}` | Heap-checked `pdiutil::safe_new<T>(args...)` / `safe_new_array<T>(n)` + `safe_delete` / `safe_delete_array` (null-safe). Refuses allocations that would breach `PDI_SAFE_ALLOC_HEAP_MARGIN` (default 2 KB headroom). Used by the TLS path to bail cleanly on tight heap |
 | **Queue / RingBuf / Proto** | `queue/queue.{h,cpp}`, `queue/ringbuf.{h,cpp}`, `queue/proto.{h,cpp}` | Byte queues and a length-prefixed parser |
 | **Utility umbrella** | `Utility.{h,cpp}` | Single `#include <utility/Utility.h>` that pulls the lot in (conditional on `ENABLE_*`) |
 | **Crypto** | `crypto/` | SHA-1/256/512, HMAC-SHA1, AES (ECB/CBC/CTR), Curve25519, Ed25519 |
@@ -3307,7 +3298,7 @@ A quick scan of the most common ways extensions fail to land cleanly:
 
 ## 17. Troubleshooting & FAQ
 
-This section bundles the most common problems contributors and integrators hit, plus answers to questions that recur. Each entry is short by design — the deep explanations live in the section it points to.
+Common problems and recurring questions. Each entry is short — deep explanations live in the sections they point to.
 
 ### 17.1 Build & flash problems
 
@@ -3452,8 +3443,8 @@ Not bundled. `devices/mockdevice/` is a header-only stub that lets the framework
 **Q. How do I unit-test framework code?**
 The interface-based design supports it: mock the `i*Interface` your unit depends on and link against the unit's `.cpp`. The framework doesn't ship a test harness — bring your own (CppUTest, Catch2, …). PdiSTL works on host x86 with GCC.
 
-**Q. What's the upgrade path from old `esp8266-framework` (Suraj151's prior repo)?**
-The README references the older repo's screenshots. Migration is mostly mechanical — rename `__i_dvc_ctrl` calls, replace `String` with `pdiutil::string`, follow the [§14.8 device port guide](#148-adding-a-new-device--step-by-step) if you had a custom board.
+**Q. What's the upgrade path from the old `esp8266-framework` repo?**
+Migration is mostly mechanical — rename `__i_dvc_ctrl` calls, replace `String` with `pdiutil::string`, follow the [§14.8 device port guide](#148-adding-a-new-device--step-by-step) if you had a custom board.
 
 **Q. Does the framework receive security updates?**
 Crypto primitives are upstream (`ed25519`, `curve25519`, `aes`, `sha*`) — vendored copies. There's no automated CVE tracking. If you ship a product on it, mirror the upstream sources and watch their release feeds yourself.
