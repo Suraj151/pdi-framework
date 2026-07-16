@@ -79,12 +79,6 @@ created Date    : 1st June 2019
 // #define ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME
 #endif
 
-/**
- * enable/disable cmd service here
- */
-#define ENABLE_CMD_SERVICE
-
-
 #ifdef ENABLE_NETWORK_SERVICE
 
 /**

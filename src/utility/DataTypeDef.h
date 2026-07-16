@@ -19,6 +19,7 @@ Created Date    : 1st June 2019
 #include <stdint.h>
 #include <stddef.h>
 #include <stdarg.h>
+#include <limits.h>
 #include <utility/pdistl/functional>
 #include <utility/pdistl/string>
 #include <utility/pdistl/vector>

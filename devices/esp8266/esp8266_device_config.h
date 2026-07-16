@@ -57,6 +57,11 @@ created Date    : 1st Jan 2026
 #define ENABLE_AUTH_SERVICE
 
 /**
+ * enable/disable cmd service here
+ */
+#define ENABLE_CMD_SERVICE
+
+/**
  * device capabilities (read by common config to gate optional features)
  */
 #define DEVICE_SUPPORTS_TLS

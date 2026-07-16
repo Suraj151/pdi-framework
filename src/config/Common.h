@@ -37,7 +37,9 @@ created Date    : 1st June 2019
 /**
  * max tasks and callbacks
  */
+#ifndef MAX_SCHEDULABLE_TASKS
 #define MAX_SCHEDULABLE_TASKS	25
+#endif
 #define MAX_FACTORY_RESET_CALLBACKS	MAX_SCHEDULABLE_TASKS
 
 

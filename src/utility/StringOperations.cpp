@@ -440,9 +440,10 @@ int __sprintf(char *str, const char *format, ...)
 {
     va_list args;
     va_start(args, format);
-    // No size bound — callers are responsible for buffer sizing. Pass a large
-    // value so __vsnprintf's internal "size - 1" bookkeeping still works.
-    int r = __vsnprintf(str, INT32_MAX, format, args);
+    // No size bound — callers are responsible for buffer sizing. Pass the
+    // largest positive value that fits in __vsnprintf's `int size` parameter
+    // (INT_MAX is 32767 on 16-bit int platforms like AVR).
+    int r = __vsnprintf(str, INT_MAX, format, args);
     va_end(args);
     return r;
 }

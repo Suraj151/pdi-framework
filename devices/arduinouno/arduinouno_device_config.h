@@ -47,4 +47,9 @@ created Date    : 1st Jan 2026
  */
 #define ENABLE_GPIO_BASIC_ONLY
 
+/**
+ * max tasks
+ */
+#define MAX_SCHEDULABLE_TASKS	8
+
 #endif // _ARDUINOUNO_DEVICE_CONFIG_H_
