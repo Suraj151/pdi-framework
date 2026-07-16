@@ -194,7 +194,7 @@ private:
     volatile bool m_inPump;
 
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    int           m_taskId;
+    pdiutil::task_id_t m_taskId;
     volatile bool m_taskRunning;
     #endif
 

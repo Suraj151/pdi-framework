@@ -99,7 +99,7 @@ void LoggerInterface::log_success(const char *success)
  */
 void LoggerInterface::log_format(const char *format, logger_type_t log_type, ...)
 {
-    int fmtLen = strlen_P(format); 
+    size_t fmtLen = strlen_P(format);
     char *fmtLocal = new char[fmtLen+1];
     memset(fmtLocal, 0, fmtLen+1);
     memcpy_P (fmtLocal, format, fmtLen);
@@ -107,7 +107,7 @@ void LoggerInterface::log_format(const char *format, logger_type_t log_type, ...
     va_list args;
     va_start(args, fmtLocal);
 
-    for (int indx = 0; indx < fmtLen; indx++)
+    for (size_t indx = 0; indx < fmtLen; indx++)
     {
         if( fmtLocal[indx] == '%' && indx < (fmtLen-1) )
         {

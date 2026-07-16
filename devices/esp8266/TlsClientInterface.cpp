@@ -421,7 +421,7 @@ void TlsClientInterface::stopTlsWorker() {
     if (m_taskId < 0) return;
 
     m_taskRunning = false;
-    int taskid = m_taskId;
+    pdiutil::task_id_t taskid = m_taskId;
     m_taskId = -1;
 
     LogFmtI("TLS stopTlsWorker : %d\n", taskid);

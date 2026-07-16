@@ -326,9 +326,9 @@ void CooperativeScheduler::remove_from_sleepers(Cooperative* f) {
 Cooperative* CooperativeScheduler::pick_next_ready() {
 
     Cooperative* best = nullptr;
-    int bestScore = -1;
+    int32_t bestScore = -1;
 
-    for (int i = 0; i < ready.size(); ++i) {
+    for (uint16_t i = 0; i < ready.size(); ++i) {
 
         Cooperative* f = ready[i];
 
@@ -336,7 +336,7 @@ Cooperative* CooperativeScheduler::pick_next_ready() {
         if (!t) continue;
 
         // Aging: score(effective priority) = base_priority + wait_ticks
-        int score = t->_task_priority + f->wait_ticks;
+        int32_t score = t->_task_priority + f->wait_ticks;
 
         if (score > bestScore) {
             bestScore = score;

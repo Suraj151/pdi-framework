@@ -470,13 +470,13 @@ void PreemptiveScheduler::remove_from_sleepers(Preemptive* f) {
 Preemptive* PreemptiveScheduler::pick_next_ready() {
 
     Preemptive* best = nullptr;
-    int bestScore = -1;
+    int32_t bestScore = -1;
     Preemptive* nonpreemptive = &__non_preemptive;
 
-    for (int i = 0; i < ready.size(); ++i) {
+    for (uint16_t i = 0; i < ready.size(); ++i) {
 
         Preemptive* f = ready[i];
-        int p = 0; // default priority
+        int32_t p = 0; // default priority
         task_t* t = __task_scheduler.get_task(f->task_id);
 
         if(t) p = t->_task_priority;
@@ -486,7 +486,7 @@ Preemptive* PreemptiveScheduler::pick_next_ready() {
         }
 
         // Aging: score(effective priority) = base_priority + wait_ticks
-        int score = p + f->wait_ticks;
+        int32_t score = p + f->wait_ticks;
 
         if (score > bestScore) {
             bestScore = score;

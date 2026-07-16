@@ -271,7 +271,7 @@ int32_t TcpClientInterface::write_ro(const char *c_str)
     auto len = strlen_P(p);
     int32_t n = 0;
     while (n < len) {
-        int to_write = std::min(sizeof(buff), len - n);
+        size_t to_write = std::min(sizeof(buff), (size_t)(len - n));
         memcpy_P(buff, p, to_write);
         auto written = write(buff, to_write);
         n += written;

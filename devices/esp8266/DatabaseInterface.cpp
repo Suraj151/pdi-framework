@@ -25,7 +25,7 @@ void DatabaseInterface::beginConfigs(uint32_t _size)
  */
 void DatabaseInterface::cleanAllConfigs(void)
 {
-  for (int i = 0; i < DATABASE_MAX_SIZE; i++)
+  for (uint16_t i = 0; i < DATABASE_MAX_SIZE; i++)
   {
     EEPROM.write(i, 0);
   }

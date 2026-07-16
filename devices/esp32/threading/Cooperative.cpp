@@ -249,15 +249,15 @@ void CooperativeScheduler::sleep_from_othersched(uint32_t ms) {
 Cooperative* CooperativeScheduler::pick_next_ready() {
 
     Cooperative* best = nullptr;
-    int bestScore = -1;
+    int32_t bestScore = -1;
 
-    for (int i = 0; i < ready.size(); ++i) {
+    for (uint16_t i = 0; i < ready.size(); ++i) {
 
         Cooperative* f = ready[i];
         task_t* t = __task_scheduler.get_task(f->task_id);
         if (!t) continue;
 
-        int score = t->_task_priority + f->wait_ticks;
+        int32_t score = t->_task_priority + f->wait_ticks;
         if (score > bestScore) {
             bestScore = score;
             best = f;
