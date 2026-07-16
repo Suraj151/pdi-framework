@@ -58,7 +58,7 @@ struct login_credential {
 //   DEFAULT_LOGIN_USERNAME,  DEFAULT_LOGIN_PASSWORD, SERVER_SESSION_NAME, SERVER_COOKIE_MAX_AGE
 // };
 
-const int login_credential_size = sizeof(login_credential) + 5;
+const size_t login_credential_size = sizeof(login_credential) + 5;
 
 using login_credential_table = login_credential;
 

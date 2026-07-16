@@ -232,7 +232,7 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
 
   for (uint8_t _pin = 0; _pin < MAX_ANALOG_GPIO_PINS; _pin++) {
 
-    if( this->isAllowedGpioPin(MAX_DIGITAL_GPIO_PINS+_pin, allowedlist) ){
+    if( !__i_dvc_ctrl.isExceptionalGpio(MAX_DIGITAL_GPIO_PINS+_pin) && this->isAllowedGpioPin(MAX_DIGITAL_GPIO_PINS+_pin, allowedlist) ){
 
       _payload += "\"A";
       _payload += pdiutil::to_string(_pin);

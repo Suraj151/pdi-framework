@@ -15,7 +15,7 @@ Created Date    : 1st June 2019
  *
  * Initializes the EventUtil object and sets default values for internal state.
  */
-EventUtil::EventUtil() : m_last_event(0),
+EventUtil::EventUtil() : m_last_event(EVENT_NAME_MAX),
                          m_last_event_millis(0),
                          m_util(nullptr)
 {

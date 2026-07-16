@@ -16,6 +16,7 @@ Created Date    : 1st June 2019
 #define _DATA_TYPE_DEFS_H_
 
 #include "../../devices/DeviceConfig.h"
+#include "pdi_types.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdarg.h>
@@ -212,7 +213,7 @@ namespace rofn{
 
 
 /* Connection status enums */
-typedef enum {
+enum conn_status : uint8_t {
     CONN_STATUS_IDLE = 0,
     CONN_STATUS_CONNECTED,
     CONN_STATUS_CONNECTION_FAILED,
@@ -221,7 +222,8 @@ typedef enum {
     CONN_STATUS_NOT_AVAILABLE,
     CONN_STATUS_DISCONNECTED,
     CONN_STATUS_MAX
-} conn_status_t;
+};
+typedef enum conn_status conn_status_t;
 
 // GPIO and WiFi-related typedefs
 typedef uint8_t gpio_id_t;
@@ -243,21 +245,22 @@ typedef pdiutil::function<bool(const uint8_t *, uint32_t)> CallBackBytesArgBoolR
 /**
  * Logging types
  */
-typedef enum {
+enum logger_type : uint8_t {
     INFO_LOG,
     ERROR_LOG,
     WARNING_LOG,
     SUCCESS_LOG
-} logger_type_t;
+};
+typedef enum logger_type logger_type_t;
 
 /**
  * IP address types
  */
-typedef enum {
+enum ip_addr_type : uint8_t {
     IP_ADDR_TYPE_V4 = 4,  /** IPv4 */
     IP_ADDR_TYPE_V6 = 6,  /** IPv6 */
     IP_ADDR_TYPE_ANY = 46 /** IPv4+IPv6 ("dual-stack") */
-} ip_addr_type;
+};
 
 // IPv4 address constants and macros
 /** 255.255.255.255 */
@@ -378,12 +381,13 @@ struct wifi_station_info_t {
 /**
  * Upgrade status enums
  */
-typedef enum {
+enum upgrade_status : int8_t {
     UPGRADE_STATUS_FAILED = -1,
     UPGRADE_STATUS_SUCCESS,
     UPGRADE_STATUS_IGNORE, // No update available
     UPGRADE_STATUS_MAX
-} upgrade_status_t;
+};
+typedef enum upgrade_status upgrade_status_t;
 
 /**
  * @struct task_t
@@ -399,30 +403,32 @@ typedef enum {
 class iExecutive;
 #endif
 
-typedef enum TaskMode { 
-    TASK_MODE_INLINE = 0, 
+enum TaskMode : uint8_t {
+    TASK_MODE_INLINE = 0,
 #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    TASK_MODE_COOPERATIVE, 
-    TASK_MODE_PREEMPTIVE, 
+    TASK_MODE_COOPERATIVE,
+    TASK_MODE_PREEMPTIVE,
 #endif
     TASK_MODE_MAX
-} task_mode_t;
+};
+typedef enum TaskMode task_mode_t;
 
-typedef enum TaskPolicy { 
-    TASK_POLICY_FIFO = 0, ///< First-In-First-Out 
-    TASK_POLICY_ROUNDROBIN, ///< Equal time slices 
-    TASK_POLICY_DEADLINE, ///< Earliest deadline first 
-    TASK_POLICY_FAIRSHARE ///< Balance across tasks 
-} task_policy_t;
+enum TaskPolicy : uint8_t {
+    TASK_POLICY_FIFO = 0, ///< First-In-First-Out
+    TASK_POLICY_ROUNDROBIN, ///< Equal time slices
+    TASK_POLICY_DEADLINE, ///< Earliest deadline first
+    TASK_POLICY_FAIRSHARE ///< Balance across tasks
+};
+typedef enum TaskPolicy task_policy_t;
 
 struct task_t {
-    int _task_id; ///< Task ID
-    int _max_attempts; ///< Maximum number of attempts
-    uint64_t _duration; ///< Task duration in milliseconds
-    uint64_t _last_millis; ///< Last execution timestamp
+    pdiutil::task_id_t _task_id; ///< Task ID (-1 = invalid)
+    pdiutil::attempts_t _max_attempts; ///< Maximum number of attempts (-1 = unlimited, 0 = expired)
+    pdiutil::millis_t _duration; ///< Task duration in milliseconds
+    pdiutil::millis_t _last_millis; ///< Last execution timestamp
     CallBackVoidArgFn _task; ///< Task callback function
-    int _task_priority; ///< Task priority (default is 0)
-    uint64_t _task_exec_millis; ///< Task execution timestamp
+    pdiutil::task_priority_t _task_priority; ///< Task priority (default is 0)
+    pdiutil::millis_t _task_exec_millis; ///< Task execution timestamp
     task_mode_t _task_mode; ///< Task mode
     task_policy_t _task_policy; ///< Task policy
     #ifdef ENABLE_CONTEXTUAL_EXECUTION    
@@ -491,17 +497,18 @@ struct task_t {
 /**
  * Terminal types
  */
-typedef enum terminal_types {
+enum terminal_types : uint8_t {
     TERMINAL_TYPE_SERIAL = 0,
     TERMINAL_TYPE_TELNET,
     TERMINAL_TYPE_SSH,
     TERMINAL_TYPE_MAX
-} terminal_types_t;
+};
+typedef enum terminal_types terminal_types_t;
 
 /* 
  * enumeration for special terminal input sequences 
  */
-enum cmd_term_inseq_t {
+enum cmd_term_inseq_t : uint8_t {
     CMD_TERM_INSEQ_NONE = 0,
     CMD_TERM_INSEQ_ENTER,
     CMD_TERM_INSEQ_BACKSPACE_CHAR,
@@ -531,7 +538,7 @@ enum cmd_term_inseq_t {
 #define FILE_SEPARATOR "/"
 #define FILE_NAME_MAX_SIZE 24
 
-enum file_type_t {
+enum file_type_t : uint8_t {
     FILE_TYPE_REG = 0, ///< Regular file
     FILE_TYPE_DIR, ///< Directory
     FILE_TYPE_LINK, ///< Symbolic link

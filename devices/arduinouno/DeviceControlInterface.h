@@ -93,7 +93,7 @@ private:
 
   gpio_id_t m_pin;
   gpio_val_t m_duration;
-  int m_ticker_id;
+  pdiutil::task_id_t m_ticker_id;
 
 public:
   /**

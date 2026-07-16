@@ -87,7 +87,7 @@ struct email_config {
 //   DEFAULT_MAIL_FROM, DEFAULT_MAIL_FROM_NAME, DEFAULT_MAIL_TO, DEFAULT_MAIL_SUBJECT, DEFAULT_MAIL_FREQUENCY
 // };
 
-const int email_config_size = sizeof(email_config) + 5;
+const size_t email_config_size = sizeof(email_config) + 5;
 
 using email_config_table = email_config;
 

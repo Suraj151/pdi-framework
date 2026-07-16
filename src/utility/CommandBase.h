@@ -26,7 +26,7 @@ Created Date    : 1st June 2019
  * @enum cmd_result_t
  * @brief Represents the result of a command execution.
  */
-typedef enum {
+enum cmd_result : uint8_t {
     CMD_RESULT_OK = 0,               ///< Command executed successfully.
     CMD_RESULT_ARGS_ERROR,           ///< Argument error in the command.
     CMD_RESULT_ARGS_MISSING,         ///< Missing arguments for the command.
@@ -42,18 +42,20 @@ typedef enum {
     CMD_RESULT_TERMINAL_ABORTED,     ///< Terminal was aborted.
     CMD_RESULT_TERMINAL_HOLD_BUFFER, ///< Terminal is about to hold buffer.
     CMD_RESULT_MAX                   ///< Unknown or unhandled result.
-} cmd_result_t;
+};
+typedef enum cmd_result cmd_result_t;
 
 /**
  * @enum cmd_status_t
  * @brief Represents the status of a command.
  */
-typedef enum {
+enum cmd_status : uint8_t {
     CMD_STATUS_IDLE = 0,             ///< Command is idle.
     CMD_STATUS_ACTIVE,               ///< Command is active.
     CMD_STATUS_INACTIVE,             ///< Command is inactive.
     CMD_STATUS_MAX                   ///< Unknown or unhandled status.
-} cmd_status_t;
+};
+typedef enum cmd_status cmd_status_t;
 
 /* Command constants */
 #ifndef CMD_SIZE_MAX

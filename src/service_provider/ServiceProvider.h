@@ -173,10 +173,10 @@ class ServiceProvider{
     static iTerminalInterface *m_terminal;
 
     /**
-     * @var int32_t m_service_task_id
+     * @var pdiutil::task_id_t m_service_task_id
      * @brief Task ID associated with the service.
      */
-    int32_t m_service_routine_task_id;
+    pdiutil::task_id_t m_service_routine_task_id;
 };
 
 #endif

@@ -58,7 +58,7 @@ class DeviceIotServiceProvider : public ServiceProvider {
     uint16_t  m_server_configurable_sensor_data_publish_freq;
 
     char      m_server_configurable_channel_host[DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE];
-    uint32_t  m_server_configurable_channel_port;
+    pdiutil::net_port_t m_server_configurable_channel_port;
     char      m_server_configurable_channel_read[DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE];
     char      m_server_configurable_channel_write[DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE];
     char      m_server_configurable_channel_token[DEVICE_IOT_CONFIG_CHANNEL_TOKEN_MAX_SIZE];
@@ -74,9 +74,9 @@ class DeviceIotServiceProvider : public ServiceProvider {
     bool      m_token_validity;
     uint16_t  m_sample_index;
 
-    int16_t   m_handle_sensor_data_cb_id;
-    int16_t   m_mqtt_connection_check_cb_id;
-    int16_t   m_device_config_request_cb_id;
+    pdiutil::task_id_t m_handle_sensor_data_cb_id;
+    pdiutil::task_id_t m_mqtt_connection_check_cb_id;
+    pdiutil::task_id_t m_device_config_request_cb_id;
 
     /**
 		 * @var	iDeviceIotInterface*  m_device_iot

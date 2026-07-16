@@ -121,7 +121,7 @@ enum smtp_reply_code
    SMTP_STATUS_MAX = 999
 };
 
-enum smtp_command_status
+enum smtp_command_status : uint8_t
 {
    SMTP_RESPONSE_CONN_ERR,
    SMTP_RESPONSE_STARTING,
@@ -153,8 +153,8 @@ public:
    void waitForResponse(uint16_t _timeOut = SMTP_DEFAULT_TIMEOUT);
    bool waitForExpectedResponse(char *expectedResponse, uint16_t _timeOut = SMTP_DEFAULT_TIMEOUT);
    bool sendCommandAndExpect(char *command, char *expectedResponse, uint16_t _timeOut = SMTP_DEFAULT_TIMEOUT);
-   int sendCommandAndGetCode(char *command, uint16_t _timeOut = SMTP_DEFAULT_TIMEOUT);
-   int sendCommandAndGetCode(const char * command, uint16_t _timeOut = SMTP_DEFAULT_TIMEOUT);
+   int16_t sendCommandAndGetCode(char *command, uint16_t _timeOut = SMTP_DEFAULT_TIMEOUT);
+   int16_t sendCommandAndGetCode(const char * command, uint16_t _timeOut = SMTP_DEFAULT_TIMEOUT);
 
    bool sendHello(char *domain);
    bool sendAuthLogin(char *username, char *password);
@@ -171,7 +171,7 @@ public:
 protected:
    iClientInterface *m_client;
    uint16_t m_port;
-   int m_lastResponseCode;
+   int16_t m_lastResponseCode;
    uint16_t m_responseBufferIndex;
    uint32_t m_lastReceive;
    uint32_t m_timeOut;

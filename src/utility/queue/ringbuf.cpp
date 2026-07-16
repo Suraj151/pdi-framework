@@ -12,7 +12,7 @@
  * @param size size of buf
  * @return 0 if successfull, otherwise failed
  */
-int RINGBUF_Init(RINGBUF *r, unsigned char *buf, unsigned int size)
+int RINGBUF_Init(RINGBUF *r, uint8_t *buf, size_t size)
 {
 	if (r == NULL || buf == NULL || size < 2)
 		return -1;
@@ -29,7 +29,7 @@ int RINGBUF_Init(RINGBUF *r, unsigned char *buf, unsigned int size)
  * @param c character to be put
  * @return 0 if successfull, otherwise failed
  */
-int RINGBUF_Put(RINGBUF *r, unsigned char c)
+int RINGBUF_Put(RINGBUF *r, uint8_t c)
 {
 	if (r->fill_cnt >= r->size)
 		return -1; // ring buffer is full, this should be atomic operation
@@ -49,7 +49,7 @@ int RINGBUF_Put(RINGBUF *r, unsigned char c)
  * @param c read character
  * @return 0 if successfull, otherwise failed
  */
-int RINGBUF_Get(RINGBUF *r, unsigned char *c)
+int RINGBUF_Get(RINGBUF *r, uint8_t *c)
 {
 	if (r->fill_cnt <= 0)
 		return -1; // ring buffer is empty, this should be atomic operation

@@ -13,11 +13,11 @@
  */
 typedef struct
 {
-    unsigned char *p_o;				/**< Original pointer to the buffer memory */
-    unsigned char *volatile p_r;	/**< Read pointer indicating the next byte to read */
-    unsigned char *volatile p_w;	/**< Write pointer indicating the next byte to write */
-    volatile unsigned int fill_cnt; /**< Number of filled slots in the buffer */
-    unsigned int size;				/**< Total size of the buffer */
+    uint8_t *p_o;				/**< Original pointer to the buffer memory */
+    uint8_t *volatile p_r;	/**< Read pointer indicating the next byte to read */
+    uint8_t *volatile p_w;	/**< Write pointer indicating the next byte to write */
+    volatile size_t fill_cnt; /**< Number of filled slots in the buffer */
+    size_t size;				/**< Total size of the buffer */
 } RINGBUF;
 
 /**
@@ -31,7 +31,7 @@ typedef struct
  * @param size Size of the memory buffer.
  * @return 0 on success, -1 on failure.
  */
-int RINGBUF_Init(RINGBUF *r, unsigned char *buf, unsigned int size);
+int RINGBUF_Init(RINGBUF *r, uint8_t *buf, size_t size);
 
 /**
  * @brief Adds a byte to the ring buffer.
@@ -43,7 +43,7 @@ int RINGBUF_Init(RINGBUF *r, unsigned char *buf, unsigned int size);
  * @param c The byte to add to the buffer.
  * @return 0 on success, -1 if the buffer is full.
  */
-int RINGBUF_Put(RINGBUF *r, unsigned char c);
+int RINGBUF_Put(RINGBUF *r, uint8_t c);
 
 /**
  * @brief Retrieves a byte from the ring buffer.
@@ -55,6 +55,6 @@ int RINGBUF_Put(RINGBUF *r, unsigned char c);
  * @param c Pointer to store the retrieved byte.
  * @return 0 on success, -1 if the buffer is empty.
  */
-int RINGBUF_Get(RINGBUF *r, unsigned char *c);
+int RINGBUF_Get(RINGBUF *r, uint8_t *c);
 
 #endif

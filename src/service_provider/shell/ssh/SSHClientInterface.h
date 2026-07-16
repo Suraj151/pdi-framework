@@ -188,7 +188,7 @@ private:
     iTcpClientInterface* m_tcpClient;
     LWSSHSession* m_client_session;
     uint32_t m_minSizeToWritePayload;
-    int m_writeCommitTaskId;
+    pdiutil::task_id_t m_writeCommitTaskId;
 };
 
 }

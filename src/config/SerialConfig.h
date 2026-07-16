@@ -46,7 +46,7 @@ typedef enum serial_iface{
 /**
 * available serial modes
 */
-enum SERIAL_MODE {
+enum SERIAL_MODE : uint8_t {
   SERIAL_MODE_OFF = GPIO_MODE_MAX,
   SERIAL_WRITE,
   SERIAL_READ,

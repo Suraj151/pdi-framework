@@ -60,7 +60,7 @@ bool NtpInterface::is_valid_ntptime()
  *
  * @return  time_t
  */
-long NtpInterface::get_ntp_time()
+pdiutil::epoch_time_t NtpInterface::get_ntp_time()
 {
   return time(nullptr);
 }

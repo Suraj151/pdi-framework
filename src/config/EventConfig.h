@@ -20,7 +20,7 @@ created Date    : 1st June 2019
 /**
 * available event names
 */
-typedef enum event_name{
+enum event_name : uint8_t {
 
   EVENT_WIFI_STA_CONNECTED = 0,
   EVENT_WIFI_STA_GOT_IP,
@@ -32,7 +32,8 @@ typedef enum event_name{
   EVENT_FACTORY_RESET,
   EVENT_SERIAL_AVAILABLE,
   EVENT_NAME_MAX,
-} event_name_t;
+};
+typedef enum event_name event_name_t;
 
 /**
 * event listener struct type for event
@@ -46,11 +47,11 @@ typedef struct event_listener {
 
   // Clear members method
   void clear(){
-    _event = 0;
+    _event = EVENT_NAME_MAX;
     _event_handler = nullptr;
   }
 
-  int _event;
+  event_name_t _event;
   CallBackVoidPointerArgFn _event_handler;
 } event_listener_t;
 

@@ -374,9 +374,9 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
 
   memset( _value_buff, 0, 100 );
   _json_result = __get_from_json( json_resp, DEVICE_IOT_CONFIG_CHANNEL_PORT_KEY, _value_buff, 31 );
-  if( _json_result && 0 < this->m_server_configurable_channel_port && this->m_server_configurable_channel_port <= UINT32_MAX ){
+  if( _json_result && 0 < this->m_server_configurable_channel_port && this->m_server_configurable_channel_port <= UINT16_MAX ){
 
-    this->m_server_configurable_channel_port = StringToUint32( _value_buff, 31 );
+    this->m_server_configurable_channel_port = (pdiutil::net_port_t)StringToUint32( _value_buff, 31 );
     LogFmtI("Got Channel Port : %d\n", (int)this->m_server_configurable_channel_port);
   }else{
     this->m_server_configurable_channel_port = DEVICE_IOT_DEFAULT_CHANNEL_DATA_PORT;

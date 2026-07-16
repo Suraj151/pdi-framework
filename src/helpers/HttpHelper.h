@@ -60,8 +60,8 @@ static rofn::ROPTR getHttpStatusString(int code) {
 static void urlDecode(pdiutil::string& text){
 
     pdiutil::string decoded;
-    unsigned int len = text.length();
-    unsigned int i = 0;
+    size_t len = text.length();
+    size_t i = 0;
     while (i < len)
     {
         char decodedChar;

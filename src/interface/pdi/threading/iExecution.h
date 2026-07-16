@@ -14,7 +14,7 @@ created Date    : 1st Jan 2024
 #include <interface/interface_includes.h>
 
 // Executive state
-enum class ExecState { Ready, Running, Sleeping, Mute, Finished };
+enum class ExecState : uint8_t { Ready, Running, Sleeping, Mute, Finished };
 
 // Generic execution context interface
 class iExecutionContext {
@@ -32,7 +32,7 @@ public:
 
     uint8_t* stack = nullptr;       // allocated stack memory
     uint32_t stack_size;
-    int task_id = -1; // link back to corresponding task_t
+    pdiutil::task_id_t task_id = -1; // link back to corresponding task_t
     void (*entry)(void*) = nullptr; // entry function 
     void* arg = nullptr; // argument    
 };

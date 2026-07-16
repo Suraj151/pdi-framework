@@ -256,12 +256,14 @@ UARTSerial __serial_uart1(Serial1);
   SerialEvent occurs whenever a new data comes in the hardware serial RX. This
   routine is run between each time loop() runs, so using delay inside loop can
   delay response. Multiple bytes of data may be available.
+  Now polled via DeviceControlInterface::handleEvents() because Arduino esp8266
+  core does not reliably invoke serialEvent across all core versions.
 */
-void serialEvent() {
-
-  // check for uart serial data available if any
-  if (__serial_uart.available()) {
-    serial_event_t e(SERIAL_IFACE_UART, SERIAL_IFACE_CMD, &__serial_uart);
-    __utl_event.execute_event(EVENT_SERIAL_AVAILABLE, &e);
-  }
-}
+// void serialEvent() {
+//
+//   // check for uart serial data available if any
+//   if (__serial_uart.available()) {
+//     serial_event_t e(SERIAL_IFACE_UART, SERIAL_IFACE_CMD, &__serial_uart);
+//     __utl_event.execute_event(EVENT_SERIAL_AVAILABLE, &e);
+//   }
+// }

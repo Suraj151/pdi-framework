@@ -104,7 +104,7 @@ static mqtt_message_t* fail_message(mqtt_connection_t* connection){
   return &connection->message;
 }
 
-static mqtt_message_t* fini_message(mqtt_connection_t* connection, int type, int dup, int qos, int retain){
+static mqtt_message_t* fini_message(mqtt_connection_t* connection, uint8_t type, uint8_t dup, uint8_t qos, uint8_t retain){
 
   if( nullptr == connection || nullptr == connection->buffer ){
     return nullptr;
@@ -141,7 +141,7 @@ void mqtt_msg_init(mqtt_connection_t* connection, uint8_t* buffer, uint16_t buff
   }
 }
 
-int mqtt_get_total_length(uint8_t* buffer, uint16_t length){
+int32_t mqtt_get_total_length(uint8_t* buffer, uint16_t length){
 
   if( nullptr == buffer || length < 1 ){
     return -1;
@@ -402,7 +402,7 @@ mqtt_message_t* mqtt_msg_connect(mqtt_connection_t* connection, mqtt_connect_inf
   return fini_message(connection, MQTT_MSG_TYPE_CONNECT, 0, 0, 0);
 }
 
-mqtt_message_t* mqtt_msg_publish(mqtt_connection_t* connection, const char* topic, const char* data, int data_length, int qos, int retain, uint16_t* message_id){
+mqtt_message_t* mqtt_msg_publish(mqtt_connection_t* connection, const char* topic, const char* data, size_t data_length, uint8_t qos, uint8_t retain, uint16_t* message_id){
 
   if( nullptr == connection ){
     return nullptr;
@@ -496,7 +496,7 @@ mqtt_message_t* mqtt_msg_pubcomp(mqtt_connection_t* connection, uint16_t message
   return fini_message(connection, MQTT_MSG_TYPE_PUBCOMP, 0, 0, 0);
 }
 
-mqtt_message_t* mqtt_msg_subscribe(mqtt_connection_t* connection, const char* topic, int qos, uint16_t* message_id){
+mqtt_message_t* mqtt_msg_subscribe(mqtt_connection_t* connection, const char* topic, uint8_t qos, uint16_t* message_id){
 
   if( nullptr == connection ){
     return nullptr;

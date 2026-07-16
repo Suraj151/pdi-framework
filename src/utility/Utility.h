@@ -65,7 +65,7 @@ Created Date    : 1st June 2019
 template <typename Struct>
 void _ClearObject(const Struct *_object)
 {
-    for (unsigned int i = 0; i < sizeof((*_object)); i++)
+    for (size_t i = 0; i < sizeof((*_object)); i++)
     {
         *((char *)&(*_object) + i) = 0;
     }

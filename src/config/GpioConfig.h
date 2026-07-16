@@ -67,8 +67,8 @@ typedef struct {
 extern __gpio_event_track_t __gpio_event_track;
 
 struct last_gpio_monitor_point{
-  int x;
-  int y;
+  int16_t x;
+  int16_t y;
 };
 
 #endif
@@ -81,20 +81,20 @@ struct last_gpio_monitor_point{
 #define GPIO_TABLE_UPDATE_DURATION 300000
 
 
-enum GPIO_CONFIG_TYPE {
+enum GPIO_CONFIG_TYPE : uint8_t {
   GPIO_MODE_CONFIG,
   GPIO_WRITE_CONFIG,
   GPIO_SERVER_CONFIG,
   GPIO_EVENT_CONFIG,
 };
 
-enum GPIO_STATE {
+enum GPIO_STATE : uint8_t {
   GPIO_STATE_LOW=0,
   GPIO_STATE_HIGH=1,
   GPIO_STATE_MAX
 };
 
-enum GPIO_MODE {
+enum GPIO_MODE : uint8_t {
   OFF=0,
   DIGITAL_WRITE,
   DIGITAL_READ,
@@ -104,14 +104,14 @@ enum GPIO_MODE {
   GPIO_MODE_MAX
 };
 
-enum GPIO_EVENT_CONDITION {
+enum GPIO_EVENT_CONDITION : uint8_t {
   EQUAL=0,
   GREATER_THAN,
   LESS_THAN,
   GPIO_EVENT_CONDITION_MAX
 };
 
-enum GPIO_EVENT_CHANNEL {
+enum GPIO_EVENT_CHANNEL : uint8_t {
   NO_CHANNEL,
 #ifdef ENABLE_EMAIL_SERVICE
   EMAIL,
@@ -192,8 +192,8 @@ struct gpio_configs {
 #ifndef ENABLE_GPIO_BASIC_ONLY
   gpio_event gpio_events[MAX_GPIO_EVENTS];
   char gpio_host[GPIO_HOST_BUF_SIZE];
-  int gpio_port;
-  int gpio_post_frequency;
+  pdiutil::net_port_t gpio_port;
+  uint32_t gpio_post_frequency;
 
   // return true if gpio has event
   bool gpioHasEvents(uint8_t gpionumber, uint8_t condition = GPIO_EVENT_CONDITION_MAX){
@@ -282,7 +282,7 @@ private:
 //   {OFF}, {0}, {EQUAL}, {GPIO_EVENT_CHANNEL_MAX}, {0}, "", 80, GPIO_DATA_POST_FREQ
 // };
 
-const int gpio_config_size = sizeof(gpio_configs) + 5;
+const size_t gpio_config_size = sizeof(gpio_configs) + 5;
 
 using gpio_config_table = gpio_configs;
 

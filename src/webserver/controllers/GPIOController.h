@@ -210,7 +210,7 @@ public:
 
 		for (uint8_t _pin = 0; _pin < MAX_ANALOG_GPIO_PINS; _pin++)
 		{
-			if (!__i_dvc_ctrl.isExceptionalGpio(_pin))
+			if (!__i_dvc_ctrl.isExceptionalGpio(MAX_DIGITAL_GPIO_PINS + _pin))
 			{
 				memset(_name, 0, 5);
 				__appendUintToBuff(_name, "A%d", _pin, 4);
@@ -391,7 +391,7 @@ public:
 			memset(_label, 0, 6);
 			__appendUintToBuff(_name, "A%d:", _pin, 5);
 			__appendUintToBuff(_label, "a%d", _pin, 5);
-			if (!__i_dvc_ctrl.isExceptionalGpio(_pin))
+			if (!__i_dvc_ctrl.isExceptionalGpio(MAX_DIGITAL_GPIO_PINS + _pin))
 			{
 				concat_tr_select_html_tags(_page, _name, _label, _gpio_mode_analog_options, _gpio_mode_analog_options_size, (int)__gpio_service.m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS + _pin]);
 				CONTINUE_SEND_IN_CHUNK(_page);
@@ -450,7 +450,7 @@ public:
 				__appendUintToBuff(_label, "a%d", _pin, 5);
 
 				uint16_t _val = StringToUint16(this->m_web_resource->m_server->arg(_label).c_str());
-				__gpio_service.m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS + _pin] = !__i_dvc_ctrl.isExceptionalGpio(_pin) ? _val : 0;
+				__gpio_service.m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS + _pin] = !__i_dvc_ctrl.isExceptionalGpio(MAX_DIGITAL_GPIO_PINS + _pin) ? _val : 0;
 
 				LogFmtI("Pin A%d : %d\n", _pin, _val);
 

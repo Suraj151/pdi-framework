@@ -13,7 +13,7 @@ created Date    : 1st June 2019
 #include "Common.h"
 
 /* Http defs */
-typedef enum {
+enum http_resp_code : uint16_t {
     HTTP_RESP_OK = 200,
     HTTP_RESP_MULTIPLE_CHOICES = 300,
     HTTP_RESP_MOVED_PERMANENTLY = 301,
@@ -38,31 +38,35 @@ typedef enum {
     HTTP_RESP_HTTP_VERSION_NOT_SUPPORTED = 505,
     HTTP_RESP_VARIANT_ALSO_NEGOTIATES = 506,
     HTTP_RESP_MAX = 999
-} http_resp_code_t;
+};
+typedef enum http_resp_code http_resp_code_t;
 
-typedef enum {
+enum http_err_code : int16_t {
     HTTP_ERROR_CONNECTION_FAILED = -1,
     HTTP_ERROR_MAX = -999
-} http_err_code_t;
+};
+typedef enum http_err_code http_err_code_t;
 
-typedef enum {
+enum http_version : uint8_t {
     HTTP_VERSION_1_0,
     HTTP_VERSION_1_1,
     HTTP_VERSION_2,
     HTTP_VERSION_3,
     HTTP_VERSION_MAX
-} http_version_t;
+};
+typedef enum http_version http_version_t;
 
-typedef enum {
-    HTTP_METHOD_GET, 
-    HTTP_METHOD_POST, 
-    HTTP_METHOD_HEAD, 
-    HTTP_METHOD_PUT, 
-    HTTP_METHOD_PATCH, 
-    HTTP_METHOD_DELETE, 
+enum http_method : uint8_t {
+    HTTP_METHOD_GET,
+    HTTP_METHOD_POST,
+    HTTP_METHOD_HEAD,
+    HTTP_METHOD_PUT,
+    HTTP_METHOD_PATCH,
+    HTTP_METHOD_DELETE,
     HTTP_METHOD_OPTIONS,
-    HTTP_METHOD_MAX, 
-} http_method_t;
+    HTTP_METHOD_MAX,
+};
+typedef enum http_method http_method_t;
 
 
 #ifndef HTTP_HOST_CONNECT_TIMEOUT

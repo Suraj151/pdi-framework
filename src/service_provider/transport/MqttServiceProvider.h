@@ -53,15 +53,15 @@ public:
   /**
    * @var	int|0 m_mqtt_timer_cb_id
    */
-  int m_mqtt_timer_cb_id;
+  pdiutil::task_id_t m_mqtt_timer_cb_id;
   /**
-   * @var	int|0 m_mqtt_publish_cb_id
+   * @var	int16_t|0 m_mqtt_publish_cb_id
    */
-  int m_mqtt_publish_cb_id;
+  pdiutil::task_id_t m_mqtt_publish_cb_id;
   /**
-   * @var	int|0 m_mqtt_subscribe_cb_id
+   * @var	int16_t|0 m_mqtt_subscribe_cb_id
    */
-  int m_mqtt_subscribe_cb_id;
+  pdiutil::task_id_t m_mqtt_subscribe_cb_id;
   /**
    * @array	char  m_mqtt_payload
    */

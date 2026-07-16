@@ -39,7 +39,7 @@ created Date    : 1st June 2019
  */
 #define ALLOW_MQTT_CONFIG_MODIFICATION
 
-enum MQTT_CONFIG_TYPE {
+enum MQTT_CONFIG_TYPE : uint8_t {
   MQTT_GENERAL_CONFIG,
   MQTT_LWT_CONFIG,
   MQTT_PUBSUB_CONFIG,
@@ -101,13 +101,13 @@ struct mqtt_general_configs {
   }
 
   char host[MQTT_HOST_BUF_SIZE];
-  int port;
-  int security;
+  pdiutil::net_port_t port;
+  uint8_t security;
   char client_id[MQTT_CLIENT_ID_BUF_SIZE];
   char username[MQTT_USERNAME_BUF_SIZE];
   char password[MQTT_PASSWORD_BUF_SIZE];
-  int keepalive;
-  int clean_session;
+  uint16_t keepalive;
+  uint8_t clean_session;
 };
 
 struct mqtt_lwt_configs {
@@ -127,8 +127,8 @@ struct mqtt_lwt_configs {
 
   char will_topic[MQTT_TOPIC_BUF_SIZE];
   char will_message[MQTT_WILL_MSG_BUF_SIZE];
-  int will_qos;
-  int will_retain;
+  uint8_t will_qos;
+  uint8_t will_retain;
 };
 
 struct mqtt_pubsub_configs {
@@ -145,7 +145,7 @@ struct mqtt_pubsub_configs {
 
   mqtt_pub_topics_t publish_topics[MQTT_MAX_PUBLISH_TOPIC];
   mqtt_sub_topics_t subscribe_topics[MQTT_MAX_SUBSCRIBE_TOPIC];
-  int publish_frequency;
+  uint32_t publish_frequency;
 };
 
 // const mqtt_sub_topics_t PROGMEM _mqtt_sub_topic_defaults = {
@@ -173,9 +173,9 @@ struct mqtt_pubsub_configs {
 // };
 
 
-const int mqtt_general_config_size = sizeof(mqtt_general_configs) + 5;
-const int mqtt_lwt_config_size     = sizeof(mqtt_lwt_configs) + 5;
-const int mqtt_pubsub_config_size  = sizeof(mqtt_pubsub_configs) + 5;
+const size_t mqtt_general_config_size = sizeof(mqtt_general_configs) + 5;
+const size_t mqtt_lwt_config_size     = sizeof(mqtt_lwt_configs) + 5;
+const size_t mqtt_pubsub_config_size  = sizeof(mqtt_pubsub_configs) + 5;
 
 using mqtt_general_config_table = mqtt_general_configs;
 using mqtt_lwt_config_table = mqtt_lwt_configs;

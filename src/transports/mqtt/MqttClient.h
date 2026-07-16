@@ -72,15 +72,15 @@ typedef struct
 	mqtt_connect_info_t *connect_info;
 	uint8_t *in_buffer;
 	uint8_t *out_buffer;
-	int in_buffer_length;
-	int out_buffer_length;
+	size_t in_buffer_length;
+	size_t out_buffer_length;
 	uint16_t message_length;
 	uint16_t message_length_read;
 	mqtt_message_t *outbound_message;
 	mqtt_connection_t mqtt_connection;
 	uint16_t pending_msg_id;
-	int pending_msg_type;
-	int pending_publish_qos;
+	uint8_t pending_msg_type;
+	uint8_t pending_publish_qos;
 } mqtt_state_t;
 
 typedef void (*MqttCallback)(uint32_t *args);
@@ -116,7 +116,7 @@ public:
 	~MQTTClient();
 
 	bool begin(iClientInterface *_client, mqtt_general_config_table *_mqtt_general_configs, mqtt_lwt_config_table *_mqtt_lwt_configs);
-	void InitConnection(char *host, int port = MQTT_DEFAULT_PORT, uint8_t security = 0);
+	void InitConnection(char *host, pdiutil::net_port_t port = MQTT_DEFAULT_PORT, uint8_t security = 0);
 	void InitClient(char *client_id, char *client_user, char *client_pass, uint32_t keepAliveTime = MQTT_DEFAULT_KEEPALIVE, uint8_t cleanSession = 1);
 	void InitLWT(char *will_topic, char *will_msg, uint8_t will_qos, uint8_t will_retain);
 
@@ -132,7 +132,7 @@ public:
 	bool UnSubscribe(char *topic);
 	void Connect(void);
 	void Disconnect(void);
-	bool Publish(const char *topic, const char *data, int data_length, int qos, int retain);
+	bool Publish(const char *topic, const char *data, size_t data_length, uint8_t qos, uint8_t retain);
 	void DeleteClient(void);
 
 	void mqtt_timer(void);
@@ -149,7 +149,7 @@ public:
 
 protected:
 	char *m_host;
-	int m_port;
+	pdiutil::net_port_t m_port;
 	uint8_t m_security;
 
 	iClientInterface *m_client;
@@ -171,7 +171,7 @@ protected:
 	void mqtt_client_disconnect(void);
 	// void mqtt_wificlient_delete( void );
 	void mqtt_client_recv(void);
-	void deliver_publish(uint8_t *message, int length);
+	void deliver_publish(uint8_t *message, size_t length);
 };
 
 #endif

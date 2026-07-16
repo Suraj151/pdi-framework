@@ -50,7 +50,7 @@ public:
      * @param _task_priority The priority of the task (default is DEFAULT_TASK_PRIORITY).
      * @param _last_millis The last execution time of the task (default is 0).
      */
-    TaskScheduler(CallBackVoidArgFn _task_fn, uint64_t _duration, int _task_priority = DEFAULT_TASK_PRIORITY, uint64_t _last_millis = 0);
+    TaskScheduler(CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration, pdiutil::task_priority_t _task_priority = DEFAULT_TASK_PRIORITY, pdiutil::millis_t _last_millis = 0);
 
     /**
      * @brief Sets a one-time timeout for a task.
@@ -61,7 +61,7 @@ public:
      * @param _task_priority The priority of the task (default is DEFAULT_TASK_PRIORITY).
      * @return The unique ID of the registered task.
      */
-    int setTimeout(CallBackVoidArgFn _task_fn, uint64_t _duration, uint64_t _now_millis, int _task_priority = DEFAULT_TASK_PRIORITY);
+    pdiutil::task_id_t setTimeout(CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration, pdiutil::millis_t _now_millis, pdiutil::task_priority_t _task_priority = DEFAULT_TASK_PRIORITY);
 
     /**
      * @brief Update a one-time timeout for a task.
@@ -73,7 +73,7 @@ public:
      * @param _task_priority The priority of the task (default is DEFAULT_TASK_PRIORITY).
      * @return The unique ID of the registered task.
      */
-    int updateTimeout(int _task_id, CallBackVoidArgFn _task_fn, uint64_t _duration, uint64_t _now_millis, int _task_priority = DEFAULT_TASK_PRIORITY);
+    pdiutil::task_id_t updateTimeout(pdiutil::task_id_t _task_id, CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration, pdiutil::millis_t _now_millis, pdiutil::task_priority_t _task_priority = DEFAULT_TASK_PRIORITY);
 
     /**
      * @brief Sets a recurring interval for a task.
@@ -84,7 +84,7 @@ public:
      * @param _task_priority The priority of the task (default is DEFAULT_TASK_PRIORITY).
      * @return The unique ID of the registered task.
      */
-    int setInterval(CallBackVoidArgFn _task_fn, uint64_t _duration, uint64_t _now_millis, int _task_priority = DEFAULT_TASK_PRIORITY);
+    pdiutil::task_id_t setInterval(CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration, pdiutil::millis_t _now_millis, pdiutil::task_priority_t _task_priority = DEFAULT_TASK_PRIORITY);
 
     /**
      * @brief Updates the interval of an existing task.
@@ -97,7 +97,7 @@ public:
      * @param _max_attempts The maximum number of attempts for the task (default is -1 for unlimited).
      * @return The unique ID of the updated task.
      */
-    int updateInterval(int _task_id, CallBackVoidArgFn _task_fn, uint64_t _duration, int _task_priority = DEFAULT_TASK_PRIORITY, uint64_t _last_millis = 0, int _max_attempts = -1);
+    pdiutil::task_id_t updateInterval(pdiutil::task_id_t _task_id, CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration, pdiutil::task_priority_t _task_priority = DEFAULT_TASK_PRIORITY, pdiutil::millis_t _last_millis = 0, pdiutil::attempts_t _max_attempts = -1);
 
     /**
      * @brief Clears a one-time timeout task.
@@ -105,7 +105,7 @@ public:
      * @param _id The unique ID of the task to clear.
      * @return True if the task was successfully cleared, false otherwise.
      */
-    bool clearTimeout(int _id);
+    bool clearTimeout(pdiutil::task_id_t _id);
 
     /**
      * @brief Clears a recurring interval task.
@@ -113,7 +113,7 @@ public:
      * @param _id The unique ID of the task to clear.
      * @return True if the task was successfully cleared, false otherwise.
      */
-    bool clearInterval(int _id);
+    bool clearInterval(pdiutil::task_id_t _id);
 
     /**
      * @brief Registers a new task.
@@ -125,7 +125,7 @@ public:
      * @param _max_attempts The maximum number of attempts for the task (default is -1 for unlimited).
      * @return The unique ID of the registered task.
      */
-    int register_task(CallBackVoidArgFn _task_fn, uint64_t _duration = 1, int _task_priority = DEFAULT_TASK_PRIORITY, uint64_t _last_millis = 0, int _max_attempts = -1);
+    pdiutil::task_id_t register_task(CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration = 1, pdiutil::task_priority_t _task_priority = DEFAULT_TASK_PRIORITY, pdiutil::millis_t _last_millis = 0, pdiutil::attempts_t _max_attempts = -1);
 
     /**
      * @brief Executes all registered tasks that are due.
@@ -143,7 +143,7 @@ public:
      * @param _id The unique ID of the task to check.
      * @return The index of the task if registered, or -1 if not found.
      */
-    int is_registered_task(int _id);
+    int16_t is_registered_task(pdiutil::task_id_t _id);
 
     /**
      * @brief Removes a task from the scheduler.
@@ -151,21 +151,21 @@ public:
      * @param _id The unique ID of the task to remove.
      * @return True if the task was successfully removed, false otherwise.
      */
-    bool remove_task(int _id);
+    bool remove_task(pdiutil::task_id_t _id);
 
     /**
      * @brief Generates a unique ID for a new task.
      *
      * @return A unique task ID.
      */
-    int get_unique_task_id(void);
+    pdiutil::task_id_t get_unique_task_id(void);
 
     /**
      * @brief Get task by its id
      *
      * @return task pointer pointing to task
      */
-    task_t* get_task(int _id);
+    task_t* get_task(pdiutil::task_id_t _id);
 
     /**
      * @brief Sets the maximum number of tasks allowed in the scheduler.
@@ -226,7 +226,7 @@ public:
     /**
      * @brief Schedule task under context based execution scheduler
      */
-    int scheduleUnderExecSched(iExecutionScheduler* _exec_sched, int _task_id, task_mode_t _task_mode, uint32_t _stackdepth);
+    int scheduleUnderExecSched(iExecutionScheduler* _exec_sched, pdiutil::task_id_t _task_id, task_mode_t _task_mode, uint32_t _stackdepth);
 
     #endif
 

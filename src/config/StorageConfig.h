@@ -30,7 +30,7 @@ created Date    : 1st June 2025
 //     STORAGE_ACCESS_MODE_MAX
 // };
 
-typedef enum {
+enum mimetype : uint8_t {
     MIME_TYPE_TEXT_PLAIN,
     MIME_TYPE_TEXT_HTML,
     MIME_TYPE_TEXT_CSS,
@@ -47,7 +47,8 @@ typedef enum {
     MIME_TYPE_IMAGE_JPEG,
     MIME_TYPE_IMAGE_PNG,
     MIME_TYPE_MAX
-} mimetype_t;
+};
+typedef enum mimetype mimetype_t;
 
 
 #endif

@@ -40,14 +40,14 @@ struct ota_configs {
   }
 
   char ota_host[OTA_HOST_BUF_SIZE];
-  int ota_port;
+  pdiutil::net_port_t ota_port;
 };
 
 // const ota_configs PROGMEM _ota_config_defaults = {
 //   {0}, 80
 // };
 
-const int ota_config_size = sizeof(ota_configs) + 5;
+const size_t ota_config_size = sizeof(ota_configs) + 5;
 
 using ota_config_table = ota_configs;
 

@@ -186,7 +186,7 @@ void PDIStack::handleLogPrints(){
 
   #ifdef ENABLE_NETWORK_SERVICE
   LogFmtI("\nNTP Validity : %d\n", __i_ntp.is_valid_ntptime());
-  LogFmtI("NTP Time : %d\n", (int)__i_ntp.get_ntp_time());
+  LogFmtI("NTP Time : %d\n", (int32_t)__i_ntp.get_ntp_time());
   #endif
 }
 

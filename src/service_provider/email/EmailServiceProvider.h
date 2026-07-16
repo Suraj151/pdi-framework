@@ -45,7 +45,7 @@ public:
   /**
    * @var	int|0 m_mail_handler_cb_id
    */
-  int m_mail_handler_cb_id;
+  pdiutil::task_id_t m_mail_handler_cb_id;
 
 protected:
   iClientInterface *m_client;

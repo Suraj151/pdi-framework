@@ -163,7 +163,7 @@ bool MQTTClient::remove_from_subscribed_topics(char *_topic)
   return false;
 }
 
-void MQTTClient::deliver_publish(uint8_t *message, int length)
+void MQTTClient::deliver_publish(uint8_t *message, size_t length)
 {
 
   mqtt_event_data_t event_data;
@@ -704,7 +704,7 @@ bool MQTTClient::UnSubscribe(char *topic)
   return true;
 }
 
-bool MQTTClient::Publish(const char *topic, const char *data, int data_length, int qos, int retain)
+bool MQTTClient::Publish(const char *topic, const char *data, size_t data_length, uint8_t qos, uint8_t retain)
 {
 
   uint8_t dataBuffer[MQTT_BUF_SIZE];
@@ -817,7 +817,7 @@ bool MQTTClient::begin(iClientInterface *_client, mqtt_general_config_table *_mq
   return true;
 }
 
-void MQTTClient::InitConnection(char *host, int port, uint8_t security)
+void MQTTClient::InitConnection(char *host, pdiutil::net_port_t port, uint8_t security)
 {
 
   LogI("MQTT: InitConnection\n");

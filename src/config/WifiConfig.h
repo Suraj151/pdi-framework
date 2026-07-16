@@ -96,7 +96,7 @@ struct wifi_configs {
 //   DEFAULT_AP_LOCAL_IP, DEFAULT_AP_GATEWAY, DEFAULT_AP_SUBNET
 // };
 
-const int wifi_config_size = sizeof(wifi_configs) + 5;
+const size_t wifi_config_size = sizeof(wifi_configs) + 5;
 
 using wifi_config_table = wifi_configs;
 

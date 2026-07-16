@@ -120,78 +120,313 @@ gpio_id_t DeviceControlInterface::gpioFromPinMap(gpio_id_t pin, bool isAnalog)
   gpio_id_t mapped_pin;
 
 #if defined(CONFIG_IDF_TARGET_ESP32C3)
+  // ESP32-C3: 22 GPIOs. 11-17=flash, 18-19=USB-JTAG, 20-21=UART0.
+  // 8 digital + 4 analog = 12 user pins. Some boot-strap pins (2/8/9) included
+  // because C3 doesn't have enough fully-safe pins to reach 8 digital otherwise.
   switch ( pin ) {
     case 0:
-      mapped_pin = isAnalog ? 0 : 2;
+      mapped_pin = isAnalog ? 0 : 5;    // D0 or A0 (ADC1_CH0)
       break;
     case 1:
-      mapped_pin = isAnalog ? 1 : 3;
+      mapped_pin = isAnalog ? 1 : 6;    // D1 or A1 (ADC1_CH1)
       break;
     case 2:
-      mapped_pin = isAnalog ? 4 : 4;
+      mapped_pin = isAnalog ? 3 : 7;    // D2 or A2 (ADC1_CH3)
       break;
     case 3:
-      mapped_pin = 5;
+      mapped_pin = isAnalog ? 4 : 10;   // D3 or A3 (ADC1_CH4)
       break;
     case 4:
-      mapped_pin = 6;
+      mapped_pin = 8;                    // D4 (boot-strap)
       break;
     case 5:
-      mapped_pin = 7;
+      mapped_pin = 9;                    // D5 (boot-strap)
       break;
     case 6:
-      mapped_pin = 21;
+      mapped_pin = 2;                    // D6 (boot-strap)
       break;
     case 7:
-      mapped_pin = 20;
+      mapped_pin = 1;                    // D7
       break;
     case 8:
-      mapped_pin = 8;
+      mapped_pin = 0;                    // A0 via total-index (ADC1_CH0)
       break;
     case 9:
-      mapped_pin = 9;
+      mapped_pin = 1;                    // A1 via total-index (ADC1_CH1)
       break;
     case 10:
-      mapped_pin = 10;
+      mapped_pin = 3;                    // A2 via total-index (ADC1_CH3)
+      break;
+    case 11:
+      mapped_pin = 4;                    // A3 via total-index (ADC1_CH4)
       break;
     default:
-      mapped_pin = 0;
+      mapped_pin = INVALID_GPIO_NUMBER;
+  }
+#elif defined(CONFIG_IDF_TARGET_ESP32S2)
+  // ESP32-S2: 43 GPIOs. 26-32=flash, 19-20=USB, boot-strap 0/45/46.
+  // ADC1 = GPIO 1-10. 12 digital + 4 analog = 16 user pins.
+  switch ( pin ) {
+    case 0:
+      mapped_pin = isAnalog ? 1 : 17;   // D0 or A0 (ADC1_CH0)
+      break;
+    case 1:
+      mapped_pin = isAnalog ? 2 : 18;   // D1 or A1 (ADC1_CH1)
+      break;
+    case 2:
+      mapped_pin = isAnalog ? 3 : 21;   // D2 or A2 (ADC1_CH2)
+      break;
+    case 3:
+      mapped_pin = isAnalog ? 4 : 33;   // D3 or A3 (ADC1_CH3)
+      break;
+    case 4:
+      mapped_pin = 34;                   // D4
+      break;
+    case 5:
+      mapped_pin = 35;                   // D5
+      break;
+    case 6:
+      mapped_pin = 36;                   // D6
+      break;
+    case 7:
+      mapped_pin = 37;                   // D7
+      break;
+    case 8:
+      mapped_pin = 38;                   // D8
+      break;
+    case 9:
+      mapped_pin = 39;                   // D9
+      break;
+    case 10:
+      mapped_pin = 40;                   // D10
+      break;
+    case 11:
+      mapped_pin = 41;                   // D11
+      break;
+    case 12:
+      mapped_pin = 1;                    // A0 via total-index (ADC1_CH0)
+      break;
+    case 13:
+      mapped_pin = 2;                    // A1 via total-index (ADC1_CH1)
+      break;
+    case 14:
+      mapped_pin = 3;                    // A2 via total-index (ADC1_CH2)
+      break;
+    case 15:
+      mapped_pin = 4;                    // A3 via total-index (ADC1_CH3)
+      break;
+    default:
+      mapped_pin = INVALID_GPIO_NUMBER;
+  }
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+  // ESP32-S3: 45 GPIOs. 26-32=flash, 33-37=octal PSRAM, 19-20=USB-JTAG,
+  // boot-strap 0/45/46. ADC1 = GPIO 1-10. 12 digital + 4 analog = 16 user pins.
+  switch ( pin ) {
+    case 0:
+      mapped_pin = isAnalog ? 1 : 4;    // D0 or A0 (ADC1_CH0)
+      break;
+    case 1:
+      mapped_pin = isAnalog ? 2 : 5;    // D1 or A1 (ADC1_CH1)
+      break;
+    case 2:
+      mapped_pin = isAnalog ? 3 : 6;    // D2 or A2 (ADC1_CH2)
+      break;
+    case 3:
+      mapped_pin = isAnalog ? 7 : 8;    // D3 or A3 (ADC1_CH6)
+      break;
+    case 4:
+      mapped_pin = 9;                    // D4
+      break;
+    case 5:
+      mapped_pin = 10;                   // D5
+      break;
+    case 6:
+      mapped_pin = 11;                   // D6
+      break;
+    case 7:
+      mapped_pin = 12;                   // D7
+      break;
+    case 8:
+      mapped_pin = 13;                   // D8
+      break;
+    case 9:
+      mapped_pin = 14;                   // D9
+      break;
+    case 10:
+      mapped_pin = 15;                   // D10
+      break;
+    case 11:
+      mapped_pin = 16;                   // D11
+      break;
+    case 12:
+      mapped_pin = 1;                    // A0 via total-index
+      break;
+    case 13:
+      mapped_pin = 2;                    // A1 via total-index
+      break;
+    case 14:
+      mapped_pin = 3;                    // A2 via total-index
+      break;
+    case 15:
+      mapped_pin = 7;                    // A3 via total-index (ADC1_CH6)
+      break;
+    default:
+      mapped_pin = INVALID_GPIO_NUMBER;
+  }
+#elif defined(CONFIG_IDF_TARGET_ESP32C6)
+  // ESP32-C6: 31 GPIOs. Flash pins (module dependent), 12-13=USB, boot-strap 8/9/15.
+  // ADC1 = GPIO 0-6. 12 digital + 4 analog = 16 user pins.
+  switch ( pin ) {
+    case 0:
+      mapped_pin = isAnalog ? 0 : 4;    // D0 or A0 (ADC1_CH0)
+      break;
+    case 1:
+      mapped_pin = isAnalog ? 1 : 5;    // D1 or A1 (ADC1_CH1)
+      break;
+    case 2:
+      mapped_pin = isAnalog ? 2 : 6;    // D2 or A2 (ADC1_CH2)
+      break;
+    case 3:
+      mapped_pin = isAnalog ? 3 : 7;    // D3 or A3 (ADC1_CH3)
+      break;
+    case 4:
+      mapped_pin = 10;                   // D4
+      break;
+    case 5:
+      mapped_pin = 11;                   // D5
+      break;
+    case 6:
+      mapped_pin = 16;                   // D6
+      break;
+    case 7:
+      mapped_pin = 17;                   // D7
+      break;
+    case 8:
+      mapped_pin = 18;                   // D8
+      break;
+    case 9:
+      mapped_pin = 19;                   // D9
+      break;
+    case 10:
+      mapped_pin = 20;                   // D10
+      break;
+    case 11:
+      mapped_pin = 21;                   // D11
+      break;
+    case 12:
+      mapped_pin = 0;                    // A0 via total-index
+      break;
+    case 13:
+      mapped_pin = 1;                    // A1 via total-index
+      break;
+    case 14:
+      mapped_pin = 2;                    // A2 via total-index
+      break;
+    case 15:
+      mapped_pin = 3;                    // A3 via total-index
+      break;
+    default:
+      mapped_pin = INVALID_GPIO_NUMBER;
+  }
+#elif defined(CONFIG_IDF_TARGET_ESP32H2)
+  // ESP32-H2: ~19 GPIOs. Flash pins module-dependent, 26-27=USB-JTAG.
+  // ADC1 = GPIO 1-5. 8 digital + 4 analog = 12 user pins.
+  switch ( pin ) {
+    case 0:
+      mapped_pin = isAnalog ? 1 : 10;   // D0 or A0 (ADC1_CH0)
+      break;
+    case 1:
+      mapped_pin = isAnalog ? 2 : 11;   // D1 or A1 (ADC1_CH1)
+      break;
+    case 2:
+      mapped_pin = isAnalog ? 3 : 12;   // D2 or A2 (ADC1_CH2)
+      break;
+    case 3:
+      mapped_pin = isAnalog ? 4 : 13;   // D3 or A3 (ADC1_CH3)
+      break;
+    case 4:
+      mapped_pin = 14;                   // D4
+      break;
+    case 5:
+      mapped_pin = 0;                    // D5 (boot-strap)
+      break;
+    case 6:
+      mapped_pin = 8;                    // D6 (boot-strap)
+      break;
+    case 7:
+      mapped_pin = 9;                    // D7 (boot-strap)
+      break;
+    case 8:
+      mapped_pin = 1;                    // A0 via total-index
+      break;
+    case 9:
+      mapped_pin = 2;                    // A1 via total-index
+      break;
+    case 10:
+      mapped_pin = 3;                    // A2 via total-index
+      break;
+    case 11:
+      mapped_pin = 4;                    // A3 via total-index
+      break;
+    default:
+      mapped_pin = INVALID_GPIO_NUMBER;
   }
 #else
+  // ESP32 WROOM base variant. 12 digital + 4 analog user pins.
+  // Cases 0-3 keep isAnalog conditional so the framework's re-indexed analog
+  // access (pin = total_index - MAX_DIGITAL_GPIO_PINS) resolves to ADC hw pins.
   switch ( pin ) {
 
     case 0:
-      mapped_pin = isAnalog ? 32 : 4;
+      mapped_pin = isAnalog ? 32 : 4;   // D0 or A0 (ADC1_CH4)
       break;
     case 1:
-      mapped_pin = isAnalog ? 33 : 13;
+      mapped_pin = isAnalog ? 33 : 5;   // D1 or A1 (ADC1_CH5)
       break;
     case 2:
-      mapped_pin = isAnalog ? 34 : 14;
+      mapped_pin = isAnalog ? 34 : 13;  // D2 or A2 (ADC1_CH6, input-only)
       break;
     case 3:
-      mapped_pin = isAnalog ? 35 : 16;
+      mapped_pin = isAnalog ? 35 : 14;  // D3 or A3 (ADC1_CH7, input-only)
       break;
     case 4:
-      mapped_pin = 17;
+      mapped_pin = 16;                  // D4
       break;
     case 5:
-      mapped_pin = 18;
+      mapped_pin = 17;                  // D5
       break;
     case 6:
-      mapped_pin = 19;
+      mapped_pin = 18;                  // D6 (VSPI CLK default)
       break;
     case 7:
-      mapped_pin = 21;
+      mapped_pin = 19;                  // D7 (VSPI MISO default)
       break;
     case 8:
-      mapped_pin = 22;
+      mapped_pin = 21;                  // D8 (I2C SDA default)
       break;
     case 9:
-      mapped_pin = 23;
+      mapped_pin = 22;                  // D9 (I2C SCL default)
+      break;
+    case 10:
+      mapped_pin = 23;                  // D10 (VSPI MOSI default)
+      break;
+    case 11:
+      mapped_pin = 25;                  // D11 (DAC1)
+      break;
+    case 12:
+      mapped_pin = 32;                  // A0 via total-index (ADC1_CH4)
+      break;
+    case 13:
+      mapped_pin = 33;                  // A1 via total-index (ADC1_CH5)
+      break;
+    case 14:
+      mapped_pin = 34;                  // A2 via total-index (ADC1_CH6, input-only)
+      break;
+    case 15:
+      mapped_pin = 35;                  // A3 via total-index (ADC1_CH7, input-only)
       break;
     default:
-      mapped_pin = 0;
+      mapped_pin = INVALID_GPIO_NUMBER; // out-of-range user pin
   }
 #endif
 

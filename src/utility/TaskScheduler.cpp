@@ -46,7 +46,7 @@ TaskScheduler::~TaskScheduler()
  * @param _task_priority The priority of the task.
  * @param _last_millis The last execution time of the task.
  */
-TaskScheduler::TaskScheduler(CallBackVoidArgFn _task_fn, uint64_t _duration, int _task_priority, uint64_t _last_millis)
+TaskScheduler::TaskScheduler(CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration, pdiutil::task_priority_t _task_priority, pdiutil::millis_t _last_millis)
 {
     this->register_task(_task_fn, _duration, _task_priority, _last_millis);
 }
@@ -60,7 +60,7 @@ TaskScheduler::TaskScheduler(CallBackVoidArgFn _task_fn, uint64_t _duration, int
  * @param _task_priority The priority of the task.
  * @return The unique ID of the registered task.
  */
-int TaskScheduler::setTimeout(CallBackVoidArgFn _task_fn, uint64_t _duration, uint64_t _now_millis, int _task_priority)
+pdiutil::task_id_t TaskScheduler::setTimeout(CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration, pdiutil::millis_t _now_millis, pdiutil::task_priority_t _task_priority)
 {
     return this->register_task(_task_fn, _duration, _task_priority, _now_millis, 1);
 }
@@ -75,7 +75,7 @@ int TaskScheduler::setTimeout(CallBackVoidArgFn _task_fn, uint64_t _duration, ui
  * @param _task_priority The priority of the task (default is DEFAULT_TASK_PRIORITY).
  * @return The unique ID of the registered task.
  */
-int TaskScheduler::updateTimeout(int _task_id, CallBackVoidArgFn _task_fn, uint64_t _duration, uint64_t _now_millis, int _task_priority)
+pdiutil::task_id_t TaskScheduler::updateTimeout(pdiutil::task_id_t _task_id, CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration, pdiutil::millis_t _now_millis, pdiutil::task_priority_t _task_priority)
 {
     return updateInterval(_task_id, _task_fn, _duration, _task_priority, _now_millis, 1);
 }
@@ -89,7 +89,7 @@ int TaskScheduler::updateTimeout(int _task_id, CallBackVoidArgFn _task_fn, uint6
  * @param _task_priority The priority of the task.
  * @return The unique ID of the registered task.
  */
-int TaskScheduler::setInterval(CallBackVoidArgFn _task_fn, uint64_t _duration, uint64_t _now_millis, int _task_priority)
+pdiutil::task_id_t TaskScheduler::setInterval(CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration, pdiutil::millis_t _now_millis, pdiutil::task_priority_t _task_priority)
 {
     return this->register_task(_task_fn, _duration, _task_priority, _now_millis);
 }
@@ -105,9 +105,9 @@ int TaskScheduler::setInterval(CallBackVoidArgFn _task_fn, uint64_t _duration, u
  * @param _max_attempts The maximum number of attempts for the task.
  * @return The unique ID of the updated task.
  */
-int TaskScheduler::updateInterval(int _task_id, CallBackVoidArgFn _task_fn, uint64_t _duration, int _task_priority, uint64_t _last_millis, int _max_attempts)
+pdiutil::task_id_t TaskScheduler::updateInterval(pdiutil::task_id_t _task_id, CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration, pdiutil::task_priority_t _task_priority, pdiutil::millis_t _last_millis, pdiutil::attempts_t _max_attempts)
 {
-    int _registered_index = this->is_registered_task(_task_id);
+    int16_t _registered_index = this->is_registered_task(_task_id);
     if (_registered_index > -1)
     {
         CRITICAL_SECTION_ENTER
@@ -131,7 +131,7 @@ int TaskScheduler::updateInterval(int _task_id, CallBackVoidArgFn _task_fn, uint
  * @param _id The unique ID of the task to clear.
  * @return True if the task was successfully cleared, false otherwise.
  */
-bool TaskScheduler::clearTimeout(int _id)
+bool TaskScheduler::clearTimeout(pdiutil::task_id_t _id)
 {
     return this->remove_task(_id);
 }
@@ -142,7 +142,7 @@ bool TaskScheduler::clearTimeout(int _id)
  * @param _id The unique ID of the task to clear.
  * @return True if the task was successfully cleared, false otherwise.
  */
-bool TaskScheduler::clearInterval(int _id)
+bool TaskScheduler::clearInterval(pdiutil::task_id_t _id)
 {
     return this->remove_task(_id);
 }
@@ -157,7 +157,7 @@ bool TaskScheduler::clearInterval(int _id)
  * @param _max_attempts The maximum number of attempts for the task.
  * @return The unique ID of the registered task.
  */
-int TaskScheduler::register_task(CallBackVoidArgFn _task_fn, uint64_t _duration, int _task_priority, uint64_t _last_millis, int _max_attempts)
+pdiutil::task_id_t TaskScheduler::register_task(CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration, pdiutil::task_priority_t _task_priority, pdiutil::millis_t _last_millis, pdiutil::attempts_t _max_attempts)
 {
     if (this->m_tasks.size() < this->m_max_tasks)
     {
@@ -386,7 +386,7 @@ void TaskScheduler::remove_expired_tasks()
  * @param _id The unique ID of the task to check.
  * @return The index of the task if registered, or -1 if not found.
  */
-int TaskScheduler::is_registered_task(int _id)
+int16_t TaskScheduler::is_registered_task(pdiutil::task_id_t _id)
 {
     for (uint16_t i = 0; i < this->m_tasks.size(); i++)
     {
@@ -404,7 +404,7 @@ int TaskScheduler::is_registered_task(int _id)
  * @param _id The unique ID of the task to remove.
  * @return True if the task was successfully removed, false otherwise.
  */
-bool TaskScheduler::remove_task(int _id)
+bool TaskScheduler::remove_task(pdiutil::task_id_t _id)
 {
     bool _removed = false;
     for (uint16_t i = 0; i < this->m_tasks.size(); i++)
@@ -431,12 +431,12 @@ bool TaskScheduler::remove_task(int _id)
  *
  * @return A unique task ID.
  */
-int TaskScheduler::get_unique_task_id()
+pdiutil::task_id_t TaskScheduler::get_unique_task_id()
 {
-    for (int _id = 1; _id < this->m_max_tasks; _id++)
+    for (pdiutil::task_id_t _id = 1; _id < this->m_max_tasks; _id++)
     {
         bool _id_used = false;
-        for (int i = 0; i < this->m_tasks.size(); i++)
+        for (uint16_t i = 0; i < this->m_tasks.size(); i++)
         {
             if (this->m_tasks[i]._task_id == _id)
             {
@@ -454,9 +454,9 @@ int TaskScheduler::get_unique_task_id()
  *
  * @return task pointer pointing to task
  */
-task_t* TaskScheduler::get_task(int _id)
+task_t* TaskScheduler::get_task(pdiutil::task_id_t _id)
 {
-    for (int i = 0; i < this->m_tasks.size(); i++)
+    for (uint16_t i = 0; i < this->m_tasks.size(); i++)
     {
         if (this->m_tasks[i]._task_id == _id)
         {
@@ -518,7 +518,7 @@ void TaskScheduler::printTasksToTerminal(iTerminalInterface *terminal)
 
         char content[20];
 
-        for (int i = 0; i < this->m_tasks.size(); i++)
+        for (uint16_t i = 0; i < this->m_tasks.size(); i++)
         {
             Int32ToString(this->m_tasks[i]._task_id, content, 20, 10);
             terminal->write(content);
@@ -587,7 +587,7 @@ void TaskScheduler::run()
 /**
  * @brief Schedule task under context based execution scheduler
  */
-int TaskScheduler::scheduleUnderExecSched(iExecutionScheduler* _exec_sched, int _task_id, task_mode_t _task_mode, uint32_t _stackdepth)
+int TaskScheduler::scheduleUnderExecSched(iExecutionScheduler* _exec_sched, pdiutil::task_id_t _task_id, task_mode_t _task_mode, uint32_t _stackdepth)
 {
     int ret = -99;
 

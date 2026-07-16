@@ -40,10 +40,17 @@ extern portMUX_TYPE __pdi_critical_mux;
 #define CMD_OPTION_SIZE_MAX         3   ///< Maximum size of an option.
 
 /**
- * gpio pin counts
+ * gpio pin counts - per esp32 variant
+ * C3 and H2 have fewer GPIOs available after excluding flash/USB/UART/boot-strap,
+ * so their user-pin count is trimmed accordingly.
  */
-#define MAX_DIGITAL_GPIO_PINS         9
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32H2)
+#define MAX_DIGITAL_GPIO_PINS         8
 #define MAX_ANALOG_GPIO_PINS          4
+#else /* ESP32 WROOM, S2, S3, C6 */
+#define MAX_DIGITAL_GPIO_PINS         12
+#define MAX_ANALOG_GPIO_PINS          4
+#endif
 
 /**
  * define max number of tables in database

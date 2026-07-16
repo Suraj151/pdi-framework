@@ -12,7 +12,7 @@
  * @param bufSize Size of the buffer.
  * @return 0 on success.
  */
-char PROTO_Init(PROTO_PARSER *parser, PROTO_PARSE_CALLBACK *completeCallback, unsigned char *buf, uint16_t bufSize)
+char PROTO_Init(PROTO_PARSER *parser, PROTO_PARSE_CALLBACK *completeCallback, uint8_t *buf, uint16_t bufSize)
 {
     parser->buf = buf;
     parser->bufSize = bufSize;
@@ -32,7 +32,7 @@ char PROTO_Init(PROTO_PARSER *parser, PROTO_PARSE_CALLBACK *completeCallback, un
  * @param value The byte to parse.
  * @return 0 if a complete packet is parsed, -1 otherwise.
  */
-char PROTO_ParseByte(PROTO_PARSER *parser, unsigned char value)
+char PROTO_ParseByte(PROTO_PARSER *parser, uint8_t value)
 {
     switch (value)
     {
@@ -82,7 +82,7 @@ char PROTO_ParseByte(PROTO_PARSER *parser, unsigned char value)
  * @param len Length of the data buffer.
  * @return 0 on success.
  */
-char PROTO_Parse(PROTO_PARSER *parser, unsigned char *buf, uint16_t len)
+char PROTO_Parse(PROTO_PARSER *parser, uint8_t *buf, uint16_t len)
 {
     while (len--)
         PROTO_ParseByte(parser, *buf++);
@@ -101,9 +101,9 @@ char PROTO_Parse(PROTO_PARSER *parser, unsigned char *buf, uint16_t len)
  * @param maxBufLen Maximum length of the output buffer.
  * @return 0 if a complete packet is parsed, -1 otherwise.
  */
-int PROTO_ParseRb(RINGBUF *rb, unsigned char *bufOut, uint16_t *len, uint16_t maxBufLen)
+int PROTO_ParseRb(RINGBUF *rb, uint8_t *bufOut, uint16_t *len, uint16_t maxBufLen)
 {
-    unsigned char c;
+    uint8_t c;
 
     PROTO_PARSER proto;
     PROTO_Init(&proto, NULL, bufOut, maxBufLen);
@@ -129,7 +129,7 @@ int PROTO_ParseRb(RINGBUF *rb, unsigned char *bufOut, uint16_t *len, uint16_t ma
  * @param bufSize Size of the buffer.
  * @return The number of bytes added to the buffer, or -1 on failure.
  */
-int PROTO_Add(unsigned char *buf, const unsigned char *packet, int bufSize)
+int PROTO_Add(uint8_t *buf, const uint8_t *packet, int bufSize)
 {
     uint16_t i = 2;
     uint16_t len = *(uint16_t *)packet;
@@ -182,7 +182,7 @@ int PROTO_Add(unsigned char *buf, const unsigned char *packet, int bufSize)
  * @param len Length of the packet data.
  * @return The number of bytes added to the ring buffer, or -1 on failure.
  */
-int PROTO_AddRb(RINGBUF *rb, const unsigned char *packet, int len)
+int PROTO_AddRb(RINGBUF *rb, const uint8_t *packet, int len)
 {
     uint16_t i = 2;
     if (RINGBUF_Put(rb, 0x7E) == -1) // Start of packet

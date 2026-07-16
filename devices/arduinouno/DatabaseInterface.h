@@ -51,7 +51,7 @@ public:
   void saveConfig(uint16_t _address, T *_object)
   {
     bool _data_written = false;
-    for (unsigned int i = 0; i < sizeof((*_object)); i++)
+    for (size_t i = 0; i < sizeof((*_object)); i++)
     {
       if ((char)PDIEEPROM.read(_address + i) != *((char *)&(*_object) + i))
       {
@@ -72,7 +72,7 @@ public:
   {
     if (isValidConfigs())
     {
-      for (unsigned int i = 0; i < sizeof((*_object)); i++)
+      for (size_t i = 0; i < sizeof((*_object)); i++)
       {
         *((char *)&(*_object) + i) = PDIEEPROM.read(_address + i);
       }

@@ -19,8 +19,9 @@ created Date    : 1st Jan 2024
 
 /**
  * Gpio's that should not be touched
+ * 1 = UART0 TX, 3 = UART0 RX, 6-11 = SPI flash pins
  */
-const uint8_t EXCEPTIONAL_GPIO_PINS[] = {3};
+const uint8_t EXCEPTIONAL_GPIO_PINS[] = {1, 3, 6, 7, 8, 9, 10, 11};
 
 /**
  * DeviceControlInterface class
@@ -74,6 +75,7 @@ public:
   uint32_t get_free_heap() override;
   void log(logger_type_t log_type, const char *content) override;
   void yield() override;
+  void handleEvents() override;
 
   // upgrade api
   upgrade_status_t Upgrade(const char *path, const char *version, void *client = nullptr) override;
@@ -89,7 +91,7 @@ private:
 
   gpio_id_t m_pin;
   gpio_val_t m_duration;
-  int m_ticker_id;
+  pdiutil::task_id_t m_ticker_id;
 
 public:
   /**

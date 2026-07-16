@@ -78,7 +78,7 @@ struct device_iot_configs {
 //   {0},{0},{0}
 // };
 
-const int device_iot_config_size = sizeof(device_iot_configs) + 5;
+const size_t device_iot_config_size = sizeof(device_iot_configs) + 5;
 
 using device_iot_config_table = device_iot_configs;
 

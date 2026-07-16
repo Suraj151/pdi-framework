@@ -188,7 +188,7 @@ extern "C" void custom_crash_callback(struct rst_info *rst_info, uint32_t stack,
 	}
 	if (_file)
 	{
-		unsigned int w = _file.write((uint8_t *)strprinter2.str.c_str(), strprinter2.str.length());
+		size_t w = _file.write((uint8_t *)strprinter2.str.c_str(), strprinter2.str.length());
 		_file.close();
 	}
 

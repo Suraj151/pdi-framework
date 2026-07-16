@@ -18,17 +18,23 @@ created Date    : 1st Jan 2024
  * Gpio's that should not be touched (flash / PSRAM / USB-JTAG / strapping)
  */
 #if defined(CONFIG_IDF_TARGET_ESP32C3)
-const uint8_t EXCEPTIONAL_GPIO_PINS[] = { 11, 12, 13, 14, 15, 16, 17, 18, 19 };
+// 11-17 = SPI flash, 18/19 = USB-JTAG, 20/21 = U0RXD/U0TXD
+const uint8_t EXCEPTIONAL_GPIO_PINS[] = { 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21 };
 #elif defined(CONFIG_IDF_TARGET_ESP32C6)
-const uint8_t EXCEPTIONAL_GPIO_PINS[] = { 24, 25, 26, 27, 28, 29, 30 };
+// 12/13 = USB, 24-30 = SPI flash (module dependent)
+const uint8_t EXCEPTIONAL_GPIO_PINS[] = { 12, 13, 24, 25, 26, 27, 28, 29, 30 };
 #elif defined(CONFIG_IDF_TARGET_ESP32H2)
-const uint8_t EXCEPTIONAL_GPIO_PINS[] = { 15, 16, 17, 18, 19, 20, 21 };
+// 15-25 = SPI flash worst case, 26/27 = USB-JTAG
+const uint8_t EXCEPTIONAL_GPIO_PINS[] = { 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27 };
 #elif defined(CONFIG_IDF_TARGET_ESP32S2)
-const uint8_t EXCEPTIONAL_GPIO_PINS[] = { 26, 27, 28, 29, 30, 31, 32 };
+// 19/20 = USB, 26-32 = SPI flash, 43/44 = U0TXD/U0RXD
+const uint8_t EXCEPTIONAL_GPIO_PINS[] = { 19, 20, 26, 27, 28, 29, 30, 31, 32, 43, 44 };
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
-const uint8_t EXCEPTIONAL_GPIO_PINS[] = { 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37 };
+// 19/20 = USB-JTAG, 26-32 = SPI flash, 33-37 = octal PSRAM, 43/44 = U0TXD/U0RXD
+const uint8_t EXCEPTIONAL_GPIO_PINS[] = { 19, 20, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 43, 44 };
 #elif defined(CONFIG_IDF_TARGET_ESP32)
-const uint8_t EXCEPTIONAL_GPIO_PINS[] = { 6, 7, 8, 9, 10, 11 };
+// 1/3 = U0TXD/U0RXD, 6-11 = SPI flash
+const uint8_t EXCEPTIONAL_GPIO_PINS[] = { 1, 3, 6, 7, 8, 9, 10, 11 };
 #else
 const uint8_t EXCEPTIONAL_GPIO_PINS[] = {};
 #endif
@@ -98,7 +104,7 @@ private:
 
   gpio_id_t m_pin;
   gpio_val_t m_duration;
-  int m_ticker_id;
+  pdiutil::task_id_t m_ticker_id;
 
 public:
   /**

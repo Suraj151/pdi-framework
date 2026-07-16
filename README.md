@@ -492,8 +492,8 @@ Every `ENABLE_*` (and `ALLOW_*` / `IGNORE_*` / `AUTO_*`) flag lives in [devices/
 
 | Macro | Purpose | Typical values |
 |---|---|---|
-| `MAX_DIGITAL_GPIO_PINS` | Size of GPIO config table | 14 (uno), 9 (esp32), 9 (esp8266) |
-| `MAX_ANALOG_GPIO_PINS` | Same, analog side | 5 (uno), 4 (esp32), 1 (esp8266) |
+| `MAX_DIGITAL_GPIO_PINS` | Size of GPIO config table | 14 (uno), 12 (esp32 WROOM/S2/S3/C6), 8 (esp32 C3/H2), 9 (esp8266) |
+| `MAX_ANALOG_GPIO_PINS` | Same, analog side | 5 (uno), 4 (esp32 all variants), 1 (esp8266) |
 | `MAX_DB_TABLES` | Upper bound on registered tables | 5 (uno), 15 (esp*) |
 | `MAX_SCHEDULABLE_TASKS` | Inline scheduler slot count | 25 (in `Common.h`) |
 | `MAX_FACTORY_RESET_CALLBACKS` | Reset-hook count | `MAX_SCHEDULABLE_TASKS` |

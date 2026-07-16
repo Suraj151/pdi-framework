@@ -80,13 +80,13 @@ public:
    * @var m_last_event
    * @brief Stores the name of the last executed event.
    */
-  int m_last_event;
+  event_name_t m_last_event;
 
   /**
    * @var m_last_event_millis
    * @brief Stores the timestamp of the last executed event in milliseconds.
    */
-  unsigned long m_last_event_millis;
+  pdiutil::millis_t m_last_event_millis;
 
 protected:
   /**

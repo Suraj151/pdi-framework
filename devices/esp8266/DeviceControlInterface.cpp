@@ -170,13 +170,10 @@ gpio_id_t DeviceControlInterface::gpioFromPinMap(gpio_id_t pin, bool isAnalog)
       mapped_pin = 15;
       break;
     case 9:
-      mapped_pin = 3;
-      break;
-    case 10:
-      mapped_pin = 1;
+      mapped_pin = 17; // A0 (ADC pseudo pin) - reached when _pin == MAX_DIGITAL_GPIO_PINS
       break;
     default:
-      mapped_pin = 0;
+      mapped_pin = INVALID_GPIO_NUMBER; // out-of-range user pin
   }
 
   return mapped_pin;
@@ -187,9 +184,10 @@ gpio_id_t DeviceControlInterface::gpioFromPinMap(gpio_id_t pin, bool isAnalog)
  */
 bool DeviceControlInterface::isExceptionalGpio(gpio_id_t pin)
 {
+  gpio_id_t hw = gpioFromPinMap(pin);
   for (uint8_t j = 0; j < sizeof(EXCEPTIONAL_GPIO_PINS); j++) {
 
-    if( EXCEPTIONAL_GPIO_PINS[j] == pin )return true;
+    if( EXCEPTIONAL_GPIO_PINS[j] == hw )return true;
   }
   return false;
 }
@@ -413,6 +411,19 @@ void DeviceControlInterface::log(logger_type_t log_type, const char *content)
         __i_logger.log(log_type, content);
     #endif
     #endif
+}
+
+/**
+ * handle device specific events
+ * Polled from PdiStack loop instead of relying on Arduino serialEvent()
+ * which is not reliably invoked across esp8266 core versions.
+ */
+void DeviceControlInterface::handleEvents()
+{
+    if (__serial_uart.available()) {
+        serial_event_t e(SERIAL_IFACE_UART, SERIAL_IFACE_CMD, &__serial_uart);
+        __utl_event.execute_event(EVENT_SERIAL_AVAILABLE, &e);
+    }
 }
 
 /**

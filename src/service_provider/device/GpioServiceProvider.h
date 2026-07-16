@@ -67,7 +67,7 @@ public:
   /**
    * @var	int|0 m_gpio_http_request_cb_id
    */
-  int m_gpio_http_request_cb_id;
+  pdiutil::task_id_t m_gpio_http_request_cb_id;
   /**
    * @var	bool|true m_update_gpio_table_from_copy
    */

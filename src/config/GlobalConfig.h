@@ -16,7 +16,7 @@ created Date    : 1st June 2019
  * common default configurations for all stack
  */
 #define CONFIG_START      5
-#define CONFIG_VERSION    "1.0"
+#define CONFIG_VERSION    "1.1"
 #define FIRMWARE_VERSION  2019041100
 #define RELEASE           "uEOS-A"
 #define LAUNCH_YEAR       19
@@ -47,7 +47,7 @@ struct global_config {
 //   CONFIG_VERSION, LAUNCH_YEAR, FIRMWARE_VERSION
 // };
 
-const int global_config_size = sizeof(global_config) + 5;
+const size_t global_config_size = sizeof(global_config) + 5;
 
 using global_config_table = global_config;
 

@@ -29,11 +29,11 @@ typedef void(PROTO_PARSE_CALLBACK)();
  */
 typedef struct
 {
-    unsigned char *buf;                ///< Pointer to the buffer for storing parsed data.
+    uint8_t *buf;                ///< Pointer to the buffer for storing parsed data.
     uint16_t bufSize;                  ///< Size of the buffer.
     uint16_t dataLen;                  ///< Length of the data currently in the buffer.
-    unsigned char isEsc;               ///< Flag indicating if the parser is in an escape state.
-    unsigned char isBegin;             ///< Flag indicating if the parser has started parsing a packet.
+    uint8_t isEsc;               ///< Flag indicating if the parser is in an escape state.
+    uint8_t isBegin;             ///< Flag indicating if the parser has started parsing a packet.
     PROTO_PARSE_CALLBACK *callback;    ///< Callback function to invoke when parsing is complete.
 } PROTO_PARSER;
 
@@ -49,7 +49,7 @@ typedef struct
  * @param bufSize Size of the buffer.
  * @return 0 on success, -1 on failure.
  */
-char PROTO_Init(PROTO_PARSER *parser, PROTO_PARSE_CALLBACK *completeCallback, unsigned char *buf, uint16_t bufSize);
+char PROTO_Init(PROTO_PARSER *parser, PROTO_PARSE_CALLBACK *completeCallback, uint8_t *buf, uint16_t bufSize);
 
 /**
  * @brief Parses a data buffer using the protocol parser.
@@ -62,7 +62,7 @@ char PROTO_Init(PROTO_PARSER *parser, PROTO_PARSE_CALLBACK *completeCallback, un
  * @param len Length of the data buffer.
  * @return 0 on success, -1 on failure.
  */
-char PROTO_Parse(PROTO_PARSER *parser, unsigned char *buf, uint16_t len);
+char PROTO_Parse(PROTO_PARSER *parser, uint8_t *buf, uint16_t len);
 
 /**
  * @brief Adds a packet to a buffer.
@@ -74,7 +74,7 @@ char PROTO_Parse(PROTO_PARSER *parser, unsigned char *buf, uint16_t len);
  * @param bufSize Size of the buffer.
  * @return The number of bytes added to the buffer, or -1 on failure.
  */
-int PROTO_Add(unsigned char *buf, const unsigned char *packet, int bufSize);
+int PROTO_Add(uint8_t *buf, const uint8_t *packet, int bufSize);
 
 /**
  * @brief Adds a packet to a ring buffer.
@@ -86,7 +86,7 @@ int PROTO_Add(unsigned char *buf, const unsigned char *packet, int bufSize);
  * @param len Length of the packet data.
  * @return The number of bytes added to the ring buffer, or -1 on failure.
  */
-int PROTO_AddRb(RINGBUF *rb, const unsigned char *packet, int len);
+int PROTO_AddRb(RINGBUF *rb, const uint8_t *packet, int len);
 
 /**
  * @brief Parses a single byte using the protocol parser.
@@ -97,7 +97,7 @@ int PROTO_AddRb(RINGBUF *rb, const unsigned char *packet, int len);
  * @param value The byte to parse.
  * @return 0 on success, -1 on failure.
  */
-char PROTO_ParseByte(PROTO_PARSER *parser, unsigned char value);
+char PROTO_ParseByte(PROTO_PARSER *parser, uint8_t value);
 
 /**
  * @brief Parses data from a ring buffer.
@@ -110,6 +110,6 @@ char PROTO_ParseByte(PROTO_PARSER *parser, unsigned char value);
  * @param maxBufLen Maximum length of the output buffer.
  * @return The number of bytes parsed, or -1 on failure.
  */
-int PROTO_ParseRb(RINGBUF *rb, unsigned char *bufOut, uint16_t *len, uint16_t maxBufLen);
+int PROTO_ParseRb(RINGBUF *rb, uint8_t *bufOut, uint16_t *len, uint16_t maxBufLen);
 
 #endif
