@@ -17,6 +17,7 @@ created Date    : 7th June 2026
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/error.h"
 #include "mbedtls/debug.h"
+#include "mbedtls/net_sockets.h" // for MBEDTLS_ERR_NET_* codes
 #include "lwip/dns.h"
 #include "lwip/netdb.h"
 #include <stdlib.h>
