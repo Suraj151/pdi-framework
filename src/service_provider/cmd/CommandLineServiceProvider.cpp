@@ -695,7 +695,11 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
           if(__i_instance.getFileSystemInstance().isFileExist(tempFilePath.c_str())){
               __i_instance.getFileSystemInstance().deleteFile(tempFilePath.c_str());
           }
-          
+
+          // Snapshot original ctime so it survives the temp+rename rotation.
+          uint32_t origCtime = 0;
+          __i_instance.getFileSystemInstance().getFileAttr(m_termhistoryfile.c_str(), FILE_ATTR_CTIME, &origCtime, sizeof(origCtime));
+
           int iStatus = __i_instance.getFileSystemInstance().readFile(m_termhistoryfile.c_str(), 100, [&](char* data, uint32_t size)->bool{
             __i_instance.getFileSystemInstance().writeFile(tempFilePath.c_str(), data, size, true);
             return true;
@@ -704,6 +708,9 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
           if( iStatus >= 0 ){
             __i_instance.getFileSystemInstance().deleteFile(m_termhistoryfile.c_str());
             __i_instance.getFileSystemInstance().moveFile(tempFilePath.c_str(), m_termhistoryfile.c_str());
+            if( origCtime ){
+              __i_instance.getFileSystemInstance().setFileAttr(m_termhistoryfile.c_str(), FILE_ATTR_CTIME, &origCtime, sizeof(origCtime));
+            }
           }
         }
 

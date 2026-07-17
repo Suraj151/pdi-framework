@@ -17,6 +17,7 @@ Created Date    : 6th Apr 2025
 #include "FileSystemInterfaceImpl.h"
 #include "../../../../../../external/LittleFSWrapper.cpp"
 #include <helpers/StorageHelper.h>
+#include <interface/pdi/middlewares/iNtpInterface.h>
 
 
 /**
@@ -304,6 +305,33 @@ void FileSystemInterfaceImpl::applyFileSizeLimit(pdiutil::string &name, uint32_t
         name = name.substr(0, keepsize);
         name += fileformat;
     }
+}
+
+uint32_t FileSystemInterfaceImpl::nowEpoch(){
+    if( !__i_ntp.is_valid_ntptime() ){
+        return 0;
+    }
+    return (uint32_t)__i_ntp.get_ntp_time();
+}
+
+int FileSystemInterfaceImpl::getFileMeta(const char *path, file_info_t &out){
+    if( !isFileExist(path) && !isDirExist(path) ){
+        return -1;
+    }
+    bool isDir = isDirectory(path);
+    out.type = isDir ? FILE_TYPE_DIR : FILE_TYPE_REG;
+    out.size = isDir ? 0 : (uint64_t)getFileSize(path);
+    out.ctime = 0;
+    out.mtime = 0;
+    out.perms = isDir ? (uint16_t)FILE_PERM_DEFAULT_DIR : (uint16_t)FILE_PERM_DEFAULT_FILE;
+    getFileAttr(path, FILE_ATTR_CTIME, &out.ctime, sizeof(out.ctime));
+    getFileAttr(path, FILE_ATTR_MTIME, &out.mtime, sizeof(out.mtime));
+    getFileAttr(path, FILE_ATTR_PERMS, &out.perms, sizeof(out.perms));
+    return 0;
+}
+
+int FileSystemInterfaceImpl::setFilePermissions(const char *path, uint16_t perms){
+    return setFileAttr(path, FILE_ATTR_PERMS, &perms, sizeof(perms));
 }
 
 #endif

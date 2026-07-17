@@ -118,6 +118,36 @@ void Uint32ToHexString(uint32_t val, char *pString, uint8_t _maxlen, bool cap = 
 void FloatToString(double val, char *pString, uint8_t _maxlen, uint8_t _padmax = 0);
 
 /**
+ * @brief 3-letter English month abbreviations, indexed 1..12
+ *        (slot 0 is a blank sentinel so month arithmetic reads naturally).
+ *        Sits in .rodata; single copy shared across the whole build.
+ */
+extern const char __g_month_abbr[13][4];
+
+/**
+ * @brief Converts a Unix epoch (seconds since 1970-01-01 UTC) into a
+ *        human-readable string using a strftime-style format.
+ *        For local time, add the desired offset in seconds before calling.
+ *        An epoch value of 0 is treated as "unknown" and written as a dash
+ *        padded (with spaces) to the width the format would have produced.
+ *
+ *        Supported specifiers:
+ *          %Y - 4-digit year        %y - 2-digit year
+ *          %m - 2-digit month       %b - 3-letter month name (Jan..Dec)
+ *          %d - 2-digit day         %H - 2-digit hour (24h)
+ *          %M - 2-digit minute      %S - 2-digit second
+ *          %% - literal '%'
+ *        Any other characters (including unknown '%X') are copied verbatim.
+ *
+ * @param epoch  Unix epoch seconds to format.
+ * @param pString Output buffer.
+ * @param _maxlen Capacity of the output buffer (including the NUL terminator).
+ * @param fmt    Format string. Defaults to "%Y-%m-%d %H:%M:%S" (19 chars + NUL).
+ */
+void EpochToDateTimeString(uint32_t epoch, char *pString, uint8_t _maxlen,
+                           const char *fmt = "%Y-%m-%d %H:%M:%S");
+
+/**
  * @brief Counts the number of digits in a signed 32-bit integer.
  * @param x The signed 32-bit integer.
  * @return The number of digits in the integer.

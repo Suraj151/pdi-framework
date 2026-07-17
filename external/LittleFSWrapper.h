@@ -289,6 +289,14 @@ public:
      */
     int removeFileAttr(const char *path, uint8_t type);
 
+protected:
+    // Stamp ctime + mtime + perms on a freshly created entry. Uses nowEpoch()
+    // (implemented by the policy layer) for the timestamp value.
+    void stampCreate(const char *path, bool isDir);
+
+    // Refresh mtime on an existing entry.
+    void stampModify(const char *path);
+
 private:
     lfs_t m_lfs;
     lfs_config m_lfscfg;

@@ -545,6 +545,19 @@ enum file_type_t : uint8_t {
     FILE_TYPE_MAX
 };
 
+// Reserved custom-attribute IDs for PDI file metadata. Values 0 and >=
+// FILE_ATTR_USER_BASE are free for callers of setFileAttr to define their own.
+enum file_attr_id_t : uint8_t {
+    FILE_ATTR_CTIME = 1,     ///< uint32_t seconds since Unix epoch (created)
+    FILE_ATTR_MTIME = 2,     ///< uint32_t seconds since Unix epoch (modified)
+    FILE_ATTR_PERMS = 3,     ///< uint16_t POSIX-style permission bit mask
+    FILE_ATTR_USER_BASE = 16 ///< first attribute id available to user code
+};
+
+// Default POSIX-style permission bits assigned to newly created entries.
+#define FILE_PERM_DEFAULT_FILE  0644
+#define FILE_PERM_DEFAULT_DIR   0755
+
 struct file_info_t {
     // Type of the file
     file_type_t type;
@@ -555,6 +568,16 @@ struct file_info_t {
     // Name of the file stored as a null-terminated string. must be limited to
     // FILE_NAME_MAX_SIZE+1,
     char *name;
+
+    // Seconds since Unix epoch when the entry was created. 0 means unknown
+    // (time source was unavailable when the entry was made).
+    uint32_t ctime;
+
+    // Seconds since Unix epoch of the last content modification. 0 means unknown.
+    uint32_t mtime;
+
+    // POSIX-style permission bits (advisory only; not enforced by the FS).
+    uint16_t perms;
 };
 
 #endif

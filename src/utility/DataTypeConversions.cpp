@@ -421,6 +421,152 @@ void FloatToString(double val, char *pString, uint8_t _maxlen, uint8_t _padmax)
     for (int l = pos; l < _padmax && l < _maxlen - 1; l++) pString[l] = ' ';
 }
 
+// 3-letter English month abbreviations; indexed 1..12 (slot 0 unused so
+// month arithmetic reads naturally). Declared extern in the header.
+const char __g_month_abbr[13][4] = {
+    "   ", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+};
+
+// Width the format string would produce for a real timestamp; used to
+// left-align the "-" sentinel for epoch == 0 so callers get stable columns.
+static uint8_t EpochFmtWidth(const char *fmt)
+{
+    uint8_t w = 0;
+    while (*fmt) {
+        if (*fmt == '%' && *(fmt + 1)) {
+            switch (*(fmt + 1)) {
+                case 'Y': w += 4; break;
+                case 'b': w += 3; break;
+                case 'y': case 'm': case 'd':
+                case 'H': case 'M': case 'S': w += 2; break;
+                case '%': w += 1; break;
+                default:  w += 2; break; // unknown %X passes through as-is
+            }
+            fmt += 2;
+        } else {
+            w += 1;
+            fmt++;
+        }
+    }
+    return w;
+}
+
+/**
+ * @brief Converts a Unix epoch (seconds since 1970-01-01 UTC) into a
+ *        human-readable string using a strftime-style format. epoch == 0
+ *        renders as a dash padded to the format's rendered width.
+ *
+ * Uses Howard Hinnant's civil-from-days algorithm so it does not pull in
+ * newlib's gmtime/localtime.
+ */
+void EpochToDateTimeString(uint32_t epoch, char *pString, uint8_t _maxlen,
+                           const char *fmt)
+{
+    if (nullptr == pString || _maxlen == 0) return;
+    if (nullptr == fmt) fmt = "%Y-%m-%d %H:%M:%S";
+    memset(pString, 0, _maxlen);
+
+    uint8_t width = EpochFmtWidth(fmt);
+
+    // Sentinel: unknown time. Emit a dash left-padded blank to keep the
+    // callers' fixed-width columns aligned to what a real timestamp would use.
+    if (epoch == 0) {
+        int n = (_maxlen - 1 < width) ? (_maxlen - 1) : width;
+        if (n > 0) {
+            pString[0] = '-';
+            for (int i = 1; i < n; i++) pString[i] = ' ';
+        }
+        return;
+    }
+
+    // Refuse to write a truncated date; a half-formed timestamp is worse
+    // than none for downstream parsers/log scrapers.
+    if (_maxlen <= width) {
+        pString[0] = '\0';
+        return;
+    }
+
+    uint32_t sec_of_day = epoch % 86400u;
+    uint32_t days = epoch / 86400u;
+
+    uint32_t hh = sec_of_day / 3600u;
+    uint32_t mm = (sec_of_day % 3600u) / 60u;
+    uint32_t ss = sec_of_day % 60u;
+
+    // Civil-from-days (Howard Hinnant). Shift epoch (1970-01-01) to an era
+    // starting 0000-03-01 so month arithmetic becomes uniform.
+    int32_t z = (int32_t)days + 719468;
+    int32_t era = (z >= 0 ? z : z - 146096) / 146097;
+    uint32_t doe = (uint32_t)(z - era * 146097);              // [0, 146096]
+    uint32_t yoe = (doe - doe/1460 + doe/36524 - doe/146096) / 365; // [0, 399]
+    int32_t y = (int32_t)yoe + era * 400;
+    uint32_t doy = doe - (365*yoe + yoe/4 - yoe/100);         // [0, 365]
+    uint32_t mp  = (5*doy + 2) / 153;                         // [0, 11]
+    uint32_t d   = doy - (153*mp + 2)/5 + 1;                  // [1, 31]
+    uint32_t m   = mp < 10 ? mp + 3 : mp - 9;                 // [1, 12]
+    if (m <= 2) y += 1;
+
+    uint32_t yr = (y < 0) ? 0 : (uint32_t)y;
+
+    uint8_t pos = 0;
+    while (*fmt && (uint8_t)(pos + 1) < _maxlen) {
+        if (*fmt == '%' && *(fmt + 1)) {
+            char c = *(fmt + 1);
+            switch (c) {
+                case 'Y':
+                    pString[pos++] = '0' + (yr / 1000) % 10;
+                    pString[pos++] = '0' + (yr / 100) % 10;
+                    pString[pos++] = '0' + (yr / 10) % 10;
+                    pString[pos++] = '0' + yr % 10;
+                    break;
+                case 'y':
+                    pString[pos++] = '0' + (yr / 10) % 10;
+                    pString[pos++] = '0' + yr % 10;
+                    break;
+                case 'm':
+                    pString[pos++] = '0' + (m / 10);
+                    pString[pos++] = '0' + (m % 10);
+                    break;
+                case 'b': {
+                    uint8_t mi = (m >= 1 && m <= 12) ? (uint8_t)m : 0;
+                    pString[pos++] = __g_month_abbr[mi][0];
+                    pString[pos++] = __g_month_abbr[mi][1];
+                    pString[pos++] = __g_month_abbr[mi][2];
+                    break;
+                }
+                case 'd':
+                    pString[pos++] = '0' + (d / 10);
+                    pString[pos++] = '0' + (d % 10);
+                    break;
+                case 'H':
+                    pString[pos++] = '0' + (hh / 10);
+                    pString[pos++] = '0' + (hh % 10);
+                    break;
+                case 'M':
+                    pString[pos++] = '0' + (mm / 10);
+                    pString[pos++] = '0' + (mm % 10);
+                    break;
+                case 'S':
+                    pString[pos++] = '0' + (ss / 10);
+                    pString[pos++] = '0' + (ss % 10);
+                    break;
+                case '%':
+                    pString[pos++] = '%';
+                    break;
+                default:
+                    pString[pos++] = '%';
+                    if ((uint8_t)(pos + 1) < _maxlen) pString[pos++] = c;
+                    break;
+            }
+            fmt += 2;
+        } else {
+            pString[pos++] = *fmt++;
+        }
+    }
+    pString[pos] = '\0';
+}
+
 /**
  * @brief Counts the number of digits in a signed 32-bit integer.
  *

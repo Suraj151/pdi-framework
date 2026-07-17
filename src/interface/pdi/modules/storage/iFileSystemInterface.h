@@ -362,7 +362,31 @@ public:
      * @return 0 on success, or a negative error code on failure.
      */
     virtual int removeFileAttr(const char *path, uint8_t type) = 0;
+
+    /**
+     * @brief Get metadata (type, size, ctime, mtime, perms) for a single path.
+     * @param path The path of the file or directory.
+     * @param out file_info_t populated on success; `name` is left untouched.
+     * @return 0 on success, or a negative error code on failure.
+     */
+    virtual int getFileMeta(const char *path, file_info_t &out) = 0;
+
+    /**
+     * @brief Set POSIX-style permission bits on a file or directory (advisory).
+     * @param path The path of the file or directory.
+     * @param perms Permission bit mask (e.g. 0644).
+     * @return 0 on success, or a negative error code on failure.
+     */
+    virtual int setFilePermissions(const char *path, uint16_t perms) = 0;
 protected:
+    /**
+     * @brief Get current wall-clock time as seconds since Unix epoch, or 0
+     *        when the time source is not yet valid. Implemented by the policy
+     *        layer (e.g. FileSystemInterfaceImpl) since it depends on the
+     *        active time provider (NTP, RTC, etc.).
+     */
+    virtual uint32_t nowEpoch() = 0;
+
     iStorageInterface& m_istorage; ///< Reference to the storage interface used for file operations.
 };
 

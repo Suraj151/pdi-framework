@@ -12,6 +12,8 @@ created Date    : 1st June 2019
 #define _LIST_FILE_SYSTEM_COMMAND_H_
 
 #include "CommandCommon.h"
+#include <utility/DataTypeConversions.h>
+#include <interface/pdi/middlewares/iNtpInterface.h>
 
 #ifdef ENABLE_STORAGE_SERVICE
 /**
@@ -69,20 +71,63 @@ struct ListFSCommand : public CommandBase {
 			m_terminal->write_ro(RODT_ATTR("Used : "));
 			m_terminal->write((int64_t)__i_fs.getUsedSize());
 			m_terminal->write_ro(RODT_ATTR(", Free : "));
-			m_terminal->write((int64_t)__i_fs.getFreeSize());
+			m_terminal->writeln((int64_t)__i_fs.getFreeSize());
 			m_terminal->putln();
 
-			m_terminal->writeln_ro(RODT_ATTR("Type Name        Size"));
+			// Current local year, computed once, used to pick between
+			// "%b %d %H:%M" (same year) and "%b %d  %Y" (different year) —
+			// matches GNU coreutils' `ls -l` display policy.
+			uint32_t nowLocal = __i_ntp.is_valid_ntptime()
+				? (uint32_t)__i_ntp.get_ntp_time() + (uint32_t)TZ_SEC
+				: 0;
+			char nowYear[5];
+			EpochToDateTimeString(nowLocal, nowYear, sizeof(nowYear), "%Y");
 
 			for (file_info_t item : itemlist) {
 				if( item.type == FILE_TYPE_DIR ){
-					m_terminal->write_ro(RODT_ATTR("D    "));
+					m_terminal->write_ro(RODT_ATTR("D "));
 				}else {
-					m_terminal->write_ro(RODT_ATTR("F    "));
+					m_terminal->write_ro(RODT_ATTR("F "));
 				}
-				m_terminal->write_pad(item.name, 12);
-				m_terminal->write((int64_t)item.size);
-				m_terminal->writeln_ro(RODT_ATTR(" bytes"));
+
+				// Permissions as 4 octal digits (chmod style), e.g. 0644 / 0755.
+				char permbuf[6];
+				permbuf[0] = '0' + ((item.perms >> 9) & 7);
+				permbuf[1] = '0' + ((item.perms >> 6) & 7);
+				permbuf[2] = '0' + ((item.perms >> 3) & 7);
+				permbuf[3] = '0' + (item.perms & 7);
+				permbuf[4] = ' ';
+				permbuf[5] = '\0';
+				m_terminal->write(permbuf);
+
+				char tsbuf[16];
+
+				// // Ctime column, ls-style: shift UTC by TZ then pick fmt by year.
+				// uint32_t ctimeLocal = item.ctime ? item.ctime + (uint32_t)TZ_SEC : 0;
+				// char cYear[5];
+				// EpochToDateTimeString(ctimeLocal, cYear, sizeof(cYear), "%Y");
+				// const char* cfmt = __are_arrays_equal(cYear, nowYear, 4)
+				// 	? "%b %d %H:%M" : "%b %d  %Y";
+				// EpochToDateTimeString(ctimeLocal, tsbuf, sizeof(tsbuf), cfmt);
+				// m_terminal->write(tsbuf);
+				// m_terminal->write(' ');
+
+				// Mtime column, ls-style: shift UTC by TZ then pick fmt by year.
+				uint32_t mtimeLocal = item.mtime ? item.mtime + (uint32_t)TZ_SEC : 0;
+				char mYear[5];
+				EpochToDateTimeString(mtimeLocal, mYear, sizeof(mYear), "%Y");
+				const char* mfmt = __are_arrays_equal(mYear, nowYear, 4)
+					? "%b %d %H:%M" : "%b %d  %Y";
+				EpochToDateTimeString(mtimeLocal, tsbuf, sizeof(tsbuf), mfmt);
+				m_terminal->write(tsbuf);
+				m_terminal->write(' ');
+
+				char sizebuf[12];
+				Uint32ToString((uint32_t)item.size, sizebuf, sizeof(sizebuf) - 1, 10);
+				m_terminal->write(sizebuf);
+				m_terminal->write(' ');
+
+				m_terminal->writeln(item.name);
 				// deallocates memory for items
 				delete[] item.name;
 			}

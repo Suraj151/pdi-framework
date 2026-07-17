@@ -97,6 +97,9 @@ int LittleFSWrapper::createFile(const char* path, const char* content, int64_t s
     }
     int bytesWrittenOrErr = lfs_file_write(&m_lfs, &file, content, (size == -1) ? strlen(content) : size);
     lfs_file_close(&m_lfs, &file);
+    if( bytesWrittenOrErr >= 0 ){
+        stampCreate(path, false);
+    }
     return bytesWrittenOrErr;
 }
 
@@ -153,7 +156,11 @@ int LittleFSWrapper::editFile(const char* path, uint64_t offset, const char* con
     if (bytesWrittenOrErr > 0 && (uint32_t)bytesWrittenOrErr != size) {
         return -2; // Partial write
     }
-    
+
+    if( bytesWrittenOrErr >= 0 ){
+        stampModify(path);
+    }
+
     return bytesWrittenOrErr;
 }
 
@@ -170,6 +177,8 @@ int LittleFSWrapper::writeFile(const char *path, const char *content, uint32_t s
         return 0;
     }
 
+    bool preExisted = isFileExist(path);
+
     lfs_file_t file;
     int fileOpenOrErr = lfs_file_open(&m_lfs, &file, path, LFS_O_WRONLY | LFS_O_CREAT | (append ? LFS_O_APPEND : LFS_O_TRUNC) );
     if (fileOpenOrErr < 0) {
@@ -177,6 +186,13 @@ int LittleFSWrapper::writeFile(const char *path, const char *content, uint32_t s
     }
     int bytesWrittenOrErr = lfs_file_write(&m_lfs, &file, content, size);
     lfs_file_close(&m_lfs, &file);
+    if( bytesWrittenOrErr >= 0 ){
+        if( preExisted ){
+            stampModify(path);
+        } else {
+            stampCreate(path, false);
+        }
+    }
     return bytesWrittenOrErr;
 }
 
@@ -321,6 +337,28 @@ int LittleFSWrapper::getFileAttr(const char *path, uint8_t type, void *buffer, u
  */
 int LittleFSWrapper::removeFileAttr(const char *path, uint8_t type){
     return lfs_removeattr(&m_lfs, path, type);
+}
+
+void LittleFSWrapper::stampCreate(const char *path, bool isDir){
+    // Perms are independent of the clock, so always write them on fresh entries.
+    uint16_t perms = isDir ? (uint16_t)FILE_PERM_DEFAULT_DIR : (uint16_t)FILE_PERM_DEFAULT_FILE;
+    lfs_setattr(&m_lfs, path, FILE_ATTR_PERMS, &perms, sizeof(perms));
+
+    // Skip time attrs when the time source is not yet valid so we do not
+    // record a misleading 0 sentinel; the next mutation with a valid clock
+    // will fill them in.
+    uint32_t now = nowEpoch();
+    if (now == 0) return;
+    lfs_setattr(&m_lfs, path, FILE_ATTR_CTIME, &now, sizeof(now));
+    lfs_setattr(&m_lfs, path, FILE_ATTR_MTIME, &now, sizeof(now));
+}
+
+void LittleFSWrapper::stampModify(const char *path){
+    // Skip when the time source is not yet valid so we do not clobber a
+    // previously-good mtime with a 0 sentinel.
+    uint32_t now = nowEpoch();
+    if (now == 0) return;
+    lfs_setattr(&m_lfs, path, FILE_ATTR_MTIME, &now, sizeof(now));
 }
 
 /**
@@ -741,6 +779,9 @@ int LittleFSWrapper::createDirectory(const char* path) {
                 temp[i] = '\0';
                 res = lfs_mkdir(&m_lfs, temp);
                 if (res != 0 && res != LFS_ERR_EXIST) return res;
+                if (res == 0) {
+                    stampCreate(temp, true);
+                }
             }
             last = i + 1;
         }
@@ -838,6 +879,13 @@ int LittleFSWrapper::copyFile(const char* sourcePath, const char* destPath) {
     lfs_file_close(&m_lfs, &sourceFile);
     lfs_file_close(&m_lfs, &destFile);
 
+    // Fresh entry: stamp ctime/mtime, then carry over source perms if present.
+    stampCreate(destPath, false);
+    uint16_t srcPerms = 0;
+    if (lfs_getattr(&m_lfs, sourcePath, FILE_ATTR_PERMS, &srcPerms, sizeof(srcPerms)) == (int)sizeof(srcPerms)) {
+        lfs_setattr(&m_lfs, destPath, FILE_ATTR_PERMS, &srcPerms, sizeof(srcPerms));
+    }
+
     return LFS_ERR_OK; // Success
 }
 
@@ -894,6 +942,9 @@ int LittleFSWrapper::getDirFileList(const char *path, pdiutil::vector<file_info_
         return dirOpenOrErr; // Failed to open directory
     }    
 
+    size_t basepathlen = strlen(path);
+    bool needsep = (basepathlen > 0 && path[basepathlen - 1] != '/');
+
     while (lfs_dir_read(&m_lfs, &dir, &info) > 0) {
 
         char *name = new char[strlen(info.name) + 1];
@@ -901,14 +952,38 @@ int LittleFSWrapper::getDirFileList(const char *path, pdiutil::vector<file_info_
         strcpy(name, info.name);
 
         if( nullptr != pattern && strlen(pattern) > 0 ){
-            if( strlen(pattern) > strlen(name) || 
+            if( strlen(pattern) > strlen(name) ||
                 __are_arrays_equal(name, (char*)pattern, strlen(pattern)) == false ){
                 delete[] name;
                 continue; // pattern not matched, skip this file
             }
         }
 
-        items.push_back({info.type==LFS_TYPE_DIR?FILE_TYPE_DIR:FILE_TYPE_REG, info.size, name});
+        file_info_t entry;
+        entry.type = (info.type == LFS_TYPE_DIR) ? FILE_TYPE_DIR : FILE_TYPE_REG;
+        entry.size = info.size;
+        entry.name = name;
+        entry.ctime = 0;
+        entry.mtime = 0;
+        entry.perms = (info.type == LFS_TYPE_DIR) ? (uint16_t)FILE_PERM_DEFAULT_DIR : (uint16_t)FILE_PERM_DEFAULT_FILE;
+
+        // Skip attr lookup for "." and ".." (they are not real distinct entries).
+        if (strcmp(info.name, ".") != 0 && strcmp(info.name, "..") != 0) {
+            char childpath[LFS_NAME_MAX * 2];
+            size_t namelen = strlen(info.name);
+            if (basepathlen + (needsep ? 1 : 0) + namelen < sizeof(childpath)) {
+                memcpy(childpath, path, basepathlen);
+                size_t off = basepathlen;
+                if (needsep) { childpath[off++] = '/'; }
+                memcpy(childpath + off, info.name, namelen);
+                childpath[off + namelen] = '\0';
+                lfs_getattr(&m_lfs, childpath, FILE_ATTR_CTIME, &entry.ctime, sizeof(entry.ctime));
+                lfs_getattr(&m_lfs, childpath, FILE_ATTR_MTIME, &entry.mtime, sizeof(entry.mtime));
+                lfs_getattr(&m_lfs, childpath, FILE_ATTR_PERMS, &entry.perms, sizeof(entry.perms));
+            }
+        }
+
+        items.push_back(entry);
     }
 
     lfs_dir_close(&m_lfs, &dir);

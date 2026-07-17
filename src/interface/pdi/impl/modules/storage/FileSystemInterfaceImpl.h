@@ -141,7 +141,30 @@ public:
      */
     virtual void applyFileSizeLimit(pdiutil::string &name, uint32_t sizelimit = FILE_NAME_MAX_SIZE);
 
+    /**
+     * @brief Get metadata (type, size, ctime, mtime, perms) for a single path.
+     * @param path The path of the file or directory.
+     * @param out file_info_t populated on success; `name` is left untouched.
+     * @return 0 on success, or a negative error code on failure.
+     */
+    virtual int getFileMeta(const char *path, file_info_t &out) override;
+
+    /**
+     * @brief Set POSIX-style permission bits on a file or directory (advisory).
+     * @param path The path of the file or directory.
+     * @param perms Permission bit mask (e.g. 0644).
+     * @return 0 on success, or a negative error code on failure.
+     */
+    virtual int setFilePermissions(const char *path, uint16_t perms) override;
+
 protected:
+
+    /**
+     * @brief Provides the current wall-clock time as seconds since Unix epoch,
+     *        or 0 when the NTP time source is not yet valid. Consumed by the
+     *        LittleFSWrapper's stamp helpers.
+     */
+    uint32_t nowEpoch() override;
     pdiutil::string m_pwd; ///< Present working directory.
     pdiutil::string m_lastpwd; ///< Last Present working directory.
     pdiutil::string m_root; ///< Root directory of the file system.
