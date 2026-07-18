@@ -71,16 +71,16 @@ struct ChangeDirFSCommand : public CommandBase {
 						memcpy(dirname, homedir, strlen(homedir));
 					}else if( cmdoptn->optionvalsize == 1 && cmdoptn->optionval[0] == '-' ){
 
-						pdiutil::string lastpwd = __i_fs.getLastPWD();
+						pdiutil::string lastpwd = SessionManager::getLastPWD();
 						memcpy(dirname, lastpwd.c_str(), lastpwd.length());
 					}else{
 
-						memcpy(dirname, __i_fs.getPWD().c_str(), __i_fs.getPWD().size());
+						memcpy(dirname, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
 						__i_fs.appendFileSeparator(dirname);
 						strncat(dirname, cmdoptn->optionval, cmdoptn->optionvalsize);
 					}
 
-					bool bStatus = __i_fs.changeDirectory(dirname);
+					bool bStatus = SessionManager::changeDirectory(dirname);
 					if(!bStatus){
 						result = CMD_RESULT_FAILED;
 						m_terminal->putln();

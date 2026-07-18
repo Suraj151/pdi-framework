@@ -56,7 +56,7 @@ struct PWDFSCommand  : public CommandBase {
 
 		if(nullptr != m_terminal){
 			m_terminal->putln();
-			m_terminal->write(__i_fs.getPWD().c_str());
+			m_terminal->write(SessionManager::getPWD().c_str());
 		}
 
 		return result;

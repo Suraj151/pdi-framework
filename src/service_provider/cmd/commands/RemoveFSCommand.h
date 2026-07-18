@@ -58,10 +58,10 @@ struct RemoveFSCommand : public CommandBase {
 			// Get first option which must be the path
 			CommandOption *cmdoptn = &m_options[0];
 			if( nullptr != cmdoptn && nullptr != cmdoptn->optionval && cmdoptn->optionvalsize > 0 ){
-				char *fileOrDir = new char[cmdoptn->optionvalsize+__i_fs.getPWD().size()+2]();
+				char *fileOrDir = new char[cmdoptn->optionvalsize+SessionManager::getPWD().size()+2]();
 				if( nullptr != fileOrDir ){
-					memset(fileOrDir, 0, cmdoptn->optionvalsize+__i_fs.getPWD().size()+2);
-					memcpy(fileOrDir, __i_fs.getPWD().c_str(), __i_fs.getPWD().size());
+					memset(fileOrDir, 0, cmdoptn->optionvalsize+SessionManager::getPWD().size()+2);
+					memcpy(fileOrDir, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
 					__i_fs.appendFileSeparator(fileOrDir);
 					strncat(fileOrDir, cmdoptn->optionval, cmdoptn->optionvalsize);
 

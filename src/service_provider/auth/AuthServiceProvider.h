@@ -52,9 +52,9 @@ private:
     bool m_initStatus;
 
 	/**
-	 * @var	bool	m_isAuthorized
+	 * @var	pdiutil::string	m_lastVerifiedUsername
 	 */
-    bool m_isAuthorized;
+    pdiutil::string m_lastVerifiedUsername;
 };
 
 extern AuthServiceProvider __auth_service;

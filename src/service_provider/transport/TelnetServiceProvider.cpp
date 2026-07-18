@@ -12,6 +12,7 @@ created Date    : 1st May 2025
 #if defined(ENABLE_TELNET_SERVICE)
 
 #include "TelnetServiceProvider.h"
+#include <service_provider/session/SessionManager.h>
 #ifdef ENABLE_CMD_SERVICE
 #include <service_provider/cmd/CommandLineServiceProvider.h>
 #endif
@@ -95,9 +96,7 @@ void TelnetServiceProvider::stop() {
 void TelnetServiceProvider::closeClient() {
     if (m_client) {
         #ifdef ENABLE_CMD_SERVICE
-        // Notify command service to stop using the terminal
-        __cmd_service.useTerminal(nullptr);
-        // Inform serial terminal about the end of telnet client session
+        SessionManager::detach(m_client);
         if(__i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)){
             __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln();
             __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln_ro(RODT_ATTR("Telnet Client Session ended."));
@@ -133,19 +132,7 @@ void TelnetServiceProvider::handle() {
                 __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln_ro(RODT_ATTR("Telnet Client Session started."));
             }
 
-            iTerminalInterface *current_terminal = __cmd_service.getTerminal();
-            if( current_terminal && TERMINAL_TYPE_SSH == current_terminal->get_terminal_type() ){
-
-                if(__i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)){
-                    __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln();
-                    __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln_ro(RODT_ATTR("Unable to start telnet client session."));
-                }
-
-                m_client->writeln_ro(RODT_ATTR("Can't start session due to existing ssh session."));
-                closeClient();
-            }else{
-                __cmd_service.useTerminal(m_client);
-            }
+            __cmd_service.useTerminal(m_client);
             #endif            
         }
     }

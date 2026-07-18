@@ -13,6 +13,7 @@ created Date    : 6th Apr 2025
 #if defined(ENABLE_SSH_SERVICE)
 
 #include "SSHServiceprovider.h"
+#include <service_provider/session/SessionManager.h>
 #ifdef ENABLE_CMD_SERVICE
 #include <service_provider/cmd/CommandLineServiceProvider.h>
 #endif
@@ -101,9 +102,9 @@ void SSHServer::stop() {
  */
 void SSHServer::closeSession() {
     #ifdef ENABLE_CMD_SERVICE
-    // Notify command service to stop using the terminal
-    __cmd_service.useTerminal(nullptr);
-    // Inform serial terminal about the end of telnet client session
+    if (m_session && m_session->m_sshclient) {
+        SessionManager::detach(m_session->m_sshclient);
+    }
     if(__i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)){
         __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln();
         __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln_ro(RODT_ATTR("SSH Client Session ended."));
@@ -518,6 +519,8 @@ void LWSSH::SSHServer::handleAuthentication(){
                     reply.push_back(SSH2_MSG_USERAUTH_SUCCESS); // 52
                     bstatus = send_server_ssh_packet(m_session, reply, true);
                     if(bstatus){
+                        SessionManager::attach(m_session->m_sshclient);
+                        __auth_service.setAuthorized(true);
                         m_session->m_state = LWSSHSession::SESSION_STATE_CHANNEL_REQUEST;
                     }
                 }
@@ -651,7 +654,7 @@ void LWSSH::SSHServer::handleChannelRequest(){
                                 res == CMD_RESULT_TERMINAL_ABORTED
                             ){
                                 __auth_service.setAuthorized(false);
-                                __i_fs.changeDirectory(__i_fs.getHomeDirectory());
+                                SessionManager::changeDirectory(__i_fs.getHomeDirectory());
                                 m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
                             }
                             #endif
@@ -888,7 +891,7 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                             // Build absolute starting path. SFTP path separator is always '/'.
                             pdiutil::string abspath;
                             if (reqpath.empty() || reqpath[0] != '/') {
-                                abspath = __i_fs.getPWD();
+                                abspath = SessionManager::getPWD();
                                 if (abspath.empty() || abspath[abspath.length() - 1] != '/') {
                                     abspath += '/';
                                 }

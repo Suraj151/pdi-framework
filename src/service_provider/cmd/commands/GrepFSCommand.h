@@ -128,12 +128,12 @@ struct GrepFSCommand : public CommandBase {
 			if(isPatternProvided && isFileProvided){
 
 				char *pattern = new char[patternoptn->optionvalsize + 1]();
-				char *path = new char[fileoptn->optionvalsize + __i_fs.getPWD().size() + 2]();
+				char *path = new char[fileoptn->optionvalsize + SessionManager::getPWD().size() + 2]();
 
 				if(nullptr != pattern && nullptr != path){
 					memcpy(pattern, patternoptn->optionval, patternoptn->optionvalsize);
 
-					memcpy(path, __i_fs.getPWD().c_str(), __i_fs.getPWD().size());
+					memcpy(path, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
 					__i_fs.appendFileSeparator(path);
 					strncat(path, fileoptn->optionval, fileoptn->optionvalsize);
 					int path_len = (int)strlen(path);

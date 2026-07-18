@@ -56,9 +56,9 @@ struct HeadFSCommand : public CommandBase {
 					if(parsed > 0) count = parsed;
 				}
 
-				char *filename = new char[fileoptn->optionvalsize + __i_fs.getPWD().size() + 2]();
+				char *filename = new char[fileoptn->optionvalsize + SessionManager::getPWD().size() + 2]();
 				if(nullptr != filename){
-					memcpy(filename, __i_fs.getPWD().c_str(), __i_fs.getPWD().size());
+					memcpy(filename, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
 					__i_fs.appendFileSeparator(filename);
 					strncat(filename, fileoptn->optionval, fileoptn->optionvalsize);
 

@@ -1137,9 +1137,10 @@ The working example sketch is walked through in [§11.6 DeviceIotExample](#116-d
 | Flag | `ENABLE_AUTH_SERVICE` |
 |---|---|
 | Source | [auth/AuthServiceProvider.{h,cpp}](src/service_provider/auth/AuthServiceProvider.h) |
-| Depends on | `__database_service` (`login_credential_table`) |
-| Used by | The web `AuthMiddleware` ([§8](#8-web-server)) and the CLI's login prompt; the `auth` and `passwd` commands. Credentials are verified against the login table via `isAuthorized(user, pass)`; a session flag is maintained for CLI use |
-| Persistence | One row: `username`, `password`, `session_name`, `cookie_max_age` (default 300 s) |
+| Depends on | `__database_service` (legacy `login_credential_table`); [`__user_store_service`](#6217-userstoreservice--__user_store_service) when `/etc/shadow` exists |
+| Used by | Web `AuthMiddleware` ([§8](#8-web-server)); CLI login/su/passwd; every command with `needauth()` |
+| Model | **Session-aware delegator** — `isAuthorized(u, p)` is a pure verifier that routes to `__user_store_service.verifyPassword` when `/etc/shadow` exists, else falls back to the LoginTable string check. `setAuthorized(bool)` / `getAuthorized()` / `getUsername()` read+write the **current** `session_t` via `SessionManager::current()`. No global auth bit any more — each session is authorised independently |
+| Persistence | LoginTable row is the bootstrap seed only. Actual user directory lives in `/etc/passwd` + `/etc/shadow` (see [§6.2.17](#6217-userstoreservice--__user_store_service)) |
 
 #### 6.2.11 Storage (interface init, no provider)
 
@@ -1181,11 +1182,11 @@ Full breakdown lives in [§8. Web Server](#8-web-server) — it has its own rout
 |---|---|
 | Source | [cmd/CommandLineServiceProvider.{h,cpp}](src/service_provider/cmd/CommandLineServiceProvider.h) |
 | Inherits | `ServiceProvider`, `CommandExecutionInterface` |
-| Depends on | `__auth_service`, every command in [cmd/commands/](src/service_provider/cmd/commands/) it dispatches to |
-| Init does | Registers all command handlers; `CommandLineServiceProvider::startInteraction()` (called by PdiStack) attaches to the serial terminal and starts the login prompt |
-| Terminal binding | Telnet and SSH sessions swap the active terminal by calling `useTerminal(iTerminalInterface*)` on connect and again on disconnect — the same CLI serves all three transports |
-| Built-in commands | `help`, `uptime`, `ls`, `cd`, `pwd`, `mkd`, `mkf`, `mv`, `cp`, `rm`, `cat`, `fwrite`, `head`, `tail`, `wc`, `df`, `grep`, `hexdump`, `cls`, `gpio`, `net`, `srvc`, `scht`, `ssh`, `tls` (if `ENABLE_TLS_CERT_GENERATION`), `iot`, `auth`, `reboot`, `watch` — full reference in [§7.7 Built-in command inventory](#77-built-in-command-inventory) |
-| Multi-terminal | The same command instance services serial, telnet, and SSH terminals — each just swaps the underlying `iTerminalInterface*` via `useTerminal` |
+| Depends on | `__auth_service`, `SessionManager` ([§6.2.18](#6218-sessionmanager)), every command in [cmd/commands/](src/service_provider/cmd/commands/) |
+| Init does | Registers all command handlers; `PdiStack` calls `SessionManager::attach(serialTerminal)` at boot so the serial slot is populated before first input |
+| Terminal binding | `useTerminal(t)` attaches a `session_t` for terminal `t` (idempotent) and draws the login prompt. `processTerminalInput(t)` looks up the session via `SessionManager::findByTerminal(t)`, sets it as current for the tick, then dispatches. Each in-flight command carries `m_owner = session` so cross-session `getCommandWaitingForUserInput` never returns another session's prompt |
+| Built-in commands | Files (`ls`/`cd`/`pwd`/`mkd`/`mkf`/`mv`/`cp`/`rm`/`cat`/`fwrite`/`head`/`tail`/`wc`/`df`/`grep`/`hexdump`), auth+users (`login`/`logout`/`whoami`/`id`/`who`/`su`/`passwd`/`useradd`/`userdel`/`groups`), device (`gpio`/`net`/`srvc`/`scht`/`ssh`/`tls`/`iot`/`reboot`/`watch`/`uptime`/`cls`/`help`) — full reference in [§7.7](#77-built-in-command-inventory) |
+| Multi-session | Up to `PDI_MAX_SESSIONS` (default 3) sessions run concurrently across serial + telnet + ssh. Each has its own linebuf, cursor, history-walk, cwd, auth, username, and in-flight commands. See [§7.8](#78-multi-terminal-session-lifecycle) |
 
 #### 6.2.16 TLS (no provider; transport hookup + cert provisioning)
 
@@ -1201,6 +1202,30 @@ Full breakdown lives in [§8. Web Server](#8-web-server) — it has its own rout
 | Cert provisioning (esp32) | [devices/esp32/TlsCertProvisioner.{h,cpp}](devices/esp32/TlsCertProvisioner.h). `generateCert(...)` issues a self-signed EC/RSA cert with optional CA bit, IPv4/DNS SANs, custom validity. `ensureServerCert(...)` creates one only if missing — wired to `EVENT_WIFI_STA_GOT_IP` when `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` is on |
 | Off-device cert generation | [scripts/GenTlsCerts.py](scripts/GenTlsCerts.py) — OpenSSL-backed alternative for boards without on-device gen (esp8266). EC/RSA, multi-DNS/IP SANs, CA mode, CSR re-signing. Output under `certs/`; upload to the `TLS_DEFAULT_*_PATH` paths |
 | CLI | `tls q=1,t=<EC|RSA>,l=<bits>,n=<CN/DNS>,i=<IPv4>` — generates a server cert on-device (esp32 only). See [§7.7](#77-built-in-command-inventory). |
+
+#### 6.2.17 `UserStoreService` — `__user_store_service`
+
+| Flag | `ENABLE_AUTH_SERVICE` + `ENABLE_STORAGE_SERVICE` |
+|---|---|
+| Source | [user/UserStoreService.{h,cpp}](src/service_provider/user/UserStoreService.h) |
+| Config | [config/UserStoreConfig.h](src/config/UserStoreConfig.h) — `USER_STORE_PASSWD_PATH="/etc/passwd"`, `USER_STORE_SHADOW_PATH="/etc/shadow"`, `USER_STORE_SALT_LEN=8`, `USER_STORE_ROOT_UID=0`, `USER_STORE_DEFAULT_SHELL="cmd"` |
+| Depends on | `__i_fs`, `__database_service` (bootstrap only), `utility/crypto/hash/sha256`, `utility/DataTypeConversions` (hex helpers) |
+| Files | **`/etc/passwd`** — one line per user: `username:x:uid:gid:home:shell`. **`/etc/shadow`** — `username:hexhash:hexsalt` (32-byte SHA-256 of `salt‖password`, 8-byte random salt). Both readable, but only usable via the API below |
+| Public API | `findUserByName`, `findUserByUid`, `addUser(record, password)` (writes both files, rolls back passwd row on shadow failure), `removeUser` (removes from both), `verifyPassword` (constant-time hash compare), `setPassword` |
+| Bootstrap | On `initService`, if `/etc/passwd` doesn't exist, seeds it with the LoginTable admin as `uid=0, gid=0, home=/, shell=cmd` and hashes the admin password into `/etc/shadow`. Idempotent — reboot doesn't clobber. |
+| Init order | Called from `PdiStack::initialize` after `__i_fs.init()` and before the CLI, so FS is ready but auth still degrades cleanly to LoginTable if shadow write fails |
+| Auth path | `AuthServiceProvider::isAuthorized(u, p)` (§6.2.10) prefers this service when `/etc/shadow` exists, else falls back to LoginTable. That's the switch that turns pdi-framework from single-record auth into a multi-user OS |
+
+#### 6.2.18 `SessionManager`
+
+Not a `ServiceProvider` — a static registry that owns the per-session state.
+
+| Source | [session/SessionManager.{h,cpp}](src/service_provider/session/SessionManager.h) |
+|---|---|
+| Config | [config/SessionConfig.h](src/config/SessionConfig.h) — `PDI_MAX_SESSIONS` (default 3). Override to 1 on AVR-class devices |
+| State type | `session_t` in [utility/DataTypeDef.h](src/utility/DataTypeDef.h) — `sid`, `state`, `terminal*`, `loginAt`, `lastActivityAt`, `linebuf`, `cursor`, `historyIdx`, `origTypedPrefix`, `prevArgSize`, `autoCompleteIdx`, `prevCmdSize`, `cwd`, `lastCwd`, `isAuthorized`, `username` (auth/storage-gated) |
+| API | `attach(terminal)` / `detach(terminal)` / `findByTerminal` / `current` / `setCurrent` / `getByIndex(i)` / `maxSessions()` / `activeCount()`. Storage-gated: `getPWD`, `getLastPWD`, `setPWD`, `changeDirectory` — session-scoped cwd with `__i_fs` fallback pre-attach |
+| Wire-in | `CommandLineServiceProvider::useTerminal` calls `attach`; `processTerminalInput` calls `findByTerminal` + `setCurrent`; SSH's USERAUTH_SUCCESS attaches early so auth state anchors to the SSH channel; Telnet/SSH `closeSession` calls `detach(theClient)` explicitly |
 
 ### 6.3 Init order and why it matters
 
@@ -1325,7 +1350,7 @@ Any source that wants to feed the CLI must implement `iTerminalInterface` (defin
 | Telnet client session | `iClientInterface*` returned by `iTcpServerInterface::accept()` | Device port (TCP) |
 | SSH channel | LWSSH session wrapper | [src/service_provider/shell/ssh/](src/service_provider/shell/ssh/) |
 
-When a telnet or SSH client connects, the corresponding service calls `__cmd_service.useTerminal(client)` to redirect the CLI's I/O to that session for the duration of the connection — then back to serial on disconnect.
+When a telnet or SSH client connects, the corresponding service calls `__cmd_service.useTerminal(client)`, which attaches a fresh `session_t` slot via `SessionManager` and starts a login prompt on that client. Serial keeps its own slot (pinned at boot). Each session's input/output stays isolated — see [§7.8](#78-multi-terminal-session-lifecycle).
 
 ### 7.3 Input sequences
 
@@ -1400,7 +1425,7 @@ By default, parsed `optionval` points into the live receive buffer — so once t
 
 ### 7.6 `CommandLineServiceProvider`
 
-[CommandLineServiceProvider.h](src/service_provider/cmd/CommandLineServiceProvider.h) — the runtime around `CommandBase`. It owns the active command stack, the per-keystroke receive buffer, the cursor position, and the history / autocomplete walk state; drives them via `processTerminalInput` → `executeCommand`. `useTerminal(iTerminalInterface*)` is what telnet / SSH call to swap the CLI's I/O source per session, and `startInteraction()` is the entry point `PdiStack::initialize` uses to attach the CLI to the serial terminal at boot.
+[CommandLineServiceProvider.h](src/service_provider/cmd/CommandLineServiceProvider.h) — the runtime around `CommandBase`. It owns the in-flight command list (`m_cmdlist`, session-tagged via `m_owner`) and the persistent history file path; the receive buffer, cursor, history-walk, autocomplete indexes, and cwd all live **on each `session_t`** (see [§6.2.18](#6218-sessionmanager)). Dispatch: `processTerminalInput(t)` resolves the session via `SessionManager::findByTerminal(t)`, sets it current for the tick, then drives `executeCommand`. `useTerminal(t)` attaches a session for a fresh client and draws its login prompt.
 
 #### History & autocomplete
 
@@ -1433,6 +1458,16 @@ Names come from [CommandCommon.h](src/service_provider/cmd/commands/CommandCommo
 | grep \<pattern> \<file_or_dir> | | Search a file or dir (recursive). Output `path:line:col:content` (vim/vscode jump format). Regex subset: `.` `*` `+` `?` `^` `$` `[abc]` `[a-z]` `[^abc]` `\\<char>`. No alternation / groups / backrefs. e.g. **grep ^ERROR /home/log.txt** |
 | cls | | Clear screen. e.g. **cls** |
 | cd \<dir> | | Change directory. e.g. **cd /home/scripts** |
+| login | u=\<user> p=\<pass> | Interactive login (three-line: user then pass). Also inline as `login u=<u>, p=<p>` (comma separator on this legacy command). |
+| logout | | End the session. Serial returns to `login:` prompt; Telnet/SSH channel is closed. |
+| whoami | | Print current session's username. e.g. **whoami** |
+| id | | Print `uid=N(username) gid=N` for the current session's user. e.g. **id** |
+| who | | List active authenticated sessions across serial/telnet/ssh: `USER TTY SID LOGIN IDLE` in seconds. e.g. **who** |
+| groups | | Print the current user's primary gid. e.g. **groups** |
+| su u=\<user> p=\<pass> | u, p (space-separated) | Switch user in the current session. Prompts interactively when args omitted. On success sets session identity + jumps to target's home dir. e.g. **su u=alice p=alice123** |
+| passwd p=\<curr> n=\<new> c=\<confirm> | p, n, c (space) | Change own password. Three-phase interactive when omitted (`current:` / `new:` / `confirm:`), all echo-suppressed. e.g. **passwd p=oldpw n=newpw c=newpw** |
+| useradd u=\<user> p=\<pass> | u, p (space) | **Root-only.** Create a new user. UID auto-assigned to next free slot ≥1; home=`/`, shell=`cmd`. Writes both `/etc/passwd` and `/etc/shadow` (rolls back on shadow failure). e.g. **useradd u=alice p=alice123** |
+| userdel u=\<user> | u (space) | **Root-only.** Delete a user from `/etc/passwd` + `/etc/shadow`. Refuses self-delete and uid=0 (root). e.g. **userdel u=alice** |
 | gpio p=\<pin>,m=\<mode>,v=\<value> | p=\<pin> m=\<mode> v=\<value> | Perform GPIO operations. Modes: OFF=0, DIGITAL_WRITE=1, DIGITAL_READ=2, DIGITAL_BLINK=3, ANALOG_WRITE=4, ANALOG_READ=5. e.g. blink GPIO 4 at 500 ms: **gpio p=4,m=3,v=500** |
 | srvc s=\<service>,q=\<query> | s=\<service> q=\<query> | Query running services. Use `srvc l` to list ids. Queries: QUERY_CONFIG=1, QUERY_STATUS=2. e.g. **srvc s=1,q=2** |
 | scht | l\<list> | List active scheduler tasks. e.g. **scht l** |
@@ -1449,30 +1484,48 @@ Each command's implementation lives in [src/service_provider/cmd/commands/](src/
 
 ### 7.8 Multi-terminal session lifecycle
 
+Up to `PDI_MAX_SESSIONS` (default 3) sessions can run concurrently — one each across serial, telnet, and ssh — with fully independent state. There is one `CommandLineServiceProvider` singleton dispatcher, and one `SessionManager::m_sessions[PDI_MAX_SESSIONS]` slot array; each slot holds its own `linebuf`, `cursor`, `history/autocomplete` cursors, `cwd`, `isAuthorized`, `username`, `loginAt`, `lastActivityAt` (see [§6.2.18](#6218-sessionmanager)).
+
 ```
 boot
- │
- └─ CommandLineServiceProvider::startInteraction()
-       useTerminal(__i_dvc_ctrl.getTerminal())     // serial
-       prompt "login: …"
-       ...
+ └─ PdiStack::initialize
+       __i_fs.init()
+       __user_store_service.initService()          // bootstraps /etc/passwd + /etc/shadow if missing
+       SessionManager::attach(serialTerminal)      // pins slot 0 for serial
+       login prompt on serial
 
-(later) telnet client connects on :23
- │
+(any time) telnet client connects on :23
  └─ TelnetServiceProvider::handle()
        accept() → iClientInterface* c
-       __cmd_service.useTerminal(c)                // CLI now writes to telnet
-       loop until disconnect: processTerminalInput(c)
+       __cmd_service.useTerminal(c) ─┐
+                                      ├─ SessionManager::attach(c) → next free slot
+                                      └─ startInteraction() draws login: on c
+       every tick with c-side data:
+           processTerminalInput(c) → findByTerminal(c) → SessionManager::setCurrent(s)
+                                    → session-scoped input/exec
        on disconnect:
-           __cmd_service.useTerminal(serialTerminal)   // back to serial
+           SessionManager::detach(c)               // slot freed
 
-(later) SSH client connects on :22
- │
- └─ same pattern, additionally:
-       authenticate, open channel, optionally SFTP subsystem
+(any time) SSH client connects on :22
+ └─ USERAUTH_SUCCESS:
+       SessionManager::attach(m_sshclient) + setAuthorized(true)   // anchor auth to SSH slot
+    channel-open:
+       __cmd_service.useTerminal(m_sshclient)     // idempotent attach + prompt
+    shell data ticks:
+       processTerminalInput(m_sshclient) → same session-scoped path
+    close:
+       SessionManager::detach(m_sshclient)
 ```
 
-One CLI instance, three doorways. The implication: at most one user at a time has the prompt. A telnet session blocks the SSH and serial prompts until it disconnects.
+Two invariants make it work:
+
+1. **Per-tick context switch.** At the top of `processTerminalInput(t)`, cmd_service calls `SessionManager::setCurrent(findByTerminal(t))` and re-points the static `ServiceProvider::m_terminal` to `t`. Downstream code (prompt drawing, new command instances, `__auth_service` delegators) automatically sees the right session for this tick without any explicit parameter passing.
+
+2. **Owner-tagged in-flight commands.** Every `cmd_t` created via `getCommandToExecute` gets `m_owner = SessionManager::current()`. `getCommandWaitingForUserInput` and `getActiveCommandByName` filter by owner, so a Telnet-side `login` prompt waiting for a username never picks up SSH-side keystrokes as its input.
+
+Constraints:
+- Telnet transport currently accepts **one client at a time** ([TelnetServiceProvider.cpp](src/service_provider/transport/TelnetServiceProvider.cpp)); the session layer supports more, but Telnet needs a client-vector refactor to exercise it.
+- Long-running commands (e.g. `watch`) capture their `m_terminal` and `m_owner` at creation time, so their output continues to flow to the correct session regardless of what other sessions do in later ticks.
 
 ### 7.9 SFTP / SCP file transfer
 
@@ -3400,7 +3453,7 @@ ssh q=1,t=1
 By design — the framework streams SFTP in small bolus chunks (≤256 B) and has overwrite overhead on flash filesystems. Expected throughput 0.2-1 KB/s ([§6.2.14](#6-service-providers), [§7.9](#7-command-line--terminal)). Use OTA, not SFTP, for firmware.
 
 **Two telnet clients can't connect simultaneously.**
-Only one CLI session is supported at a time across all transports — telnet, SSH, and serial share the bound terminal ([§7.8](#7-command-line--terminal)).
+The Telnet transport currently holds a single `m_client`, so a second telnet TCP connect is refused until the first disconnects. The session layer itself supports `PDI_MAX_SESSIONS` concurrent slots — serial + telnet + ssh coexist fine, and multi-telnet just needs a client-vector refactor in [TelnetServiceProvider.cpp](src/service_provider/transport/TelnetServiceProvider.cpp) ([§7.8](#78-multi-terminal-session-lifecycle)).
 
 **`fwrite` won't exit.**
 Press **ESC** to finalize (commit + exit). See [§7.7 Built-in command inventory](#77-built-in-command-inventory).

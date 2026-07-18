@@ -12,6 +12,7 @@ created Date    : 1st June 2019
 
 #include "Common.h"
 #include "GlobalConfig.h"
+#include "SessionConfig.h"
 
 #ifdef ENABLE_WIFI_SERVICE
 #include "WifiConfig.h"
@@ -19,6 +20,10 @@ created Date    : 1st June 2019
 
 #if defined(ENABLE_HTTP_SERVER) || defined(ENABLE_AUTH_SERVICE)
 #include "ServerConfig.h"
+#endif
+
+#ifdef ENABLE_AUTH_SERVICE
+#include "UserStoreConfig.h"
 #endif
 
 #if defined(ENABLE_HTTP_SERVER) || defined(ENABLE_HTTP_CLIENT)

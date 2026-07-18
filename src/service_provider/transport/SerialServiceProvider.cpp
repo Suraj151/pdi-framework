@@ -13,6 +13,7 @@ created Date    : 1st June 2019
 #if defined(ENABLE_SERIAL_SERVICE)
 
 #include "SerialServiceProvider.h"
+#include <service_provider/session/SessionManager.h>
 #ifdef ENABLE_CMD_SERVICE
 #include <service_provider/cmd/CommandLineServiceProvider.h>
 #endif
@@ -71,21 +72,11 @@ void SerialServiceProvider::processSerial(serial_event_t *se)
 
     if( SERIAL_IFACE_UART == se->source && SERIAL_IFACE_CMD == se->dest ){
 
-      // process and execute if command has provided
       #ifdef ENABLE_CMD_SERVICE
-      iTerminalInterface *terminal = __cmd_service.getTerminal();
-      if( nullptr == terminal ){
+      if( nullptr == SessionManager::findByTerminal(se->serial) ){
         __cmd_service.useTerminal(se->serial);
-        terminal = __cmd_service.getTerminal();
       }
-
-      // Currently supporting multiple client (tcp, telnet, serial, ssh) for command service.
-      // And at a time currently only one terminal can be used for command service.
-      // So checking the terminal type before proceeding the command service
-      // Other client types can override running serial terminal and use it for command service
-      if( terminal->get_terminal_type() == TERMINAL_TYPE_SERIAL ){
-          __cmd_service.processTerminalInput(se->serial);
-      }
+      __cmd_service.processTerminalInput(se->serial);
       #endif
     }
 

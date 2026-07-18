@@ -85,6 +85,7 @@ void PDIStack::initialize(){
 
   // Set the terminal interface for the service providers
   ServiceProvider::setTerminal(terminal);
+  SessionManager::attach(terminal);
 
   __database_service.initService();
 
@@ -128,6 +129,10 @@ void PDIStack::initialize(){
 
   #ifdef ENABLE_STORAGE_SERVICE
   __i_fs.init();
+  #endif
+
+  #if defined(ENABLE_AUTH_SERVICE) && defined(ENABLE_STORAGE_SERVICE)
+  __user_store_service.initService();
   #endif
 
   #ifdef ENABLE_HTTP_SERVER

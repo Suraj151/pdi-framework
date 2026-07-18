@@ -60,10 +60,10 @@ struct FileReadCommand : public CommandBase {
 			// Get first option which must be the filename to read
 			CommandOption *cmdoptn = &m_options[0];
 			if( nullptr != cmdoptn && nullptr != cmdoptn->optionval && cmdoptn->optionvalsize > 0 ){
-				char *filename = new char[cmdoptn->optionvalsize+__i_fs.getPWD().size()+2]();
+				char *filename = new char[cmdoptn->optionvalsize+SessionManager::getPWD().size()+2]();
 				if( nullptr != filename ){
-					memset(filename, 0, cmdoptn->optionvalsize+__i_fs.getPWD().size()+2);
-					memcpy(filename, __i_fs.getPWD().c_str(), __i_fs.getPWD().size());
+					memset(filename, 0, cmdoptn->optionvalsize+SessionManager::getPWD().size()+2);
+					memcpy(filename, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
 					__i_fs.appendFileSeparator(filename);
 					strncat(filename, cmdoptn->optionval, cmdoptn->optionvalsize);
 
@@ -234,12 +234,12 @@ struct FileWriteCommand : public CommandBase {
 	cmd_result_t updateFile( CommandOption *filenamecmdoptn, const char* data, int16_t len){
 
 		cmd_result_t result = CMD_RESULT_OK;
-		char *filename = new char[filenamecmdoptn->optionvalsize+__i_fs.getPWD().size()+2]();
+		char *filename = new char[filenamecmdoptn->optionvalsize+SessionManager::getPWD().size()+2]();
 		
 		if( nullptr != filename ){
 
-			memset(filename, 0, filenamecmdoptn->optionvalsize+__i_fs.getPWD().size()+2);
-			memcpy(filename, __i_fs.getPWD().c_str(), __i_fs.getPWD().size());
+			memset(filename, 0, filenamecmdoptn->optionvalsize+SessionManager::getPWD().size()+2);
+			memcpy(filename, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
 			__i_fs.appendFileSeparator(filename);
 			strncat(filename, filenamecmdoptn->optionval, filenamecmdoptn->optionvalsize);
 

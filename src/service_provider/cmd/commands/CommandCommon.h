@@ -12,6 +12,7 @@ created Date    : 1st June 2019
 #define _COMMANDCOMMON_H_
 
 #include <config/Config.h>
+#include <service_provider/session/SessionManager.h>
 
 #ifdef ENABLE_AUTH_SERVICE
 #include <service_provider/auth/AuthServiceProvider.h>
@@ -46,6 +47,14 @@ created Date    : 1st June 2019
 #ifdef ENABLE_AUTH_SERVICE
 #define CMD_NAME_LOGIN 				"login"
 #define CMD_NAME_LOGOUT				"logout"
+#define CMD_NAME_WHOAMI 			"whoami"
+#define CMD_NAME_ID 				"id"
+#define CMD_NAME_WHO 				"who"
+#define CMD_NAME_SU 				"su"
+#define CMD_NAME_PASSWD 			"passwd"
+#define CMD_NAME_USERADD 			"useradd"
+#define CMD_NAME_USERDEL 			"userdel"
+#define CMD_NAME_GROUPS 			"groups"
 #endif
 #define CMD_NAME_GPIO 				"gpio"
 #define CMD_NAME_SERVICE 			"srvc"

@@ -15,6 +15,14 @@ created Date    : 1st June 2019
 
 // commands
 #include "commands/AuthCommand.h"
+#include "commands/WhoAmICommand.h"
+#include "commands/IdCommand.h"
+#include "commands/WhoCommand.h"
+#include "commands/SuCommand.h"
+#include "commands/PasswdCommand.h"
+#include "commands/UseraddCommand.h"
+#include "commands/UserdelCommand.h"
+#include "commands/GroupsCommand.h"
 #include "commands/GpioCommand.h"
 #include "commands/ServiceCommand.h"
 #include "commands/ListFSCommand.h"
@@ -89,58 +97,12 @@ private:
 	 */
     pdiutil::vector<cmd_t*> m_cmdlist;
 
-	/**
-	 * @var	pdiutil::string	m_termrecvdata
-	 */
-    pdiutil::string m_termrecvdata;
-
-	/**
-	 * @var	uint16_t	m_terminalCursorIndex
-	 */
-    uint16_t m_terminalCursorIndex;
-
 	#ifdef ENABLE_STORAGE_SERVICE
 	/**
 	 * @var	pdiutil::string	m_termhistoryfile
 	 */
 	pdiutil::string m_termhistoryfile;
-
-	/**
-	 * @var	int16_t	m_cmdHistoryIndex
-	 */
-    int16_t m_cmdHistoryIndex;
-
-	/**
-	 * @var	int16_t	m_prevHistorySize
-	 * Size of the in-buffer pattern captured when up/down history walk began.
-	 */
-    int16_t m_prevHistorySize;
-
-	/**
-	 * @var	pdiutil::string	m_origTypedPrefix
-	 * Original prefix the user typed before pressing up/down. Preserved through
-	 * the walk so the search pattern doesn't drift to the first char of the
-	 * currently displayed history entry.
-	 */
-    pdiutil::string m_origTypedPrefix;
-
-	/**
-	 * @var	int16_t	m_prevArgSize
-	 * Size of the argument fragment captured when tab-completing a filename arg.
-	 */
-    int16_t m_prevArgSize;
 	#endif
-
-	/**
-	 * @var	int16_t	m_cmdAutoCompleteIndex
-	 */
-    int16_t m_cmdAutoCompleteIndex;
-
-	/**
-	 * @var	int16_t	m_prevCmdSize
-	 * Size of the command fragment captured when tab-completion began.
-	 */
-    int16_t m_prevCmdSize;
 
 	int16_t getCommandWaitingForUserInput();
 	cmd_t* getCommandToExecute(const char *cmdname);

@@ -34,10 +34,12 @@ struct LoginCommand : public CommandBase {
      * @brief Register the command.
      */
     static void RegisterCommand(){
-		CommandBase::RegisterCommand(CMD_NAME_LOGIN, [](void *arg)->void *{ 
-			return new LoginCommand(); 
-		}); 
+		CommandBase::RegisterCommand(CMD_NAME_LOGIN, [](void *arg)->void *{
+			return new LoginCommand();
+		});
 	}
+
+	bool wantsMaskedInput() override { return isWaitingForOption(CMD_OPTION_NAME_P); }
 
 	/* execute command with provided options */
 	cmd_result_t execute(cmd_term_inseq_t terminputaction){
@@ -128,14 +130,19 @@ struct LogoutCommand : public CommandBase {
 	/* execute command with provided options */
 	cmd_result_t execute(cmd_term_inseq_t terminputaction){
 
-		cmd_result_t result = CMD_RESULT_OK;
 		__auth_service.setAuthorized(false);
 
 		#ifdef ENABLE_STORAGE_SERVICE
-		__i_fs.setPWD(__i_fs.getHomeDirectory());
+		SessionManager::setPWD(__i_fs.getHomeDirectory());
 		#endif
-		
-		return result;
+
+		if( nullptr != m_terminal ){
+			terminal_types_t t = m_terminal->get_terminal_type();
+			if( TERMINAL_TYPE_TELNET == t || TERMINAL_TYPE_SSH == t ){
+				return CMD_RESULT_TERMINAL_ABORTED;
+			}
+		}
+		return CMD_RESULT_OK;
 	}
 };
 

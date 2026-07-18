@@ -58,6 +58,7 @@ created Date    : 1st June 2019
 
 #ifdef ENABLE_AUTH_SERVICE
 #include <service_provider/auth/AuthServiceProvider.h>
+#include <service_provider/user/UserStoreService.h>
 #endif
 
 #ifdef ENABLE_CMD_SERVICE

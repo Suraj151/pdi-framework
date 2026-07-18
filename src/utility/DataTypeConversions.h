@@ -109,6 +109,23 @@ void Uint32ToString(uint32_t val, char *pString, uint8_t _maxlen, uint8_t _padma
 void Uint32ToHexString(uint32_t val, char *pString, uint8_t _maxlen, bool cap = false);
 
 /**
+ * @brief Converts a byte array to a lowercase hex string.
+ * @param bytes Source byte array.
+ * @param bytelen Number of bytes to encode.
+ * @param out Destination buffer, must hold at least (bytelen*2 + 1) bytes.
+ */
+void BytesToHexString(const uint8_t *bytes, uint8_t bytelen, char *out);
+
+/**
+ * @brief Parses a hex string into a byte array.
+ * @param hex Source hex string (2*bytelen characters, upper or lower case).
+ * @param bytelen Number of bytes to decode.
+ * @param out Destination byte array of size bytelen.
+ * @return true on success, false if any character was not a hex digit.
+ */
+bool HexStringToBytes(const char *hex, uint8_t bytelen, uint8_t *out);
+
+/**
  * @brief Converts a floating-point value to a string.
  * @param val The floating-point value to convert.
  * @param pString The buffer to store the resulting string.

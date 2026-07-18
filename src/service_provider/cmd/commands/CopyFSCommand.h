@@ -62,15 +62,15 @@ struct CopyFSCommand : public CommandBase {
 			if( nullptr != cmdoptn1 && nullptr != cmdoptn1->optionval && cmdoptn1->optionvalsize > 0 &&
 				nullptr != cmdoptn2 && nullptr != cmdoptn2->optionval && cmdoptn2->optionvalsize > 0){
 
-				char *srcpath = new char[cmdoptn1->optionvalsize+__i_fs.getPWD().size()+2]();
-				char *dstpath = new char[cmdoptn2->optionvalsize+__i_fs.getPWD().size()+2]();
+				char *srcpath = new char[cmdoptn1->optionvalsize+SessionManager::getPWD().size()+2]();
+				char *dstpath = new char[cmdoptn2->optionvalsize+SessionManager::getPWD().size()+2]();
 
 				if( nullptr != srcpath && nullptr != dstpath ){
-					memset(srcpath, 0, cmdoptn1->optionvalsize+__i_fs.getPWD().size()+2);
-					memset(dstpath, 0, cmdoptn2->optionvalsize+__i_fs.getPWD().size()+2);
+					memset(srcpath, 0, cmdoptn1->optionvalsize+SessionManager::getPWD().size()+2);
+					memset(dstpath, 0, cmdoptn2->optionvalsize+SessionManager::getPWD().size()+2);
 
-					memcpy(srcpath, __i_fs.getPWD().c_str(), __i_fs.getPWD().size());
-					memcpy(dstpath, __i_fs.getPWD().c_str(), __i_fs.getPWD().size());
+					memcpy(srcpath, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
+					memcpy(dstpath, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
 
 					__i_fs.appendFileSeparator(srcpath);
 					__i_fs.appendFileSeparator(dstpath);

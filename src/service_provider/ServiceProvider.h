@@ -24,6 +24,7 @@ typedef enum services{
 
 #ifdef ENABLE_AUTH_SERVICE
   SERVICE_AUTH,
+  SERVICE_USER_STORE,
 #endif
 #ifdef ENABLE_CMD_SERVICE
   SERVICE_CMD,

@@ -13,11 +13,13 @@ created Date    : 1st June 2019
 #if defined(ENABLE_AUTH_SERVICE)
 
 #include "AuthServiceProvider.h"
+#include <service_provider/session/SessionManager.h>
+#include <service_provider/user/UserStoreService.h>
 
 /**
  * AuthServiceProvider constructor
  */
-AuthServiceProvider::AuthServiceProvider(): m_initStatus(false), m_isAuthorized(false), ServiceProvider(SERVICE_AUTH, RODT_ATTR("Auth"))
+AuthServiceProvider::AuthServiceProvider(): m_initStatus(false), ServiceProvider(SERVICE_AUTH, RODT_ATTR("Auth"))
 {
 }
 
@@ -48,15 +50,26 @@ bool AuthServiceProvider::initService(void *arg)
  */
 bool AuthServiceProvider::isAuthorized(const char *username, const char *password)
 {
-  if( m_initStatus &&
-      __are_str_equals(username, m_login_credentials.username, LOGIN_CONFIGS_BUF_SIZE) &&
-      __are_str_equals(password, m_login_credentials.password, LOGIN_CONFIGS_BUF_SIZE) 
-  ){
-    m_isAuthorized = true;
-  }else{
-    return false;
+  if( nullptr == username || nullptr == password ) return false;
+
+  bool ok = false;
+
+#ifdef ENABLE_STORAGE_SERVICE
+  if( __i_fs.isFileExist(USER_STORE_SHADOW_PATH) ){
+    ok = __user_store_service.verifyPassword(username, password);
+  }else
+#endif
+  {
+    ok = ( m_initStatus &&
+        __are_str_equals(username, m_login_credentials.username, LOGIN_CONFIGS_BUF_SIZE) &&
+        __are_str_equals(password, m_login_credentials.password, LOGIN_CONFIGS_BUF_SIZE)
+    );
   }
-  return m_isAuthorized;
+
+  if( ok ){
+    m_lastVerifiedUsername = username;
+  }
+  return ok;
 }
 
 /**
@@ -66,7 +79,23 @@ bool AuthServiceProvider::isAuthorized(const char *username, const char *passwor
  */
 void AuthServiceProvider::setAuthorized(bool auth)
 {
-  m_isAuthorized = auth;
+  session_t *s = SessionManager::current();
+  if( nullptr == s ) return;
+  s->m_isAuthorized = auth;
+  if( auth ){
+    if( !m_lastVerifiedUsername.empty() ){
+      s->m_username = m_lastVerifiedUsername;
+    }else{
+      s->m_username = m_login_credentials.username;
+    }
+    s->m_loginAt = (uint32_t)__i_dvc_ctrl.millis_now();
+    s->m_lastActivityAt = s->m_loginAt;
+  }else{
+    s->m_username.clear();
+    s->m_loginAt = 0;
+    s->m_lastActivityAt = 0;
+    m_lastVerifiedUsername.clear();
+  }
 }
 
 /**
@@ -76,7 +105,8 @@ void AuthServiceProvider::setAuthorized(bool auth)
  */
 bool AuthServiceProvider::getAuthorized()
 {
-  return m_isAuthorized;
+  session_t *s = SessionManager::current();
+  return ( nullptr != s && s->m_isAuthorized );
 }
 
 /**
@@ -86,7 +116,11 @@ bool AuthServiceProvider::getAuthorized()
  */
 const char *AuthServiceProvider::getUsername()
 {
-    return m_login_credentials.username;
+  session_t *s = SessionManager::current();
+  if( nullptr != s && !s->m_username.empty() ){
+    return s->m_username.c_str();
+  }
+  return m_login_credentials.username;
 }
 
 /**

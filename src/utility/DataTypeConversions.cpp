@@ -366,6 +366,50 @@ void Uint32ToHexString(uint32_t val, char *pString, uint8_t _maxlen, bool cap)
 }
 
 /**
+ * @brief Converts a byte array to a lowercase hex string.
+ * @param bytes Source byte array.
+ * @param bytelen Number of bytes to encode.
+ * @param out Destination buffer, must hold at least (bytelen*2 + 1) bytes.
+ */
+void BytesToHexString(const uint8_t *bytes, uint8_t bytelen, char *out)
+{
+    if (nullptr == bytes || nullptr == out) return;
+    static const char kHex[] = "0123456789abcdef";
+    for (uint8_t i = 0; i < bytelen; i++) {
+        out[i*2]     = kHex[(bytes[i] >> 4) & 0x0F];
+        out[i*2 + 1] = kHex[ bytes[i]       & 0x0F];
+    }
+    out[bytelen*2] = '\0';
+}
+
+/**
+ * @brief Parses a hex string into a byte array.
+ * @param hex Source hex string (2*bytelen characters, upper or lower case).
+ * @param bytelen Number of bytes to decode.
+ * @param out Destination byte array of size bytelen.
+ * @return true on success, false if any character was not a hex digit.
+ */
+bool HexStringToBytes(const char *hex, uint8_t bytelen, uint8_t *out)
+{
+    if (nullptr == hex || nullptr == out) return false;
+    for (uint8_t i = 0; i < bytelen; i++) {
+        uint8_t hi, lo;
+        char c = hex[i*2];
+        if (c >= '0' && c <= '9')      hi = c - '0';
+        else if (c >= 'a' && c <= 'f') hi = 10 + (c - 'a');
+        else if (c >= 'A' && c <= 'F') hi = 10 + (c - 'A');
+        else return false;
+        c = hex[i*2 + 1];
+        if (c >= '0' && c <= '9')      lo = c - '0';
+        else if (c >= 'a' && c <= 'f') lo = 10 + (c - 'a');
+        else if (c >= 'A' && c <= 'F') lo = 10 + (c - 'A');
+        else return false;
+        out[i] = (hi << 4) | lo;
+    }
+    return true;
+}
+
+/**
  * @brief Converts a floating-point value to a string.
  *
  * @param val The floating-point value to convert.

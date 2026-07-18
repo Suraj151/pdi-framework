@@ -59,10 +59,10 @@ struct MakeDirFSCommand : public CommandBase {
 			// Get first option which must be the path
 			CommandOption *cmdoptn = &m_options[0];
 			if( nullptr != cmdoptn && nullptr != cmdoptn->optionval && cmdoptn->optionvalsize > 0 ){
-				char *dirname = new char[cmdoptn->optionvalsize+__i_fs.getPWD().size()+2]();
+				char *dirname = new char[cmdoptn->optionvalsize+SessionManager::getPWD().size()+2]();
 				if( nullptr != dirname ){
-					memset(dirname, 0, cmdoptn->optionvalsize+__i_fs.getPWD().size()+2);
-					memcpy(dirname, __i_fs.getPWD().c_str(), __i_fs.getPWD().size());
+					memset(dirname, 0, cmdoptn->optionvalsize+SessionManager::getPWD().size()+2);
+					memcpy(dirname, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
 					__i_fs.appendFileSeparator(dirname);
 					strncat(dirname, cmdoptn->optionval, cmdoptn->optionvalsize);
 					int bStatus = __i_fs.createDirectory(dirname);

@@ -580,4 +580,90 @@ struct file_info_t {
     uint16_t perms;
 };
 
+#ifdef ENABLE_AUTH_SERVICE
+struct user_record_t {
+    user_record_t() : m_uid(0), m_gid(0) {}
+
+    void clear() {
+        m_uid = 0;
+        m_gid = 0;
+        m_username.clear();
+        m_home.clear();
+        m_shell.clear();
+    }
+
+    uint16_t m_uid;
+    uint16_t m_gid;
+    pdiutil::string m_username;
+    pdiutil::string m_home;
+    pdiutil::string m_shell;
+};
+#endif
+
+class iTerminalInterface;
+
+enum session_state_t : uint8_t {
+    SESSION_STATE_FREE = 0,
+    SESSION_STATE_PRELOGIN,
+    SESSION_STATE_LOGIN_WAIT,
+    SESSION_STATE_INTERACTIVE,
+    SESSION_STATE_DEAD
+};
+
+struct session_t {
+    session_t() : m_sid(0), m_state(SESSION_STATE_FREE), m_terminal(nullptr), m_loginAt(0), m_lastActivityAt(0),
+                  m_cursor(0),
+#ifdef ENABLE_STORAGE_SERVICE
+                  m_historyIdx(-1), m_prevHistorySize(0), m_prevArgSize(0),
+#endif
+                  m_autoCompleteIdx(-1), m_prevCmdSize(0) {}
+
+    void clear() {
+        m_sid = 0;
+        m_state = SESSION_STATE_FREE;
+        m_terminal = nullptr;
+        m_loginAt = 0;
+        m_lastActivityAt = 0;
+        m_linebuf.clear();
+        m_cursor = 0;
+#ifdef ENABLE_STORAGE_SERVICE
+        m_historyIdx = -1;
+        m_prevHistorySize = 0;
+        m_origTypedPrefix.clear();
+        m_prevArgSize = 0;
+        m_cwd.clear();
+        m_lastCwd.clear();
+#endif
+#ifdef ENABLE_AUTH_SERVICE
+        m_isAuthorized = false;
+        m_username.clear();
+#endif
+        m_autoCompleteIdx = -1;
+        m_prevCmdSize = 0;
+    }
+
+    uint8_t m_sid;
+    session_state_t m_state;
+    iTerminalInterface *m_terminal;
+    uint32_t m_loginAt;
+    uint32_t m_lastActivityAt;
+
+    pdiutil::string m_linebuf;
+    uint16_t m_cursor;
+#ifdef ENABLE_STORAGE_SERVICE
+    int16_t m_historyIdx;
+    int16_t m_prevHistorySize;
+    pdiutil::string m_origTypedPrefix;
+    int16_t m_prevArgSize;
+    pdiutil::string m_cwd;
+    pdiutil::string m_lastCwd;
+#endif
+#ifdef ENABLE_AUTH_SERVICE
+    bool m_isAuthorized;
+    pdiutil::string m_username;
+#endif
+    int16_t m_autoCompleteIdx;
+    int16_t m_prevCmdSize;
+};
+
 #endif

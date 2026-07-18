@@ -151,6 +151,7 @@ typedef struct CommandBase {
     uint8_t m_optionindx;                         ///< Index of the current option.
     int8_t m_waitingoptionindx;                   ///< Index of the option waiting for input.
     iTerminalInterface *m_terminal;              ///< Terminal interface for command interaction.
+    session_t *m_owner;                          ///< Session that owns this in-flight command.
     cmd_status_t m_status;                        ///< Status of the command.
     cmd_result_t m_result;                        ///< Result of the command execution.
     bool m_acceptArgsOptions;                   ///< Flag to accept argumental options.
@@ -556,6 +557,7 @@ typedef struct CommandBase {
         ClearOptions(true);
         m_optionindx = 0;
         m_terminal = nullptr;
+        m_owner = nullptr;
         m_status = CMD_STATUS_MAX;
         m_result = CMD_RESULT_MAX;
         m_acceptArgsOptions = false;
@@ -628,6 +630,11 @@ typedef struct CommandBase {
      * @return True if authentication is required, false otherwise.
      */
     virtual bool needauth() { return false; }
+
+    /**
+     * @brief Whether the currently-awaited option should be entered with echo suppressed.
+     */
+    virtual bool wantsMaskedInput() { return false; }
 
     /**
      * @brief Executes the command logic.

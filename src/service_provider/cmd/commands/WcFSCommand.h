@@ -46,9 +46,9 @@ struct WcFSCommand : public CommandBase {
 		if(nullptr != m_terminal){
 			CommandOption *cmdoptn = &m_options[0];
 			if( nullptr != cmdoptn && nullptr != cmdoptn->optionval && cmdoptn->optionvalsize > 0 ){
-				char *filename = new char[cmdoptn->optionvalsize + __i_fs.getPWD().size() + 2]();
+				char *filename = new char[cmdoptn->optionvalsize + SessionManager::getPWD().size() + 2]();
 				if( nullptr != filename ){
-					memcpy(filename, __i_fs.getPWD().c_str(), __i_fs.getPWD().size());
+					memcpy(filename, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
 					__i_fs.appendFileSeparator(filename);
 					strncat(filename, cmdoptn->optionval, cmdoptn->optionvalsize);
 
