@@ -44,9 +44,13 @@ struct SSHCommand : public CommandBase {
      * @brief Register the command.
      */
     static void RegisterCommand(){
-		CommandBase::RegisterCommand(CMD_NAME_SSH, [](void *arg)->void *{ 
-			return new SSHCommand(); 
-		}); 
+		CommandBase::RegisterCommand(CMD_NAME_SSH, [](void *arg)->void *{
+			return new SSHCommand();
+		});
+	}
+
+	const char* getUsage() const override {
+		return RODT_ATTR("ssh q=<query>,t=<algo>  q=1 (KEYGEN) creates a keypair of given algo");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -143,6 +147,8 @@ struct SSHCommand : public CommandBase {
 					}
 				}
 			}
+		}else{
+			result = CMD_RESULT_ARGS_ERROR;
 		}
 
 		return result;

@@ -78,8 +78,8 @@ bool GpioServiceProvider::initService(void *arg){
   this->handleGpioModes();
   __database_service.get_gpio_config_table(&this->m_gpio_config_copy);
 
-  __task_scheduler.setInterval( [&]() { this->handleGpioOperations(); }, GPIO_OPERATION_DURATION, __i_dvc_ctrl.millis_now() );
-  __task_scheduler.setInterval( [&]() { this->enable_update_gpio_table_from_copy(); }, GPIO_TABLE_UPDATE_DURATION, __i_dvc_ctrl.millis_now() );
+  this->serviceSetInterval( [&]() { this->handleGpioOperations(); }, GPIO_OPERATION_DURATION, __i_dvc_ctrl.millis_now() );
+  this->serviceSetInterval( [&]() { this->enable_update_gpio_table_from_copy(); }, GPIO_TABLE_UPDATE_DURATION, __i_dvc_ctrl.millis_now() );
 
   return ServiceProvider::initService(arg);
 }
@@ -680,7 +680,7 @@ void GpioServiceProvider::handleGpioModes( int _gpio_config_type ){
   if( strlen( this->m_gpio_config_copy.gpio_host ) > 5 && this->m_gpio_config_copy.gpio_port > 0 &&
     this->m_gpio_config_copy.gpio_post_frequency > 0
   ){
-    this->m_gpio_http_request_cb_id = __task_scheduler.updateInterval(
+    this->m_gpio_http_request_cb_id = this->serviceUpdateInterval(
       this->m_gpio_http_request_cb_id,
       [&]() { this->handleGpioHttpRequest(); },
       this->m_gpio_config_copy.gpio_post_frequency*MILLISECOND_DURATION_1000

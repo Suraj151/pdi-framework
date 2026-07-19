@@ -29,6 +29,10 @@ struct HexdumpCommand : public CommandBase {
 		});
 	}
 
+	const char* getUsage() const override {
+		return RODT_ATTR("hexdump <file>  print offset / 16 hex bytes / ASCII");
+	}
+
 #ifdef ENABLE_AUTH_SERVICE
 	bool needauth() override { return true; }
 #endif

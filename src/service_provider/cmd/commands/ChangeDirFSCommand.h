@@ -33,9 +33,13 @@ struct ChangeDirFSCommand : public CommandBase {
      * @brief Register the command.
      */
     static void RegisterCommand(){
-		CommandBase::RegisterCommand(CMD_NAME_CD, [](void *arg)->void *{ 
-			return new ChangeDirFSCommand(); 
-		}); 
+		CommandBase::RegisterCommand(CMD_NAME_CD, [](void *arg)->void *{
+			return new ChangeDirFSCommand();
+		});
+	}
+
+	const char* getUsage() const override {
+		return RODT_ATTR("cd <dir>  change working directory");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -87,7 +91,16 @@ struct ChangeDirFSCommand : public CommandBase {
 						m_terminal->write_ro(RODT_ATTR("Failed to change directory: "));
 						m_terminal->write(dirname);
 					}
-					delete[] dirname;	
+					delete[] dirname;
+				}
+			}else{
+				// POSIX-style: bare `cd` goes to the home directory.
+				const char* homedir = __i_fs.getHomeDirectory();
+				if( nullptr != homedir && SessionManager::changeDirectory(homedir) == false ){
+					result = CMD_RESULT_FAILED;
+					m_terminal->putln();
+					m_terminal->write_ro(RODT_ATTR("Failed to change directory: "));
+					m_terminal->write(homedir);
 				}
 			}
 		}

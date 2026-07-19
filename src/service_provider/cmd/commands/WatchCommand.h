@@ -43,9 +43,13 @@ struct WatchCommand : public CommandBase {
      * @brief Register the command.
      */
     static void RegisterCommand(){
-		CommandBase::RegisterCommand(CMD_NAME_WATCH, [](void *arg)->void *{ 
-			return new WatchCommand(); 
-		}); 
+		CommandBase::RegisterCommand(CMD_NAME_WATCH, [](void *arg)->void *{
+			return new WatchCommand();
+		});
+	}
+
+	const char* getUsage() const override {
+		return RODT_ATTR("watch c=<cmd>; i=<ms>; n=<iters>  re-run a command periodically; Ctrl+C to stop");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -130,7 +134,7 @@ struct WatchCommand : public CommandBase {
 					}
 				}
 				
-			}, interval, 0, __i_dvc_ctrl.millis_now(), numberofiterations );
+			}, interval, 0, __i_dvc_ctrl.millis_now(), numberofiterations, CMD_NAME_WATCH );
 
 			if( m_watchtaskid < 0 ){
 				result = CMD_RESULT_FAILED;

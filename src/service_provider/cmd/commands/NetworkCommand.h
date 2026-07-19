@@ -41,9 +41,13 @@ struct NetworkCommand : public CommandBase {
      * @brief Register the command.
      */
     static void RegisterCommand(){
-		CommandBase::RegisterCommand(CMD_NAME_NETWORK, [](void *arg)->void *{ 
-			return new NetworkCommand(); 
-		}); 
+		CommandBase::RegisterCommand(CMD_NAME_NETWORK, [](void *arg)->void *{
+			return new NetworkCommand();
+		});
+	}
+
+	const char* getUsage() const override {
+		return RODT_ATTR("net ip|scansta|connsta,<ssid>,<pass>  query network / join a WiFi network");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -143,7 +147,12 @@ struct NetworkCommand : public CommandBase {
 				__wifi_service.initService(&__i_wifi);
 
 				m_terminal->writeln_ro(RODT_ATTR("Check Station Status after 10 second using 'net ip' command"));
+			}else{
+				// subverb parsed but did not match any known keyword
+				result = CMD_RESULT_INVALID_OPTION;
 			}
+		}else{
+			result = CMD_RESULT_ARGS_ERROR;
 		}
 
 		return result;

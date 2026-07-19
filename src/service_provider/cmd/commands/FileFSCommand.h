@@ -34,9 +34,13 @@ struct FileReadCommand : public CommandBase {
      * @brief Register the command.
      */
     static void RegisterCommand(){
-		CommandBase::RegisterCommand(CMD_NAME_FILE_READ, [](void *arg)->void *{ 
-			return new FileReadCommand(); 
-		}); 
+		CommandBase::RegisterCommand(CMD_NAME_FILE_READ, [](void *arg)->void *{
+			return new FileReadCommand();
+		});
+	}
+
+	const char* getUsage() const override {
+		return RODT_ATTR("cat <file>  print file contents to terminal");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -82,8 +86,10 @@ struct FileReadCommand : public CommandBase {
 						m_terminal->write_ro(RODT_ATTR(" : "));
 						m_terminal->write((int32_t)iStatus);
 					}
-					delete[] filename;	
+					delete[] filename;
 				}
+			}else{
+				result = CMD_RESULT_ARGS_ERROR;
 			}
 		}
 
@@ -116,9 +122,13 @@ struct FileWriteCommand : public CommandBase {
      * @brief Register the command.
      */
     static void RegisterCommand(){
-		CommandBase::RegisterCommand(CMD_NAME_FILE_WRITE, [](void *arg)->void *{ 
-			return new FileWriteCommand(); 
-		}); 
+		CommandBase::RegisterCommand(CMD_NAME_FILE_WRITE, [](void *arg)->void *{
+			return new FileWriteCommand();
+		});
+	}
+
+	const char* getUsage() const override {
+		return RODT_ATTR("fwrite [f=<file> v=<value>]  append text; ESC saves & exits");
 	}
 
 	// Local variables used in operations

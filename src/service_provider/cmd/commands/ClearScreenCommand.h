@@ -31,9 +31,13 @@ struct ClearScreenCommand : public CommandBase {
      * @brief Register the command.
      */
     static void RegisterCommand(){
-		CommandBase::RegisterCommand(CMD_NAME_CLS, [](void *arg)->void *{ 
-			return new ClearScreenCommand(); 
-		}); 
+		CommandBase::RegisterCommand(CMD_NAME_CLS, [](void *arg)->void *{
+			return new ClearScreenCommand();
+		});
+	}
+
+	const char* getUsage() const override {
+		return RODT_ATTR("cls  clear the terminal screen");
 	}
 
 	/* execute command with provided options */

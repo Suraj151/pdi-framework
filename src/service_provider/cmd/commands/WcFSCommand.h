@@ -29,6 +29,10 @@ struct WcFSCommand : public CommandBase {
 		});
 	}
 
+	const char* getUsage() const override {
+		return RODT_ATTR("wc <file>  print line / word / byte counts");
+	}
+
 #ifdef ENABLE_AUTH_SERVICE
 	bool needauth() override { return true; }
 #endif

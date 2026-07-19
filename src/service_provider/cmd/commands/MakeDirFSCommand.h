@@ -33,9 +33,13 @@ struct MakeDirFSCommand : public CommandBase {
      * @brief Register the command.
      */
     static void RegisterCommand(){
-		CommandBase::RegisterCommand(CMD_NAME_MKD, [](void *arg)->void *{ 
-			return new MakeDirFSCommand(); 
-		}); 
+		CommandBase::RegisterCommand(CMD_NAME_MKD, [](void *arg)->void *{
+			return new MakeDirFSCommand();
+		});
+	}
+
+	const char* getUsage() const override {
+		return RODT_ATTR("mkd <dir>  create directory (no spaces in name)");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -74,8 +78,10 @@ struct MakeDirFSCommand : public CommandBase {
 						m_terminal->write_ro(RODT_ATTR(" : "));
 						m_terminal->write((int32_t)bStatus);
 					}
-					delete[] dirname;	
+					delete[] dirname;
 				}
+			}else{
+				result = CMD_RESULT_ARGS_ERROR;
 			}
 		}
 

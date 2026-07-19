@@ -305,6 +305,21 @@ uint32_t DeviceControlInterface::millis_now()
 }
 
 /**
+ * return current time in micro second (64-bit). AVR's micros() is 32-bit and
+ * wraps every ~71.6 min; track wraps here to keep the returned value monotonic
+ * across long uptimes. Must be called from loop() context, not from an ISR.
+ */
+uint64_t DeviceControlInterface::micros_now()
+{
+    static uint32_t s_prev = 0;
+    static uint32_t s_wraps = 0;
+    uint32_t now = micros();
+    if (now < s_prev) s_wraps++;
+    s_prev = now;
+    return ((uint64_t)s_wraps << 32) | (uint64_t)now;
+}
+
+/**
  * log helper for utility
  */
 void DeviceControlInterface::log(logger_type_t log_type, const char *content)

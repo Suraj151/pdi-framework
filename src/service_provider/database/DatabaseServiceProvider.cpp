@@ -115,7 +115,7 @@ bool DatabaseServiceProvider::initService(void *arg)
 
   #ifdef AUTO_FACTORY_RESET_ON_INVALID_CONFIGS
   factoryResetOnInvalidConfigs();
-  __task_scheduler.setInterval( factoryResetOnInvalidConfigs, MILLISECOND_DURATION_5000, __i_dvc_ctrl.millis_now() );
+  this->serviceSetInterval( factoryResetOnInvalidConfigs, MILLISECOND_DURATION_5000, __i_dvc_ctrl.millis_now() );
   #endif
 
   return ServiceProvider::initService(arg);

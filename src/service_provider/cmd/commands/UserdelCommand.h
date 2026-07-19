@@ -30,6 +30,10 @@ struct UserdelCommand : public CommandBase {
 		});
 	}
 
+	const char* getUsage() const override {
+		return RODT_ATTR("userdel u=<user>  root-only; delete a user");
+	}
+
 	bool needauth() override { return true; }
 
 	cmd_result_t execute(cmd_term_inseq_t terminputaction){

@@ -79,7 +79,7 @@ bool SSHServer::initService(void *arg) {
 
     // If the service started successfully, set up a periodic task to handle incoming clients
     if(started){
-        __task_scheduler.setInterval( [&]() {
+        this->serviceSetInterval( [&]() {
             this->handle();
         }, 1, __i_dvc_ctrl.millis_now() );
     }
@@ -650,9 +650,10 @@ void LWSSH::SSHServer::handleChannelRequest(){
 
                             cmd_result_t res = __cmd_service.processTerminalInput(m_session->m_sshclient);
 
-                            if( res == CMD_RESULT_ABORTED ||
-                                res == CMD_RESULT_TERMINAL_ABORTED
-                            ){
+                            // Only an explicit terminal abort (logout / EOF)
+                            // closes the SSH channel. CMD_RESULT_ABORTED is a
+                            // command-scope Ctrl+C/Ctrl+Z — session stays.
+                            if( res == CMD_RESULT_TERMINAL_ABORTED ){
                                 __auth_service.setAuthorized(false);
                                 SessionManager::changeDirectory(__i_fs.getHomeDirectory());
                                 m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;

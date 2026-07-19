@@ -26,6 +26,10 @@ struct UptimeCommand : public CommandBase {
 		});
 	}
 
+	const char* getUsage() const override {
+		return RODT_ATTR("uptime  time since boot as Xd Yh Zm Ws");
+	}
+
 	cmd_result_t execute(cmd_term_inseq_t terminputaction){
 
 		if(nullptr != m_terminal){

@@ -34,9 +34,13 @@ struct ListFSCommand : public CommandBase {
      * @brief Register the command.
      */
     static void RegisterCommand(){
-		CommandBase::RegisterCommand(CMD_NAME_LS, [](void *arg)->void *{ 
-			return new ListFSCommand(); 
-		}); 
+		CommandBase::RegisterCommand(CMD_NAME_LS, [](void *arg)->void *{
+			return new ListFSCommand();
+		});
+	}
+
+	const char* getUsage() const override {
+		return RODT_ATTR("ls  list files and directories in the current directory");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE

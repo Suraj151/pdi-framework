@@ -42,9 +42,13 @@ struct DeviceIotCommand : public CommandBase {
      * @brief Register the command.
      */
     static void RegisterCommand(){
-		CommandBase::RegisterCommand(CMD_NAME_IOT, [](void *arg)->void *{ 
-			return new DeviceIotCommand(); 
-		}); 
+		CommandBase::RegisterCommand(CMD_NAME_IOT, [](void *arg)->void *{
+			return new DeviceIotCommand();
+		});
+	}
+
+	const char* getUsage() const override {
+		return RODT_ATTR("iot setid|getid|sethost|gethost [,value]  manage IoT device id / host");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -131,7 +135,12 @@ struct DeviceIotCommand : public CommandBase {
 					// ssid is must
 					return CMD_RESULT_ARGS_MISSING;
 				}
+			}else{
+				// subverb parsed but did not match any known keyword
+				result = CMD_RESULT_INVALID_OPTION;
 			}
+		}else{
+			result = CMD_RESULT_ARGS_ERROR;
 		}
 
 		return result;

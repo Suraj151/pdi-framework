@@ -35,9 +35,13 @@ struct GpioCommand : public CommandBase {
      * @brief Register the command.
      */
     static void RegisterCommand(){
-		CommandBase::RegisterCommand(CMD_NAME_GPIO, [](void *arg)->void *{ 
-			return new GpioCommand(); 
-		}); 
+		CommandBase::RegisterCommand(CMD_NAME_GPIO, [](void *arg)->void *{
+			return new GpioCommand();
+		});
+	}
+
+	const char* getUsage() const override {
+		return RODT_ATTR("gpio p=<pin>,m=<mode>,v=<value>  0=OFF 1=DW 2=DR 3=BLINK 4=AW 5=AR");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE

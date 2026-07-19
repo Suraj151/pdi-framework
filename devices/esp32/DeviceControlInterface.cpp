@@ -24,6 +24,7 @@ created Date    : 1st Jan 2024
 #endif
 
 #include <Update.h>
+#include <esp_timer.h>
 
 /**
  * DeviceControlInterface constructor.
@@ -632,6 +633,15 @@ void DeviceControlInterface::wait(double timeoutms)
 uint32_t DeviceControlInterface::millis_now()
 {
     return millis();
+}
+
+/**
+ * return current time in micro second (64-bit, monotonic since boot —
+ * esp_timer_get_time() is the ESP-IDF high-resolution monotonic timer)
+ */
+uint64_t DeviceControlInterface::micros_now()
+{
+    return (uint64_t)esp_timer_get_time();
 }
 
 /**

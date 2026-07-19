@@ -39,6 +39,10 @@ struct LoginCommand : public CommandBase {
 		});
 	}
 
+	const char* getUsage() const override {
+		return RODT_ATTR("login [u=<user>,p=<pass>]  interactive login (three-line if args omitted)");
+	}
+
 	bool wantsMaskedInput() override { return isWaitingForOption(CMD_OPTION_NAME_P); }
 
 	/* execute command with provided options */
@@ -122,9 +126,13 @@ struct LogoutCommand : public CommandBase {
      * @brief Register the command.
      */
     static void RegisterCommand(){
-		CommandBase::RegisterCommand(CMD_NAME_LOGOUT, [](void *arg)->void *{ 
-			return new LogoutCommand(); 
-		}); 
+		CommandBase::RegisterCommand(CMD_NAME_LOGOUT, [](void *arg)->void *{
+			return new LogoutCommand();
+		});
+	}
+
+	const char* getUsage() const override {
+		return RODT_ATTR("logout  end the session (or close the telnet/SSH channel)");
 	}
 
 	/* execute command with provided options */

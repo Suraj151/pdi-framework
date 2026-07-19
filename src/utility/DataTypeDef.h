@@ -421,54 +421,102 @@ enum TaskPolicy : uint8_t {
 };
 typedef enum TaskPolicy task_policy_t;
 
+enum TaskState : uint8_t {
+    TASK_STATE_READY = 0,   ///< Registered, waiting for its next dispatch
+    TASK_STATE_RUNNING,     ///< Currently executing on the scheduler
+    TASK_STATE_SLEEPING,    ///< Waiting for its next due tick (default idle)
+    TASK_STATE_STOPPED,     ///< Suspended (SIGSTOP analogue); skipped by scheduler
+    TASK_STATE_ZOMBIE       ///< Callback done, awaiting reap by remove_expired_tasks
+};
+typedef enum TaskState task_state_t;
+
+/**
+ * POSIX-style signal numbers delivered to tasks via TaskScheduler::sendSignal.
+ * Only SIG_KILL and SIG_TERM are honored today (both reap the task); SIG_STOP /
+ * SIG_CONT / SIG_HUP reserved for future steps.
+ */
+enum Signal : uint8_t {
+    SIG_NONE = 0,
+    SIG_HUP  = 1,   ///< reload/hangup
+    SIG_KILL = 9,   ///< uncatchable; reap immediately
+    SIG_TERM = 15,  ///< default `kill`; polite reap (invokes handler if set)
+    SIG_CONT = 18,  ///< resume a stopped task
+    SIG_STOP = 19   ///< suspend a running task
+};
+typedef enum Signal signal_t;
+
 struct task_t {
-    pdiutil::task_id_t _task_id; ///< Task ID (-1 = invalid)
-    pdiutil::attempts_t _max_attempts; ///< Maximum number of attempts (-1 = unlimited, 0 = expired)
-    pdiutil::millis_t _duration; ///< Task duration in milliseconds
-    pdiutil::millis_t _last_millis; ///< Last execution timestamp
-    CallBackVoidArgFn _task; ///< Task callback function
-    pdiutil::task_priority_t _task_priority; ///< Task priority (default is 0)
-    pdiutil::millis_t _task_exec_millis; ///< Task execution timestamp
-    task_mode_t _task_mode; ///< Task mode
-    task_policy_t _task_policy; ///< Task policy
-    #ifdef ENABLE_CONTEXTUAL_EXECUTION    
-    iExecutive* _task_exec = nullptr; ///< Task executive
+    pdiutil::task_id_t m_task_id;               ///< Task ID (-1 = invalid, acts as PID)
+    pdiutil::attempts_t m_max_attempts;         ///< Maximum number of attempts (-1 = unlimited, 0 = expired)
+    pdiutil::millis_t m_duration;               ///< Task duration in milliseconds
+    pdiutil::millis_t m_last_millis;            ///< Last execution timestamp
+    CallBackVoidArgFn m_task;                   ///< Task callback function
+    pdiutil::task_priority_t m_task_priority;   ///< Task priority (default is 0)
+    uint32_t m_task_exec_us;                ///< Last execution duration in µs
+    task_mode_t m_task_mode;                    ///< Task mode
+    task_policy_t m_task_policy;                ///< Task policy
+    const char* m_name;                         ///< Human-readable name (RO ptr; nullptr = anonymous)
+    uint8_t m_owner;                            ///< Owning session id (0 = kernel)
+    task_state_t m_state;                       ///< Current lifecycle state
+    int8_t m_nice;                              ///< POSIX-style nice value (-20..19), folded into priority
+    pdiutil::millis_t m_created_ms;             ///< Timestamp of registration
+    uint32_t m_run_count;                       ///< Times the callback has fired
+    uint64_t m_total_exec_us;                   ///< Cumulative execution time (µs) since registration
+    uint8_t m_pending_sig;                      ///< Pending signal number to consume on next tick (SIG_NONE = idle)
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    iExecutive* m_task_exec = nullptr;          ///< Task executive
     #endif
 
     task_t() { clear(); }
     ~task_t() { clear(); }
 
     void clear() {
-        _task_id = -1;
-        _max_attempts = 0;
-        _duration = 0;
-        _last_millis = 0;
-        _task = nullptr;
-        _task_priority = 0;
-        _task_exec_millis = 0;
-        _task_mode = TASK_MODE_INLINE;
-        _task_policy = TASK_POLICY_FIFO;
+        m_task_id = -1;
+        m_max_attempts = 0;
+        m_duration = 0;
+        m_last_millis = 0;
+        m_task = nullptr;
+        m_task_priority = 0;
+        m_task_exec_us = 0;
+        m_task_mode = TASK_MODE_INLINE;
+        m_task_policy = TASK_POLICY_FIFO;
+        m_name = nullptr;
+        m_owner = 0;
+        m_state = TASK_STATE_READY;
+        m_nice = 0;
+        m_created_ms = 0;
+        m_run_count = 0;
+        m_total_exec_us = 0;
+        m_pending_sig = SIG_NONE;
         // #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        // if(_task_exec != nullptr){
-        //     delete _task_exec;
+        // if(m_task_exec != nullptr){
+        //     delete m_task_exec;
         // }
-        // _task_exec = nullptr;
+        // m_task_exec = nullptr;
         // #endif
     }
 
     // Copy Constructor
     task_t(const task_t &t) {
-        _task_id = t._task_id;
-        _max_attempts = t._max_attempts;
-        _duration = t._duration;
-        _last_millis = t._last_millis;
-        _task = t._task;
-        _task_priority = t._task_priority;
-        _task_exec_millis = t._task_exec_millis;
-        _task_mode = t._task_mode;
-        _task_policy = t._task_policy;
+        m_task_id = t.m_task_id;
+        m_max_attempts = t.m_max_attempts;
+        m_duration = t.m_duration;
+        m_last_millis = t.m_last_millis;
+        m_task = t.m_task;
+        m_task_priority = t.m_task_priority;
+        m_task_exec_us = t.m_task_exec_us;
+        m_task_mode = t.m_task_mode;
+        m_task_policy = t.m_task_policy;
+        m_name = t.m_name;
+        m_owner = t.m_owner;
+        m_state = t.m_state;
+        m_nice = t.m_nice;
+        m_created_ms = t.m_created_ms;
+        m_run_count = t.m_run_count;
+        m_total_exec_us = t.m_total_exec_us;
+        m_pending_sig = t.m_pending_sig;
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        _task_exec = t._task_exec;
+        m_task_exec = t.m_task_exec;
         #endif
     }
 
@@ -477,17 +525,25 @@ struct task_t {
 
         if (this != &t) {
 
-            _task_id = t._task_id;
-            _max_attempts = t._max_attempts;
-            _duration = t._duration;
-            _last_millis = t._last_millis;
-            _task = t._task;
-            _task_priority = t._task_priority;
-            _task_exec_millis = t._task_exec_millis;
-            _task_mode = t._task_mode;
-            _task_policy = t._task_policy;
+            m_task_id = t.m_task_id;
+            m_max_attempts = t.m_max_attempts;
+            m_duration = t.m_duration;
+            m_last_millis = t.m_last_millis;
+            m_task = t.m_task;
+            m_task_priority = t.m_task_priority;
+            m_task_exec_us = t.m_task_exec_us;
+            m_task_mode = t.m_task_mode;
+            m_task_policy = t.m_task_policy;
+            m_name = t.m_name;
+            m_owner = t.m_owner;
+            m_state = t.m_state;
+            m_nice = t.m_nice;
+            m_created_ms = t.m_created_ms;
+            m_run_count = t.m_run_count;
+            m_total_exec_us = t.m_total_exec_us;
+            m_pending_sig = t.m_pending_sig;
             #ifdef ENABLE_CONTEXTUAL_EXECUTION
-            _task_exec = t._task_exec;
+            m_task_exec = t.m_task_exec;
             #endif
         }
         return *this;

@@ -33,9 +33,13 @@ struct CopyFSCommand : public CommandBase {
      * @brief Register the command.
      */
     static void RegisterCommand(){
-		CommandBase::RegisterCommand(CMD_NAME_COPY, [](void *arg)->void *{ 
-			return new CopyFSCommand(); 
-		}); 
+		CommandBase::RegisterCommand(CMD_NAME_COPY, [](void *arg)->void *{
+			return new CopyFSCommand();
+		});
+	}
+
+	const char* getUsage() const override {
+		return RODT_ATTR("cp <src> <dst>  copy a file");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -103,11 +107,13 @@ struct CopyFSCommand : public CommandBase {
 				}
 
 				if(nullptr != srcpath){
-					delete[] srcpath;	
+					delete[] srcpath;
 				}
 				if(nullptr != dstpath){
-					delete[] dstpath;	
+					delete[] dstpath;
 				}
+			}else{
+				result = CMD_RESULT_ARGS_ERROR;
 			}
 		}
 

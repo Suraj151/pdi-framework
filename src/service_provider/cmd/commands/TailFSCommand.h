@@ -30,6 +30,10 @@ struct TailFSCommand : public CommandBase {
 		});
 	}
 
+	const char* getUsage() const override {
+		return RODT_ATTR("tail <file> [N]  print last N lines (default 10)");
+	}
+
 #ifdef ENABLE_AUTH_SERVICE
 	bool needauth() override { return true; }
 #endif

@@ -587,6 +587,19 @@ typedef struct CommandBase {
             m_terminal->writeln();
             m_terminal->write_ro(RODT_ATTR("CmdErr : "));
             m_terminal->write((int32_t)res);
+            // For argument-shaped failures, append the command's usage line
+            // right below the error code — the command already provides it via
+            // getUsage(), so we avoid duplicating the string in every command.
+            if( res == CMD_RESULT_ARGS_MISSING ||
+                res == CMD_RESULT_ARGS_ERROR ||
+                res == CMD_RESULT_INVALID_OPTION ){
+                const char *u = this->getUsage();
+                if( nullptr != u ){
+                    m_terminal->writeln();
+                    m_terminal->write_ro(RODT_ATTR("usage: "));
+                    m_terminal->write_ro(u);
+                }
+            }
             // switch (res){
             // case CMD_RESULT_ARGS_ERROR:
             //     // m_terminal->write_ro(RODT_ATTR("Arg Error"));
@@ -635,6 +648,20 @@ typedef struct CommandBase {
      * @brief Whether the currently-awaited option should be entered with echo suppressed.
      */
     virtual bool wantsMaskedInput() { return false; }
+
+    /**
+     * @brief Returns a one-line usage description of the command in RO/flash
+     *        memory (must be `RODT_ATTR`-wrapped). Read with `write_ro`.
+     *        Backs `help` output and the `usage:` line printed on argument
+     *        errors. Default returns nullptr — commands that haven't been
+     *        migrated print nothing beyond their name in `help`.
+     *
+     *        Recommended format:
+     *            "<verb> [args]  brief description"
+     *        e.g. "kill p=<pid> [s=<sig>]  signal a scheduler task by pid"
+     * @return RO string pointer, or nullptr if the command has no usage line.
+     */
+    virtual const char* getUsage() const { return nullptr; }
 
     /**
      * @brief Executes the command logic.

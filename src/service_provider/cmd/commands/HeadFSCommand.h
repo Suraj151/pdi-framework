@@ -30,6 +30,10 @@ struct HeadFSCommand : public CommandBase {
 		});
 	}
 
+	const char* getUsage() const override {
+		return RODT_ATTR("head <file> [N]  print first N lines (default 10)");
+	}
+
 #ifdef ENABLE_AUTH_SERVICE
 	bool needauth() override { return true; }
 #endif

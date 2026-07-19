@@ -66,6 +66,7 @@ public:
   // util methods
   void wait(uint64_t timeoutms) override{}
   uint32_t millis_now() override{ static uint32_t now=0; return now++; }
+  uint64_t micros_now() override{ static uint64_t now=0; return now++; }
   void log(logger_type_t log_type, const char *content) override{}
   void yield() override{}
 

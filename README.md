@@ -11,8 +11,9 @@ PDI is a modular C++ stack for embedded devices. Application code is written onc
 - **Portable architecture.** Services depend on abstract interfaces, not vendor SDKs. Adding a new board means writing an adapter — the application and service layers stay unchanged.
 - **Bundled services.** WiFi captive portal, HTTP/HTTPS web portal, MQTT client, OTA updates, SSH server, Telnet server, SFTP subsystem, SMTP client, GPIO control (local + MQTT/HTTP), NVM database, TLS (BearSSL / mbedTLS), ESPNOW mesh, Auth, Device-IoT.
 - **Compile-time feature gating.** Each capability is wrapped in an `ENABLE_*` flag; disabled features contribute zero flash.
-- **Configurable task scheduler.** Inline, cooperative, and preemptive modes; priority-and-policy scheduling per task.
-- **Linux-style CLI on serial / Telnet / SSH.** `ls`, `cat`, `grep`, `head`, `tail`, `wc`, `hexdump`, `df`, `uptime`, `mv`, `cp`, `mkd`, `rm`, `watch`, `gpio`, `srvc`, `scht`, `net`, `iot`, `ssh`, `tls`, `reboot`, and more.
+- **Configurable task scheduler.** Inline, cooperative, and preemptive modes; priority-and-policy scheduling; POSIX nice; per-task signals (KILL/TERM/STOP/CONT) with `ps`/`top`/`kill`/`pkill`/`killall`/`renice`.
+- **Service supervisor (systemd-lite).** `srvc list / status / start / stop / restart` — every service tracks its scheduler tasks and can be paused or resumed at runtime.
+- **Linux-style CLI on serial / Telnet / SSH.** `ls`, `cat`, `grep`, `head`, `tail`, `wc`, `hexdump`, `df`, `uptime`, `mv`, `cp`, `mkd`, `rm`, `watch`, `gpio`, `srvc`, `ps`, `top`, `kill`, `pkill`, `killall`, `renice`, `net`, `iot`, `ssh`, `tls`, `reboot`, and more.
 - **On-device file transfer.** `scp` (single file) and interactive `sftp` over the SSH tunnel.
 - **Web portal for configuration.** Session-based login, per-service settings pages, GPIO control, storage browser, MQTT tester, Email tester.
 - **Persistent config store.** Address-based table engine with JSON-driven codegen for schema tables.
@@ -52,7 +53,7 @@ Per-service reference in [§6 Service Providers](#6-service-providers).
 **Utilities** — Task Scheduler (inline / cooperative / preemptive), Event bus, Queues, String helpers, Data converters, Crypto, PdiSTL, Reset Factory.
 Full inventory in [§15 Utility Library](#15-utility-library).
 
-**CLI** — 20+ built-in commands including `ls mkd mv cp cat head tail wc hexdump grep df gpio srvc scht net watch iot ssh tls reboot uptime`.
+**CLI** — 25+ built-in commands including `ls mkd mv cp cat head tail wc hexdump grep df gpio srvc ps top kill pkill killall renice net watch iot ssh tls reboot uptime`.
 Full command reference in [§7.7 Built-in command inventory](#77-built-in-command-inventory).
 
 **Extras** — Captive portal, GPIO events over MQTT/HTTP/Email, NAT (ESP8266 lwIP — see [§2.4.1](#241-nat-and-mesh)), Mesh via ESPNOW.
@@ -657,22 +658,60 @@ The scoring formula is in [TaskScheduler::computeScore](src/utility/TaskSchedule
 
 ### 4.3 The `task_t` record
 
-Defined in [src/utility/DataTypeDef.h](src/utility/DataTypeDef.h). A POD carrying the callback, id, interval, last-run timestamp, last execution duration, priority, policy, mode, and remaining attempts — everything the scheduler needs to make a scoring decision. The scheduler stores tasks in a `pdiutil::vector<task_t>` reserved to `MAX_SCHEDULABLE_TASKS` slots, so there is no heap churn during steady-state operation.
+Defined in [src/utility/DataTypeDef.h](src/utility/DataTypeDef.h). A POD carrying everything the scheduler needs to make scoring, signalling, and observability decisions. Stored by value in `pdiutil::vector<task_t>` reserved to `MAX_SCHEDULABLE_TASKS` slots — no heap churn during steady-state.
+
+Every member uses the `m_` prefix. Grouped for readability:
+
+| Group | Fields | Purpose |
+|---|---|---|
+| identity | `m_task_id`, `m_name`, `m_owner` | PID (unique per slot), human-readable name (RO ptr — may be PROGMEM), owning session id (0 = kernel) |
+| callback | `m_task` | The `CallBackVoidArgFn` to invoke |
+| schedule | `m_duration`, `m_last_millis`, `m_max_attempts`, `m_task_priority`, `m_nice`, `m_task_policy`, `m_task_mode` | Interval / last run / remaining attempts / base priority / POSIX nice (-20..19) / policy (FIFO/RR/DEADLINE/FAIRSHARE) / mode (INLINE/COOP/PREEMPT) |
+| lifecycle state | `m_state`, `m_pending_sig` | READY / RUNNING / SLEEPING / STOPPED / ZOMBIE; queued signal (SIG_NONE / HUP / KILL / TERM / CONT / STOP) consumed at the top of `handle_tasks` |
+| observability | `m_created_ms`, `m_run_count`, `m_task_exec_us`, `m_total_exec_us` | Registration timestamp (ms), how many times the callback has fired, last exec time in µs, cumulative exec time in µs — powers `ps` / `top` %CPU |
+| contextual | `m_task_exec` (ifdef `ENABLE_CONTEXTUAL_EXECUTION`) | Pointer to the per-lane executive |
+
+Exec-time bookkeeping is µs-granular via [`iUtilityInterface::micros_now()`](src/utility/iUtilityInterface.h) — see §14 for port hooks. Callbacks finishing under 1 ms are counted correctly (they don't just round to zero).
 
 ### 4.4 Public API by use case
 
+Every registration entry point (`register_task`, `setInterval`, `setTimeout`, `updateInterval`) takes trailing `const char* name = nullptr`, `uint8_t owner = 0` — populate them to make the task visible in `ps` / `top` and reachable by `pkill NAME`. Service subclasses normally don't call these directly; they use the `ServiceProvider` wrappers (see §6.1) which auto-supply the service's name and owner=0.
+
+**Registration & scheduling**
+
 | Want to… | Call | Returns | Notes |
 |---|---|---|---|
-| Run something once after N ms | `setTimeout(fn, dur, now)` | task id | Sets `_max_attempts = 1`; task is auto-removed after firing |
-| Run something every N ms | `setInterval(fn, dur, now)` | task id | `_max_attempts = -1` |
+| Run something once after N ms | `setTimeout(fn, dur, now, prio, name, owner)` | task id | Sets `m_max_attempts = 1`; task is auto-removed after firing |
+| Run something every N ms | `setInterval(fn, dur, now, prio, name, owner)` | task id | `m_max_attempts = -1` |
 | Reschedule an existing timeout | `updateTimeout(id, fn, dur, now)` | id | Replaces the callback/duration in place |
-| Reschedule an existing interval | `updateInterval(id, fn, dur, prio, last, maxAtt)` | id | Falls back to `register_task` if id not found |
-| Register a task with custom priority / attempts | `register_task(fn, dur, prio, last, maxAtt)` | id | The lowest-level entry point |
+| Reschedule an existing interval | `updateInterval(id, fn, dur, prio, last, maxAtt, name, owner)` | id | Falls back to `register_task` if id not found |
+| Register a task with everything spelled out | `register_task(fn, dur, prio, last, maxAtt, name, owner)` | id | The lowest-level entry point |
 | Cancel a one-shot | `clearTimeout(id)` | bool | Marks the task for removal next sweep (see §4.7) |
 | Cancel a periodic | `clearInterval(id)` | bool | Same |
-| Look up a task | `get_task(id)` | `task_t*` or `nullptr` | Useful to mutate `_task_policy` / `_task_mode` after registration |
+| Look up a task | `get_task(id)` | `task_t*` or `nullptr` | Useful to mutate `m_task_policy` / `m_task_mode` after registration |
 | Force a re-sort mid-sweep | `rebaseAndRestartPrioTasks()` | void | Breaks out of the current `handle_tasks` loop on the next iteration |
-| Print active tasks to terminal | `printTasksToTerminal(t)` | void | Backs the `scht` CLI command |
+
+**Metadata mutation (used by `ps` / `renice` / `srvc`)**
+
+| Want to… | Call | Returns | Notes |
+|---|---|---|---|
+| Attach / change a task's name after registration | `setTaskName(id, name)` | bool | Name pointer must outlive the task (RO literal / PROGMEM). Backs `pkill` name lookup |
+| Attach an owning session id | `setTaskOwner(id, sid)` | bool | Used by kill's owner check; 0 = kernel |
+| Change POSIX nice (-20..19) | `setTaskNice(id, nice)` | bool | Clamped in range. Follow with `rebaseAndRestartPrioTasks` for immediate re-sort |
+| Read the owning session id | `getTaskOwner(id)` | `uint8_t` | Returns 0 if not found |
+
+**Signals (§4.5 details how they're consumed)**
+
+| Want to… | Call | Returns | Notes |
+|---|---|---|---|
+| Queue a signal on a specific task | `sendSignal(id, sig)` | bool | Consumed on the next `handle_tasks` iteration |
+| Broadcast a signal to every task with a given name | `sendSignalByName(name, sig, requester_sid, is_root)` | uint16_t hits | Applies owner check per task unless `is_root`. Used by `pkill` / `killall` / `srvc stop` |
+
+**Rendering**
+
+| Want to… | Call | Returns | Notes |
+|---|---|---|---|
+| Print POSIX-style ps view | `printPsToTerminal(t, filter_owner=0xFF)` | void | Backs the `ps` / `top` CLI commands. Filter by owner sid or `0xFF` for all |
 | Promote a task to a contextual lane | `scheduleUnderExecSched(sched, id, mode, stackdepth)` | int (negative on failure — typically `-1`/`-99` if the port doesn't supply the scheduler or the task couldn't be queued) | Requires `ENABLE_CONTEXTUAL_EXECUTION` |
 
 `register_task` returns `-1` if the slot table is full. Callers must check the return value before assuming the task was accepted.
@@ -682,14 +721,25 @@ Defined in [src/utility/DataTypeDef.h](src/utility/DataTypeDef.h). A POD carryin
 `__task_scheduler.run()` calls `handle_tasks()`, which on every tick:
 
 1. Reads `now = m_util->millis_now()`.
-2. Builds an array of indices and sorts it via `getSortedTaskList` using `computeScore` plus a 3 ms tolerance window on due-times. **The vector itself is not reordered** — only an indirection table — so task ids stay stable.
-3. Iterates the sorted indices, skipping any task whose `_task_mode != TASK_MODE_INLINE` when contextual execution is compiled in.
-4. For each due task (`now - _last_millis ≥ _duration`), invokes the callback, advances `_last_millis` by whole multiples of `_duration` (catch-up, capped at 3 rounds to avoid runaway after a long stall), decrements `_max_attempts` if finite, and records `_task_exec_millis`.
-5. Calls `m_util->yield()` after each task so the platform can service WiFi / interrupts.
-6. If `m_rebase_start_priotask` was set (either by another task calling `rebaseAndRestartPrioTasks` or implicitly at the top of `handle_tasks`), breaks out of the loop after running **one** task — the next tick will re-sort. This guarantees a newly-registered high-priority task is picked up on the very next tick.
-7. Calls `remove_expired_tasks` to drop everything with `_max_attempts == 0`.
+2. Builds an array of indices and sorts it via `getSortedTaskList` using `computeScore` plus a 3 ms tolerance window on due-times. `computeScore` folds `m_nice` in as `effective_priority = m_task_priority - m_nice` before weighting by policy. **The vector itself is not reordered** — only an indirection table — so task ids stay stable.
+3. Iterates the sorted indices, skipping any task whose `m_task_mode != TASK_MODE_INLINE` when contextual execution is compiled in.
+4. **Consumes `m_pending_sig` before scheduling.** Under one critical section: the sig is cleared, then dispatched as
+   - `SIG_KILL` / `SIG_TERM` → task marked ZOMBIE, callback nulled, `m_max_attempts = 0`; iteration `continue`s.
+   - `SIG_STOP` → `m_state = TASK_STATE_STOPPED`.
+   - `SIG_CONT` → if currently STOPPED, `m_state = TASK_STATE_SLEEPING`.
+   - `SIG_HUP` → accepted but currently no-op (reserved for a future user handler hook).
+5. If `m_state == TASK_STATE_STOPPED` after signal consumption, skip this task's execution — it stays in the slot but the scheduler ignores it until a `SIG_CONT` arrives.
+6. For each due task (`now - m_last_millis ≥ m_duration`), samples `m_util->micros_now()` immediately **before and after** the callback, invokes it, updates
+   - `m_task_exec_us = end - start` (µs delta — sub-ms callbacks now register non-zero),
+   - `m_total_exec_us +=` that delta (lifetime accumulator; feeds `%CPU`),
+   - `m_run_count++`,
+   - `m_state` flipping `SLEEPING → RUNNING → SLEEPING` around the callback (or `→ ZOMBIE` if this was the last attempt).
+7. Advances `m_last_millis` by whole multiples of `m_duration` (catch-up, capped at 3 rounds to avoid runaway after a long stall) and decrements `m_max_attempts` if finite.
+8. Calls `m_util->yield()` after each task so the platform can service WiFi / interrupts.
+9. If `m_rebase_start_priotask` was set (either by another task calling `rebaseAndRestartPrioTasks` or implicitly at the top of `handle_tasks`), breaks out of the loop after running **one** task — the next tick will re-sort. This guarantees a newly-registered high-priority task is picked up on the very next tick.
+10. Calls `remove_expired_tasks` to drop everything with `m_max_attempts == 0`.
 
-The "run-one-then-break" pattern (point 6) is the key reason the scheduler keeps low jitter without preemption: each `serve()` iteration runs at most one inline task before yielding back to the platform, the web server, and the contextual lanes.
+The "run-one-then-break" pattern (point 9) is the key reason the scheduler keeps low jitter without preemption: each `serve()` iteration runs at most one inline task before yielding back to the platform, the web server, and the contextual lanes.
 
 ### 4.6 Choosing a mode — decision tree
 
@@ -718,10 +768,10 @@ If your port does not provide the contextual interfaces, **the only honest choic
 
 A few sharp edges worth knowing before you use the API in anger:
 
-- **`remove_task` does not erase immediately.** It marks the task by zeroing `_task`, dropping priority, and setting `_max_attempts = 0`; the actual `vector::erase` happens in `remove_expired_tasks` at the *end* of `handle_tasks`. This is intentional — erasing during iteration was a bug source ([TaskScheduler.cpp](src/utility/TaskScheduler.cpp)). Don't dereference an id immediately after `clearInterval`.
+- **`remove_task` does not erase immediately.** It marks the task by zeroing `m_task`, dropping priority, setting `m_max_attempts = 0`, and flipping `m_state = TASK_STATE_ZOMBIE`; the actual `vector::erase` happens in `remove_expired_tasks` at the *end* of `handle_tasks`. This is intentional — erasing during iteration was a bug source ([TaskScheduler.cpp](src/utility/TaskScheduler.cpp)). Don't dereference an id immediately after `clearInterval`.
 - **Tasks are stored by value.** Lambdas that capture a `this` pointer or large state work fine, but be mindful that captures live until the task is removed *and* the next sweep runs.
 - **The scheduler is not re-entrant.** Don't call `__task_scheduler.run()` from inside a task. Use the contextual lanes if you need nested execution.
-- **`_last_millis = 0` means "first run".** On the first dispatch the scheduler stamps `_last_millis = now` instead of doing catch-up, so a freshly registered interval will fire after one full `_duration` from the moment it is first considered.
+- **`m_last_millis = 0` means "first run".** On the first dispatch the scheduler stamps `m_last_millis = now` instead of doing catch-up, so a freshly registered interval will fire after one full `m_duration` from the moment it is first considered.
 - **Catch-up is capped at 3 rounds.** A scheduler that has been frozen for >3× the task duration will resume fresh rather than firing all the back-runs. Long blocks (OTA, deep sleep) should re-register their tasks if they need exact-count semantics.
 - **`MAX_SCHEDULABLE_TASKS` defaults to 25** ([src/config/Common.h](src/config/Common.h)). `PDIStack::PDIStack()` configures the scheduler with that limit. If you raise it, every service's worst-case footprint grows along with `MAX_FACTORY_RESET_CALLBACKS`.
 - **No clock skew tolerance beyond 3 ms.** If your `iUtilityInterface::millis_now()` jitters more than that, you will see tasks reshuffle order between runs. The 3 ms window in `getSortedTaskList` is per-comparison, not per-tick.
@@ -757,9 +807,34 @@ Cross-lane primitives:
 
 ### 4.9 Inspecting and tuning at runtime
 
-- **`scht` CLI command** prints every registered task with id, priority, policy, interval, last-run timestamp, last execution duration, and remaining attempts. Source: [printTasksToTerminal](src/utility/TaskScheduler.cpp).
-- **`watch` CLI command** uses the scheduler internally to re-run another command on a fixed interval (`watch c=net ip; i=3000; n=10`).
-- **`srvc` CLI** lists each service's currently-held task id (`m_service_routine_task_id` on the `ServiceProvider` base) so you can correlate scheduler rows back to services.
+Every runtime tool below is available at the shell — no debugger, no recompile.
+
+**Observability**
+
+- **`ps`** — POSIX-style view of every registered task: PID, owner session, state (`R` running / `S` sleeping / `T` stopped / `Z` zombie), priority, nice, policy (`F`/`R`/`D`/`S`), rolling `%CPU`, run count, interval, name. Filter by owner with `ps u=<sid>`. Source: [printPsToTerminal](src/utility/TaskScheduler.cpp).
+- **`top`** — same view re-rendered on a scheduler tick (`top i=<ms>; n=<iters>; u=<sid>`), clearing the screen each pass. Stops with Ctrl+C. Source: [TopCommand](src/service_provider/cmd/commands/TopCommand.h).
+- **`watch`** — general periodic wrapper (`watch c=<cmd>; i=<ms>; n=<iters>`); use for anything not already tied to a scheduler view.
+
+**Signals & lifecycle**
+
+Task-scheduler analogues of POSIX signals: `SIG_HUP=1`, `SIG_KILL=9`, `SIG_TERM=15`, `SIG_CONT=18`, `SIG_STOP=19` (see `enum Signal` in [DataTypeDef.h](src/utility/DataTypeDef.h)). Delivery is queued on `m_pending_sig` and consumed at the top of the next `handle_tasks` iteration under one critical section.
+
+- **`kill p=<PID> [s=<sig>]`** — send by PID. Default `s=15` (TERM). SIG_HUP is accepted but currently no-op.
+- **`pkill n=<NAME> [s=<sig>]`** — send by task name. Default TERM. Prints `signaled N task(s)`.
+- **`killall n=<NAME> [s=<sig>]`** — same as `pkill` but default is SIG_KILL (impolite).
+- **`renice n=<nice> p=<PID>`** — change POSIX nice (-20..19) on a live task; auto-triggers `rebaseAndRestartPrioTasks` so the new sort order takes effect on the next tick.
+
+Permission model on all four: root (uid=0) can touch any task; other users only tasks whose `m_owner` matches the current session id. Compiled out entirely when `ENABLE_AUTH_SERVICE` is off.
+
+**Services (systemd-lite)**
+
+- **`srvc list`** — every registered service with state (`inactive` / `active` / `stopped` / `dead`) and task counts.
+- **`srvc status <name>`** — per-service detail: state, tracked PID list.
+- **`srvc start <name>`** — SIG_CONT every task owned by the service.
+- **`srvc stop <name>`** — SIG_STOP every task owned. Task-level freeze, not resource release.
+- **`srvc restart <name>`** — STOP then CONT.
+
+`start` / `stop` / `restart` require root. Service ownership of tasks lives in `ServiceProvider::m_service_task_ids[]` (see §6.1), so name matching is by _service_, not by task name — renaming a task in the future won't break lifecycle.
 
 ---
 
@@ -975,9 +1050,9 @@ class XServiceProvider : public ServiceProvider {
 public:
     XServiceProvider() : ServiceProvider(SERVICE_X, RODT_ATTR("X")) {}
     bool initService(void* arg = nullptr) override;     // wired from PDIStack::initialize
-    bool stopService()                  override;       // optional
-    void printConfigToTerminal(iTerminalInterface*) override;   // backs `srvc s=N,q=1`
-    void printStatusToTerminal(iTerminalInterface*) override;   // backs `srvc s=N,q=2`
+    bool stopService()                  override;       // optional; base impl reaps every tracked task
+    void printConfigToTerminal(iTerminalInterface*) override;   // free-form status hook
+    void printStatusToTerminal(iTerminalInterface*) override;   // free-form status hook
 };
 extern XServiceProvider __x_service;
 ```
@@ -986,9 +1061,24 @@ Conventions that hold across all providers:
 
 - The global instance is `__<name>_service` (matches [§1.7](#1-architecture-overview) naming).
 - The constructor passes a `service_t` enum value and a `RODT_ATTR` flash-string name; the base class self-registers it into `m_services[]` so the `srvc` CLI can enumerate it generically.
-- Long-running work is driven by `__task_scheduler` (`setInterval` for periodic, `setTimeout` for one-shots / state-machine steps) and the returned task id is stored in `m_service_routine_task_id` so the base `stopService` can clean it up.
+- Long-running work is driven by `__task_scheduler`, but **never called directly**. Use the base wrappers so every task is auto-named (from `m_service_name`), owner-tagged (0 = kernel), and tracked for `srvc stop/start/restart` (§4.9):
+  - `serviceSetInterval(fn, dur, now_millis, prio=DEFAULT)` — periodic.
+  - `serviceSetTimeout(fn, dur, now_millis, prio=DEFAULT)` — one-shot.
+  - `serviceUpdateInterval(id, fn, dur, prio, last_millis, max_attempts)` — reschedule in-place.
+  Each mirrors the underlying [`TaskScheduler`](src/utility/TaskScheduler.h) call 1:1 — only the trailing `name`/`owner` args are auto-supplied. All other timing knobs stay explicit.
+- The returned id joins a fixed-size list `m_service_task_ids[MAX_SERVICE_TASKS]` (default 6; raise in [ServiceProvider.h](src/service_provider/ServiceProvider.h) if a service needs more). Overflow is silently dropped for that slot. Backward-compat: the base still exposes `m_service_routine_task_id`, kept in sync with the first tracked id.
+- `stopService()` in the base now reaps **every** tracked task (used to be primary-only — old leak). Override it if you also need to close sockets or release buffers, and call the base at the end.
 - Cross-service triggers flow through `__utl_event` events ([EventConfig.h](src/config/EventConfig.h)), not direct calls — this keeps the dependency graph one-way through the orchestrator.
 - Persisted config lives in NVM through `__database_service.get_<name>_config_table` / `set_<name>_config_table` ([§5.4](#5-database-layer)); services never touch `__i_db` directly.
+
+**Lifecycle helpers on the base (all called by `srvc`):**
+
+| Call | Purpose |
+|---|---|
+| `trackServiceTask(id)` / `untrackServiceTask(id)` / `isServiceTaskTracked(id)` | Explicit list membership. Wrappers call `trackServiceTask` automatically; use `untrackServiceTask` when you cancel a task by other means |
+| `signalAllServiceTasks(sig)` | Deliver a signal (§4.9) to every tracked task. Returns hit count |
+| `countServiceTasks(running, stopped, zombie)` | Bucketed lifecycle counts used by `srvc list`/`srvc status` |
+| `getServiceTaskCount()` / `getServiceTaskId(idx)` | Iterate for status prints |
 
 ### 6.2 Service reference
 
@@ -1185,7 +1275,7 @@ Full breakdown lives in [§8. Web Server](#8-web-server) — it has its own rout
 | Depends on | `__auth_service`, `SessionManager` ([§6.2.18](#6218-sessionmanager)), every command in [cmd/commands/](src/service_provider/cmd/commands/) |
 | Init does | Registers all command handlers; `PdiStack` calls `SessionManager::attach(serialTerminal)` at boot so the serial slot is populated before first input |
 | Terminal binding | `useTerminal(t)` attaches a `session_t` for terminal `t` (idempotent) and draws the login prompt. `processTerminalInput(t)` looks up the session via `SessionManager::findByTerminal(t)`, sets it as current for the tick, then dispatches. Each in-flight command carries `m_owner = session` so cross-session `getCommandWaitingForUserInput` never returns another session's prompt |
-| Built-in commands | Files (`ls`/`cd`/`pwd`/`mkd`/`mkf`/`mv`/`cp`/`rm`/`cat`/`fwrite`/`head`/`tail`/`wc`/`df`/`grep`/`hexdump`), auth+users (`login`/`logout`/`whoami`/`id`/`who`/`su`/`passwd`/`useradd`/`userdel`/`groups`), device (`gpio`/`net`/`srvc`/`scht`/`ssh`/`tls`/`iot`/`reboot`/`watch`/`uptime`/`cls`/`help`) — full reference in [§7.7](#77-built-in-command-inventory) |
+| Built-in commands | Files (`ls`/`cd`/`pwd`/`mkd`/`mkf`/`mv`/`cp`/`rm`/`cat`/`fwrite`/`head`/`tail`/`wc`/`df`/`grep`/`hexdump`), auth+users (`login`/`logout`/`whoami`/`id`/`who`/`su`/`passwd`/`useradd`/`userdel`/`groups`), device (`gpio`/`net`/`srvc`/`ps`/`top`/`ssh`/`tls`/`iot`/`reboot`/`watch`/`uptime`/`cls`/`help`) — full reference in [§7.7](#77-built-in-command-inventory) |
 | Multi-session | Up to `PDI_MAX_SESSIONS` (default 3) sessions run concurrently across serial + telnet + ssh. Each has its own linebuf, cursor, history-walk, cwd, auth, username, and in-flight commands. See [§7.8](#78-multi-terminal-session-lifecycle) |
 
 #### 6.2.16 TLS (no provider; transport hookup + cert provisioning)
@@ -1275,12 +1365,12 @@ To add (say) a `MetricsServiceProvider`:
 
 1. **Pick a feature flag** in [devices/DeviceConfig.h](devices/DeviceConfig.h) (`ENABLE_METRICS_SERVICE`) and a `service_t` enum value in [ServiceProvider.h](src/service_provider/ServiceProvider.h), guarded by the flag.
 2. **Add the persisted struct** ([§3.4](#3-configuration-system)) and the DB table ([§5.9](#5-database-layer)).
-3. **Create [src/service_provider/metrics/MetricsServiceProvider.{h,cpp}](src/service_provider/metrics/MetricsServiceProvider.h)** deriving from `ServiceProvider`:
+3. **Create [src/service_provider/metrics/MetricsServiceProvider.{h,cpp}](src/service_provider/metrics/MetricsServiceProvider.h)** deriving from `ServiceProvider`. Register scheduler work through the base wrappers so the task is auto-named, owner-tagged, and tracked (§6.1) — this makes it visible in `ps`, killable via `pkill Metrics`, and controllable via `srvc stop Metrics`:
    ```cpp
    MetricsServiceProvider() : ServiceProvider(SERVICE_METRICS, RODT_ATTR("Metrics")) {}
    bool initService(void* arg) override {
        __database_service.get_metrics_config_table(&m_cfg);
-       m_service_routine_task_id = __task_scheduler.setInterval(
+       this->serviceSetInterval(
            [&]{ this->tick(); }, m_cfg.interval_ms, __i_dvc_ctrl.millis_now());
        return ServiceProvider::initService(arg);
    }
@@ -1293,7 +1383,7 @@ To add (say) a `MetricsServiceProvider`:
 
 - **Constructor side-effects are a trap.** Allocating, reading the DB, or touching `__i_*` interfaces in your service's constructor will run before `setup()`, before the device's interface globals are initialised. Always defer to `initService`.
 - **Don't `new` in `initService` either.** Use a value member or a static buffer; the embedded heap can fragment over months of uptime.
-- **The base `stopService` clears `m_service_routine_task_id`** but does not cancel sub-tasks you scheduled. Track them and cancel explicitly in an override.
+- **The base `stopService` reaps every task in `m_service_task_ids[]`** — as long as you registered through the `serviceSet*` wrappers (§6.1), no override is needed. If you registered a task via raw `__task_scheduler.setInterval(...)` (usually a mistake now), it'll leak on stop unless you also call `trackServiceTask(id)` or explicitly `clearInterval` it in your override.
 - **`SERVICE_DATABASE` and `SERVICE_FACTORY` are unconditional** in the `service_t` enum — every build always has them. Don't guard them with `ENABLE_*` even if your minimal build "doesn't need" them.
 - **`printConfigToTerminal` is called from the CLI thread** (whichever lane the terminal is attached to). It must not block. If your config print is slow (e.g. iterates 50 MQTT topics), paginate via repeated `srvc` calls instead.
 - **One global per service.** The `m_services[SERVICE_X]` slot is filled by the constructor; instantiating a second `XServiceProvider` overwrites the pointer and silently breaks `getService(SERVICE_X)`.
@@ -1382,8 +1472,9 @@ A command class:
 3. Optionally `setAcceptArgsOptions(true)` to also accept positional/free args.
 4. Optionally `setCmdOptionSeparator(",")` (default), `";"`, or `" "`.
 5. Implements `execute(cmd_term_inseq_t)` returning a `cmd_result_t`.
-6. Optionally overrides `needauth()` to require login, `executeTermInputAction()` to handle CTRL+C/ESC/etc., `stopRunningInBackground()` for cleanup.
-7. Registers itself via `CommandBase::RegisterCommand("ls", &ListFSCommand::Registrar)` so `__cmd_service` can dispatch by name.
+6. **Overrides `getUsage() const`** to return an `RODT_ATTR`-wrapped one-line usage string. Format: `"<verb> [args]  brief description"`. `help` prints it under the command name, and `CommandBase::ResultToTerminal` prints it under `CmdErr` whenever the command returns `CMD_RESULT_ARGS_MISSING` / `CMD_RESULT_ARGS_ERROR` / `CMD_RESULT_INVALID_OPTION` — so bad-argument branches never need to inline the string themselves.
+7. Optionally overrides `needauth()` to require login, `executeTermInputAction()` to handle CTRL+C/ESC/etc., `stopRunningInBackground()` for cleanup.
+8. Registers itself via `CommandBase::RegisterCommand("ls", &ListFSCommand::Registrar)` so `__cmd_service` can dispatch by name.
 
 #### Parsing rules
 
@@ -1416,7 +1507,7 @@ By default, parsed `optionval` points into the live receive buffer — so once t
 |---|---|---|
 | `CMD_RESULT_OK` | Success | Print blank line; clear options |
 | `CMD_RESULT_INCOMPLETE` | Multi-iter; keep me active | Do not clear; wait for next input |
-| `CMD_RESULT_ARGS_ERROR` / `_ARGS_MISSING` / `_INVALID_OPTION` | Bad usage | Print `CmdErr : <n>` |
+| `CMD_RESULT_ARGS_ERROR` / `_ARGS_MISSING` / `_INVALID_OPTION` | Bad usage | Print `CmdErr : <n>` **and** `usage: <getUsage()>` if the command provides one — no need for bad-argument branches to inline usage strings themselves |
 | `CMD_RESULT_NOT_FOUND` / `_INVALID` | No such command / can't parse | Print error |
 | `CMD_RESULT_NEED_AUTH` / `_WRONG_CREDENTIAL` | Login required / failed | Re-prompt via the login flow |
 | `CMD_RESULT_ABORTED` | CTRL+C / CTRL+Z hit | Print error; stop iteration |
@@ -1469,14 +1560,19 @@ Names come from [CommandCommon.h](src/service_provider/cmd/commands/CommandCommo
 | useradd u=\<user> p=\<pass> | u, p (space) | **Root-only.** Create a new user. UID auto-assigned to next free slot ≥1; home=`/`, shell=`cmd`. Writes both `/etc/passwd` and `/etc/shadow` (rolls back on shadow failure). e.g. **useradd u=alice p=alice123** |
 | userdel u=\<user> | u (space) | **Root-only.** Delete a user from `/etc/passwd` + `/etc/shadow`. Refuses self-delete and uid=0 (root). e.g. **userdel u=alice** |
 | gpio p=\<pin>,m=\<mode>,v=\<value> | p=\<pin> m=\<mode> v=\<value> | Perform GPIO operations. Modes: OFF=0, DIGITAL_WRITE=1, DIGITAL_READ=2, DIGITAL_BLINK=3, ANALOG_WRITE=4, ANALOG_READ=5. e.g. blink GPIO 4 at 500 ms: **gpio p=4,m=3,v=500** |
-| srvc s=\<service>,q=\<query> | s=\<service> q=\<query> | Query running services. Use `srvc l` to list ids. Queries: QUERY_CONFIG=1, QUERY_STATUS=2. e.g. **srvc s=1,q=2** |
-| scht | l\<list> | List active scheduler tasks. e.g. **scht l** |
+| srvc list \| status \<name> \| start \<name> \| stop \<name> \| restart \<name> | positional, space-separated | Service supervisor (systemd-lite). `list` prints every service with state; `status <name>` shows tracked PIDs; `start`/`stop`/`restart` deliver `SIG_CONT`/`SIG_STOP` (both) to every task the service owns. Root required for start/stop/restart. e.g. **srvc list**, **srvc stop GPIO** |
+| ps | u=\<sid> | List active scheduler tasks POSIX-style with owner, state, %CPU, runs, interval, name. Filter by owner session id. e.g. **ps** or **ps u=1** |
+| top | i=\<ms>; n=\<iters>; u=\<sid> | Same view as `ps`, refreshed on a scheduler task at `i` ms (default 2000, min 500). `n` bounds iterations (omit for forever). Stop with Ctrl+C. e.g. **top i=1500; n=10** |
+| kill p=\<pid> [s=\<sig>] | p, s (space) | Deliver a signal to a scheduler task. Default `s=15` (SIG_TERM). Accepted: 9 KILL / 15 TERM / 18 CONT / 19 STOP. Root can hit any task; other users only tasks they own. e.g. **kill p=8** or **kill p=8 s=9** |
+| pkill n=\<name> [s=\<sig>] | n, s (space) | Same as `kill` but matches by task name; hits every task with that name. Default TERM. Prints `signaled N task(s)`. e.g. **pkill n=MQTT s=19** |
+| killall n=\<name> [s=\<sig>] | n, s (space) | Like `pkill` but default signal is `SIG_KILL` (impolite). e.g. **killall n=GPIO** |
+| renice n=\<nice> p=\<pid> | n (signed, -20..19), p (pid) | Change POSIX nice on a live task. Auto-triggers scheduler resort. Same owner/root gate as `kill`. e.g. **renice n=-5 p=10** |
 | ssh q=\<query>,t=\<algo> | q=\<query> t=\<algo> | SSH command. q=1 (SSH_COMMAND_QUERY_KEYGEN) creates keypair of given algo. e.g. **ssh q=1,t=2** |
 | net \<options> | ip, scansta, connsta | Query network params. **ip** shows STA/AP info; **scansta** lists nearby SSIDs; **connsta** joins one. e.g. **net connsta,\<ssid>,\<password>** |
 | reboot | | Reboot the device. e.g. **reboot** |
 | watch | c=\<command> i=\<interval_ms> n=\<iterations> | Run a command periodically. Default interval 1 s, infinite iterations. Stop with Ctrl+C. Options separated by `;`. e.g. **watch c=net ip; i=3000; n=10** |
 | iot \<options> | setid, getid, sethost, gethost | Manage IoT config. **setid/getid** for device unique ID; **sethost/gethost** for IoT HTTP host. e.g. **iot setid,\<DeviceID>** or **iot sethost,\<HostAddress>** |
-| help | | List every registered command. Available before login. Tab-completion works on partial names. e.g. **help** |
+| help | | List every registered command with its one-line usage (from each command's `getUsage()`; name column padded to 12 chars for alignment). Available before login. Tab-completion works on partial names. e.g. **help** |
 | uptime | | Time since boot as `up Xd Yh Zm Ws`. Wraps at ~49.7 days. e.g. **uptime** |
 | tls q=\<query>,t=\<algo>,l=\<bits>,n=\<CN/DNS>,i=\<IPv4> | q (1=CERTGEN), t (0=EC, 1=RSA), l (key bits / curve size), n (CN or DNS SAN), i (IPv4 SAN) | On-device TLS cert generation. esp32 builds with `ENABLE_TLS_CERT_GENERATION` only. Output at `TLS_DEFAULT_SERVER_CERT_PATH` / `TLS_DEFAULT_SERVER_KEY_PATH`. e.g. **tls q=1,t=0,l=256,n=device.local,i=192.168.1.50** |
 
@@ -1576,17 +1672,18 @@ Implementation notes:
 - Directory listings are cached once at `OPENDIR` time into the session (`Sftp::dir_entries`) and paginated across multiple `READDIR` responses (16 entries per response). Memory is released on `CLOSE` or session destruction (RAII).
 - SFTP sessions only have an **idle timeout** (default 60 s, in `handle()`); plain SSH shell sessions are not idle-reaped because a human may pause at the prompt indefinitely.
 
-### 7.10 `watch` and CTRL+C semantics
+### 7.10 Background commands and CTRL+C semantics
 
-`watch c=<command>; i=<ms>; n=<count>` is the framework's universal scheduler-on-demand. Internals:
+`watch` and `top` are the two built-ins that run as scheduler tasks in the background of a shell session. Both follow the same template — the model any user-supplied long-running command should copy:
 
-1. Parses `c`, `i`, `n` (semicolon-separated because the inner command itself may use commas).
-2. `holdOptionValue("c")` so the child command string survives across iterations.
-3. Registers itself with `__task_scheduler.setInterval(... i ms ...)` — the periodic tick re-runs the child via `__cmd_service.executeCommand(&child, CMD_TERM_INSEQ_NONE)`.
-4. Returns `CMD_RESULT_INCOMPLETE` so the service keeps it active.
-5. On `CMD_TERM_INSEQ_CTRL_C`, the override of `executeTermInputAction` cancels the scheduler task, clears, and returns `CMD_RESULT_ABORTED`.
+1. Parse args and hold any pointers that must outlive a tick (e.g. `holdOptionValue("c")` in `watch` so the child command string survives).
+2. Register a scheduler task via `__task_scheduler.register_task(fn, interval, ..., name)` with the command name so it shows up in `ps`.
+3. Set `m_runinbackground = true` and return `CMD_RESULT_INCOMPLETE` so the dispatcher keeps the command instance alive.
+4. Override `stopRunningInBackground()` to call `__task_scheduler.remove_task(...)` on the tracked id and clear `m_runinbackground`.
 
-This is the model any user-supplied long-running command should copy.
+**Ctrl+C dispatch is generic.** [CommandLineServiceProvider.cpp](src/service_provider/cmd/CommandLineServiceProvider.cpp) walks its `m_cmdlist` and calls `stopRunningInBackground()` on **every** command with `isRunningInBackground() == true` owned by the current session. So Ctrl+C works out of the box for any new background command — no per-command wiring in the shell dispatcher.
+
+For a live inspection of what's currently running in the background, use `ps` — background commands appear with their `CMD_NAME_*` as the row name (e.g. `watch`, `top`).
 
 ### 7.11 Adding a new command
 
@@ -1602,6 +1699,9 @@ To add `temp` (read a temperature sensor):
            SetCommand(CMD_NAME_TEMP);
            AddOption(CMD_OPTION_NAME_T);
        }
+       const char* getUsage() const override {
+           return RODT_ATTR("temp [t=C|F]  read the temperature sensor (default Celsius)");
+       }
        bool needauth() override { return true; }
        cmd_result_t execute(cmd_term_inseq_t) override {
            auto unit = RetrieveOption(CMD_OPTION_NAME_T);
@@ -1613,8 +1713,9 @@ To add `temp` (read a temperature sensor):
        static void* Registrar(void*) { static TempCommand cmd; return &cmd; }
    };
    ```
+   The `getUsage()` string is what `help` prints and what `CommandBase::ResultToTerminal` prints under `CmdErr` on `CMD_RESULT_ARGS_MISSING` / `_ARGS_ERROR` / `_INVALID_OPTION` — one source of truth per command, always in flash.
 4. **Register it** by including the header in [CommandLineServiceProvider.h](src/service_provider/cmd/CommandLineServiceProvider.h) **and** calling `CommandBase::RegisterCommand(CMD_NAME_TEMP, &TempCommand::Registrar)` from `CommandLineServiceProvider::initService` (mirror the pattern used by sibling commands).
-5. **Done.** `temp` will autocomplete via TAB, appear in history, and respect CTRL+C if you ever make it multi-iteration.
+5. **Done.** `temp` will autocomplete via TAB, appear in history, respect CTRL+C if you ever make it multi-iteration, and show up in `help` with its usage line.
 
 ### 7.12 Gotchas
 
@@ -1625,7 +1726,7 @@ To add `temp` (read a temperature sensor):
 - **Option values are pointers into the input buffer by default.** If your `execute` may live across input arrivals (CTRL+C handler, multi-iteration), `holdOptionValue` first.
 - **`needauth()` is the only gate.** A command returning `true` only fires after a successful `login`; setting it on a "harmless" command still adds friction. Use it for anything mutating state.
 - **`watch` semicolon-separates options because the inner command can use commas.** When chaining your own composite commands, pick a separator that doesn't appear in payloads.
-- **`fwrite` blocks the line until ESC.** Don't run it over telnet/SSH if you also rely on the watchdog firing inside the session — it does, but the terminal is unavailable for `srvc` / `scht` until you exit.
+- **`fwrite` blocks the line until ESC.** Don't run it over telnet/SSH if you also rely on the watchdog firing inside the session — it does, but the terminal is unavailable for `srvc` / `ps` until you exit.
 - **No quoted args.** Values cannot contain `,` (or whichever separator), `=`, or spaces inside an option value. Escape at the producer or accept the constraint.
 
 ---
@@ -2658,8 +2759,8 @@ Total to first prompt: ~1-4 seconds depending on whether STA connection happens 
 
 Three handles for runtime visibility:
 
-- **`scht`** lists every scheduler task with its last `_task_exec_millis` — your best signal that a service is hogging the loop ([§4.9](#4-task-scheduler)).
-- **`srvc s=<n>,q=2`** prints each service's status — covers DB validity, WiFi connectivity, MQTT connect state.
+- **`ps`** lists every scheduler task with its rolling `%CPU`, run count, and last-run interval — your best signal that a service is hogging the loop ([§4.9](#4-task-scheduler)).
+- **`srvc list`** enumerates every service with its state and tracked task count; **`srvc status <name>`** drills into one — covers DB validity, WiFi connectivity, MQTT connect state.
 - **`iUtilityInterface::measure_lastfn_stack()`** ([§13.3.1](#13-portable-interfaces)) — optional; a port that implements it lets you wrap critical work with `__i_dvc_ctrl.measure_lastfn_stack()` calls to estimate per-fn stack high-water marks. esp* ports don't implement it today.
 
 ### 12.10 Gotchas
@@ -2668,7 +2769,7 @@ Three handles for runtime visibility:
 - **`PAGE_HTML_MAX_SIZE = 1800`** is per-`send` chunk, not per-response. Compose pages in three calls ([§8.7](#8-web-server)) — one big string overflows silently.
 - **`NAPT` table growth is unbounded** by default in lwIP. If your AP carries dozens of clients, the heap will climb. The framework has no per-client throttle.
 - **History file writes happen per-keystroke** during `fwrite` ([§7.9](#7-command-line--terminal)). For long files, the flash wear is real — `fwrite` is for small config edits, not log capture.
-- **`__task_scheduler` runs *one* inline task per `serve()` tick.** Twenty registered tasks at 100 ms cadence each can starve each other if your serve loop runs less than 10 times per second. Profile with `scht`.
+- **`__task_scheduler` runs *one* inline task per `serve()` tick.** Twenty registered tasks at 100 ms cadence each can starve each other if your serve loop runs less than 10 times per second. Profile with `ps` (or `top` for a live view).
 
 ---
 
@@ -2714,7 +2815,7 @@ In addition, [src/utility/](src/utility/) ships three foundational interfaces th
 | Foundation interface | Path | Role |
 |---|---|---|
 | `iIOInterface` / `iTerminalInterface` | [src/utility/iIOInterface.h](src/utility/iIOInterface.h) | Byte/line I/O contract — base of every stream-like interface (serial, TCP client, terminal sessions) |
-| `iUtilityInterface` | [src/utility/iUtilityInterface.h](src/utility/iUtilityInterface.h) | `wait`, `millis_now`, `yield`, `log`, optional stack measurement |
+| `iUtilityInterface` | [src/utility/iUtilityInterface.h](src/utility/iUtilityInterface.h) | `wait`, `millis_now`, `micros_now` (64-bit µs — powers `ps` %CPU), `yield`, `log`, optional stack measurement |
 | `iInstanceInterface` | [src/utility/iInstanceInterface.h](src/utility/iInstanceInterface.h) | Factory: new TCP client/server, get utility/filesystem |
 
 ### 13.2 Naming and discovery conventions
@@ -2739,7 +2840,7 @@ Each row below: what the interface models, who implements it on a typical port, 
 | `iDeviceControlInterface` | [middlewares/iDeviceControlInterface.h](src/interface/pdi/middlewares/iDeviceControlInterface.h) | Device | `PDIStack`, every service via `__i_dvc_ctrl` | `initDeviceSpecificFeatures`, `resetDevice`, `restartDevice`, `eraseConfig`, `getDeviceId`, `getDeviceMac`, `isDeviceFactoryRequested`, `getTerminal`, `handleEvents` (+ inherited GPIO/WDT/utility/upgrade) |
 | `iDatabaseInterface` | [iDatabaseInterface.h](src/interface/pdi/iDatabaseInterface.h) | Device | `DatabaseServiceProvider`, every config table | `beginConfigs(size)`, `cleanAllConfigs`, `isValidConfigs`, `getMaxDBSize`, plus templated typed read/write |
 | `iInstanceInterface` | [src/utility/iInstanceInterface.h](src/utility/iInstanceInterface.h) | Device | Services that need fresh TCP/TLS/FS instances (MQTT pool, SSH, OTA, HTTPS) | `getNewTcpClientInstance`, `getNewTcpServerInstance`, `getNewTlsClientInstance` / `getNewTlsServerInstance` (`ENABLE_TLS_SERVICE`), `getFileSystemInstance`, `getUtilityInstance` |
-| `iUtilityInterface` | [src/utility/iUtilityInterface.h](src/utility/iUtilityInterface.h) | Inherited via `iDeviceControlInterface` | Scheduler, event bus, logger | `wait`, `millis_now`, `yield`, `log`, optional `can_measure_stack` / `measure_lastfn_stack` |
+| `iUtilityInterface` | [src/utility/iUtilityInterface.h](src/utility/iUtilityInterface.h) | Inherited via `iDeviceControlInterface` | Scheduler, event bus, logger | `wait`, `millis_now`, `micros_now`, `yield`, `log`, optional `can_measure_stack` / `measure_lastfn_stack` |
 | `iIOInterface`, `iTerminalInterface` | [src/utility/iIOInterface.h](src/utility/iIOInterface.h) | Any stream (serial, TCP, etc.) | Logger, CLI, web body writers | `write`/`writeln` family (overloaded for all primitive types + `RODT_ATTR` strings), `with_timestamp`, `connect`/`disconnect` |
 
 #### 13.3.2 Drivers
@@ -3030,7 +3131,8 @@ A port is ready to merge when:
 - [ ] `devices/mockdevice/` still compiles (you didn't accidentally couple `src/` to a vendor header).
 - [ ] The bundled `examples/PdiStack` builds with all flags this board *can* support enabled.
 - [ ] Every `__i_*` symbol expected by the build's `ENABLE_*` set is defined exactly once.
-- [ ] The `srvc l` CLI command lists every service your build started.
+- [ ] `iUtilityInterface::micros_now()` returns monotonic 64-bit µs across the platform's native counter wrap. Reference impls: ESP8266 → `micros64()`; ESP32 → `esp_timer_get_time()`; AVR → wrap-tracking around 32-bit `micros()` (loop-context only). `ps` should show non-zero `%CPU` for any task with sub-ms callbacks after a few ticks.
+- [ ] The `srvc list` CLI command lists every service your build started; `srvc stop <name>` freezes it (SIG_STOP), `srvc start <name>` resumes (SIG_CONT).
 - [ ] `reboot` and factory-reset both round-trip without losing the DB.
 - [ ] If `ENABLE_STORAGE_SERVICE` is on, SFTP upload/download via `scp` works.
 - [ ] If `ENABLE_CONTEXTUAL_EXECUTION` is on, a sample task scheduled under `__i_cooperative_scheduler` and `__i_preemptive_scheduler` prints from both lanes without stack corruption.
@@ -3051,7 +3153,7 @@ Most of these have appeared in passing in earlier sections. This section is the 
 | Component | Path | Purpose |
 |---|---|---|
 | **Interface foundations** | `iIOInterface.h`, `iUtilityInterface.h`, `iInstanceInterface.h` | Three abstract bases the entire framework rests on |
-| **Type definitions** | `DataTypeDef.h` | `task_t`, `serial_event_t`, `CallBack*Fn` aliases, `cmd_term_inseq_t`, `ipaddress_t`, etc. |
+| **Type definitions** | `DataTypeDef.h` | `task_t`, `task_state_t` (`READY`/`RUNNING`/`SLEEPING`/`STOPPED`/`ZOMBIE`), `signal_t` (`SIG_HUP`/`KILL`/`TERM`/`CONT`/`STOP`), `session_t`, `serial_event_t`, `CallBack*Fn` aliases, `cmd_term_inseq_t`, `ipaddress_t`, etc. |
 | **Database engine** | `Database.{h,cpp}` | See [§5](#5-database-layer) |
 | **Task scheduler** | `TaskScheduler.{h,cpp}` | See [§4](#4-task-scheduler) |
 | **Command base** | `CommandBase.{h,cpp}` | See [§7](#7-command-line--terminal) |
@@ -3069,7 +3171,7 @@ Most of these have appeared in passing in earlier sections. This section is the 
 
 ### 15.2 Interface foundations (recap)
 
-The three abstract bases — `iIOInterface` / `iTerminalInterface` (stream I/O + VT100 helpers), `iUtilityInterface` (`wait`, `millis_now`, `yield`, `log`), and `iInstanceInterface` (factory for TCP/TLS/FS handles) — are documented in [§13.1](#13-portable-interfaces); listed here only as a cross-reference.
+The three abstract bases — `iIOInterface` / `iTerminalInterface` (stream I/O + VT100 helpers), `iUtilityInterface` (`wait`, `millis_now`, `micros_now`, `yield`, `log`), and `iInstanceInterface` (factory for TCP/TLS/FS handles) — are documented in [§13.1](#13-portable-interfaces); listed here only as a cross-reference.
 
 ### 15.3 `EventUtil` — cross-service pub/sub
 
@@ -3364,7 +3466,7 @@ You're on an old checkout that still hard-required `DeviceSetup.h`. The current 
 **Build succeeds against ESP8266 / UNO but device misbehaves at runtime.**
 You installed via Library Manager (or copied a fresh repo) without running `DeviceSetup.py -d <board>` for the actual target. The ESP32 fallback in `DeviceConfig.h` produced an ESP32-shaped binary. Run the setup script for your target board. See [§2.6](#26-gotchas).
 
-**Build succeeds, but `srvc l` lists no services and the AP never appears.**
+**Build succeeds, but `srvc list` lists no services and the AP never appears.**
 `devices/DeviceSetup.h` still points at the wrong device — usually because you switched boards without re-running the setup script. Re-run with the new `-d <board>`, or `rm devices/DeviceSetup.h` to fall back to ESP32. See [§2.6](#26-gotchas).
 
 **`multiple definition of __i_<x>` link error.**
@@ -3378,7 +3480,7 @@ The host compiler is missing GCC's variadic-macro / variadic-template extensions
 
 ### 17.2 Boot & runtime problems
 
-**Device boots but `srvc l` shows nothing or factory-resets every 5 s.**
+**Device boots but `srvc list` shows nothing or factory-resets every 5 s.**
 NVM is in an invalid state (corrupt checksum, mismatched schema after a struct edit). With `AUTO_FACTORY_RESET_ON_INVALID_CONFIGS` on (the default), the device auto-recovers — wait one reset cycle. If it loops, the table sizes have outgrown the address allocation; see [§5.10](#5-database-layer).
 
 **Boot hangs after `Starting PDIStack !` with no AP.**
@@ -3394,7 +3496,7 @@ Almost always missing `PdiStack.serve()` in `loop()`. Without it the inline sche
 Symptoms: `register_task` returning `-1`, `pdiutil::vector` growth failing, transports refusing new connections. You're allocating inside a hot path. The discipline is in [§12.5](#125-heap-discipline) — pre-reserve containers, hold-then-free, no `new` after `setup()`.
 
 **`__task_scheduler.register_task` always returns `-1`.**
-The slot table (`MAX_SCHEDULABLE_TASKS = 25`) is full. Either you have a legitimate need for more (raise the constant in [src/config/Common.h](src/config/Common.h)) or a service is leaking tasks (`scht` will show the population). See [§4.7](#4-task-scheduler).
+The slot table (`MAX_SCHEDULABLE_TASKS = 25`) is full. Either you have a legitimate need for more (raise the constant in [src/config/Common.h](src/config/Common.h)) or a service is leaking tasks (`ps` will show the population). See [§4.7](#4-task-scheduler).
 
 **One service starves the others; serve loop feels jittery.**
 The scheduler runs **one** inline task per `serve()` iteration ([§4.5](#4-task-scheduler)). If a task does too much work per call, every other task suffers. Split into a state machine or promote to a cooperative lane.
@@ -3402,7 +3504,7 @@ The scheduler runs **one** inline task per `serve()` iteration ([§4.5](#4-task-
 ### 17.3 Network / portal problems
 
 **Cannot connect to the `pdiStack` AP.**
-Default password is `pdiStack@123` (case-sensitive). Confirm the AP is up via `srvc l` + `srvc s=<id>,q=2` over serial. If still missing, `ENABLE_WIFI_SERVICE` may be off — re-check [devices/DeviceConfig.h](devices/DeviceConfig.h).
+Default password is `pdiStack@123` (case-sensitive). Confirm the AP is up via `srvc list` + `srvc status WiFi` over serial. If still missing, `ENABLE_WIFI_SERVICE` may be off — re-check [devices/DeviceConfig.h](devices/DeviceConfig.h).
 
 **Cannot reach `http://192.168.0.1` from the AP.**
 Default subnet is hardcoded in [WifiConfig.h](src/config/WifiConfig.h). If `ENABLE_DYNAMIC_SUBNETTING` is on, the AP may have picked a different subnet; check the IP your phone/laptop got from DHCP and use that subnet's `.1`.
@@ -3440,7 +3542,7 @@ Most likely `ENABLE_NAPT` is also on. The two cannot coexist on esp8266 — both
 ### 17.4 CLI / terminal problems
 
 **Telnet / SSH login fails with the right credentials.**
-The CLI uses the same login row as the web portal (`login_credential_table`). If you've changed credentials via the web, telnet/SSH inherits them. If history `srvc s=<auth>,q=2` shows defaults, factory reset.
+The CLI uses the same login row as the web portal (`login_credential_table`). If you've changed credentials via the web, telnet/SSH inherits them. If `srvc status Auth` shows defaults, factory reset.
 
 **SSH won't accept any client.**
 You probably never generated a key pair. From the CLI:
@@ -3513,12 +3615,13 @@ GitHub: <https://github.com/Suraj151/pdi-framework>.
 The best signal-to-noise loop on an unknown problem:
 
 1. **Enable logs.** Uncomment `ENABLE_LOG_ALL` in [devices/DeviceConfig.h](devices/DeviceConfig.h), flash, watch serial @ 115200.
-2. **List services.** `srvc l` over the terminal — confirms what actually booted.
-3. **Print a service's config / status.** `srvc s=<id>,q=1` / `srvc s=<id>,q=2`.
-4. **List active tasks.** `scht` — column `exc_ms` is your CPU-hog detector.
-5. **Watch a task over time.** `watch c=scht; i=2000; n=10`.
-6. **Check NVM integrity.** A `srvc s=<db>,q=2` reports DB validity; outside that, an `AUTO_FACTORY_RESET_ON_INVALID_CONFIGS` build will reset every 5 s if NVM is bad.
-7. **Reboot.** `reboot` — the explicit version, since pulling power loses serial output.
+2. **List services.** `srvc list` over the terminal — confirms what actually booted, with per-service state and task counts.
+3. **Print a service's status.** `srvc status <name>` — state, tracked PIDs, ready to correlate against `ps`.
+4. **List active tasks.** `ps` — column `%CPU` is your CPU-hog detector; the `OWN` column ties tasks back to their owning session or kernel.
+5. **Watch tasks over time.** `top i=2000; n=10` (built-in refresh), or `watch c=ps; i=2000; n=10` for a scroll-preserving variant.
+6. **Poke lifecycle live.** `srvc stop <name>` freezes the service (SIG_STOP its tasks), `srvc start <name>` resumes; `kill p=<pid> s=19` / `s=18` do the same at task granularity. Watch `ST` in `ps` flip `S`→`T`→`S`.
+7. **Check NVM integrity.** `srvc status DB` reports DB validity; outside that, an `AUTO_FACTORY_RESET_ON_INVALID_CONFIGS` build will reset every 5 s if NVM is bad.
+8. **Reboot.** `reboot` — the explicit version, since pulling power loses serial output.
 
 If none of those localise the issue, open a GitHub issue with: device + board-package version, the relevant `ENABLE_*` flags, the serial log up to and including the failure, and the exact command sequence that reproduces.
 

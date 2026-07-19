@@ -32,9 +32,13 @@ struct RemoveFSCommand : public CommandBase {
      * @brief Register the command.
      */
     static void RegisterCommand(){
-		CommandBase::RegisterCommand(CMD_NAME_RM, [](void *arg)->void *{ 
-			return new RemoveFSCommand(); 
-		}); 
+		CommandBase::RegisterCommand(CMD_NAME_RM, [](void *arg)->void *{
+			return new RemoveFSCommand();
+		});
+	}
+
+	const char* getUsage() const override {
+		return RODT_ATTR("rm <file_or_dir>  remove a file or directory");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -81,8 +85,10 @@ struct RemoveFSCommand : public CommandBase {
 						m_terminal->write((int32_t)iStatus);
 					}
 
-					delete[] fileOrDir;	
+					delete[] fileOrDir;
 				}
+			}else{
+				result = CMD_RESULT_ARGS_ERROR;
 			}
 		}
 

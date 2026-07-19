@@ -30,9 +30,13 @@ struct RebootCommand : public CommandBase {
      * @brief Register the command.
      */
     static void RegisterCommand(){
-		CommandBase::RegisterCommand(CMD_NAME_REBOOT, [](void *arg)->void *{ 
-			return new RebootCommand(); 
-		}); 
+		CommandBase::RegisterCommand(CMD_NAME_REBOOT, [](void *arg)->void *{
+			return new RebootCommand();
+		});
+	}
+
+	const char* getUsage() const override {
+		return RODT_ATTR("reboot  restart the device");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE

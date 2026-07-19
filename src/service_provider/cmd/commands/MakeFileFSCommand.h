@@ -32,9 +32,13 @@ struct MakeFileFSCommand : public CommandBase {
      * @brief Register the command.
      */
     static void RegisterCommand(){
-		CommandBase::RegisterCommand(CMD_NAME_MKF, [](void *arg)->void *{ 
-			return new MakeFileFSCommand(); 
-		}); 
+		CommandBase::RegisterCommand(CMD_NAME_MKF, [](void *arg)->void *{
+			return new MakeFileFSCommand();
+		});
+	}
+
+	const char* getUsage() const override {
+		return RODT_ATTR("mkf <file>  create file (no spaces in name)");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -73,8 +77,10 @@ struct MakeFileFSCommand : public CommandBase {
 						m_terminal->write_ro(RODT_ATTR(" : "));
 						m_terminal->write((int32_t)bStatus);
 					}
-					delete[] filename;	
+					delete[] filename;
 				}
+			}else{
+				result = CMD_RESULT_ARGS_ERROR;
 			}
 		}
 

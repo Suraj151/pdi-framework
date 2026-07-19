@@ -53,6 +53,10 @@ struct TlsCommand : public CommandBase {
         });
     }
 
+    const char* getUsage() const override {
+        return RODT_ATTR("tls q=<query>,t=<algo>,l=<bits>,n=<CN>,i=<IPv4>  q=1 generates a cert");
+    }
+
 #ifdef ENABLE_AUTH_SERVICE
     /* override the necesity of required permission */
     bool needauth() override { return true; }
@@ -139,6 +143,8 @@ struct TlsCommand : public CommandBase {
                     m_terminal->writeln_ro(RODT_ATTR("Failed to generate TLS cert."));
                 }
             }
+        }else{
+            result = CMD_RESULT_ARGS_ERROR;
         }
 
         return result;

@@ -32,9 +32,13 @@ struct PWDFSCommand  : public CommandBase {
      * @brief Register the command.
      */
     static void RegisterCommand(){
-		CommandBase::RegisterCommand(CMD_NAME_PWD, [](void *arg)->void *{ 
-			return new PWDFSCommand(); 
-		}); 
+		CommandBase::RegisterCommand(CMD_NAME_PWD, [](void *arg)->void *{
+			return new PWDFSCommand();
+		});
+	}
+
+	const char* getUsage() const override {
+		return RODT_ATTR("pwd  print current working directory");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE

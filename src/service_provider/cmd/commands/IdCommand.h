@@ -31,6 +31,10 @@ struct IdCommand : public CommandBase {
 		});
 	}
 
+	const char* getUsage() const override {
+		return RODT_ATTR("id  print uid=N(user) gid=N for the current session");
+	}
+
 	bool needauth() override { return true; }
 
 	cmd_result_t execute(cmd_term_inseq_t terminputaction){

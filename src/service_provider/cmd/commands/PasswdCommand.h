@@ -32,6 +32,10 @@ struct PasswdCommand : public CommandBase {
 		});
 	}
 
+	const char* getUsage() const override {
+		return RODT_ATTR("passwd [p=<curr> n=<new> c=<confirm>]  change own password (echo-off prompts)");
+	}
+
 	bool needauth() override { return true; }
 
 	bool wantsMaskedInput() override {

@@ -72,7 +72,7 @@ bool TelnetServiceProvider::initService(void *arg) {
 
     // If the service started successfully, set up a periodic task to handle incoming clients
     if(started){
-        __task_scheduler.setInterval( [&]() {
+        this->serviceSetInterval( [&]() {
             this->handle();
         }, 1, __i_dvc_ctrl.millis_now() );
     }
@@ -144,9 +144,9 @@ void TelnetServiceProvider::handle() {
             // process and execute if command has provided
             #ifdef ENABLE_CMD_SERVICE
             cmd_result_t res = __cmd_service.processTerminalInput(m_client);
-            if( res == CMD_RESULT_ABORTED ||
-                res == CMD_RESULT_TERMINAL_ABORTED
-            ){
+            // Only an explicit terminal abort (logout / EOF) closes the channel.
+            // CMD_RESULT_ABORTED = command-scope Ctrl+C/Ctrl+Z; session stays.
+            if( res == CMD_RESULT_TERMINAL_ABORTED ){
                 __auth_service.setAuthorized(false);
                 m_client->disconnect();
             }

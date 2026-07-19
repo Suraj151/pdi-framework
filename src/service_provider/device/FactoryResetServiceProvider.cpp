@@ -28,8 +28,8 @@ DeviceFactoryReset::~DeviceFactoryReset()
  */
 bool DeviceFactoryReset::initService(void *arg)
 {
-  __task_scheduler.setInterval([&](){ 
-    this->check_device_factory_request(); 
+  this->serviceSetInterval([&](){
+    this->check_device_factory_request();
   }, MILLISECOND_DURATION_1000, __i_dvc_ctrl.millis_now());
 
   return ServiceProvider::initService(arg);

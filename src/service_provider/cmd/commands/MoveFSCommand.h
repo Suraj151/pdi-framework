@@ -33,9 +33,13 @@ struct MoveFSCommand : public CommandBase {
      * @brief Register the command.
      */
     static void RegisterCommand(){
-		CommandBase::RegisterCommand(CMD_NAME_MOVE, [](void *arg)->void *{ 
-			return new MoveFSCommand(); 
-		}); 
+		CommandBase::RegisterCommand(CMD_NAME_MOVE, [](void *arg)->void *{
+			return new MoveFSCommand();
+		});
+	}
+
+	const char* getUsage() const override {
+		return RODT_ATTR("mv <src> <dst>  move or rename a file/directory");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -90,11 +94,13 @@ struct MoveFSCommand : public CommandBase {
 				}
 
 				if(nullptr != oldname){
-					delete[] oldname;	
+					delete[] oldname;
 				}
 				if(nullptr != newname){
-					delete[] newname;	
+					delete[] newname;
 				}
+			}else{
+				result = CMD_RESULT_ARGS_ERROR;
 			}
 		}
 

@@ -56,6 +56,16 @@ public:
   virtual uint32_t millis_now() = 0;
 
   /**
+   * @brief Gets the current time in microseconds since the system started.
+   *        Returned as 64-bit so long-running deltas never wrap. On ports whose
+   *        native counter is 32-bit (e.g. Arduino `micros()` on AVR), the impl
+   *        is responsible for either supplying a 64-bit source or tracking
+   *        overflows to keep monotonicity.
+   * @return The current time in microseconds.
+   */
+  virtual uint64_t micros_now() = 0;
+
+  /**
    * @brief Logs a message with a specified log type.
    * @param log_type The type of log (e.g., INFO, ERROR, DEBUG).
    * @param content The message content to log.

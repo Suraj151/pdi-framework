@@ -31,6 +31,10 @@ struct UseraddCommand : public CommandBase {
 		});
 	}
 
+	const char* getUsage() const override {
+		return RODT_ATTR("useradd u=<user> p=<pass>  root-only; create a new user");
+	}
+
 	bool needauth() override { return true; }
 	bool wantsMaskedInput() override { return isWaitingForOption(CMD_OPTION_NAME_P); }
 

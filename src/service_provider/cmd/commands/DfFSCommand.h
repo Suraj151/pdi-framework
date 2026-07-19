@@ -28,6 +28,10 @@ struct DfFSCommand : public CommandBase {
 		});
 	}
 
+	const char* getUsage() const override {
+		return RODT_ATTR("df  print filesystem total/used(%)/free bytes");
+	}
+
 #ifdef ENABLE_AUTH_SERVICE
 	bool needauth() override { return true; }
 #endif

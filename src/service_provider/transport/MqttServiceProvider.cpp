@@ -198,7 +198,7 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
       __find_and_replace( _mqtt_lwt_configs.will_message, "[mac]", __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
 
       if( this->m_mqtt_client.begin( m_client, &_mqtt_general_configs, &_mqtt_lwt_configs ) ){
-        this->m_mqtt_timer_cb_id = __task_scheduler.updateInterval(
+        this->m_mqtt_timer_cb_id = this->serviceUpdateInterval(
           this->m_mqtt_timer_cb_id,
           [&]() { this->m_mqtt_client.mqtt_timer(); },
           MILLISECOND_DURATION_1000
@@ -231,7 +231,7 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
   }
 
   if( _mqtt_pubsub_configs.publish_frequency > 0 ){
-    this->m_mqtt_publish_cb_id = __task_scheduler.updateInterval(
+    this->m_mqtt_publish_cb_id = this->serviceUpdateInterval(
       this->m_mqtt_publish_cb_id,
       [&]() { this->handleMqttPublish(); },
       _mqtt_pubsub_configs.publish_frequency*MILLISECOND_DURATION_1000
@@ -242,7 +242,7 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
   }
 
   if( _mqtt_general_configs.keepalive > 0 ){
-    this->m_mqtt_subscribe_cb_id = __task_scheduler.updateInterval(
+    this->m_mqtt_subscribe_cb_id = this->serviceUpdateInterval(
       this->m_mqtt_subscribe_cb_id,
       [&]() { this->handleMqttSubScribe(); },
       (_mqtt_general_configs.keepalive/2)*MILLISECOND_DURATION_1000,

@@ -54,13 +54,13 @@ bool WiFiServiceProvider::initService( void *arg ){
   this->configure_wifi_access_point( &_wifi_credentials );
 
   // routine to check wifi and internet connectivity
-  m_service_routine_task_id = __task_scheduler.updateInterval( m_service_routine_task_id, [&]() {
+  m_service_routine_task_id = this->serviceUpdateInterval( m_service_routine_task_id, [&]() {
     this->handleWiFiConnectivity();
     #ifdef ENABLE_DYNAMIC_SUBNETTING
     this->reconfigure_wifi_access_point();
     #endif
     this->handleInternetConnectivity();
-  }, WIFI_CONNECTIVITY_CHECK_DURATION, 0, __i_dvc_ctrl.millis_now() );
+  }, WIFI_CONNECTIVITY_CHECK_DURATION, 0, __i_dvc_ctrl.millis_now(), -1 );
 
   // __task_scheduler.setInterval( [&]() {
   //   this->handleInternetConnectivity();

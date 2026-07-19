@@ -53,9 +53,9 @@ bool OtaServiceProvider::initService(void *arg)
     this->m_http_client->SetClient(_client);
   }
 
-  __task_scheduler.setInterval([&]()
-                               { this->handleOta(); },
-                               OTA_API_CHECK_DURATION, __i_dvc_ctrl.millis_now());
+  this->serviceSetInterval([&]()
+                           { this->handleOta(); },
+                           OTA_API_CHECK_DURATION, __i_dvc_ctrl.millis_now());
 
   return ServiceProvider::initService(arg);
 }

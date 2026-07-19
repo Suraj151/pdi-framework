@@ -386,6 +386,15 @@ uint32_t DeviceControlInterface::millis_now()
 }
 
 /**
+ * return current time in micro second (64-bit, monotonic across the 32-bit
+ * micros() wrap at ~71 min — Arduino core supplies micros64() natively)
+ */
+uint64_t DeviceControlInterface::micros_now()
+{
+    return micros64();
+}
+
+/**
  * return currently free heap size in bytes
  */
 uint32_t DeviceControlInterface::get_free_heap()

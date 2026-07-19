@@ -27,6 +27,10 @@ struct WhoAmICommand : public CommandBase {
 		});
 	}
 
+	const char* getUsage() const override {
+		return RODT_ATTR("whoami  print the current session's username");
+	}
+
 	bool needauth() override { return true; }
 
 	cmd_result_t execute(cmd_term_inseq_t terminputaction){

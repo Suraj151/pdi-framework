@@ -74,6 +74,7 @@ public:
   // util methods
   void wait(double timeoutms) override;
   uint32_t millis_now() override;
+  uint64_t micros_now() override;
   void log(logger_type_t log_type, const char *content) override;
   void yield() override;
   bool can_measure_stack() override;

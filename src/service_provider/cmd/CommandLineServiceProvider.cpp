@@ -103,9 +103,12 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   // m_cmdlist.push_back(clearscreencmd);
   ClearScreenCommand::RegisterCommand();
 
-  // SchedulerTaskCommand *schtaskcmd = new SchedulerTaskCommand();
-  // m_cmdlist.push_back(schtaskcmd);
-  SchedulerTaskCommand::RegisterCommand();
+  PsCommand::RegisterCommand();
+  TopCommand::RegisterCommand();
+  KillCommand::RegisterCommand();
+  PkillCommand::RegisterCommand();
+  KillallCommand::RegisterCommand();
+  ReniceCommand::RegisterCommand();
 
   #ifdef ENABLE_SSH_SERVICE
   // SSHCommand *sshcmd = new SSHCommand();
@@ -734,12 +737,14 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
 
     res = CMD_RESULT_MAX;
 
-    // check if user trying to exit
+    // Ctrl+C / Ctrl+Z at an idle prompt aborts anything running in the
+    // background but MUST NOT drop the session. Transport layers close the
+    // channel only on CMD_RESULT_TERMINAL_ABORTED (logout / EOF).
     if(
       inseq == CMD_TERM_INSEQ_CTRL_C ||
       inseq == CMD_TERM_INSEQ_CTRL_Z
     ){
-      res = CMD_RESULT_TERMINAL_ABORTED;
+      res = CMD_RESULT_ABORTED;
     }
 
     // check if any command is waiting for user input
@@ -755,11 +760,14 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
     }
   }
 
-  // if command aborted then remove watch task if any
+  // if command aborted then stop every background-running command owned by
+  // the current session
   if( CMD_RESULT_ABORTED == res || CMD_RESULT_TERMINAL_ABORTED == res ){
-    cmd_t *watchcmd = __cmd_service.getActiveCommandByName(CMD_NAME_WATCH);
-    if( nullptr != watchcmd ){
-      watchcmd->stopRunningInBackground();
+    session_t *cur = SessionManager::current();
+    for (int16_t i = 0; i < m_cmdlist.size(); i++){
+      if( nullptr != m_cmdlist[i] && m_cmdlist[i]->m_owner == cur && m_cmdlist[i]->isRunningInBackground() ){
+        m_cmdlist[i]->stopRunningInBackground();
+      }
     }
   }
 

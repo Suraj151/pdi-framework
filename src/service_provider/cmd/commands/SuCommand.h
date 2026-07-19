@@ -33,6 +33,10 @@ struct SuCommand : public CommandBase {
 		});
 	}
 
+	const char* getUsage() const override {
+		return RODT_ATTR("su u=<user> p=<pass>  switch user in the current session");
+	}
+
 	bool needauth() override { return true; }
 	bool wantsMaskedInput() override { return isWaitingForOption(CMD_OPTION_NAME_P); }
 

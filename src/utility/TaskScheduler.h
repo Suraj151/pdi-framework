@@ -61,7 +61,7 @@ public:
      * @param _task_priority The priority of the task (default is DEFAULT_TASK_PRIORITY).
      * @return The unique ID of the registered task.
      */
-    pdiutil::task_id_t setTimeout(CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration, pdiutil::millis_t _now_millis, pdiutil::task_priority_t _task_priority = DEFAULT_TASK_PRIORITY);
+    pdiutil::task_id_t setTimeout(CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration, pdiutil::millis_t _now_millis, pdiutil::task_priority_t _task_priority = DEFAULT_TASK_PRIORITY, const char* _name = nullptr, uint8_t _owner = 0);
 
     /**
      * @brief Update a one-time timeout for a task.
@@ -84,7 +84,7 @@ public:
      * @param _task_priority The priority of the task (default is DEFAULT_TASK_PRIORITY).
      * @return The unique ID of the registered task.
      */
-    pdiutil::task_id_t setInterval(CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration, pdiutil::millis_t _now_millis, pdiutil::task_priority_t _task_priority = DEFAULT_TASK_PRIORITY);
+    pdiutil::task_id_t setInterval(CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration, pdiutil::millis_t _now_millis, pdiutil::task_priority_t _task_priority = DEFAULT_TASK_PRIORITY, const char* _name = nullptr, uint8_t _owner = 0);
 
     /**
      * @brief Updates the interval of an existing task.
@@ -97,7 +97,7 @@ public:
      * @param _max_attempts The maximum number of attempts for the task (default is -1 for unlimited).
      * @return The unique ID of the updated task.
      */
-    pdiutil::task_id_t updateInterval(pdiutil::task_id_t _task_id, CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration, pdiutil::task_priority_t _task_priority = DEFAULT_TASK_PRIORITY, pdiutil::millis_t _last_millis = 0, pdiutil::attempts_t _max_attempts = -1);
+    pdiutil::task_id_t updateInterval(pdiutil::task_id_t _task_id, CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration, pdiutil::task_priority_t _task_priority = DEFAULT_TASK_PRIORITY, pdiutil::millis_t _last_millis = 0, pdiutil::attempts_t _max_attempts = -1, const char* _name = nullptr, uint8_t _owner = 0);
 
     /**
      * @brief Clears a one-time timeout task.
@@ -125,7 +125,51 @@ public:
      * @param _max_attempts The maximum number of attempts for the task (default is -1 for unlimited).
      * @return The unique ID of the registered task.
      */
-    pdiutil::task_id_t register_task(CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration = 1, pdiutil::task_priority_t _task_priority = DEFAULT_TASK_PRIORITY, pdiutil::millis_t _last_millis = 0, pdiutil::attempts_t _max_attempts = -1);
+    pdiutil::task_id_t register_task(CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration = 1, pdiutil::task_priority_t _task_priority = DEFAULT_TASK_PRIORITY, pdiutil::millis_t _last_millis = 0, pdiutil::attempts_t _max_attempts = -1, const char* _name = nullptr, uint8_t _owner = 0);
+
+    /**
+     * @brief Attach a human-readable name to an already-registered task.
+     * @return true if the task was found and updated.
+     */
+    bool setTaskName(pdiutil::task_id_t _id, const char* _name);
+
+    /**
+     * @brief Attach an owning session id to an already-registered task.
+     * @return true if the task was found and updated.
+     */
+    bool setTaskOwner(pdiutil::task_id_t _id, uint8_t _owner);
+
+    /**
+     * @brief Update the nice value of a task (POSIX-style, -20..19).
+     *        Does not immediately re-sort; caller may follow with rebaseAndRestartPrioTasks().
+     * @return true if the task was found and updated.
+     */
+    bool setTaskNice(pdiutil::task_id_t _id, int8_t _nice);
+
+    /**
+     * @brief Look up a task by its ID and find its owning session.
+     * @return owner session id, or 0 if not found (kernel).
+     */
+    uint8_t getTaskOwner(pdiutil::task_id_t _id);
+
+    /**
+     * @brief Deliver a POSIX-style signal to a task. Consumed on the next tick.
+     *        Today SIG_KILL and SIG_TERM both reap the task; SIG_STOP/CONT/HUP
+     *        are stored but not yet actioned by handle_tasks.
+     * @return true if the task was found and the signal queued.
+     */
+    bool sendSignal(pdiutil::task_id_t _id, signal_t _sig);
+
+    /**
+     * @brief Deliver a signal to every task whose m_name matches _name (exact
+     *        string equality). Skips tasks the caller isn't authorized to signal.
+     * @param _name           Task name to match (nullptr / empty → no match).
+     * @param _sig            Signal number to queue.
+     * @param _requester_sid  Session id of the caller (for owner check).
+     * @param _is_root        Bypass owner check when true.
+     * @return Number of tasks the signal was delivered to.
+     */
+    uint16_t sendSignalByName(const char* _name, signal_t _sig, uint8_t _requester_sid, bool _is_root);
 
     /**
      * @brief Executes all registered tasks that are due.
@@ -190,11 +234,16 @@ public:
     void rebaseAndRestartPrioTasks();
 
     /**
-     * @brief Prints all registered tasks to the terminal.
+     * @brief Prints a POSIX-style ps view of registered tasks to the terminal.
+     *
+     * State letters: R=running, S=sleeping, T=stopped, Z=zombie.
+     * Policy letters: F=fifo, R=roundrobin, D=deadline, S=fairshare.
+     * %CPU is a lifetime average of total exec time over elapsed since registration.
      *
      * @param terminal Pointer to the terminal interface.
+     * @param filter_owner Session id to filter by (0xFF = show all).
      */
-    void printTasksToTerminal(iTerminalInterface *terminal);
+    void printPsToTerminal(iTerminalInterface *terminal, uint8_t filter_owner = 0xFF);
 
     /**
      * @brief Base class api to yield the running task.

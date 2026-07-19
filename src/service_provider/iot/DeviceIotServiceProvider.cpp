@@ -60,7 +60,7 @@ bool DeviceIotServiceProvider::initService( void *arg ){
   }
 
   // __task_scheduler.setInterval( [&]() { this->handleDeviceIotConfigRequest(); }, HTTP_REQUEST_DURATION, __i_dvc_ctrl.millis_now() );
-  this->m_device_config_request_cb_id = __task_scheduler.updateInterval(
+  this->m_device_config_request_cb_id = this->serviceUpdateInterval(
     this->m_device_config_request_cb_id,
     [&]() {
       this->handleDeviceIotConfigRequest();
@@ -206,7 +206,7 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
 
             this->handleServerConfigurableParameters( http_resp );
 
-            this->m_mqtt_connection_check_cb_id = __task_scheduler.updateInterval(
+            this->m_mqtt_connection_check_cb_id = this->serviceUpdateInterval(
               this->m_mqtt_connection_check_cb_id,
               [&]() {
                 this->handleConnectivityCheck();
@@ -540,7 +540,7 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
 
   this->beginSensorData();
 
-  this->m_device_config_request_cb_id = __task_scheduler.updateInterval(
+  this->m_device_config_request_cb_id = this->serviceUpdateInterval(
     this->m_device_config_request_cb_id,
     [&]() {
       this->handleDeviceIotConfigRequest();
@@ -560,7 +560,7 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
  */
 void DeviceIotServiceProvider::beginSensorData(){
 
-  this->m_handle_sensor_data_cb_id = __task_scheduler.updateInterval(
+  this->m_handle_sensor_data_cb_id = this->serviceUpdateInterval(
     this->m_handle_sensor_data_cb_id,
     [&]() { this->handleSensorData(); },
     (((float)this->m_server_configurable_sensor_data_publish_freq/(float)this->m_server_configurable_sample_per_publish)*1000.0)

@@ -51,7 +51,7 @@ bool EmailServiceProvider::initService(void *arg)
  */
 void EmailServiceProvider::handleEmail()
 {
-  this->m_mail_handler_cb_id = __task_scheduler.updateInterval(
+  this->m_mail_handler_cb_id = this->serviceUpdateInterval(
       this->m_mail_handler_cb_id,
       [&]()
       {
@@ -79,7 +79,7 @@ void EmailServiceProvider::handleEmail()
           delete _payload;
         }
       },
-      180000);
+      180000, DEFAULT_TASK_PRIORITY, 0, -1);
 }
 
 // /**

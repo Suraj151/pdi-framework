@@ -31,6 +31,10 @@ struct GrepFSCommand : public CommandBase {
 		});
 	}
 
+	const char* getUsage() const override {
+		return RODT_ATTR("grep <pattern> <file_or_dir>  regex search; prints path:line:col:content");
+	}
+
 #ifdef ENABLE_AUTH_SERVICE
 	bool needauth() override { return true; }
 #endif
