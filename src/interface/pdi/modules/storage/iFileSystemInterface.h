@@ -19,7 +19,7 @@ Created Date    : 6th Apr 2025
 
 
 // forward declaration of derived class for this interface
-class FileSystemInterface;
+class VfsDispatcher;
 
 /**
  * @class iFileSystemInterface
@@ -366,7 +366,7 @@ public:
     /**
      * @brief Get metadata (type, size, ctime, mtime, perms) for a single path.
      * @param path The path of the file or directory.
-     * @param out file_info_t populated on success; `name` is left untouched.
+     * @param out file_info_t populated on success; `m_name` is left untouched.
      * @return 0 on success, or a negative error code on failure.
      */
     virtual int getFileMeta(const char *path, file_info_t &out) = 0;
@@ -378,6 +378,23 @@ public:
      * @return 0 on success, or a negative error code on failure.
      */
     virtual int setFilePermissions(const char *path, uint16_t perms) = 0;
+
+    /**
+     * @brief Set the owning uid + gid on a file or directory.
+     * @param path The path of the file or directory.
+     * @param uid Owning user id.
+     * @param gid Owning group id.
+     * @return 0 on success, or a negative error code on failure.
+     */
+    virtual int setFileOwner(const char *path, uint16_t uid, uint16_t gid) = 0;
+
+    /**
+     * @brief POSIX touch: create the file empty (with default perms) if it
+     *        does not exist; otherwise bump its mtime to the current epoch.
+     * @param path The path of the file.
+     * @return 0 on success, or a negative error code on failure.
+     */
+    virtual int touch(const char *path) = 0;
 protected:
     /**
      * @brief Get current wall-clock time as seconds since Unix epoch, or 0
@@ -387,13 +404,29 @@ protected:
      */
     virtual uint32_t nowEpoch() = 0;
 
+    /**
+     * @brief Get the owning uid + gid to stamp on freshly created entries.
+     *        Default is root (0/0). Implemented by the policy layer
+     *        (FileSystemInterfaceImpl) to pull the current session's uid/gid.
+     */
+    virtual void currentOwner(uint16_t &uid, uint16_t &gid) { uid = 0; gid = 0; }
+
+    /**
+     * @brief Get the current session's umask applied at file/dir creation
+     *        (perms &= ~umask). Default is 0 (no bits cleared). Implemented by
+     *        the policy layer to pull the current session's umask.
+     */
+    virtual uint16_t currentUmask() { return 0; }
+
     iStorageInterface& m_istorage; ///< Reference to the storage interface used for file operations.
 };
 
 /**
- * @brief Global instance of the iFileSystemInterface class.
- * This instance is used to manage file system operations throughout the PDI stack.
+ * @brief Global instance of the VFS dispatcher.
+ * Every filesystem call throughout the PDI stack goes through this dispatcher,
+ * which resolves the target mount by longest-prefix match and forwards to the
+ * backend (LittleFS root, procfs, sysfs, tmpfs, etc.).
  */
-extern FileSystemInterface __i_fs;
+extern VfsDispatcher __i_fs;
 
 #endif // _I_FILESYSTEM_INTERFACE_H

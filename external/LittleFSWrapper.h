@@ -289,9 +289,11 @@ public:
      */
     int removeFileAttr(const char *path, uint8_t type);
 
+    int setFileOwner(const char *path, uint16_t uid, uint16_t gid) override;
+
 protected:
-    // Stamp ctime + mtime + perms on a freshly created entry. Uses nowEpoch()
-    // (implemented by the policy layer) for the timestamp value.
+    // Stamp ctime + mtime + perms + uid/gid on a freshly created entry. Uses
+    // nowEpoch() + currentOwner() (implemented by the policy layer).
     void stampCreate(const char *path, bool isDir);
 
     // Refresh mtime on an existing entry.

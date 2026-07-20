@@ -13,7 +13,7 @@ PDI is a modular C++ stack for embedded devices. Application code is written onc
 - **Compile-time feature gating.** Each capability is wrapped in an `ENABLE_*` flag; disabled features contribute zero flash.
 - **Configurable task scheduler.** Inline, cooperative, and preemptive modes; priority-and-policy scheduling; POSIX nice; per-task signals (KILL/TERM/STOP/CONT) with `ps`/`top`/`kill`/`pkill`/`killall`/`renice`.
 - **Service supervisor (systemd-lite).** `srvc list / status / start / stop / restart` — every service tracks its scheduler tasks and can be paused or resumed at runtime.
-- **Linux-style CLI on serial / Telnet / SSH.** `ls`, `cat`, `grep`, `head`, `tail`, `wc`, `hexdump`, `df`, `uptime`, `mv`, `cp`, `mkd`, `rm`, `watch`, `gpio`, `srvc`, `ps`, `top`, `kill`, `pkill`, `killall`, `renice`, `net`, `iot`, `ssh`, `tls`, `reboot`, and more.
+- **Linux-style CLI on serial / Telnet / SSH.** `ls`, `cat`, `grep`, `head`, `tail`, `wc`, `hexdump`, `df`, `mount`, `chmod`, `chown`, `umask`, `uptime`, `mv`, `cp`, `mkdir`, `touch`, `rm`, `watch`, `gpio`, `srvc`, `ps`, `top`, `kill`, `pkill`, `killall`, `renice`, `net`, `iot`, `ssh`, `tls`, `reboot`, and more.
 - **On-device file transfer.** `scp` (single file) and interactive `sftp` over the SSH tunnel.
 - **Web portal for configuration.** Session-based login, per-service settings pages, GPIO control, storage browser, MQTT tester, Email tester.
 - **Persistent config store.** Address-based table engine with JSON-driven codegen for schema tables.
@@ -53,7 +53,7 @@ Per-service reference in [§6 Service Providers](#6-service-providers).
 **Utilities** — Task Scheduler (inline / cooperative / preemptive), Event bus, Queues, String helpers, Data converters, Crypto, PdiSTL, Reset Factory.
 Full inventory in [§15 Utility Library](#15-utility-library).
 
-**CLI** — 25+ built-in commands including `ls mkd mv cp cat head tail wc hexdump grep df gpio srvc ps top kill pkill killall renice net watch iot ssh tls reboot uptime`.
+**CLI** — 25+ built-in commands including `ls mkdir touch mv cp cat head tail wc hexdump grep df mount chmod chown umask gpio srvc ps top kill pkill killall renice net watch iot ssh tls reboot uptime`.
 Full command reference in [§7.7 Built-in command inventory](#77-built-in-command-inventory).
 
 **Extras** — Captive portal, GPIO events over MQTT/HTTP/Email, NAT (ESP8266 lwIP — see [§2.4.1](#241-nat-and-mesh)), Mesh via ESPNOW.
@@ -811,7 +811,7 @@ Every runtime tool below is available at the shell — no debugger, no recompile
 
 **Observability**
 
-- **`ps`** — POSIX-style view of every registered task: PID, owner session, state (`R` running / `S` sleeping / `T` stopped / `Z` zombie), priority, nice, policy (`F`/`R`/`D`/`S`), rolling `%CPU`, run count, interval, name. Filter by owner with `ps u=<sid>`. Source: [printPsToTerminal](src/utility/TaskScheduler.cpp).
+- **`ps`** — POSIX-style view of every registered task: PID, owner session, state (`R` running / `S` sleeping / `T` stopped / `Z` zombie), priority, nice, policy (`F`/`R`/`D`/`S`), rolling `%CPU`, run count, interval, name. Filter by owner with `ps <sid>`. Source: [printPsToTerminal](src/utility/TaskScheduler.cpp).
 - **`top`** — same view re-rendered on a scheduler tick (`top i=<ms>; n=<iters>; u=<sid>`), clearing the screen each pass. Stops with Ctrl+C. Source: [TopCommand](src/service_provider/cmd/commands/TopCommand.h).
 - **`watch`** — general periodic wrapper (`watch c=<cmd>; i=<ms>; n=<iters>`); use for anything not already tied to a scheduler view.
 
@@ -819,10 +819,10 @@ Every runtime tool below is available at the shell — no debugger, no recompile
 
 Task-scheduler analogues of POSIX signals: `SIG_HUP=1`, `SIG_KILL=9`, `SIG_TERM=15`, `SIG_CONT=18`, `SIG_STOP=19` (see `enum Signal` in [DataTypeDef.h](src/utility/DataTypeDef.h)). Delivery is queued on `m_pending_sig` and consumed at the top of the next `handle_tasks` iteration under one critical section.
 
-- **`kill p=<PID> [s=<sig>]`** — send by PID. Default `s=15` (TERM). SIG_HUP is accepted but currently no-op.
-- **`pkill n=<NAME> [s=<sig>]`** — send by task name. Default TERM. Prints `signaled N task(s)`.
-- **`killall n=<NAME> [s=<sig>]`** — same as `pkill` but default is SIG_KILL (impolite).
-- **`renice n=<nice> p=<PID>`** — change POSIX nice (-20..19) on a live task; auto-triggers `rebaseAndRestartPrioTasks` so the new sort order takes effect on the next tick.
+- **`kill [<sig>] <PID>`** — send by PID. Default sig is `SIG_TERM` (15). 1 arg = pid, 2 args = sig then pid. SIG_HUP is accepted but currently no-op.
+- **`pkill [<sig>] <NAME>`** — send by task name. Default TERM. Prints `signaled N task(s)`.
+- **`killall [<sig>] <NAME>`** — same as `pkill` but default is SIG_KILL (impolite).
+- **`renice <nice> <PID>`** — change POSIX nice (-20..19) on a live task; auto-triggers `rebaseAndRestartPrioTasks` so the new sort order takes effect on the next tick.
 
 Permission model on all four: root (uid=0) can touch any task; other users only tasks whose `m_owner` matches the current session id. Compiled out entirely when `ENABLE_AUTH_SERVICE` is off.
 
@@ -1234,7 +1234,34 @@ The working example sketch is walked through in [§11.6 DeviceIotExample](#116-d
 
 #### 6.2.11 Storage (interface init, no provider)
 
-`ENABLE_STORAGE_SERVICE` doesn't have its own `ServiceProvider` subclass — `PdiStack::initialize` simply calls `__i_fs.init()` ([PdiStack.cpp](src/PdiStack.cpp)). The filesystem is consumed directly by SSH/SFTP, the file-oriented CLI commands (`ls`/`cd`/`mv`/`cp`/`rm`/`mkd`/`mkf`/`cat`/`fwrite`/`head`/`tail`/`wc`/`df`/`grep`/`hexdump`), and any application code that wants to persist user files.
+`ENABLE_STORAGE_SERVICE` doesn't have its own `ServiceProvider` subclass — the FS is used directly by SSH/SFTP, `UserStoreService`, the file-oriented CLI commands (`ls`/`cd`/`mv`/`cp`/`rm`/`mkdir`/`touch`/`cat`/`fwrite`/`head`/`tail`/`wc`/`df`/`grep`/`hexdump`/`chmod`/`chown`/`umask`/`mount`), and any application code.
+
+The global `__i_fs` is a **`VfsDispatcher`** ([src/interface/pdi/impl/modules/storage/VfsDispatcher.{h,cpp}](src/interface/pdi/impl/modules/storage/VfsDispatcher.h)) — an `iFileSystemInterface` implementation that routes every call to a mounted backend selected by **longest-prefix path match**. Per-device `FileSystemInterface` (LittleFS via [external/LittleFSWrapper.{h,cpp}](external/LittleFSWrapper.h) → [FileSystemInterfaceImpl](src/interface/pdi/impl/modules/storage/FileSystemInterfaceImpl.h)) is now `__i_rootfs`, mounted at `/` during `PdiStack::initialize`:
+
+```cpp
+__i_fs.mount(FILE_SEPARATOR, &__i_rootfs, "rootfs", VFS_TYPE_LITTLEFS);
+__i_fs.init();
+```
+
+Mount table config lives in [config/VfsConfig.h](src/config/VfsConfig.h) — `VFS_MAX_MOUNTS` (default 3), `VFS_MOUNT_PREFIX_MAX` (15), `VFS_MOUNT_NAME_MAX` (11). Extra backends (procfs/sysfs/devfs/tmpfs) will land as additional `mount()` calls in the same init function. See `mount` command below in [§7.7](#77-built-in-command-inventory) to inspect the table at runtime; `df` shows total/used/free per mount.
+
+**Permissions & ownership** are advisory at the wrapper (bits stored via `lfs_setattr`) and enforced at the dispatcher. `file_info_t` carries `m_type`/`m_size`/`m_name`/`m_ctime`/`m_mtime`/`m_perms`/`m_uid`/`m_gid` and every FS entry is stamped on create with the current session's uid/gid (via the protected `currentOwner()` hook, overridden in `FileSystemInterfaceImpl` to pull from `SessionManager`). Default file/dir perms are `0644` / `0755` masked by the caller's umask (`FILE_UMASK_DEFAULT 0022`, per-session via `currentUmask()`).
+
+`VfsDispatcher` gates every write/read/mutate at entry via three helpers:
+
+| Op class | Gate | Behavior |
+|---|---|---|
+| `editFile`, `writeFile`, `deleteFile`, `deleteDirectory`, `touch` | `checkAccess(path, W)` | POSIX owner/group/other bits; root (uid=0) bypasses |
+| `readFile`, `getDirFileList`, content-search family (`findInFile`, `readLineInFile`, …) | `checkAccess(path, R)` | Same lookup |
+| `setFileAttr`, `removeFileAttr`, `setFilePermissions` | `checkOwnerOrRoot(path)` | Owner of the file or root |
+| `setFileOwner` | `checkRoot()` | Root only |
+| `createFile`, `createDirectory`, `rename`, `copyFile`, `moveFile`, `isFileExist`, `isDirExist`, `getFileMeta`, `getFileAttr`, `getFileSize` | ungated | Deferred (parent-dir traversal) / metadata-only |
+
+Missing files are treated as "allowed" (creation defer); missing uid/gid attrs on legacy entries default to **root-owned** (0/0).
+
+**Privileged scope** — a setuid analog. `beginPrivileged()` / `endPrivileged()` on the dispatcher increment a depth counter; while depth > 0 all three check helpers return `true`. Used by `UserStoreService::verifyPassword` / `setPassword` to read `/etc/shadow` (0600) on behalf of a non-root session during `su`/`login`/`passwd`. Scope kept as narrow as possible around the shadow read.
+
+Cross-mount `rename`/`copyFile`/`moveFile` return -1 for now (deferred until symlinks land).
 
 #### 6.2.12 `WebServer` — `__web_server`
 
@@ -1275,7 +1302,7 @@ Full breakdown lives in [§8. Web Server](#8-web-server) — it has its own rout
 | Depends on | `__auth_service`, `SessionManager` ([§6.2.18](#6218-sessionmanager)), every command in [cmd/commands/](src/service_provider/cmd/commands/) |
 | Init does | Registers all command handlers; `PdiStack` calls `SessionManager::attach(serialTerminal)` at boot so the serial slot is populated before first input |
 | Terminal binding | `useTerminal(t)` attaches a `session_t` for terminal `t` (idempotent) and draws the login prompt. `processTerminalInput(t)` looks up the session via `SessionManager::findByTerminal(t)`, sets it as current for the tick, then dispatches. Each in-flight command carries `m_owner = session` so cross-session `getCommandWaitingForUserInput` never returns another session's prompt |
-| Built-in commands | Files (`ls`/`cd`/`pwd`/`mkd`/`mkf`/`mv`/`cp`/`rm`/`cat`/`fwrite`/`head`/`tail`/`wc`/`df`/`grep`/`hexdump`), auth+users (`login`/`logout`/`whoami`/`id`/`who`/`su`/`passwd`/`useradd`/`userdel`/`groups`), device (`gpio`/`net`/`srvc`/`ps`/`top`/`ssh`/`tls`/`iot`/`reboot`/`watch`/`uptime`/`cls`/`help`) — full reference in [§7.7](#77-built-in-command-inventory) |
+| Built-in commands | Files (`ls`/`cd`/`pwd`/`mkdir`/`touch`/`mv`/`cp`/`rm`/`cat`/`fwrite`/`head`/`tail`/`wc`/`df`/`grep`/`hexdump`/`mount`/`chmod`/`chown`/`umask`), auth+users (`login`/`logout`/`whoami`/`id`/`who`/`su`/`passwd`/`useradd`/`userdel`/`groups`), device (`gpio`/`net`/`srvc`/`ps`/`top`/`kill`/`pkill`/`killall`/`renice`/`ssh`/`tls`/`iot`/`reboot`/`watch`/`uptime`/`cls`/`help`) — full reference in [§7.7](#77-built-in-command-inventory) |
 | Multi-session | Up to `PDI_MAX_SESSIONS` (default 3) sessions run concurrently across serial + telnet + ssh. Each has its own linebuf, cursor, history-walk, cwd, auth, username, and in-flight commands. See [§7.8](#78-multi-terminal-session-lifecycle) |
 
 #### 6.2.16 TLS (no provider; transport hookup + cert provisioning)
@@ -1300,9 +1327,11 @@ Full breakdown lives in [§8. Web Server](#8-web-server) — it has its own rout
 | Source | [user/UserStoreService.{h,cpp}](src/service_provider/user/UserStoreService.h) |
 | Config | [config/UserStoreConfig.h](src/config/UserStoreConfig.h) — `USER_STORE_PASSWD_PATH="/etc/passwd"`, `USER_STORE_SHADOW_PATH="/etc/shadow"`, `USER_STORE_SALT_LEN=8`, `USER_STORE_ROOT_UID=0`, `USER_STORE_DEFAULT_SHELL="cmd"` |
 | Depends on | `__i_fs`, `__database_service` (bootstrap only), `utility/crypto/hash/sha256`, `utility/DataTypeConversions` (hex helpers) |
-| Files | **`/etc/passwd`** — one line per user: `username:x:uid:gid:home:shell`. **`/etc/shadow`** — `username:hexhash:hexsalt` (32-byte SHA-256 of `salt‖password`, 8-byte random salt). Both readable, but only usable via the API below |
+| Files | **`/etc/passwd`** — one line per user: `username:x:uid:gid:home:shell` (mode `0644`, world-readable — `id`/`groups` need it). **`/etc/shadow`** — `username:hexhash:hexsalt` (32-byte SHA-256 of `salt‖password`, 8-byte random salt) stamped `0600` (root-only, since it holds the hashes) |
 | Public API | `findUserByName`, `findUserByUid`, `addUser(record, password)` (writes both files, rolls back passwd row on shadow failure), `removeUser` (removes from both), `verifyPassword` (constant-time hash compare), `setPassword` |
-| Bootstrap | On `initService`, if `/etc/passwd` doesn't exist, seeds it with the LoginTable admin as `uid=0, gid=0, home=/, shell=cmd` and hashes the admin password into `/etc/shadow`. Idempotent — reboot doesn't clobber. |
+| Bootstrap | On `initService`, if `/etc/passwd` doesn't exist, seeds it with the LoginTable admin as `uid=0, gid=0, home=/, shell=cmd` and hashes the admin password into `/etc/shadow`. Idempotent — reboot doesn't clobber. Also **retroactively re-stamps** `/etc/shadow` to `0600` on every boot in case a pre-perms build left it `0644` |
+| Privileged reads | `verifyPassword` and `setPassword` need to read/write `/etc/shadow` on behalf of a non-root session (during `su`/`login`/`passwd`). They bracket the shadow access in `__i_fs.beginPrivileged()` / `endPrivileged()` — a setuid analog. Scope is kept as narrow as possible; every other UserStore method runs unprivileged |
+| useradd default gid | `useradd` assigns `gid = uid` (each user in their own group). No `/etc/group` yet — group semantics land in a future step |
 | Init order | Called from `PdiStack::initialize` after `__i_fs.init()` and before the CLI, so FS is ready but auth still degrades cleanly to LoginTable if shadow write fails |
 | Auth path | `AuthServiceProvider::isAuthorized(u, p)` (§6.2.10) prefers this service when `/etc/shadow` exists, else falls back to LoginTable. That's the switch that turns pdi-framework from single-record auth into a multi-user OS |
 
@@ -1313,8 +1342,9 @@ Not a `ServiceProvider` — a static registry that owns the per-session state.
 | Source | [session/SessionManager.{h,cpp}](src/service_provider/session/SessionManager.h) |
 |---|---|
 | Config | [config/SessionConfig.h](src/config/SessionConfig.h) — `PDI_MAX_SESSIONS` (default 3). Override to 1 on AVR-class devices |
-| State type | `session_t` in [utility/DataTypeDef.h](src/utility/DataTypeDef.h) — `sid`, `state`, `terminal*`, `loginAt`, `lastActivityAt`, `linebuf`, `cursor`, `historyIdx`, `origTypedPrefix`, `prevArgSize`, `autoCompleteIdx`, `prevCmdSize`, `cwd`, `lastCwd`, `isAuthorized`, `username` (auth/storage-gated) |
-| API | `attach(terminal)` / `detach(terminal)` / `findByTerminal` / `current` / `setCurrent` / `getByIndex(i)` / `maxSessions()` / `activeCount()`. Storage-gated: `getPWD`, `getLastPWD`, `setPWD`, `changeDirectory` — session-scoped cwd with `__i_fs` fallback pre-attach |
+| State type | `session_t` in [utility/DataTypeDef.h](src/utility/DataTypeDef.h) — `m_sid`, `m_state`, `m_terminal*`, `m_loginAt`, `m_lastActivityAt`, `m_linebuf`, `m_cursor`, `m_historyIdx`, `m_origTypedPrefix`, `m_prevArgSize`, `m_autoCompleteIdx`, `m_prevCmdSize`, `m_cwd`, `m_lastCwd`, `m_umask` (storage-gated), `m_isAuthorized`, `m_username`, `m_uid`, `m_gid` (auth-gated) |
+| API | `attach(terminal)` / `detach(terminal)` / `findByTerminal` / `current` / `setCurrent` / `getByIndex(i)` / `maxSessions()` / `activeCount()`. Storage-gated: `getPWD`, `getLastPWD`, `setPWD`, `changeDirectory`, `getCurrentUmask`, `setCurrentUmask`. Auth-gated: `getCurrentUid`, `getCurrentGid` — session-scoped cwd/uid/gid/umask with `__i_fs` fallback pre-attach |
+| Login-time caching | `AuthServiceProvider::setAuthorized(true)` looks up the resolved `user_record` via `__user_store_service.findUserByName` and caches `m_uid` / `m_gid` on the session; `m_umask` is reset to `FILE_UMASK_DEFAULT` (`0022`). On logout / clear, all three reset to 0/0/`FILE_UMASK_DEFAULT`. The cache is what `VfsDispatcher` reads on every FS check (single dereference — no `/etc/passwd` scan per file op) |
 | Wire-in | `CommandLineServiceProvider::useTerminal` calls `attach`; `processTerminalInput` calls `findByTerminal` + `setCurrent`; SSH's USERAUTH_SUCCESS attaches early so auth state anchors to the SSH channel; Telnet/SSH `closeSession` calls `detach(theClient)` explicitly |
 
 ### 6.3 Init order and why it matters
@@ -1532,19 +1562,23 @@ Names come from [CommandCommon.h](src/service_provider/cmd/commands/CommandCommo
 
 | Command | Options | Brief |
 |---|---|---|
-| ls | | List files/dirs in current directory. e.g. **ls** |
-| mkd \<dir> | | Create directory (no spaces in name). e.g. **mkd /home/scripts** |
-| mkf \<file> | | Create file (no spaces in name). e.g. **mkf /home/notes.txt** |
+| ls | | List files/dirs in current directory with mode / owner / group / mtime / size. Owner+group show human names (numeric uid/gid if user record is missing). e.g. **ls** |
+| mkdir \<dir> | | Create directory. Perms = `0755 & ~umask`; owner = current session's uid/gid. e.g. **mkdir /home/scripts** |
+| touch \<file> | | Create the file empty if missing (perms = `0644 & ~umask`, owner = current session's uid/gid); bump `mtime` if it exists. e.g. **touch /home/notes.txt** |
 | mv \<src> \<dst> | | Move / rename file or dir. e.g. **mv /home/a.txt /home/b.txt** |
 | cp \<src> \<dst> | | Copy file. e.g. **cp /home/a.txt /home/b.txt** |
 | pwd | | Print current working directory. e.g. **pwd** |
-| rm \<file_or_dir> | | Remove file or directory. e.g. **rm /home/notes.txt** |
-| cat \<file> | | Print file contents to terminal (renamed from `fread`). e.g. **cat /home/notes.txt** |
-| fwrite \<file> | f=\<file> v=\<value> | Open file in append mode; type content line by line. Press **ESC** to save & exit. e.g. **fwrite /home/notes.txt** or **fwrite f=/home/notes.txt v=hello** |
+| rm \<file_or_dir> | | Remove file or directory. Requires `+w` on the target for non-root. e.g. **rm /home/notes.txt** |
+| cat \<file> | | Print file contents to terminal (renamed from `fread`). Requires `+r` on the file for non-root. e.g. **cat /home/notes.txt** |
+| fwrite \<file> | f=\<file> v=\<value> | Open file in append mode; type content line by line. Press **ESC** to save & exit. Requires `+w` on the file for non-root. e.g. **fwrite /home/notes.txt** or **fwrite f=/home/notes.txt v=hello** |
 | head \<file> [N] | | Print first N lines (default 10); constant memory. e.g. **head /home/log.txt 5** |
 | tail \<file> [N] | | Print last N lines (default 10); constant memory. e.g. **tail /home/log.txt 5** |
 | wc \<file> | | Print line / word / byte counts (Linux `wc` order). e.g. **wc /home/log.txt** |
-| df | | Print filesystem total / used (%) / free in bytes. e.g. **df** |
+| df | | Print one row per mounted VFS backend: `MOUNT NAME TOTAL USED FREE` in bytes. e.g. **df** |
+| mount | | List active VFS mount points with prefix / type / backend name. e.g. **mount** |
+| chmod \<octal> \<path> | | Set POSIX permission bits (e.g. `0644`, `0755`). Owner-or-root only (enforced by VFS). e.g. **chmod 0644 /etc/passwd** |
+| chown \<uid>[:\<gid>] \<path> | | Change owning uid (and optionally gid) of a file/dir. Root-only. If `:gid` is omitted, `gid = uid`. e.g. **chown 1001 /home/alice** or **chown 1001:1001 /home/alice** |
+| umask [\<octal>] | | Print current session's umask; with an arg, set it. Applied at file/dir creation as `default_perms & ~umask`. Default `0022`. e.g. **umask 0027** |
 | hexdump \<file> | | `hexdump -C` layout: offset, 16 hex bytes, ASCII. e.g. **hexdump /home/bin.dat** |
 | grep \<pattern> \<file_or_dir> | | Search a file or dir (recursive). Output `path:line:col:content` (vim/vscode jump format). Regex subset: `.` `*` `+` `?` `^` `$` `[abc]` `[a-z]` `[^abc]` `\\<char>`. No alternation / groups / backrefs. e.g. **grep ^ERROR /home/log.txt** |
 | cls | | Clear screen. e.g. **cls** |
@@ -1555,18 +1589,18 @@ Names come from [CommandCommon.h](src/service_provider/cmd/commands/CommandCommo
 | id | | Print `uid=N(username) gid=N` for the current session's user. e.g. **id** |
 | who | | List active authenticated sessions across serial/telnet/ssh: `USER TTY SID LOGIN IDLE` in seconds. e.g. **who** |
 | groups | | Print the current user's primary gid. e.g. **groups** |
-| su u=\<user> p=\<pass> | u, p (space-separated) | Switch user in the current session. Prompts interactively when args omitted. On success sets session identity + jumps to target's home dir. e.g. **su u=alice p=alice123** |
-| passwd p=\<curr> n=\<new> c=\<confirm> | p, n, c (space) | Change own password. Three-phase interactive when omitted (`current:` / `new:` / `confirm:`), all echo-suppressed. e.g. **passwd p=oldpw n=newpw c=newpw** |
-| useradd u=\<user> p=\<pass> | u, p (space) | **Root-only.** Create a new user. UID auto-assigned to next free slot ≥1; home=`/`, shell=`cmd`. Writes both `/etc/passwd` and `/etc/shadow` (rolls back on shadow failure). e.g. **useradd u=alice p=alice123** |
+| su u=\<user> p=\<pass> | u, p (space-separated) | Switch user in the current session. Prompts interactively when args omitted. On success sets session identity + caches uid/gid + jumps to target's home dir. Password verification enters a privileged VFS scope to read `/etc/shadow` (0600). e.g. **su u=alice p=alice123** |
+| passwd p=\<curr> n=\<new> c=\<confirm> | p, n, c (space) | Change own password. Three-phase interactive when omitted (`current:` / `new:` / `confirm:`), all echo-suppressed. Enters a privileged VFS scope for the `/etc/shadow` update. e.g. **passwd p=oldpw n=newpw c=newpw** |
+| useradd u=\<user> p=\<pass> | u, p (space) | **Root-only.** Create a new user. UID auto-assigned to next free slot ≥1; `gid = uid`; home=`/`, shell=`cmd`. Writes both `/etc/passwd` and `/etc/shadow` (rolls back on shadow failure). e.g. **useradd u=alice p=alice123** |
 | userdel u=\<user> | u (space) | **Root-only.** Delete a user from `/etc/passwd` + `/etc/shadow`. Refuses self-delete and uid=0 (root). e.g. **userdel u=alice** |
 | gpio p=\<pin>,m=\<mode>,v=\<value> | p=\<pin> m=\<mode> v=\<value> | Perform GPIO operations. Modes: OFF=0, DIGITAL_WRITE=1, DIGITAL_READ=2, DIGITAL_BLINK=3, ANALOG_WRITE=4, ANALOG_READ=5. e.g. blink GPIO 4 at 500 ms: **gpio p=4,m=3,v=500** |
 | srvc list \| status \<name> \| start \<name> \| stop \<name> \| restart \<name> | positional, space-separated | Service supervisor (systemd-lite). `list` prints every service with state; `status <name>` shows tracked PIDs; `start`/`stop`/`restart` deliver `SIG_CONT`/`SIG_STOP` (both) to every task the service owns. Root required for start/stop/restart. e.g. **srvc list**, **srvc stop GPIO** |
-| ps | u=\<sid> | List active scheduler tasks POSIX-style with owner, state, %CPU, runs, interval, name. Filter by owner session id. e.g. **ps** or **ps u=1** |
+| ps [\<sid>] | | List active scheduler tasks POSIX-style with owner, state, %CPU, runs, interval, name. Optional positional filter by owner session id. e.g. **ps** or **ps 1** |
 | top | i=\<ms>; n=\<iters>; u=\<sid> | Same view as `ps`, refreshed on a scheduler task at `i` ms (default 2000, min 500). `n` bounds iterations (omit for forever). Stop with Ctrl+C. e.g. **top i=1500; n=10** |
-| kill p=\<pid> [s=\<sig>] | p, s (space) | Deliver a signal to a scheduler task. Default `s=15` (SIG_TERM). Accepted: 9 KILL / 15 TERM / 18 CONT / 19 STOP. Root can hit any task; other users only tasks they own. e.g. **kill p=8** or **kill p=8 s=9** |
-| pkill n=\<name> [s=\<sig>] | n, s (space) | Same as `kill` but matches by task name; hits every task with that name. Default TERM. Prints `signaled N task(s)`. e.g. **pkill n=MQTT s=19** |
-| killall n=\<name> [s=\<sig>] | n, s (space) | Like `pkill` but default signal is `SIG_KILL` (impolite). e.g. **killall n=GPIO** |
-| renice n=\<nice> p=\<pid> | n (signed, -20..19), p (pid) | Change POSIX nice on a live task. Auto-triggers scheduler resort. Same owner/root gate as `kill`. e.g. **renice n=-5 p=10** |
+| kill [\<sig>] \<pid> | | Deliver a signal to a scheduler task. 1 arg = pid (default TERM). 2 args = sig then pid. Accepted signals: 9 KILL / 15 TERM / 18 CONT / 19 STOP. Root can hit any task; other users only tasks they own. e.g. **kill 8** or **kill 9 8** |
+| pkill [\<sig>] \<name> | | Same as `kill` but matches by task name; hits every task with that name. 1 arg = name (default TERM). 2 args = sig then name. Prints `signaled N task(s)`. e.g. **pkill MQTT** or **pkill 19 MQTT** |
+| killall [\<sig>] \<name> | | Like `pkill` but default signal is `SIG_KILL` (impolite). e.g. **killall GPIO** |
+| renice \<nice> \<pid> | nice signed -20..19 | Change POSIX nice on a live task. Auto-triggers scheduler resort. Same owner/root gate as `kill`. e.g. **renice -5 10** |
 | ssh q=\<query>,t=\<algo> | q=\<query> t=\<algo> | SSH command. q=1 (SSH_COMMAND_QUERY_KEYGEN) creates keypair of given algo. e.g. **ssh q=1,t=2** |
 | net \<options> | ip, scansta, connsta | Query network params. **ip** shows STA/AP info; **scansta** lists nearby SSIDs; **connsta** joins one. e.g. **net connsta,\<ssid>,\<password>** |
 | reboot | | Reboot the device. e.g. **reboot** |
@@ -1576,11 +1610,13 @@ Names come from [CommandCommon.h](src/service_provider/cmd/commands/CommandCommo
 | uptime | | Time since boot as `up Xd Yh Zm Ws`. Wraps at ~49.7 days. e.g. **uptime** |
 | tls q=\<query>,t=\<algo>,l=\<bits>,n=\<CN/DNS>,i=\<IPv4> | q (1=CERTGEN), t (0=EC, 1=RSA), l (key bits / curve size), n (CN or DNS SAN), i (IPv4 SAN) | On-device TLS cert generation. esp32 builds with `ENABLE_TLS_CERT_GENERATION` only. Output at `TLS_DEFAULT_SERVER_CERT_PATH` / `TLS_DEFAULT_SERVER_KEY_PATH`. e.g. **tls q=1,t=0,l=256,n=device.local,i=192.168.1.50** |
 
-Each command's implementation lives in [src/service_provider/cmd/commands/](src/service_provider/cmd/commands/) — one `<Name>Command.h` per verb, with names registered in [CommandCommon.h](src/service_provider/cmd/commands/CommandCommon.h). The newer file-system commands (`head`, `tail`, `wc`, `grep`, `hexdump`) use the **positional-arg** style (`setAcceptArgsOptions(true)` + space separator) instead of the `key=value` form — closer to the shell idiom users expect.
+Each command's implementation lives in [src/service_provider/cmd/commands/](src/service_provider/cmd/commands/) — one `<Name>Command.h` per verb, with names registered in [CommandCommon.h](src/service_provider/cmd/commands/CommandCommon.h).
+
+**Positional vs named options.** Commands with ≤2 required args use the **positional** style (`setAcceptArgsOptions(true)` + space separator, args at `m_options[0]`/`[1]`) — matches POSIX and reduces typing: `chmod 0644 /etc/passwd`, `renice -5 10`, `kill 9 12`. Commands with an optional leading arg (`kill [<sig>] <pid>`, `pkill`, `killall`) dispatch on **arg count** — 1 arg = target, 2 args = sig then target — no numeric-vs-name ambiguity. Named options (`x=y`) are retained for commands with many optional slots, sensitive input (`login`/`su`/`passwd`/`useradd`/`userdel`), or optional-in-the-middle patterns (`top i=… n=… u=…`).
 
 ### 7.8 Multi-terminal session lifecycle
 
-Up to `PDI_MAX_SESSIONS` (default 3) sessions can run concurrently — one each across serial, telnet, and ssh — with fully independent state. There is one `CommandLineServiceProvider` singleton dispatcher, and one `SessionManager::m_sessions[PDI_MAX_SESSIONS]` slot array; each slot holds its own `linebuf`, `cursor`, `history/autocomplete` cursors, `cwd`, `isAuthorized`, `username`, `loginAt`, `lastActivityAt` (see [§6.2.18](#6218-sessionmanager)).
+Up to `PDI_MAX_SESSIONS` (default 3) sessions can run concurrently — one each across serial, telnet, and ssh — with fully independent state. There is one `CommandLineServiceProvider` singleton dispatcher, and one `SessionManager::m_sessions[PDI_MAX_SESSIONS]` slot array; each slot holds its own `linebuf`, `cursor`, `history/autocomplete` cursors, `cwd`, `isAuthorized`, `username`, `uid`, `gid`, `umask`, `loginAt`, `lastActivityAt` (see [§6.2.18](#6218-sessionmanager)). The uid/gid/umask trio is populated at login (`AuthServiceProvider::setAuthorized(true)`) so every downstream FS check is a single dereference — no per-op `/etc/passwd` scan.
 
 ```
 boot
@@ -1986,7 +2022,7 @@ Required filesystem layout (defaults from [TlsConfig.h](src/config/TlsConfig.h) 
 | `TLS_DEFAULT_SERVER_KEY_PATH` | `/etc/http/server.key` | HTTPS server private key (PEM; EC or RSA) |
 | `TLS_DEFAULT_CLIENT_CA_PATH` | `/etc/http/client-ca.crt` | CA bundle for mTLS client-cert verification (only if `ENABLE_HTTPS_SERVER_MTLS`) |
 
-Upload these via SFTP ([§6.2.14](#6-service-providers)) after first boot, then `reboot` — the HTTPS listener picks them up on the next `initService` pass. The storage service creates `/etc/http/` lazily; you don't need to `mkd` it ahead of time.
+Upload these via SFTP ([§6.2.14](#6-service-providers)) after first boot, then `reboot` — the HTTPS listener picks them up on the next `initService` pass. The storage service creates `/etc/http/` lazily; you don't need to `mkdir` it ahead of time.
 
 HTTPS-specific response headers worth knowing:
 
@@ -3619,7 +3655,7 @@ The best signal-to-noise loop on an unknown problem:
 3. **Print a service's status.** `srvc status <name>` — state, tracked PIDs, ready to correlate against `ps`.
 4. **List active tasks.** `ps` — column `%CPU` is your CPU-hog detector; the `OWN` column ties tasks back to their owning session or kernel.
 5. **Watch tasks over time.** `top i=2000; n=10` (built-in refresh), or `watch c=ps; i=2000; n=10` for a scroll-preserving variant.
-6. **Poke lifecycle live.** `srvc stop <name>` freezes the service (SIG_STOP its tasks), `srvc start <name>` resumes; `kill p=<pid> s=19` / `s=18` do the same at task granularity. Watch `ST` in `ps` flip `S`→`T`→`S`.
+6. **Poke lifecycle live.** `srvc stop <name>` freezes the service (SIG_STOP its tasks), `srvc start <name>` resumes; `kill 19 <pid>` / `kill 18 <pid>` do the same at task granularity. Watch `ST` in `ps` flip `S`→`T`→`S`.
 7. **Check NVM integrity.** `srvc status DB` reports DB validity; outside that, an `AUTO_FACTORY_RESET_ON_INVALID_CONFIGS` build will reset every 5 s if NVM is bad.
 8. **Reboot.** `reboot` — the explicit version, since pulling power loses serial output.
 

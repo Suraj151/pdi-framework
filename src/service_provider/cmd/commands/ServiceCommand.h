@@ -180,24 +180,11 @@ private:
 	static constexpr uint8_t COL_STATE   = 10;
 	static constexpr uint8_t COL_TASKS   = 6;
 
-	/// Emit an RO/PROGMEM string then space-pad to `width`. If the string is
-	/// longer than width, one trailing space is still written so the next
-	/// column starts unambiguously.
-	void writePaddedRo(const char *ro_str, uint8_t width){
-		m_terminal->write_ro(ro_str);
-		uint8_t used = (uint8_t)strlen_ro(ro_str);
-		if (used >= width) {
-			m_terminal->write_ro(RODT_ATTR(" "));
-			return;
-		}
-		for (uint8_t i = used; i < width; i++) m_terminal->write_ro(RODT_ATTR(" "));
-	}
-
 	void printList(){
 		m_terminal->writeln();
-		writePaddedRo(RODT_ATTR("SERVICE"), COL_SERVICE);
-		writePaddedRo(RODT_ATTR("STATE"),   COL_STATE);
-		writePaddedRo(RODT_ATTR("TASKS"),   COL_TASKS);
+		m_terminal->write_pad_ro(RODT_ATTR("SERVICE"), 7, COL_SERVICE);
+		m_terminal->write_pad_ro(RODT_ATTR("STATE"),   5, COL_STATE);
+		m_terminal->write_pad_ro(RODT_ATTR("TASKS"),   5, COL_TASKS);
 		m_terminal->writeln_ro(RODT_ATTR("R/S/Z"));
 
 		char buf[16];
@@ -206,8 +193,10 @@ private:
 			if( nullptr == s ) continue;
 			uint16_t running, stopped, zombie;
 			s->countServiceTasks(running, stopped, zombie);
-			writePaddedRo(s->m_service_name != nullptr ? s->m_service_name : RODT_ATTR("-"), COL_SERVICE);
-			writePaddedRo(stateLabel(running, stopped, zombie), COL_STATE);
+			const char *svc_name = (s->m_service_name != nullptr) ? s->m_service_name : RODT_ATTR("-");
+			m_terminal->write_pad_ro(svc_name, (uint32_t)strlen_ro(svc_name), COL_SERVICE);
+			const char *state = stateLabel(running, stopped, zombie);
+			m_terminal->write_pad_ro(state, (uint32_t)strlen_ro(state), COL_STATE);
 			Int32ToString((int32_t)s->getServiceTaskCount(), buf, 16, COL_TASKS);
 			m_terminal->write(buf);
 			Int32ToString((int32_t)running, buf, 16, 0); m_terminal->write(buf);

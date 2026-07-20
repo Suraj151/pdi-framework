@@ -339,10 +339,22 @@ int LittleFSWrapper::removeFileAttr(const char *path, uint8_t type){
     return lfs_removeattr(&m_lfs, path, type);
 }
 
+int LittleFSWrapper::setFileOwner(const char *path, uint16_t uid, uint16_t gid){
+    int r1 = lfs_setattr(&m_lfs, path, FILE_ATTR_UID, &uid, sizeof(uid));
+    int r2 = lfs_setattr(&m_lfs, path, FILE_ATTR_GID, &gid, sizeof(gid));
+    return (r1 < 0) ? r1 : r2;
+}
+
 void LittleFSWrapper::stampCreate(const char *path, bool isDir){
     // Perms are independent of the clock, so always write them on fresh entries.
     uint16_t perms = isDir ? (uint16_t)FILE_PERM_DEFAULT_DIR : (uint16_t)FILE_PERM_DEFAULT_FILE;
+    perms &= ~currentUmask() & 0777;
     lfs_setattr(&m_lfs, path, FILE_ATTR_PERMS, &perms, sizeof(perms));
+
+    uint16_t uid = 0, gid = 0;
+    currentOwner(uid, gid);
+    lfs_setattr(&m_lfs, path, FILE_ATTR_UID, &uid, sizeof(uid));
+    lfs_setattr(&m_lfs, path, FILE_ATTR_GID, &gid, sizeof(gid));
 
     // Skip time attrs when the time source is not yet valid so we do not
     // record a misleading 0 sentinel; the next mutation with a valid clock
@@ -960,12 +972,14 @@ int LittleFSWrapper::getDirFileList(const char *path, pdiutil::vector<file_info_
         }
 
         file_info_t entry;
-        entry.type = (info.type == LFS_TYPE_DIR) ? FILE_TYPE_DIR : FILE_TYPE_REG;
-        entry.size = info.size;
-        entry.name = name;
-        entry.ctime = 0;
-        entry.mtime = 0;
-        entry.perms = (info.type == LFS_TYPE_DIR) ? (uint16_t)FILE_PERM_DEFAULT_DIR : (uint16_t)FILE_PERM_DEFAULT_FILE;
+        entry.m_type = (info.type == LFS_TYPE_DIR) ? FILE_TYPE_DIR : FILE_TYPE_REG;
+        entry.m_size = info.size;
+        entry.m_name = name;
+        entry.m_ctime = 0;
+        entry.m_mtime = 0;
+        entry.m_perms = (info.type == LFS_TYPE_DIR) ? (uint16_t)FILE_PERM_DEFAULT_DIR : (uint16_t)FILE_PERM_DEFAULT_FILE;
+        entry.m_uid = 0;
+        entry.m_gid = 0;
 
         // Skip attr lookup for "." and ".." (they are not real distinct entries).
         if (strcmp(info.name, ".") != 0 && strcmp(info.name, "..") != 0) {
@@ -977,9 +991,11 @@ int LittleFSWrapper::getDirFileList(const char *path, pdiutil::vector<file_info_
                 if (needsep) { childpath[off++] = '/'; }
                 memcpy(childpath + off, info.name, namelen);
                 childpath[off + namelen] = '\0';
-                lfs_getattr(&m_lfs, childpath, FILE_ATTR_CTIME, &entry.ctime, sizeof(entry.ctime));
-                lfs_getattr(&m_lfs, childpath, FILE_ATTR_MTIME, &entry.mtime, sizeof(entry.mtime));
-                lfs_getattr(&m_lfs, childpath, FILE_ATTR_PERMS, &entry.perms, sizeof(entry.perms));
+                lfs_getattr(&m_lfs, childpath, FILE_ATTR_CTIME, &entry.m_ctime, sizeof(entry.m_ctime));
+                lfs_getattr(&m_lfs, childpath, FILE_ATTR_MTIME, &entry.m_mtime, sizeof(entry.m_mtime));
+                lfs_getattr(&m_lfs, childpath, FILE_ATTR_PERMS, &entry.m_perms, sizeof(entry.m_perms));
+                lfs_getattr(&m_lfs, childpath, FILE_ATTR_UID,   &entry.m_uid,   sizeof(entry.m_uid));
+                lfs_getattr(&m_lfs, childpath, FILE_ATTR_GID,   &entry.m_gid,   sizeof(entry.m_gid));
             }
         }
 

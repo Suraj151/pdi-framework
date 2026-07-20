@@ -144,7 +144,7 @@ public:
     /**
      * @brief Get metadata (type, size, ctime, mtime, perms) for a single path.
      * @param path The path of the file or directory.
-     * @param out file_info_t populated on success; `name` is left untouched.
+     * @param out file_info_t populated on success; `m_name` is left untouched.
      * @return 0 on success, or a negative error code on failure.
      */
     virtual int getFileMeta(const char *path, file_info_t &out) override;
@@ -157,6 +157,14 @@ public:
      */
     virtual int setFilePermissions(const char *path, uint16_t perms) override;
 
+    /**
+     * @brief POSIX touch: create the file empty (default perms) if it does not
+     *        exist; otherwise bump its mtime to the current epoch.
+     * @param path The path of the file.
+     * @return 0 on success, or a negative error code on failure.
+     */
+    int touch(const char *path) override;
+
 protected:
 
     /**
@@ -165,6 +173,19 @@ protected:
      *        LittleFSWrapper's stamp helpers.
      */
     uint32_t nowEpoch() override;
+
+    /**
+     * @brief Returns the current session's cached uid/gid so stampCreate can
+     *        record who owns a freshly created entry. Defaults to root (0/0)
+     *        when there is no active session (e.g. during boot).
+     */
+    void currentOwner(uint16_t &uid, uint16_t &gid) override;
+
+    /**
+     * @brief Returns the current session's cached umask. Defaults to
+     *        FILE_UMASK_DEFAULT when there is no active session.
+     */
+    uint16_t currentUmask() override;
     pdiutil::string m_pwd; ///< Present working directory.
     pdiutil::string m_lastpwd; ///< Last Present working directory.
     pdiutil::string m_root; ///< Root directory of the file system.

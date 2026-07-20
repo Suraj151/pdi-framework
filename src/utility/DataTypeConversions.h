@@ -65,6 +65,15 @@ uint16_t StringToUint16(const char *pString, uint8_t _len = 32);
 uint8_t StringToUint8(const char *pString, uint8_t _len = 32);
 
 /**
+ * @brief Converts an octal string (leading '0' optional) to a 16-bit value.
+ *        Digits outside 0-7 terminate parsing.
+ * @param pString The string to convert.
+ * @param _len The maximum length of the string.
+ * @return The parsed 16-bit octal value.
+ */
+uint16_t StringToOctalUint16(const char *pString, uint8_t _len);
+
+/**
  * @brief Converts a string to a hexadecimal 16-bit integer.
  * @param pString The string to convert.
  * @param _strlen The length of the string.

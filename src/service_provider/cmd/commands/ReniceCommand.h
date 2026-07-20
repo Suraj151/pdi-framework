@@ -20,7 +20,7 @@ created Date    : 19th July 2026
 /**
  * renice — change the nice value of a live scheduler task.
  *
- *   renice n=<nice> p=<pid>
+ *   renice <nice> <pid>
  *
  *   nice range: -20..19 (POSIX). Lower = higher priority. Clamped by the
  *   scheduler if out of range.
@@ -38,8 +38,7 @@ struct ReniceCommand : public CommandBase {
 	ReniceCommand(){
 		Clear();
 		SetCommand(CMD_NAME_RENICE);
-		AddOption(CMD_OPTION_NAME_N);
-		AddOption(CMD_OPTION_NAME_P);
+		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
 
@@ -50,7 +49,7 @@ struct ReniceCommand : public CommandBase {
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("renice n=<-20..19> p=<pid>  change a live task's POSIX nice");
+		return RODT_ATTR("renice <-20..19> <pid>  change a live task's POSIX nice");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -69,8 +68,8 @@ struct ReniceCommand : public CommandBase {
 			return CMD_RESULT_FAILED;
 		}
 
-		CommandOption *nOpt = RetrieveOption(CMD_OPTION_NAME_N);
-		CommandOption *pOpt = RetrieveOption(CMD_OPTION_NAME_P);
+		CommandOption *nOpt = &m_options[0];
+		CommandOption *pOpt = &m_options[1];
 
 		if( nullptr == nOpt || nullptr == nOpt->optionval || 0 == nOpt->optionvalsize ||
 		    nullptr == pOpt || nullptr == pOpt->optionval || 0 == pOpt->optionvalsize ){

@@ -15,6 +15,9 @@ created Date    : 28th May 2026
 
 #ifdef ENABLE_STORAGE_SERVICE
 
+/**
+ * df command — one line per mounted VFS backend with total/used/free bytes.
+ */
 struct DfFSCommand : public CommandBase {
 
 	DfFSCommand(){
@@ -29,7 +32,7 @@ struct DfFSCommand : public CommandBase {
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("df  print filesystem total/used(%)/free bytes");
+		return RODT_ATTR("df  list mounted filesystems with total/used/free bytes");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -44,29 +47,39 @@ struct DfFSCommand : public CommandBase {
 		}
 #endif
 
-		if(nullptr != m_terminal){
+		if( nullptr == m_terminal ){
+			return CMD_RESULT_FAILED;
+		}
 
-			uint64_t total = __i_fs.getTotalSize();
-			uint64_t used = __i_fs.getUsedSize();
-			uint64_t free = __i_fs.getFreeSize();
-			uint64_t usedpct = (total > 0) ? ((used * 100) / total) : 0;
+		m_terminal->writeln();
+		m_terminal->write_pad_ro(RODT_ATTR("MOUNT"), 5, MOUNT_W);
+		m_terminal->write_pad_ro(RODT_ATTR("NAME"),  4, NAME_W);
+		m_terminal->write_pad_ro(RODT_ATTR("TOTAL"), 5, NUM_W);
+		m_terminal->write_pad_ro(RODT_ATTR("USED"),  4, NUM_W);
+		m_terminal->writeln_ro(RODT_ATTR("FREE"));
 
+		char buf[24];
+		for( uint8_t i = 0; i < __i_fs.getMountCount(); i++ ){
+			const vfs_mount_t *m = __i_fs.getMount(i);
+			if( nullptr == m || nullptr == m->m_backend ) continue;
+			m_terminal->write_pad(m->m_prefix, MOUNT_W);
+			m_terminal->write_pad(m->m_name,   NAME_W);
+			Int64ToString((int64_t)m->m_backend->getTotalSize(), buf, sizeof(buf), 0);
+			m_terminal->write_pad(buf, NUM_W);
+			Int64ToString((int64_t)m->m_backend->getUsedSize(),  buf, sizeof(buf), 0);
+			m_terminal->write_pad(buf, NUM_W);
+			m_terminal->write((int64_t)m->m_backend->getFreeSize());
 			m_terminal->putln();
-			m_terminal->write_ro(RODT_ATTR("Total : "));
-			m_terminal->write((int64_t)total);
-			m_terminal->putln();
-			m_terminal->write_ro(RODT_ATTR("Used  : "));
-			m_terminal->write((int64_t)used);
-			m_terminal->write_ro(RODT_ATTR(" ("));
-			m_terminal->write((int64_t)usedpct);
-			m_terminal->write_ro(RODT_ATTR("%)"));
-			m_terminal->putln();
-			m_terminal->write_ro(RODT_ATTR("Free  : "));
-			m_terminal->write((int64_t)free);
 		}
 
 		return CMD_RESULT_OK;
 	}
+
+private:
+
+	static constexpr uint8_t MOUNT_W = 10;
+	static constexpr uint8_t NAME_W  = 10;
+	static constexpr uint8_t NUM_W   = 12;
 };
 
 #endif

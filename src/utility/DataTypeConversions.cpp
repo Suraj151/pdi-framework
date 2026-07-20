@@ -80,6 +80,23 @@ uint64_t StringToUint64(const char *pString, uint8_t _len)
  * @param _len The maximum length of the string to parse (default is 32).
  * @return The converted unsigned 32-bit integer.
  */
+uint16_t StringToOctalUint16(const char *pString, uint8_t _len)
+{
+    if (nullptr == pString) return 0;
+
+    uint16_t value = 0;
+    uint8_t n = 0;
+
+    while ((*pString == ' ' || *pString == '"') && n < _len) { pString++; n++; }
+
+    while (n < _len && *pString >= '0' && *pString <= '7') {
+        value = (uint16_t)((value << 3) | (uint16_t)(*pString - '0'));
+        pString++;
+        n++;
+    }
+    return value;
+}
+
 uint32_t StringToUint32(const char *pString, uint8_t _len)
 {
     if (nullptr == pString)

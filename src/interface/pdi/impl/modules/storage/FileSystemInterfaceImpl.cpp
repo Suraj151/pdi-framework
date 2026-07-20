@@ -18,6 +18,7 @@ Created Date    : 6th Apr 2025
 #include "../../../../../../external/LittleFSWrapper.cpp"
 #include <helpers/StorageHelper.h>
 #include <interface/pdi/middlewares/iNtpInterface.h>
+#include <service_provider/session/SessionManager.h>
 
 
 /**
@@ -314,24 +315,55 @@ uint32_t FileSystemInterfaceImpl::nowEpoch(){
     return (uint32_t)__i_ntp.get_ntp_time();
 }
 
+void FileSystemInterfaceImpl::currentOwner(uint16_t &uid, uint16_t &gid){
+#ifdef ENABLE_AUTH_SERVICE
+    session_t *s = SessionManager::current();
+    if( nullptr != s ){
+        uid = s->m_uid;
+        gid = s->m_gid;
+        return;
+    }
+#endif
+    uid = 0;
+    gid = 0;
+}
+
+uint16_t FileSystemInterfaceImpl::currentUmask(){
+    session_t *s = SessionManager::current();
+    return (nullptr != s) ? s->m_umask : (uint16_t)FILE_UMASK_DEFAULT;
+}
+
 int FileSystemInterfaceImpl::getFileMeta(const char *path, file_info_t &out){
     if( !isFileExist(path) && !isDirExist(path) ){
         return -1;
     }
     bool isDir = isDirectory(path);
-    out.type = isDir ? FILE_TYPE_DIR : FILE_TYPE_REG;
-    out.size = isDir ? 0 : (uint64_t)getFileSize(path);
-    out.ctime = 0;
-    out.mtime = 0;
-    out.perms = isDir ? (uint16_t)FILE_PERM_DEFAULT_DIR : (uint16_t)FILE_PERM_DEFAULT_FILE;
-    getFileAttr(path, FILE_ATTR_CTIME, &out.ctime, sizeof(out.ctime));
-    getFileAttr(path, FILE_ATTR_MTIME, &out.mtime, sizeof(out.mtime));
-    getFileAttr(path, FILE_ATTR_PERMS, &out.perms, sizeof(out.perms));
+    out.m_type = isDir ? FILE_TYPE_DIR : FILE_TYPE_REG;
+    out.m_size = isDir ? 0 : (uint64_t)getFileSize(path);
+    out.m_ctime = 0;
+    out.m_mtime = 0;
+    out.m_perms = isDir ? (uint16_t)FILE_PERM_DEFAULT_DIR : (uint16_t)FILE_PERM_DEFAULT_FILE;
+    out.m_uid = 0;
+    out.m_gid = 0;
+    getFileAttr(path, FILE_ATTR_CTIME, &out.m_ctime, sizeof(out.m_ctime));
+    getFileAttr(path, FILE_ATTR_MTIME, &out.m_mtime, sizeof(out.m_mtime));
+    getFileAttr(path, FILE_ATTR_PERMS, &out.m_perms, sizeof(out.m_perms));
+    getFileAttr(path, FILE_ATTR_UID,   &out.m_uid,   sizeof(out.m_uid));
+    getFileAttr(path, FILE_ATTR_GID,   &out.m_gid,   sizeof(out.m_gid));
     return 0;
 }
 
 int FileSystemInterfaceImpl::setFilePermissions(const char *path, uint16_t perms){
     return setFileAttr(path, FILE_ATTR_PERMS, &perms, sizeof(perms));
+}
+
+int FileSystemInterfaceImpl::touch(const char *path){
+    if( !isFileExist(path) ){
+        return createFile(path, "");
+    }
+    uint32_t now = nowEpoch();
+    if( now == 0 ) return 0;
+    return setFileAttr(path, FILE_ATTR_MTIME, &now, sizeof(now));
 }
 
 #endif

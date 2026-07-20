@@ -34,6 +34,13 @@ public:
   static pdiutil::string getLastPWD();
   static bool setPWD(const char *path);
   static bool changeDirectory(const char *path);
+  static uint16_t getCurrentUmask();
+  static void setCurrentUmask(uint16_t umask);
+#endif
+
+#ifdef ENABLE_AUTH_SERVICE
+  static uint16_t getCurrentUid();
+  static uint16_t getCurrentGid();
 #endif
 
 private:

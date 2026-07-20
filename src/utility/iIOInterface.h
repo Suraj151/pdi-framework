@@ -279,6 +279,29 @@ public:
    */
   virtual int32_t writeln_ro(const char *c_str) { return (write_ro(c_str) + putln()); }
 
+  /**
+   * @brief Writes a specified number of characters from read only region.
+   * @param c_str Pointer to the ro character string.
+   * @param len length of the ro character string.
+   * @param maxsize The maximum number of characters to write.
+   * @param prepad If true, pads before the string; otherwise, pads after.
+   * @param pad The character to use for padding (default is space).
+   * @return Number of bytes written.
+   */
+  virtual int32_t write_pad_ro(const char *c_str, uint32_t len, uint32_t maxsize, bool prepad=false, char pad=' ') {
+    if (len < maxsize) {
+      for (uint32_t i = 0; prepad && (i < maxsize - len); i++) {
+        write((uint8_t)pad);
+      }
+      write_ro(c_str);
+      for (uint32_t i = 0; !prepad && (i < maxsize - len); i++) {
+        write((uint8_t)pad);
+      }
+      return maxsize;
+    }
+    return write_ro(c_str);
+  }
+
   // Data receiving APIs
 
   /**

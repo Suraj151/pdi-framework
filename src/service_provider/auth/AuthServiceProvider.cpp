@@ -90,10 +90,26 @@ void AuthServiceProvider::setAuthorized(bool auth)
     }
     s->m_loginAt = (uint32_t)__i_dvc_ctrl.millis_now();
     s->m_lastActivityAt = s->m_loginAt;
+
+    s->m_uid = 0;
+    s->m_gid = 0;
+#ifdef ENABLE_STORAGE_SERVICE
+    user_record_t rec;
+    if( __user_store_service.findUserByName(s->m_username.c_str(), rec) ){
+      s->m_uid = rec.m_uid;
+      s->m_gid = rec.m_gid;
+    }
+    s->m_umask = FILE_UMASK_DEFAULT;
+#endif
   }else{
     s->m_username.clear();
     s->m_loginAt = 0;
     s->m_lastActivityAt = 0;
+    s->m_uid = 0;
+    s->m_gid = 0;
+#ifdef ENABLE_STORAGE_SERVICE
+    s->m_umask = FILE_UMASK_DEFAULT;
+#endif
     m_lastVerifiedUsername.clear();
   }
 }

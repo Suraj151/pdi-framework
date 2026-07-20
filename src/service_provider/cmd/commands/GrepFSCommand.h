@@ -84,18 +84,18 @@ struct GrepFSCommand : public CommandBase {
 
 		if(rc >= 0){
 			for(file_info_t &item : items){
-				if(nullptr == item.name) continue;
+				if(nullptr == item.m_name) continue;
 
-				int namelen = (int)strlen(item.name);
+				int namelen = (int)strlen(item.m_name);
 				char *childpath = new char[dirpath_len + namelen + 2]();
 
 				if(nullptr != childpath){
 					memcpy(childpath, dirpath, dirpath_len);
 					__i_fs.appendFileSeparator(childpath);
-					strncat(childpath, item.name, namelen);
+					strncat(childpath, item.m_name, namelen);
 					int childpath_len = (int)strlen(childpath);
 
-					if(item.type == FILE_TYPE_DIR){
+					if(item.m_type == FILE_TYPE_DIR){
 						grepDir(childpath, childpath_len, pattern);
 					}else{
 						grepFile(childpath, childpath_len, pattern);
@@ -107,7 +107,7 @@ struct GrepFSCommand : public CommandBase {
 		}
 
 		for(file_info_t &item : items){
-			if(item.name) delete[] item.name;
+			if(item.m_name) delete[] item.m_name;
 		}
 		items.clear();
 	}

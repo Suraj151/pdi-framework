@@ -16,6 +16,7 @@ Created Date    : 6th Apr 2025
 
 #include "arduinouno.h"
 #include <interface/pdi/impl/modules/storage/FileSystemInterfaceImpl.h>
+#include <interface/pdi/impl/modules/storage/VfsDispatcher.h>
 
 /**
  * @class FileSystemInterface
@@ -58,5 +59,7 @@ public:
     //     return initLFSConfig();
     // }
 };
+
+extern FileSystemInterface __i_rootfs;
 
 #endif // _FILESYSTEM_INTERFACE_H

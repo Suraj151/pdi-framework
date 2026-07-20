@@ -21,9 +21,9 @@ created Date    : 19th July 2026
  * kill command — deliver a signal to a scheduler task (PID = scheduler task id).
  *
  * e.g.
- *   kill p=5        deliver SIG_TERM (15) — polite reap
- *   kill p=5 s=9    deliver SIG_KILL — uncatchable reap
- *   kill p=5 s=15   explicit SIG_TERM
+ *   kill 5           deliver SIG_TERM (15) — polite reap
+ *   kill 9 5         deliver SIG_KILL — uncatchable reap
+ *   kill 15 5        explicit SIG_TERM
  *
  * Permission:
  *   - root (uid=0) may kill any task
@@ -35,8 +35,7 @@ struct KillCommand : public CommandBase {
 	KillCommand(){
 		Clear();
 		SetCommand(CMD_NAME_KILL);
-		AddOption(CMD_OPTION_NAME_P);
-		AddOption(CMD_OPTION_NAME_S);
+		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
 
@@ -47,7 +46,7 @@ struct KillCommand : public CommandBase {
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("kill p=<pid> [s=<sig>]  signal a scheduler task (9/15/18/19)");
+		return RODT_ATTR("kill [<sig>] <pid>  signal a scheduler task (9[KILL]/15[TERM]/18[CONT]/19[STOP])");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -66,17 +65,23 @@ struct KillCommand : public CommandBase {
 			return CMD_RESULT_FAILED;
 		}
 
-		CommandOption *pOpt = RetrieveOption(CMD_OPTION_NAME_P);
-		CommandOption *sOpt = RetrieveOption(CMD_OPTION_NAME_S);
+		// Positional: <pid> OR <sig> <pid>. First slot is the signal only when a
+		// second slot is populated too; otherwise it's the pid.
+		CommandOption *a0 = &m_options[0];
+		CommandOption *a1 = &m_options[1];
+		bool have0 = ( nullptr != a0 && nullptr != a0->optionval && a0->optionvalsize > 0 );
+		bool have1 = ( nullptr != a1 && nullptr != a1->optionval && a1->optionvalsize > 0 );
 
-		if( nullptr == pOpt || nullptr == pOpt->optionval || 0 == pOpt->optionvalsize ){
-			// Usage line is printed by CommandBase::ResultToTerminal.
+		if( !have0 ){
 			return CMD_RESULT_ARGS_MISSING;
 		}
 
+		CommandOption *sOpt = have1 ? a0 : nullptr;
+		CommandOption *pOpt = have1 ? a1 : a0;
+
 		pdiutil::task_id_t pid = (pdiutil::task_id_t)StringToUint16(pOpt->optionval, pOpt->optionvalsize);
 		signal_t sig = SIG_TERM;
-		if( nullptr != sOpt && nullptr != sOpt->optionval && sOpt->optionvalsize > 0 ){
+		if( nullptr != sOpt ){
 			sig = (signal_t)StringToUint16(sOpt->optionval, sOpt->optionvalsize);
 		}
 		if( sig != SIG_TERM && sig != SIG_KILL && sig != SIG_STOP && sig != SIG_CONT ){

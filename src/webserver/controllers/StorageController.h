@@ -146,15 +146,15 @@ public:
 			// for (file_info_t item : itemlist) {
 
 			// 	// avoid current directory
-			// 	if( strcmp((const char*)item.name, ".") == 0 || strlen(_page) > (PAGE_HTML_MAX_SIZE - 500) ){
-			// 		delete[] item.name;
+			// 	if( strcmp((const char*)item.m_name, ".") == 0 || strlen(_page) > (PAGE_HTML_MAX_SIZE - 500) ){
+			// 		delete[] item.m_name;
 			// 		continue;
 			// 	}
 
 			// 	// Build link element
 			// 	memset(filenamenav, 0, filenamenavlen);
 			// 	memset(tempbuffer, 0, tempbufferlen);
-			// 	pdiutil::string _path = currentpath + item.name;
+			// 	pdiutil::string _path = currentpath + item.m_name;
 			// 	if( __i_fs.isDirectory(_path.c_str()) ){
 			// 		strcat(tempbuffer, WEB_SERVER_STORAGE_LIST_ROUTE);
 			// 		strcat(tempbuffer, CURRENT_PATH_ATTRIBUTE);
@@ -163,21 +163,21 @@ public:
 			// 	concat_link_element(
 			// 		filenamenav,
 			// 		(const char*)tempbuffer,
-			// 		(const char*)item.name
+			// 		(const char*)item.m_name
 			// 	);
 
 			// 	// Build svg element 
 			// 	memset(tempbuffer, 0, tempbufferlen);
 			// 	concat_svg_tag(
 			// 		tempbuffer, 
-			// 		item.type == FILE_TYPE_DIR ? SVG_ICON48_1416_PATH_FOLDER : SVG_ICON48_1216_PATH_FILE,
+			// 		item.m_type == FILE_TYPE_DIR ? SVG_ICON48_1416_PATH_FOLDER : SVG_ICON48_1216_PATH_FILE,
 			// 		RODT_ATTR("margin-left:0;"),
-			// 		item.type == FILE_TYPE_DIR ? RODT_ATTR("0 0 14 16") : RODT_ATTR("0 0 12 16"),
+			// 		item.m_type == FILE_TYPE_DIR ? RODT_ATTR("0 0 14 16") : RODT_ATTR("0 0 12 16"),
 			// 		24,24
 			// 	);
 
 			// 	// Build table row and append
-			// 	char filesize[16]; memset(filesize, 0, 16); Int64ToString(item.size, filesize, 15);
+			// 	char filesize[16]; memset(filesize, 0, 16); Int64ToString(item.m_size, filesize, 15);
 			// 	char *_storage_table_row_data[] = {
 			// 		tempbuffer, 
 			// 		filenamenav, 
@@ -186,7 +186,7 @@ public:
 			// 	concat_table_data_row(_page, _storage_table_row_data, 3, nullptr, nullptr, nullptr, nullptr);
 
 			// 	// deallocates memory for items
-			// 	delete[] item.name;
+			// 	delete[] item.m_name;
 			// }
 
 			// delete[] tempbuffer;
@@ -385,14 +385,14 @@ public:
 			for (file_info_t item : itemlist) {
 
 				// avoid current directory
-				if( strcmp((const char*)item.name, ".") == 0 ){
-					delete[] item.name;
+				if( strcmp((const char*)item.m_name, ".") == 0 ){
+					delete[] item.m_name;
 					continue;
 				}
 
 				// Build link element
 				memset(tempbuffer, 0, tempbufferlen);
-				pdiutil::string _path = currentpath + item.name;
+				pdiutil::string _path = currentpath + item.m_name;
 				if( __i_fs.isDirectory(_path.c_str()) ){
 					strcat(tempbuffer, WEB_SERVER_STORAGE_LIST_ROUTE);
 					strcat(tempbuffer, CURRENT_PATH_ATTRIBUTE);
@@ -400,17 +400,17 @@ public:
 				strncat(tempbuffer, _path.c_str(), _path.length());
 
 				jsonresp += CHARPTR_WRAP("{\"n\":\"");
-				jsonresp += item.name;
+				jsonresp += item.m_name;
 				jsonresp += CHARPTR_WRAP("\",\"s\":\"");
-				jsonresp += pdiutil::to_string(item.size);
+				jsonresp += pdiutil::to_string(item.m_size);
 				jsonresp += CHARPTR_WRAP("\",\"t\":\"");
-				jsonresp += item.type == FILE_TYPE_DIR ? "D":"F";
+				jsonresp += item.m_type == FILE_TYPE_DIR ? "D":"F";
 				jsonresp += CHARPTR_WRAP("\",\"l\":\"");
 				jsonresp += tempbuffer;
 				jsonresp += CHARPTR_WRAP("\"},");
 
 				// deallocates memory for items
-				delete[] item.name;
+				delete[] item.m_name;
 			}
 
 			jsonresp.pop_back(); // remove last comma

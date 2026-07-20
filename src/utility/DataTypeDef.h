@@ -607,6 +607,8 @@ enum file_attr_id_t : uint8_t {
     FILE_ATTR_CTIME = 1,     ///< uint32_t seconds since Unix epoch (created)
     FILE_ATTR_MTIME = 2,     ///< uint32_t seconds since Unix epoch (modified)
     FILE_ATTR_PERMS = 3,     ///< uint16_t POSIX-style permission bit mask
+    FILE_ATTR_UID   = 4,     ///< uint16_t owning user id
+    FILE_ATTR_GID   = 5,     ///< uint16_t owning group id
     FILE_ATTR_USER_BASE = 16 ///< first attribute id available to user code
 };
 
@@ -614,26 +616,70 @@ enum file_attr_id_t : uint8_t {
 #define FILE_PERM_DEFAULT_FILE  0644
 #define FILE_PERM_DEFAULT_DIR   0755
 
+// Default per-session umask (POSIX-style). Applied at file/dir creation as
+// (default_perms & ~umask).
+#define FILE_UMASK_DEFAULT      0022
+
 struct file_info_t {
     // Type of the file
-    file_type_t type;
+    file_type_t m_type;
 
     // Size of the file, only valid for REG files.
-    uint64_t size;
+    uint64_t m_size;
 
     // Name of the file stored as a null-terminated string. must be limited to
     // FILE_NAME_MAX_SIZE+1,
-    char *name;
+    char *m_name;
 
     // Seconds since Unix epoch when the entry was created. 0 means unknown
     // (time source was unavailable when the entry was made).
-    uint32_t ctime;
+    uint32_t m_ctime;
 
     // Seconds since Unix epoch of the last content modification. 0 means unknown.
-    uint32_t mtime;
+    uint32_t m_mtime;
 
-    // POSIX-style permission bits (advisory only; not enforced by the FS).
-    uint16_t perms;
+    // POSIX-style permission bits.
+    uint16_t m_perms;
+
+    // Owning user id. 0 means root or unstamped (pre-perms-era file).
+    uint16_t m_uid;
+
+    // Owning group id. 0 means root or unstamped.
+    uint16_t m_gid;
+};
+
+class iFileSystemInterface;
+
+#ifndef VFS_MOUNT_PREFIX_MAX
+#define VFS_MOUNT_PREFIX_MAX 15
+#endif
+#ifndef VFS_MOUNT_NAME_MAX
+#define VFS_MOUNT_NAME_MAX 11
+#endif
+
+enum vfs_type_t : uint8_t {
+    VFS_TYPE_UNKNOWN = 0,
+    VFS_TYPE_LITTLEFS,
+    VFS_TYPE_SPIFFS,
+    VFS_TYPE_SD,
+    VFS_TYPE_TMPFS,
+    VFS_TYPE_PROCFS,
+    VFS_TYPE_SYSFS,
+    VFS_TYPE_DEVFS,
+    VFS_TYPE_MAX
+};
+
+struct vfs_mount_t {
+    vfs_mount_t() : m_backend(nullptr), m_type(VFS_TYPE_UNKNOWN), m_prefix_len(0) {
+        m_prefix[0] = '\0';
+        m_name[0] = '\0';
+    }
+
+    char m_prefix[VFS_MOUNT_PREFIX_MAX + 1];
+    char m_name[VFS_MOUNT_NAME_MAX + 1];
+    iFileSystemInterface* m_backend;
+    uint8_t m_prefix_len;
+    vfs_type_t m_type;
 };
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -671,6 +717,10 @@ struct session_t {
                   m_cursor(0),
 #ifdef ENABLE_STORAGE_SERVICE
                   m_historyIdx(-1), m_prevHistorySize(0), m_prevArgSize(0),
+                  m_umask(FILE_UMASK_DEFAULT),
+#endif
+#ifdef ENABLE_AUTH_SERVICE
+                  m_uid(0), m_gid(0),
 #endif
                   m_autoCompleteIdx(-1), m_prevCmdSize(0) {}
 
@@ -689,10 +739,13 @@ struct session_t {
         m_prevArgSize = 0;
         m_cwd.clear();
         m_lastCwd.clear();
+        m_umask = FILE_UMASK_DEFAULT;
 #endif
 #ifdef ENABLE_AUTH_SERVICE
         m_isAuthorized = false;
         m_username.clear();
+        m_uid = 0;
+        m_gid = 0;
 #endif
         m_autoCompleteIdx = -1;
         m_prevCmdSize = 0;
@@ -713,10 +766,13 @@ struct session_t {
     int16_t m_prevArgSize;
     pdiutil::string m_cwd;
     pdiutil::string m_lastCwd;
+    uint16_t m_umask;
 #endif
 #ifdef ENABLE_AUTH_SERVICE
     bool m_isAuthorized;
     pdiutil::string m_username;
+    uint16_t m_uid;
+    uint16_t m_gid;
 #endif
     int16_t m_autoCompleteIdx;
     int16_t m_prevCmdSize;

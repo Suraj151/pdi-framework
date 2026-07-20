@@ -1152,14 +1152,14 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                         } else {
                             // List the directory now and cache the entries; READDIR
                             // will paginate over this cache. The FS allocates each
-                            // item.name via new char[]; we copy into pdiutil::string
+                            // item.m_name via new char[]; we copy into pdiutil::string
                             // and free the raw buffers immediately.
                             pdiutil::vector<file_info_t> itemlist;
                             int rc = __i_fs.getDirFileList(dirpath.c_str(), itemlist);
 
                             if (rc < 0) {
                                 errcode = SSH_FX_FAILURE;
-                                for (file_info_t item : itemlist) { if (item.name) delete[] item.name; }
+                                for (file_info_t item : itemlist) { if (item.m_name) delete[] item.m_name; }
                                 itemlist.clear();
                             } else {
                                 auto &sftp = m_session->current_channel.subsystem_req.sftp;
@@ -1170,11 +1170,11 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
 
                                 for (file_info_t item : itemlist) {
                                     SSHSubsystemRequest::Sftp::Entry e;
-                                    e.name = (item.name ? item.name : "");
-                                    e.size = item.size;
-                                    e.is_dir = (item.type == FILE_TYPE_DIR);
+                                    e.name = (item.m_name ? item.m_name : "");
+                                    e.size = item.m_size;
+                                    e.is_dir = (item.m_type == FILE_TYPE_DIR);
                                     sftp.dir_entries.push_back(e);
-                                    if (item.name) delete[] item.name;
+                                    if (item.m_name) delete[] item.m_name;
                                 }
                                 itemlist.clear();
 

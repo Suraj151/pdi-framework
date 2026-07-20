@@ -18,14 +18,15 @@ created Date    : 19th July 2026
  *
  * e.g.
  *   ps            list all tasks owned by any session (including kernel)
- *   ps u=<sid>    filter by owner session id
+ *   ps <sid>    filter by owner session id
  */
 struct PsCommand : public CommandBase {
 
 	PsCommand(){
 		Clear();
 		SetCommand(CMD_NAME_PS);
-		AddOption(CMD_OPTION_NAME_U);
+		setAcceptArgsOptions(true);
+		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
 
 	static void RegisterCommand(){
@@ -35,7 +36,7 @@ struct PsCommand : public CommandBase {
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("ps [u=<sid>]  list scheduler tasks (POSIX-style; filter by owner sid)");
+		return RODT_ATTR("ps [<sid>]  list scheduler tasks (POSIX-style; filter by owner sid)");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -55,7 +56,7 @@ struct PsCommand : public CommandBase {
 		}
 
 		uint8_t filter_owner = 0xFF;
-		CommandOption *ucmdoptn = RetrieveOption(CMD_OPTION_NAME_U);
+		CommandOption *ucmdoptn = &m_options[0];
 		if( nullptr != ucmdoptn && nullptr != ucmdoptn->optionval && ucmdoptn->optionvalsize > 0 ){
 			filter_owner = (uint8_t)StringToUint16(ucmdoptn->optionval, ucmdoptn->optionvalsize);
 		}

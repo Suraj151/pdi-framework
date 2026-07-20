@@ -32,6 +32,7 @@ created Date    : 1st June 2019
 
 #ifdef ENABLE_STORAGE_SERVICE
 #include "StorageConfig.h"
+#include "VfsConfig.h"
 #endif
 
 #ifdef ENABLE_OTA_SERVICE

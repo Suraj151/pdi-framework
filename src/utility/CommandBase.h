@@ -583,7 +583,12 @@ typedef struct CommandBase {
      * @param res The result of the command execution.
      */
     void ResultToTerminal(cmd_result_t res){
-        if( nullptr != m_terminal && CMD_RESULT_INCOMPLETE != res && CMD_RESULT_OK != res && !isWaitingForOption() ){
+        if( nullptr != m_terminal && 
+            CMD_RESULT_INCOMPLETE != res && 
+            CMD_RESULT_TERMINAL_ABORTED != res && 
+            CMD_RESULT_OK != res && 
+            !isWaitingForOption() 
+        ){
             m_terminal->writeln();
             m_terminal->write_ro(RODT_ATTR("CmdErr : "));
             m_terminal->write((int32_t)res);

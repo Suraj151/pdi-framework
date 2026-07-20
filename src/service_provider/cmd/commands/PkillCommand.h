@@ -22,10 +22,10 @@ created Date    : 19th July 2026
  * matches. Same permission model as `kill` (root can signal any task; other
  * users only tasks they own).
  *
- *   pkill n=<name>        SIG_TERM (default)
- *   pkill n=<name> s=9    SIG_KILL
- *   killall n=<name>      SIG_KILL (default — killall is the impolite one)
- *   killall n=<name> s=15 SIG_TERM
+ *   pkill <name>         SIG_TERM (default)
+ *   pkill 9 <name>       SIG_KILL
+ *   killall <name>       SIG_KILL (default — killall is the impolite one)
+ *   killall 15 <name>    SIG_TERM
  *
  * Prints the number of tasks the signal reached.
  */
@@ -34,8 +34,7 @@ struct PkillCommand : public CommandBase {
 	PkillCommand(){
 		Clear();
 		SetCommand(CMD_NAME_PKILL);
-		AddOption(CMD_OPTION_NAME_N);
-		AddOption(CMD_OPTION_NAME_S);
+		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
 
@@ -46,7 +45,7 @@ struct PkillCommand : public CommandBase {
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("pkill n=<name> [s=<sig>]  signal every task matching name (default TERM)");
+		return RODT_ATTR("pkill [<sig>] <name>  signal every task matching name (default TERM)");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -68,16 +67,23 @@ struct PkillCommand : public CommandBase {
 			return CMD_RESULT_FAILED;
 		}
 
-		CommandOption *nOpt = RetrieveOption(CMD_OPTION_NAME_N);
-		CommandOption *sOpt = RetrieveOption(CMD_OPTION_NAME_S);
+		// Positional: <name> OR <sig> <name>. First slot with content is the
+		// signal only when a second slot is populated too — otherwise it's the
+		// name (default signal applies).
+		CommandOption *a0 = &m_options[0];
+		CommandOption *a1 = &m_options[1];
+		bool have0 = ( nullptr != a0 && nullptr != a0->optionval && a0->optionvalsize > 0 );
+		bool have1 = ( nullptr != a1 && nullptr != a1->optionval && a1->optionvalsize > 0 );
 
-		if( nullptr == nOpt || nullptr == nOpt->optionval || 0 == nOpt->optionvalsize ){
-			// Usage line is printed by CommandBase::ResultToTerminal.
+		if( !have0 ){
 			return CMD_RESULT_ARGS_MISSING;
 		}
 
+		CommandOption *sOpt = have1 ? a0 : nullptr;
+		CommandOption *nOpt = have1 ? a1 : a0;
+
 		signal_t sig = defaultSignal();
-		if( nullptr != sOpt && nullptr != sOpt->optionval && sOpt->optionvalsize > 0 ){
+		if( nullptr != sOpt ){
 			sig = (signal_t)StringToUint16(sOpt->optionval, sOpt->optionvalsize);
 		}
 		if( sig != SIG_TERM && sig != SIG_KILL && sig != SIG_STOP && sig != SIG_CONT ){
@@ -128,8 +134,7 @@ struct KillallCommand : public PkillCommand {
 	KillallCommand(){
 		Clear();
 		SetCommand(CMD_NAME_KILLALL);
-		AddOption(CMD_OPTION_NAME_N);
-		AddOption(CMD_OPTION_NAME_S);
+		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
 
@@ -140,7 +145,7 @@ struct KillallCommand : public PkillCommand {
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("killall n=<name> [s=<sig>]  signal every task matching name (default KILL)");
+		return RODT_ATTR("killall [<sig>] <name>  signal every task matching name (default KILL)");
 	}
 
 	signal_t defaultSignal() const override { return SIG_KILL; }

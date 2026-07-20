@@ -128,6 +128,7 @@ void PDIStack::initialize(){
   #endif
 
   #ifdef ENABLE_STORAGE_SERVICE
+  __i_fs.mount(FILE_SEPARATOR, &__i_rootfs, "rootfs", VFS_TYPE_LITTLEFS);
   __i_fs.init();
   #endif
 

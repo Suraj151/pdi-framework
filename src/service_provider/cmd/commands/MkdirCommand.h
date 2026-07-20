@@ -1,4 +1,4 @@
-/*********************** Make Dir File System Command *************************
+/******************************* Mkdir Command ********************************
 This file is part of the pdi stack.
 
 This is free software. you can redistribute it and/or modify it but without any
@@ -8,50 +8,41 @@ Author          : Suraj I.
 created Date    : 1st June 2019
 ******************************************************************************/
 
-#ifndef _MKD_FILE_SYSTEM_COMMAND_H_
-#define _MKD_FILE_SYSTEM_COMMAND_H_
+#ifndef _MKDIR_COMMAND_H_
+#define _MKDIR_COMMAND_H_
 
 #include "CommandCommon.h"
 
 #ifdef ENABLE_STORAGE_SERVICE
 /**
- * make directory file system command
- * 
- * e.g. if we want to create a new directory, we can execute command as below
- * mkd <directory_name>
+ * mkdir command — create a directory.
+ * e.g. mkdir <dir_name>
  */
-struct MakeDirFSCommand : public CommandBase {
+struct MkdirCommand : public CommandBase {
 
-	/* Constructor */
-	MakeDirFSCommand(){
+	MkdirCommand(){
 		Clear();
-		SetCommand(CMD_NAME_MKD);
+		SetCommand(CMD_NAME_MKDIR);
 		setAcceptArgsOptions(true);
 	}
 
-	/**
-     * @brief Register the command.
-     */
-    static void RegisterCommand(){
-		CommandBase::RegisterCommand(CMD_NAME_MKD, [](void *arg)->void *{
-			return new MakeDirFSCommand();
+	static void RegisterCommand(){
+		CommandBase::RegisterCommand(CMD_NAME_MKDIR, [](void *arg)->void *{
+			return new MkdirCommand();
 		});
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("mkd <dir>  create directory (no spaces in name)");
+		return RODT_ATTR("mkdir <dir>  create directory (no spaces in name)");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
-	/* override the necesity of required permission */
 	bool needauth() override { return true; }
 #endif
 
-	/* execute command with provided options */
 	cmd_result_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
-		// return in case authentication needed and not authorized yet
 		if( needauth() && !__auth_service.getAuthorized()){
 			return CMD_RESULT_NEED_AUTH;
 		}
@@ -60,7 +51,6 @@ struct MakeDirFSCommand : public CommandBase {
 		cmd_result_t result = CMD_RESULT_OK;
 
 		if(nullptr != m_terminal){
-			// Get first option which must be the path
 			CommandOption *cmdoptn = &m_options[0];
 			if( nullptr != cmdoptn && nullptr != cmdoptn->optionval && cmdoptn->optionvalsize > 0 ){
 				char *dirname = new char[cmdoptn->optionvalsize+SessionManager::getPWD().size()+2]();

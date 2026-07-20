@@ -41,6 +41,10 @@ bool UserStoreService::initService(void *arg)
 #ifdef ENABLE_STORAGE_SERVICE
 void UserStoreService::bootstrapFromLoginTable()
 {
+  if (__i_fs.isFileExist(USER_STORE_SHADOW_PATH)) {
+    __i_fs.setFilePermissions(USER_STORE_SHADOW_PATH, 0600);
+  }
+
   if (__i_fs.isFileExist(USER_STORE_PASSWD_PATH)) return;
 
   if (!__i_fs.isDirectory(USER_STORE_ETC_DIR)) {
@@ -249,9 +253,14 @@ bool UserStoreService::verifyPassword(const char *username, const char *password
 {
   if (nullptr == username || nullptr == password) return false;
 
+  // /etc/shadow is 0600; auth is a system operation so bracket the read window
+  // in a privileged scope (setuid-analog). Kept as narrow as possible.
+  __i_fs.beginPrivileged();
   uint8_t storedHash[32];
   uint8_t salt[USER_STORE_SALT_LEN];
-  if (!readShadowRecord(username, storedHash, salt)) return false;
+  bool haveRec = readShadowRecord(username, storedHash, salt);
+  __i_fs.endPrivileged();
+  if (!haveRec) return false;
 
   uint8_t computedHash[32];
   hashPassword(password, salt, USER_STORE_SALT_LEN, computedHash);
@@ -272,8 +281,6 @@ bool UserStoreService::setPassword(const char *username, const char *password)
   generateSalt(salt, USER_STORE_SALT_LEN);
   hashPassword(password, salt, USER_STORE_SALT_LEN, hash);
 
-  removeLineByUsername(USER_STORE_SHADOW_PATH, username);
-
   char hexhash[65];
   char hexsalt[USER_STORE_SALT_LEN * 2 + 1];
   BytesToHexString(hash, 32, hexhash);
@@ -286,11 +293,19 @@ bool UserStoreService::setPassword(const char *username, const char *password)
   line += hexsalt;
   line += '\n';
 
+  __i_fs.beginPrivileged();
+  removeLineByUsername(USER_STORE_SHADOW_PATH, username);
+
   if (!__i_fs.isFileExist(USER_STORE_SHADOW_PATH)) {
-    if (__i_fs.createFile(USER_STORE_SHADOW_PATH, "") < 0) return false;
+    if (__i_fs.createFile(USER_STORE_SHADOW_PATH, "") < 0) {
+      __i_fs.endPrivileged();
+      return false;
+    }
+    __i_fs.setFilePermissions(USER_STORE_SHADOW_PATH, 0600);
   }
 
   int iStatus = __i_fs.writeFile(USER_STORE_SHADOW_PATH, (char*)line.c_str(), line.size(), true);
+  __i_fs.endPrivileged();
   return (iStatus >= 0);
 }
 

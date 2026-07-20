@@ -61,13 +61,15 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   // m_cmdlist.push_back(pwdfscmd);
   PWDFSCommand::RegisterCommand();
 
-  // MakeDirFSCommand *makedircmd = new MakeDirFSCommand();
-  // m_cmdlist.push_back(makedircmd);
-  MakeDirFSCommand::RegisterCommand();
+  MkdirCommand::RegisterCommand();
 
-  // MakeFileFSCommand *makefilecmd = new MakeFileFSCommand();
-  // m_cmdlist.push_back(makefilecmd);
-  MakeFileFSCommand::RegisterCommand();
+  TouchCommand::RegisterCommand();
+
+  ChmodCommand::RegisterCommand();
+  #ifdef ENABLE_AUTH_SERVICE
+  ChownCommand::RegisterCommand();
+  #endif
+  UmaskCommand::RegisterCommand();
 
   // RemoveFSCommand *removefdcmd = new RemoveFSCommand();
   // m_cmdlist.push_back(removefdcmd);
@@ -91,6 +93,7 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
 
   HexdumpCommand::RegisterCommand();
   DfFSCommand::RegisterCommand();
+  MountCommand::RegisterCommand();
   WcFSCommand::RegisterCommand();
   HeadFSCommand::RegisterCommand();
   TailFSCommand::RegisterCommand();
@@ -612,7 +615,7 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
               m_terminal->csi_erase_in_line(0);
 
               // copy command to terminal buffer
-              session->m_linebuf = _matchcmd + CMD_OPTION_SEPERATOR_SPACE + pdiutil::string(itemlist[session->m_autoCompleteIdx].name);
+              session->m_linebuf = _matchcmd + CMD_OPTION_SEPERATOR_SPACE + pdiutil::string(itemlist[session->m_autoCompleteIdx].m_name);
               session->m_cursor = session->m_linebuf.size();
 
               m_terminal->write(session->m_linebuf.c_str());
@@ -622,7 +625,7 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
             }
 
             for (file_info_t &item : itemlist) {
-              if(item.name) delete[] item.name;
+              if(item.m_name) delete[] item.m_name;
             }
             itemlist.clear();
             #else

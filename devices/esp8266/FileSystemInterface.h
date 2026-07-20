@@ -16,6 +16,7 @@ Created Date    : 6th Apr 2025
 
 #include "esp8266.h"
 #include <interface/pdi/impl/modules/storage/FileSystemInterfaceImpl.h>
+#include <interface/pdi/impl/modules/storage/VfsDispatcher.h>
 
 /**
  * @class FileSystemInterface
@@ -66,5 +67,7 @@ public:
     //     return status;
     // }
 };
+
+extern FileSystemInterface __i_rootfs;
 
 #endif // _ESP8266_FILE_SYSTEM_INTERFACE_H

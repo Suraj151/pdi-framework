@@ -18,7 +18,7 @@ created Date    : 1st June 2019
  * file read operation command
  * 
  * e.g. if we want to read file in the system then we can execute command as below
- * frd <filename>
+ * cat <filename>
  * 
  */
 struct FileReadCommand : public CommandBase {

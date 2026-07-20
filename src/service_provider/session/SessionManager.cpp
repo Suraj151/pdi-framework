@@ -153,5 +153,29 @@ bool SessionManager::changeDirectory(const char *path) {
   return __i_fs.updatePathNotations(path, s->m_cwd);
 }
 
+uint16_t SessionManager::getCurrentUmask() {
+  session_t *s = current();
+  return (nullptr != s) ? s->m_umask : (uint16_t)FILE_UMASK_DEFAULT;
+}
+
+void SessionManager::setCurrentUmask(uint16_t umask) {
+  session_t *s = current();
+  if (nullptr != s) s->m_umask = umask & 0777;
+}
+
+#endif
+
+#ifdef ENABLE_AUTH_SERVICE
+
+uint16_t SessionManager::getCurrentUid() {
+  session_t *s = current();
+  return (nullptr != s) ? s->m_uid : (uint16_t)0;
+}
+
+uint16_t SessionManager::getCurrentGid() {
+  session_t *s = current();
+  return (nullptr != s) ? s->m_gid : (uint16_t)0;
+}
+
 #endif
 

@@ -15,7 +15,7 @@ Created Date    : 6th Apr 2025
 
 
 /**
- * @brief Global instance of the iFileSystemInterface class.
- * This instance is used to manage file system operations throughout the PDI stack.
+ * @brief Root-mount backend for the VFS dispatcher. The dispatcher itself lives
+ * in VfsDispatcher.cpp and mounts this backend at "/" during PdiStack init.
  */
-FileSystemInterface __i_fs;
+FileSystemInterface __i_rootfs;

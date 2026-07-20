@@ -99,7 +99,7 @@ struct UseraddCommand : public CommandBase {
 
 		user_record_t newRec;
 		newRec.m_uid = nextUid;
-		newRec.m_gid = USER_STORE_ROOT_GID;
+		newRec.m_gid = nextUid;
 		newRec.m_username = uname;
 		newRec.m_home = FILE_SEPARATOR;
 		newRec.m_shell = USER_STORE_DEFAULT_SHELL;
