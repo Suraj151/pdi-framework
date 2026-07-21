@@ -205,8 +205,6 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
 
     cmd_term_inseq_t inseq = CMD_TERM_INSEQ_NONE;
     bool dontecho = false;
-    bool isCommandWaitingForInput = getCommandWaitingForUserInput() != -1;
-
     for (int16_t i = 0; !dontecho && i < m_cmdlist.size(); i++){
       if( nullptr != m_cmdlist[i] && m_cmdlist[i]->m_owner == session &&
           m_cmdlist[i]->isWaitingForOption() && m_cmdlist[i]->wantsMaskedInput() ){
@@ -451,13 +449,10 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
       return CMD_RESULT_INCOMPLETE;
     }
 
-    // check if user trying to exit
     if(
-      !isCommandWaitingForInput && (
       inseq == CMD_TERM_INSEQ_CTRL_C ||
       inseq == CMD_TERM_INSEQ_CTRL_Z
-    )){
-      // clear stored string
+    ){
       session->m_linebuf.clear();
       session->m_cursor = 0;
     }

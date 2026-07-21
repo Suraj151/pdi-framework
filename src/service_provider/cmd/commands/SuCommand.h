@@ -19,12 +19,15 @@ created Date    : 18th July 2026
 
 struct SuCommand : public CommandBase {
 
+	static constexpr int8_t SLOT_USER = 0;
+	static constexpr int8_t SLOT_PASS = 1;
+
 	SuCommand(){
 		Clear();
 		SetCommand(CMD_NAME_SU);
-		AddOption(CMD_OPTION_NAME_U);
-		AddOption(CMD_OPTION_NAME_P);
+		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
+		reservePositionalSlots(2);
 	}
 
 	static void RegisterCommand(){
@@ -34,11 +37,11 @@ struct SuCommand : public CommandBase {
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("su u=<user> p=<pass>  switch user in the current session");
+		return RODT_ATTR("su [<user> [<pass>]]  switch user in the current session");
 	}
 
 	bool needauth() override { return true; }
-	bool wantsMaskedInput() override { return isWaitingForOption(CMD_OPTION_NAME_P); }
+	bool wantsMaskedInput() override { return isWaitingForOption(SLOT_PASS); }
 
 	cmd_result_t execute(cmd_term_inseq_t terminputaction){
 
@@ -46,44 +49,44 @@ struct SuCommand : public CommandBase {
 			return CMD_RESULT_NEED_AUTH;
 		}
 
+		if( terminputaction == CMD_TERM_INSEQ_CTRL_C ||
+		    terminputaction == CMD_TERM_INSEQ_CTRL_Z ){
+			return CMD_RESULT_ABORTED;
+		}
+
 		char _username[LOGIN_CONFIGS_BUF_SIZE];
 		char _password[LOGIN_CONFIGS_BUF_SIZE];
 		memset(_username, 0, LOGIN_CONFIGS_BUF_SIZE);
 		memset(_password, 0, LOGIN_CONFIGS_BUF_SIZE);
 
-		CommandOption *unameopt = RetrieveOption(CMD_OPTION_NAME_U);
-		CommandOption *passopt  = RetrieveOption(CMD_OPTION_NAME_P);
+		CommandOption *unameopt = &m_options[SLOT_USER];
+		CommandOption *passopt  = &m_options[SLOT_PASS];
 
-		bool isU = ( nullptr != unameopt && nullptr != unameopt->optionval && unameopt->optionvalsize );
-		bool isP = ( nullptr != passopt && nullptr != passopt->optionval && passopt->optionvalsize );
+		bool isU = ( nullptr != unameopt->optionval && unameopt->optionvalsize > 0 );
+		bool isP = ( nullptr != passopt->optionval && passopt->optionvalsize > 0 );
 
-		if( isU ){
-			memcpy(_username, unameopt->optionval, unameopt->optionvalsize);
-			if( !isP ){
-				holdOptionValue(CMD_OPTION_NAME_U);
-			}
-		}else{
-			setWaitingForOption(CMD_OPTION_NAME_U);
+		if( !isU ){
+			setWaitingForOption(SLOT_USER);
 			if( nullptr != m_terminal ){
 				m_terminal->write_ro(RODT_ATTR("\nuser: "));
 			}
 			return CMD_RESULT_INCOMPLETE;
 		}
 
-		if( isP ){
-			memcpy(_password, passopt->optionval, passopt->optionvalsize);
-		}else{
-			if( terminputaction == CMD_TERM_INSEQ_CTRL_C ||
-			    terminputaction == CMD_TERM_INSEQ_CTRL_Z ){
-				setWaitingForOption(CMD_OPTION_NAME_U);
-				return CMD_RESULT_ABORTED;
-			}
-			setWaitingForOption(CMD_OPTION_NAME_P);
+		uint16_t ulen = unameopt->optionvalsize < LOGIN_CONFIGS_BUF_SIZE - 1 ? unameopt->optionvalsize : LOGIN_CONFIGS_BUF_SIZE - 1;
+		memcpy(_username, unameopt->optionval, ulen);
+
+		if( !isP ){
+			holdOptionValue(SLOT_USER);
+			setWaitingForOption(SLOT_PASS);
 			if( nullptr != m_terminal ){
 				m_terminal->write_ro(RODT_ATTR("\nPass : "));
 			}
 			return CMD_RESULT_INCOMPLETE;
 		}
+
+		uint16_t plen = passopt->optionvalsize < LOGIN_CONFIGS_BUF_SIZE - 1 ? passopt->optionvalsize : LOGIN_CONFIGS_BUF_SIZE - 1;
+		memcpy(_password, passopt->optionval, plen);
 
 		if( 0 == strlen(_username) || 0 == strlen(_password) ){
 			return CMD_RESULT_WRONG_CREDENTIAL;

@@ -358,6 +358,10 @@ typedef struct CommandBase {
         }
     }
 
+    bool isWaitingForOption(int8_t idx){
+        return (m_waitingoptionindx == idx);
+    }
+
     /**
      * @brief Checks if the command is running in background.
      * @return True if the command is running in background, false otherwise.
@@ -382,6 +386,16 @@ typedef struct CommandBase {
         m_waitingoptionindx = getOptionIndex(_optn);
     }
 
+    void setWaitingForOption(int8_t idx){
+        m_waitingoptionindx = idx;
+    }
+
+    void reservePositionalSlots(uint8_t n){
+        if( n <= CMD_OPTION_MAX && n > m_optionindx ){
+            m_optionindx = n;
+        }
+    }
+
     /**
      * @brief Sets whether to accept argument options.
      * @param _accept Indicates whether to accept argument options.
@@ -404,11 +418,13 @@ typedef struct CommandBase {
      * @return True if the option value was held successfully, false otherwise.
      */
     bool holdOptionValue(const char *_optn){
-        bool bStatus = false;
-        int8_t optindx = getOptionIndex(_optn);
+        return holdOptionValue(getOptionIndex(_optn));
+    }
+
+    bool holdOptionValue(int8_t optindx){
         if( optindx != -1 && optindx < m_optionindx ){
             if( !m_options[optindx].holdingoptn &&
-                nullptr != m_options[optindx].optionval && 
+                nullptr != m_options[optindx].optionval &&
                 m_options[optindx].optionvalsize ){
                 char *val = new char[m_options[optindx].optionvalsize+2]();
                 memset(val, 0, m_options[optindx].optionvalsize+2);
@@ -416,9 +432,9 @@ typedef struct CommandBase {
                 m_options[optindx].optionval = val;
                 m_options[optindx].holdingoptn = true;
             }
-            bStatus = m_options[optindx].holdingoptn;
+            return m_options[optindx].holdingoptn;
         }
-        return bStatus;
+        return false;
     }
 
     /**
@@ -684,6 +700,8 @@ typedef struct CommandBase {
         if( terminputaction == CMD_TERM_INSEQ_CTRL_C ||
             terminputaction == CMD_TERM_INSEQ_CTRL_Z ){
             m_status = CMD_STATUS_INACTIVE;
+            ClearOptions();
+            m_waitingoptionindx = -1;
             return CMD_RESULT_ABORTED;
         }
         return m_result;

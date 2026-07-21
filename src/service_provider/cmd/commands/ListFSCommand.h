@@ -79,7 +79,7 @@ struct ListFSCommand : public CommandBase {
 			// m_terminal->write((int64_t)__i_fs.getUsedSize());
 			// m_terminal->write_ro(RODT_ATTR(", Free : "));
 			// m_terminal->writeln((int64_t)__i_fs.getFreeSize());
-			// m_terminal->putln();
+			m_terminal->putln();
 
 			// Current local year, computed once, used to pick between
 			// "%b %d %H:%M" (same year) and "%b %d  %Y" (different year) —

@@ -55,7 +55,11 @@ struct WhoCommand : public CommandBase {
 		if( nullptr == m_terminal ) return CMD_RESULT_OK;
 
 		m_terminal->putln();
-		m_terminal->writeln_ro(RODT_ATTR("USER      TTY  SID  LOGIN  IDLE"));
+		m_terminal->write_pad_ro(RODT_ATTR("USER"),  4, COL_USER);
+		m_terminal->write_pad_ro(RODT_ATTR("TTY"),   3, COL_TTY);
+		m_terminal->write_pad_ro(RODT_ATTR("SID"),   3, COL_SID);
+		m_terminal->write_pad_ro(RODT_ATTR("LOGIN"), 5, COL_LOGIN);
+		m_terminal->writeln_ro(RODT_ATTR("IDLE"));
 
 		uint32_t now = (uint32_t)__i_dvc_ctrl.millis_now();
 		char numbuf[12];
@@ -66,16 +70,16 @@ struct WhoCommand : public CommandBase {
 			if( nullptr == s || SESSION_STATE_FREE == s->m_state ) continue;
 			if( !s->m_isAuthorized ) continue;
 
-			m_terminal->write(s->m_username.c_str());
-			m_terminal->write_ro(RODT_ATTR("  "));
-			m_terminal->write_ro(SessionTtyName(nullptr != s->m_terminal ? s->m_terminal->get_terminal_type() : TERMINAL_TYPE_MAX));
-			m_terminal->write_ro(RODT_ATTR("  "));
+			m_terminal->write_pad(s->m_username.c_str(), COL_USER);
+			const char *tty = SessionTtyName(nullptr != s->m_terminal ? s->m_terminal->get_terminal_type() : TERMINAL_TYPE_MAX);
+			m_terminal->write_pad_ro(tty, (uint32_t)strlen_ro(tty), COL_TTY);
 			Uint32ToString((uint32_t)s->m_sid, numbuf, sizeof(numbuf));
-			m_terminal->write(numbuf);
-			m_terminal->write_ro(RODT_ATTR("    "));
-			Uint32ToString((now - s->m_loginAt) / 1000, numbuf, sizeof(numbuf));
-			m_terminal->write(numbuf);
-			m_terminal->write_ro(RODT_ATTR("s     "));
+			m_terminal->write_pad(numbuf, COL_SID);
+			uint32_t login_s = (now - s->m_loginAt) / 1000;
+			Uint32ToString(login_s, numbuf, sizeof(numbuf));
+			uint32_t login_len = (uint32_t)strlen(numbuf);
+			if( login_len < sizeof(numbuf) - 1 ){ numbuf[login_len] = 's'; numbuf[login_len + 1] = '\0'; }
+			m_terminal->write_pad(numbuf, COL_LOGIN);
 			Uint32ToString((now - s->m_lastActivityAt) / 1000, numbuf, sizeof(numbuf));
 			m_terminal->write(numbuf);
 			m_terminal->write_ro(RODT_ATTR("s"));
@@ -84,6 +88,13 @@ struct WhoCommand : public CommandBase {
 
 		return CMD_RESULT_OK;
 	}
+
+private:
+
+	static constexpr uint8_t COL_USER  = 10;
+	static constexpr uint8_t COL_TTY   = 5;
+	static constexpr uint8_t COL_SID   = 5;
+	static constexpr uint8_t COL_LOGIN = 8;
 };
 
 #endif
