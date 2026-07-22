@@ -57,12 +57,12 @@ Full inventory in [§15 Utility Library](#15-utility-library).
 **Storage** — VFS with mountable backends (LittleFS root + `/proc` synthetic), POSIX permissions/ownership with per-session umask, multi-user file access control.
 Details in [§6.2.11 Storage](#6211-storage-interface-init-no-provider).
 
-**CLI** — 25+ built-in commands including `ls mkdir touch mv cp cat head tail wc hexdump grep df mount chmod chown umask gpio srvc ps top kill pkill killall renice net watch iot ssh tls reboot uptime`.
+**CLI** — 40+ built-in commands including `ls mkdir touch mv cp cat head tail wc hexdump grep df mount chmod chown umask gpio srvc ps top kill pkill killall renice net watch iot ssh tls reboot uptime groups useradd userdel passwd ...`.
 Full command reference in [§7.7 Built-in command inventory](#77-built-in-command-inventory).
 
 **Extras** — Captive portal, GPIO events over MQTT/HTTP/Email, NAT (ESP8266 lwIP — see [§2.4.1](#241-nat-and-mesh)), Mesh via ESPNOW.
 
-## A Peek at the UI
+## A Peek at the Terminal and Web UI
 
 <table>
   <tr>
@@ -72,6 +72,10 @@ Full command reference in [§7.7 Built-in command inventory](#77-built-in-comman
   <tr>
     <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-ps.png" width="100%"></td>
     <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-usradd.png" width="100%"></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-net.png" width="100%"></td>
+    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-help.png" width="100%"></td>
   </tr>
   <tr>
     <td width="50%"><img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/portal_home_menu.png" width="100%"></td>
