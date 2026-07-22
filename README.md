@@ -66,16 +66,20 @@ Full command reference in [§7.7 Built-in command inventory](#77-built-in-comman
 
 <table>
   <tr>
+    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-ls.png" width="100%"></td>
+    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-ssh.png" width="100%"></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-ps.png" width="100%"></td>
+    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal-usradd.png" width="100%"></td>
+  </tr>
+  <tr>
     <td width="50%"><img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/portal_home_menu.png" width="100%"></td>
     <td width="50%"><img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/gpio-control-menu.png" width="100%"></td>
   </tr>
   <tr>
     <td width="50%"><img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/mqtt-submenu.png" width="100%"></td>
     <td width="50%"><img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/storage-home.png" width="100%"></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/terminal.png" width="100%"></td>
-    <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/ssh-telnet-terminal.png" width="100%"></td>
   </tr>
 </table>
 
