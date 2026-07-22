@@ -52,8 +52,8 @@ struct ChownCommand : public CommandBase {
 		CommandOption *uopt = &m_options[0];
 		CommandOption *popt = &m_options[1];
 
-		if( nullptr == uopt || nullptr == uopt->optionval || 0 == uopt->optionvalsize ||
-		    nullptr == popt || nullptr == popt->optionval || 0 == popt->optionvalsize ){
+		if( nullptr == uopt || nullptr == uopt->optionval || 0 >= uopt->optionvalsize ||
+		    nullptr == popt || nullptr == popt->optionval || 0 >= popt->optionvalsize ){
 			return CMD_RESULT_ARGS_ERROR;
 		}
 
@@ -70,12 +70,9 @@ struct ChownCommand : public CommandBase {
 			gid = StringToUint16(uopt->optionval + colonAt + 1, (uint8_t)(uopt->optionvalsize - colonAt - 1));
 		}
 
-		char path[FILE_NAME_MAX_SIZE + 1];
-		memset(path, 0, sizeof(path));
-		uint16_t plen = popt->optionvalsize < sizeof(path) - 1 ? popt->optionvalsize : sizeof(path) - 1;
-		memcpy(path, popt->optionval, plen);
+		pdiutil::string path = resolveArgPath(popt);
 
-		int rc = __i_fs.setFileOwner(path, uid, gid);
+		int rc = __i_fs.setFileOwner(path.c_str(), uid, gid);
 		if( rc < 0 ){
 			m_terminal->writeln();
 			m_terminal->write_ro(RODT_ATTR("chown: permission denied or not found"));

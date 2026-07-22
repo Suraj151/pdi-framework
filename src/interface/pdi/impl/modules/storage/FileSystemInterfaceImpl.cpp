@@ -137,8 +137,11 @@ void FileSystemInterfaceImpl::appendFileSeparator(pdiutil::string &path) {
  */
 bool FileSystemInterfaceImpl::updatePathNotations(const char* path, pdiutil::string &updatedpath){
 
-    if (!path || !isDirectory(path)) {
-        return false; // Invalid path or not a directory
+    // Existence is validated on the normalized result below — checking the
+    // raw path here would break dot-notations crossing mounts (/proc/..),
+    // since synthetic backends don't resolve "." / ".." natively.
+    if (!path) {
+        return false;
     }
 
     const int len = strlen(path);
@@ -207,7 +210,7 @@ bool FileSystemInterfaceImpl::updatePathNotations(const char* path, pdiutil::str
     }
 
     // Validate the resulting path
-    if (isDirectory(newpath)) {
+    if (__i_fs.isDirectory(newpath)) {
         updatedpath = newpath; // Update the current working directory
         return true;
     }

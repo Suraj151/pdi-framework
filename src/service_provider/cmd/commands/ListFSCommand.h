@@ -31,6 +31,8 @@ struct ListFSCommand : public CommandBase {
 	ListFSCommand(){
 		Clear();
 		SetCommand(CMD_NAME_LS);
+		setAcceptArgsOptions(true);
+		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
 
 	/**
@@ -43,7 +45,7 @@ struct ListFSCommand : public CommandBase {
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("ls  list files and directories in the current directory");
+		return RODT_ATTR("ls [<dir>]  list files and directories (defaults to current dir)");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -65,8 +67,15 @@ struct ListFSCommand : public CommandBase {
 
 		if(nullptr != m_terminal){
 
+			// Optional positional arg: resolve against PWD; missing → PWD itself.
+			CommandOption *cmdoptn = &m_options[0];
+			pdiutil::string target = resolveArgPath(cmdoptn);
+			if( target.empty() ){
+				target = SessionManager::getPWD();
+			}
+
 			pdiutil::vector<file_info_t> itemlist;
-			int resultCode = __i_fs.getDirFileList(SessionManager::getPWD().c_str(), itemlist);
+			int resultCode = __i_fs.getDirFileList(target.c_str(), itemlist);
 			
 			if(resultCode < 0){
 				result = CMD_RESULT_FAILED;

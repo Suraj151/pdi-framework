@@ -10,6 +10,10 @@ created Date    : 1st June 2019
 #include "PdiStack.h"
 #include <utility/EventUtil.h>
 
+#if defined(ENABLE_STORAGE_SERVICE) && defined(ENABLE_PROCFS)
+#include <interface/pdi/impl/modules/storage/ProcFs.h>
+#endif
+
 /**
  * @brief Constructor for the PDIStack class.
  *
@@ -129,6 +133,9 @@ void PDIStack::initialize(){
 
   #ifdef ENABLE_STORAGE_SERVICE
   __i_fs.mount(FILE_SEPARATOR, &__i_rootfs, "rootfs", VFS_TYPE_LITTLEFS);
+  #ifdef ENABLE_PROCFS
+  __i_fs.mount("/proc", &__i_procfs, "procfs", VFS_TYPE_PROCFS);
+  #endif
   __i_fs.init();
   #endif
 

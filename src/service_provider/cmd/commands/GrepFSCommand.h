@@ -132,15 +132,13 @@ struct GrepFSCommand : public CommandBase {
 			if(isPatternProvided && isFileProvided){
 
 				char *pattern = new char[patternoptn->optionvalsize + 1]();
-				char *path = new char[fileoptn->optionvalsize + SessionManager::getPWD().size() + 2]();
+				pdiutil::string filepath = resolveArgPath(fileoptn);
 
-				if(nullptr != pattern && nullptr != path){
+				if(nullptr != pattern && !filepath.empty()){
 					memcpy(pattern, patternoptn->optionval, patternoptn->optionvalsize);
 
-					memcpy(path, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
-					__i_fs.appendFileSeparator(path);
-					strncat(path, fileoptn->optionval, fileoptn->optionvalsize);
-					int path_len = (int)strlen(path);
+					const char* path = filepath.c_str();
+					int path_len = (int)filepath.size();
 
 					m_terminal->putln();
 
@@ -155,7 +153,6 @@ struct GrepFSCommand : public CommandBase {
 					}
 				}
 
-				if(nullptr != path) delete[] path;
 				if(nullptr != pattern) delete[] pattern;
 			}else{
 				result = CMD_RESULT_ARGS_MISSING;

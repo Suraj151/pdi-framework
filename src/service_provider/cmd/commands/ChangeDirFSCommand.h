@@ -63,35 +63,26 @@ struct ChangeDirFSCommand : public CommandBase {
 			// Get first option which must be the path
 			CommandOption *cmdoptn = &m_options[0];
 			if( nullptr != cmdoptn && nullptr != cmdoptn->optionval && cmdoptn->optionvalsize > 0 ){
-				char *dirname = new char[cmdoptn->optionvalsize+200]();
-				if( nullptr != dirname ){
+				pdiutil::string dirname;
 
-					memset(dirname, 0, cmdoptn->optionvalsize+200);
+				// Check whether symbol was provided
+				if( cmdoptn->optionvalsize == 1 && cmdoptn->optionval[0] == '~' ){
 
-					// Check whether symbol was provided
-					if( cmdoptn->optionvalsize == 1 && cmdoptn->optionval[0] == '~' ){
+					dirname = __i_fs.getHomeDirectory();
+				}else if( cmdoptn->optionvalsize == 1 && cmdoptn->optionval[0] == '-' ){
 
-						const char* homedir = __i_fs.getHomeDirectory();
-						memcpy(dirname, homedir, strlen(homedir));
-					}else if( cmdoptn->optionvalsize == 1 && cmdoptn->optionval[0] == '-' ){
+					dirname = SessionManager::getLastPWD();
+				}else{
 
-						pdiutil::string lastpwd = SessionManager::getLastPWD();
-						memcpy(dirname, lastpwd.c_str(), lastpwd.length());
-					}else{
+					dirname = resolveArgPath(cmdoptn);
+				}
 
-						memcpy(dirname, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
-						__i_fs.appendFileSeparator(dirname);
-						strncat(dirname, cmdoptn->optionval, cmdoptn->optionvalsize);
-					}
-
-					bool bStatus = SessionManager::changeDirectory(dirname);
-					if(!bStatus){
-						result = CMD_RESULT_FAILED;
-						m_terminal->putln();
-						m_terminal->write_ro(RODT_ATTR("Failed to change directory: "));
-						m_terminal->write(dirname);
-					}
-					delete[] dirname;
+				bool bStatus = !dirname.empty() && SessionManager::changeDirectory(dirname.c_str());
+				if(!bStatus){
+					result = CMD_RESULT_FAILED;
+					m_terminal->putln();
+					m_terminal->write_ro(RODT_ATTR("Failed to change directory: "));
+					m_terminal->write(dirname.c_str());
 				}
 			}else{
 				// POSIX-style: bare `cd` goes to the home directory.

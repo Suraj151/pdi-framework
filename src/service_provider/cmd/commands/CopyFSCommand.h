@@ -66,51 +66,32 @@ struct CopyFSCommand : public CommandBase {
 			if( nullptr != cmdoptn1 && nullptr != cmdoptn1->optionval && cmdoptn1->optionvalsize > 0 &&
 				nullptr != cmdoptn2 && nullptr != cmdoptn2->optionval && cmdoptn2->optionvalsize > 0){
 
-				char *srcpath = new char[cmdoptn1->optionvalsize+SessionManager::getPWD().size()+2]();
-				char *dstpath = new char[cmdoptn2->optionvalsize+SessionManager::getPWD().size()+2]();
+				pdiutil::string srcpath = resolveArgPath(cmdoptn1);
+				pdiutil::string dstpath = resolveArgPath(cmdoptn2);
 
-				if( nullptr != srcpath && nullptr != dstpath ){
-					memset(srcpath, 0, cmdoptn1->optionvalsize+SessionManager::getPWD().size()+2);
-					memset(dstpath, 0, cmdoptn2->optionvalsize+SessionManager::getPWD().size()+2);
+				if( !srcpath.empty() && !dstpath.empty() &&
+					!__are_str_equals(srcpath.c_str(), dstpath.c_str()) ){
 
-					memcpy(srcpath, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
-					memcpy(dstpath, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
+					int iStatus = 0;
 
-					__i_fs.appendFileSeparator(srcpath);
-					__i_fs.appendFileSeparator(dstpath);
-					strncat(srcpath, cmdoptn1->optionval, cmdoptn1->optionvalsize);
-					strncat(dstpath, cmdoptn2->optionval, cmdoptn2->optionvalsize);
-
-					if( !__are_str_equals(srcpath, dstpath) ){
-
-						int iStatus = 0;
-
-						if( !__i_fs.isFileExist(srcpath) || __i_fs.isFileExist(dstpath) ){
-							result = CMD_RESULT_FAILED;
-							m_terminal->putln();
-							m_terminal->writeln_ro(RODT_ATTR("src not exist OR dst exist"));
-						}else{
-							iStatus = __i_fs.copyFile(srcpath, dstpath);
-						}
-
-						if (iStatus < 0) {
-							result = CMD_RESULT_FAILED;
-							m_terminal->putln();
-							m_terminal->write_ro(RODT_ATTR("Failed to copy file: "));
-							m_terminal->write(srcpath);
-							m_terminal->write_ro(RODT_ATTR(" : "));
-							m_terminal->write(dstpath);
-							m_terminal->write_ro(RODT_ATTR(" : "));
-							m_terminal->write((int32_t)iStatus);
-						}
+					if( !__i_fs.isFileExist(srcpath.c_str()) || __i_fs.isFileExist(dstpath.c_str()) ){
+						result = CMD_RESULT_FAILED;
+						m_terminal->putln();
+						m_terminal->writeln_ro(RODT_ATTR("src not exist OR dst exist"));
+					}else{
+						iStatus = __i_fs.copyFile(srcpath.c_str(), dstpath.c_str());
 					}
-				}
 
-				if(nullptr != srcpath){
-					delete[] srcpath;
-				}
-				if(nullptr != dstpath){
-					delete[] dstpath;
+					if (iStatus < 0) {
+						result = CMD_RESULT_FAILED;
+						m_terminal->putln();
+						m_terminal->write_ro(RODT_ATTR("Failed to copy file: "));
+						m_terminal->write(srcpath.c_str());
+						m_terminal->write_ro(RODT_ATTR(" : "));
+						m_terminal->write(dstpath.c_str());
+						m_terminal->write_ro(RODT_ATTR(" : "));
+						m_terminal->write((int32_t)iStatus);
+					}
 				}
 			}else{
 				result = CMD_RESULT_ARGS_ERROR;

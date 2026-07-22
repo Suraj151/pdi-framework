@@ -212,6 +212,19 @@ public:
     task_t* get_task(pdiutil::task_id_t _id);
 
     /**
+     * @brief Number of registered tasks (live or zombie).
+     */
+    uint16_t getTaskCount() const { return (uint16_t)m_tasks.size(); }
+
+    /**
+     * @brief Get task by index in the registration order. Read-only enumeration
+     *        for observability tools (procfs, ps). Returns nullptr if out of range.
+     */
+    task_t* getTaskByIndex(uint16_t idx) {
+      return (idx < m_tasks.size()) ? &m_tasks[idx] : nullptr;
+    }
+
+    /**
      * @brief Sets the maximum number of tasks allowed in the scheduler.
      *
      * @param maxtasks The maximum number of tasks.

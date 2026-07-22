@@ -49,19 +49,15 @@ struct WcFSCommand : public CommandBase {
 
 		if(nullptr != m_terminal){
 			CommandOption *cmdoptn = &m_options[0];
-			if( nullptr != cmdoptn && nullptr != cmdoptn->optionval && cmdoptn->optionvalsize > 0 ){
-				char *filename = new char[cmdoptn->optionvalsize + SessionManager::getPWD().size() + 2]();
-				if( nullptr != filename ){
-					memcpy(filename, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
-					__i_fs.appendFileSeparator(filename);
-					strncat(filename, cmdoptn->optionval, cmdoptn->optionvalsize);
-
+			pdiutil::string filename = resolveArgPath(cmdoptn);
+			if( !filename.empty() ){
+				{
 					uint32_t bytes = 0;
 					uint32_t lines = 0;
 					uint32_t words = 0;
 					bool in_word = false;
 
-					int iStatus = __i_fs.readFile(filename, 250, [&](char *data, uint32_t size)->bool{
+					int iStatus = __i_fs.readFile(filename.c_str(), 250, [&](char *data, uint32_t size)->bool{
 						for(uint32_t i = 0; i < size; i++){
 							bytes++;
 							char c = data[i];
@@ -84,7 +80,7 @@ struct WcFSCommand : public CommandBase {
 					if(iStatus < 0){
 						result = CMD_RESULT_FAILED;
 						m_terminal->write_ro(RODT_ATTR("Failed : "));
-						m_terminal->write(filename);
+						m_terminal->write(filename.c_str());
 						m_terminal->write_ro(RODT_ATTR(" : "));
 						m_terminal->write((int32_t)iStatus);
 					}else{
@@ -94,10 +90,8 @@ struct WcFSCommand : public CommandBase {
 						m_terminal->write(' ');
 						m_terminal->write((int32_t)bytes);
 						m_terminal->write(' ');
-						m_terminal->write(filename);
+						m_terminal->write(filename.c_str());
 					}
-
-					delete[] filename;
 				}
 			}else{
 				result = CMD_RESULT_ARGS_MISSING;

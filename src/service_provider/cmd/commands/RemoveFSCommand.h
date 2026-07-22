@@ -61,31 +61,23 @@ struct RemoveFSCommand : public CommandBase {
 		if(nullptr != m_terminal){
 			// Get first option which must be the path
 			CommandOption *cmdoptn = &m_options[0];
-			if( nullptr != cmdoptn && nullptr != cmdoptn->optionval && cmdoptn->optionvalsize > 0 ){
-				char *fileOrDir = new char[cmdoptn->optionvalsize+SessionManager::getPWD().size()+2]();
-				if( nullptr != fileOrDir ){
-					memset(fileOrDir, 0, cmdoptn->optionvalsize+SessionManager::getPWD().size()+2);
-					memcpy(fileOrDir, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
-					__i_fs.appendFileSeparator(fileOrDir);
-					strncat(fileOrDir, cmdoptn->optionval, cmdoptn->optionvalsize);
+			pdiutil::string fileOrDir = resolveArgPath(cmdoptn);
+			if( !fileOrDir.empty() ){
 
-					int iStatus = 0;
-					if( __i_fs.isDirectory(fileOrDir) ){
-						iStatus = __i_fs.deleteDirectory(fileOrDir);
-					}else{
-						iStatus = __i_fs.deleteFile(fileOrDir);
-					}
+				int iStatus = 0;
+				if( __i_fs.isDirectory(fileOrDir.c_str()) ){
+					iStatus = __i_fs.deleteDirectory(fileOrDir.c_str());
+				}else{
+					iStatus = __i_fs.deleteFile(fileOrDir.c_str());
+				}
 
-					if(iStatus < 0){
-						result = CMD_RESULT_FAILED;
-						m_terminal->putln();
-						m_terminal->write_ro(RODT_ATTR("Failed to delete : "));
-						m_terminal->write(fileOrDir);
-						m_terminal->write_ro(RODT_ATTR(" : "));
-						m_terminal->write((int32_t)iStatus);
-					}
-
-					delete[] fileOrDir;
+				if(iStatus < 0){
+					result = CMD_RESULT_FAILED;
+					m_terminal->putln();
+					m_terminal->write_ro(RODT_ATTR("Failed to delete : "));
+					m_terminal->write(fileOrDir.c_str());
+					m_terminal->write_ro(RODT_ATTR(" : "));
+					m_terminal->write((int32_t)iStatus);
 				}
 			}else{
 				result = CMD_RESULT_ARGS_ERROR;

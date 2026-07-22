@@ -60,6 +60,7 @@ struct WatchCommand : public CommandBase {
     bool stopRunningInBackground() override{
 
 		__task_scheduler.remove_task(m_watchtaskid);
+		m_watchtaskid= -1;
 		m_runinbackground = false;
         return CommandBase::stopRunningInBackground();
     }
@@ -122,6 +123,11 @@ struct WatchCommand : public CommandBase {
 				// m_terminal->putln();
 
 				if( m_cmdexecinterface != nullptr ){
+
+					if( nullptr == m_terminal ){
+						stopRunningInBackground();
+						return;
+					}
 
 					cmd_result_t cmdres = m_cmdexecinterface->executeCommand(&m_commandtoexec);
 

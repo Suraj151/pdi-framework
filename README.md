@@ -13,6 +13,7 @@ PDI is a modular C++ stack for embedded devices. Application code is written onc
 - **Compile-time feature gating.** Each capability is wrapped in an `ENABLE_*` flag; disabled features contribute zero flash.
 - **Configurable task scheduler.** Inline, cooperative, and preemptive modes; priority-and-policy scheduling; POSIX nice; per-task signals (KILL/TERM/STOP/CONT) with `ps`/`top`/`kill`/`pkill`/`killall`/`renice`.
 - **Service supervisor (systemd-lite).** `srvc list / status / start / stop / restart` — every service tracks its scheduler tasks and can be paused or resumed at runtime.
+- **Virtual filesystem (VFS).** Multiple backends mounted under one tree with longest-prefix routing; POSIX-style permissions, ownership, and per-session umask enforced at the VFS layer; multi-user aware (`/etc/passwd` + `/etc/shadow`). Includes a read-only `/proc` with live system nodes.
 - **Linux-style CLI on serial / Telnet / SSH.** `ls`, `cat`, `grep`, `head`, `tail`, `wc`, `hexdump`, `df`, `mount`, `chmod`, `chown`, `umask`, `uptime`, `mv`, `cp`, `mkdir`, `touch`, `rm`, `watch`, `gpio`, `srvc`, `ps`, `top`, `kill`, `pkill`, `killall`, `renice`, `net`, `iot`, `ssh`, `tls`, `reboot`, and more.
 - **On-device file transfer.** `scp` (single file) and interactive `sftp` over the SSH tunnel.
 - **Web portal for configuration.** Session-based login, per-service settings pages, GPIO control, storage browser, MQTT tester, Email tester.
@@ -52,6 +53,9 @@ Per-service reference in [§6 Service Providers](#6-service-providers).
 
 **Utilities** — Task Scheduler (inline / cooperative / preemptive), Event bus, Queues, String helpers, Data converters, Crypto, PdiSTL, Reset Factory.
 Full inventory in [§15 Utility Library](#15-utility-library).
+
+**Storage** — VFS with mountable backends (LittleFS root + `/proc` synthetic), POSIX permissions/ownership with per-session umask, multi-user file access control.
+Details in [§6.2.11 Storage](#6211-storage-interface-init-no-provider).
 
 **CLI** — 25+ built-in commands including `ls mkdir touch mv cp cat head tail wc hexdump grep df mount chmod chown umask gpio srvc ps top kill pkill killall renice net watch iot ssh tls reboot uptime`.
 Full command reference in [§7.7 Built-in command inventory](#77-built-in-command-inventory).
@@ -647,12 +651,12 @@ Independent of mode, each task carries a `task_policy_t` that influences which *
 
 | Policy | Enum | Selection rule |
 |---|---|---|
-| `TASK_POLICY_FIFO` | `0` (default) | Strict by priority, with overdue tasks getting a small nudge (lateness boost capped at 50). |
-| `TASK_POLICY_ROUNDROBIN` | `1` | Equal time slices — favours tasks that ran least recently (log-scaled). |
-| `TASK_POLICY_DEADLINE` | `2` | Earliest deadline first — boost = `2 ×`. |
-| `TASK_POLICY_FAIRSHARE` | `3` | Favours tasks that have consumed the **least** cumulative CPU time so far. Boost = `1.5 ×`. |
+| `TASK_POLICY_FIFO` | `0` (default) | Priority biased with logarithmic lateness aging boost (base `policy_boost = 320`, `policy_cap = 50`). |
+| `TASK_POLICY_ROUNDROBIN` | `1` | Equal time slices — favours tasks that ran least recently (log-scaled with `320` multiplier). |
+| `TASK_POLICY_DEADLINE` | `2` | Earliest deadline first — boost = `2.0 × 320`. |
+| `TASK_POLICY_FAIRSHARE` | `3` | Favours tasks that have consumed the **least** cumulative CPU time so far. Boost = `1.5 × 320`. |
 
-The scoring formula is in [TaskScheduler::computeScore](src/utility/TaskScheduler.cpp). All four share the same base term `priority × 100`, then add a policy-dependent boost capped at `50`. The practical implication: **priority always dominates policy** by a wide margin; policy is the tie-breaker.
+The scoring formula is in [TaskScheduler::computeScore](src/utility/TaskScheduler.cpp). All four share the base term `effective_priority × 100`, then add a scaled logarithmic policy boost (`policy_boost × min(floor(log2(ms + 1)), policy_cap)` where `policy_boost = 320`). This guarantees that no low-priority task waits longer than **5 seconds** before its accumulated policy score overcomes high-priority priority offsets and grants an execution turn.
 
 > Policies apply to the inline lane. Contextual lanes have their own per-implementation scheduling.
 
@@ -1240,10 +1244,20 @@ The global `__i_fs` is a **`VfsDispatcher`** ([src/interface/pdi/impl/modules/st
 
 ```cpp
 __i_fs.mount(FILE_SEPARATOR, &__i_rootfs, "rootfs", VFS_TYPE_LITTLEFS);
+#ifdef ENABLE_PROCFS
+__i_fs.mount("/proc", &__i_procfs, "procfs", VFS_TYPE_PROCFS);
+#endif
 __i_fs.init();
 ```
 
-Mount table config lives in [config/VfsConfig.h](src/config/VfsConfig.h) — `VFS_MAX_MOUNTS` (default 3), `VFS_MOUNT_PREFIX_MAX` (15), `VFS_MOUNT_NAME_MAX` (11). Extra backends (procfs/sysfs/devfs/tmpfs) will land as additional `mount()` calls in the same init function. See `mount` command below in [§7.7](#77-built-in-command-inventory) to inspect the table at runtime; `df` shows total/used/free per mount.
+Mount table config lives in [config/VfsConfig.h](src/config/VfsConfig.h) — `VFS_MAX_MOUNTS` (default 3), `VFS_MOUNT_PREFIX_MAX` (15), `VFS_MOUNT_NAME_MAX` (11), plus per-backend enable flags (`ENABLE_PROCFS`, default on). Inspect the mount table at runtime with the `mount` command ([§7.7](#77-built-in-command-inventory)); `df` reports total/used/free per mount.
+
+**procfs** ([src/interface/pdi/impl/modules/storage/ProcFs.{h,cpp}](src/interface/pdi/impl/modules/storage/ProcFs.h)) — a read-only synthetic filesystem mounted at `/proc`; node contents are generated on each read. Works with the regular file commands (`cd /proc`, `ls`, `cat`, `head`, `wc`, `hexdump`, `grep`); all nodes are `0444`, root-owned, and writes return an error.
+
+| Node | Content |
+|---|---|
+| `/proc/uptime` | seconds since boot: `<sec>.<centisec> <sec>.<centisec>` (Linux layout) |
+| `/proc/version` | `PDI Stack version <RELEASE> (<CONFIG_VERSION>)` |
 
 **Permissions & ownership** are advisory at the wrapper (bits stored via `lfs_setattr`) and enforced at the dispatcher. `file_info_t` carries `m_type`/`m_size`/`m_name`/`m_ctime`/`m_mtime`/`m_perms`/`m_uid`/`m_gid` and every FS entry is stamped on create with the current session's uid/gid (via the protected `currentOwner()` hook, overridden in `FileSystemInterfaceImpl` to pull from `SessionManager`). Default file/dir perms are `0644` / `0755` masked by the caller's umask (`FILE_UMASK_DEFAULT 0022`, per-session via `currentUmask()`).
 
@@ -1562,14 +1576,14 @@ Names come from [CommandCommon.h](src/service_provider/cmd/commands/CommandCommo
 
 | Command | Options | Brief |
 |---|---|---|
-| ls | | List files/dirs in current directory with mode / owner / group / mtime / size. Owner+group show human names (numeric uid/gid if user record is missing). e.g. **ls** |
+| ls [\<dir>] | | List files/dirs with mode / owner / group / mtime / size. No arg → current dir; absolute path → listed as-is; relative path → joined with PWD. Owner+group show human names (numeric uid/gid if user record is missing). e.g. **ls**, **ls /proc**, **ls scripts** |
 | mkdir \<dir> | | Create directory. Perms = `0755 & ~umask`; owner = current session's uid/gid. e.g. **mkdir /home/scripts** |
 | touch \<file> | | Create the file empty if missing (perms = `0644 & ~umask`, owner = current session's uid/gid); bump `mtime` if it exists. e.g. **touch /home/notes.txt** |
 | mv \<src> \<dst> | | Move / rename file or dir. e.g. **mv /home/a.txt /home/b.txt** |
 | cp \<src> \<dst> | | Copy file. e.g. **cp /home/a.txt /home/b.txt** |
 | pwd | | Print current working directory. e.g. **pwd** |
 | rm \<file_or_dir> | | Remove file or directory. Requires `+w` on the target for non-root. e.g. **rm /home/notes.txt** |
-| cat \<file> | | Print file contents to terminal (renamed from `fread`). Requires `+r` on the file for non-root. e.g. **cat /home/notes.txt** |
+| cat \<file> | | Print file contents to terminal (renamed from `fread`). Requires `+r` on the file for non-root. e.g. **cat /home/notes.txt**, **cat /proc/uptime** |
 | fwrite \<file> | f=\<file> v=\<value> | Open file in append mode; type content line by line. Press **ESC** to save & exit. Requires `+w` on the file for non-root. e.g. **fwrite /home/notes.txt** or **fwrite f=/home/notes.txt v=hello** |
 | head \<file> [N] | | Print first N lines (default 10); constant memory. e.g. **head /home/log.txt 5** |
 | tail \<file> [N] | | Print last N lines (default 10); constant memory. e.g. **tail /home/log.txt 5** |
@@ -1611,6 +1625,8 @@ Names come from [CommandCommon.h](src/service_provider/cmd/commands/CommandCommo
 | tls q=\<query>,t=\<algo>,l=\<bits>,n=\<CN/DNS>,i=\<IPv4> | q (1=CERTGEN), t (0=EC, 1=RSA), l (key bits / curve size), n (CN or DNS SAN), i (IPv4 SAN) | On-device TLS cert generation. esp32 builds with `ENABLE_TLS_CERT_GENERATION` only. Output at `TLS_DEFAULT_SERVER_CERT_PATH` / `TLS_DEFAULT_SERVER_KEY_PATH`. e.g. **tls q=1,t=0,l=256,n=device.local,i=192.168.1.50** |
 
 Each command's implementation lives in [src/service_provider/cmd/commands/](src/service_provider/cmd/commands/) — one `<Name>Command.h` per verb, with names registered in [CommandCommon.h](src/service_provider/cmd/commands/CommandCommon.h).
+
+**Path arguments** work the POSIX way in every file command (`ls`, `cd`, `cat`, `cp`, `mv`, `rm`, `mkdir`, `touch`, `chmod`, `chown`, `head`, `tail`, `wc`, `grep`, `hexdump`, `fwrite`): a leading `/` is treated as an absolute path, anything else resolves against the session's current directory. `cd` additionally supports `~` (home) and `-` (previous directory).
 
 **Positional vs named options.** Commands with ≤2 required args use the **positional** style (`setAcceptArgsOptions(true)` + space separator, args at `m_options[0]`/`[1]`) — matches POSIX and reduces typing: `chmod 0644 /etc/passwd`, `renice -5 10`, `kill 9 12`. Commands with an optional leading arg (`kill [<sig>] <pid>`, `pkill`, `killall`) dispatch on **arg count** — 1 arg = target, 2 args = sig then target — no numeric-vs-name ambiguity. Named options (`x=y`) are retained for commands with many optional slots, sensitive input (`login`/`su`/`passwd`/`useradd`/`userdel`), or optional-in-the-middle patterns (`top i=… n=… u=…`).
 

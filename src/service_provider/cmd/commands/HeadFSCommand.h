@@ -60,11 +60,9 @@ struct HeadFSCommand : public CommandBase {
 					if(parsed > 0) count = parsed;
 				}
 
-				char *filename = new char[fileoptn->optionvalsize + SessionManager::getPWD().size() + 2]();
-				if(nullptr != filename){
-					memcpy(filename, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
-					__i_fs.appendFileSeparator(filename);
-					strncat(filename, fileoptn->optionval, fileoptn->optionvalsize);
+				pdiutil::string filepath = resolveArgPath(fileoptn);
+				if(!filepath.empty()){
+					const char* filename = filepath.c_str();
 
 					m_terminal->putln();
 
@@ -99,8 +97,6 @@ struct HeadFSCommand : public CommandBase {
 							}
 						}
 					}
-
-					delete[] filename;
 				}
 			}else{
 				result = CMD_RESULT_ARGS_MISSING;

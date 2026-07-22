@@ -65,39 +65,21 @@ struct MoveFSCommand : public CommandBase {
 			CommandOption *cmdoptn2 = &m_options[1];
 			if( nullptr != cmdoptn1 && nullptr != cmdoptn1->optionval && cmdoptn1->optionvalsize > 0 &&
 				nullptr != cmdoptn2 && nullptr != cmdoptn2->optionval && cmdoptn2->optionvalsize > 0){
-				char *oldname = new char[cmdoptn1->optionvalsize+SessionManager::getPWD().size()+2]();
-				char *newname = new char[cmdoptn2->optionvalsize+SessionManager::getPWD().size()+2]();
-				if( nullptr != oldname && nullptr != newname ){
-					memset(oldname, 0, cmdoptn1->optionvalsize+SessionManager::getPWD().size()+2);
-					memset(newname, 0, cmdoptn2->optionvalsize+SessionManager::getPWD().size()+2);
+				pdiutil::string oldname = resolveArgPath(cmdoptn1);
+				pdiutil::string newname = resolveArgPath(cmdoptn2);
+				if( !oldname.empty() && !newname.empty() ){
 
-					memcpy(oldname, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
-					memcpy(newname, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
-
-					__i_fs.appendFileSeparator(oldname);
-					__i_fs.appendFileSeparator(newname);
-
-					strncat(oldname, cmdoptn1->optionval, cmdoptn1->optionvalsize);
-					strncat(newname, cmdoptn2->optionval, cmdoptn2->optionvalsize);
-
-					int iStatus = __i_fs.rename(oldname, newname);
+					int iStatus = __i_fs.rename(oldname.c_str(), newname.c_str());
 					if (iStatus < 0) {
 						result = CMD_RESULT_FAILED;
 						m_terminal->putln();
 						m_terminal->write_ro(RODT_ATTR("Failed to rename file: "));
-						m_terminal->write(oldname);
+						m_terminal->write(oldname.c_str());
 						m_terminal->write_ro(RODT_ATTR(" : "));
-						m_terminal->write(newname);
+						m_terminal->write(newname.c_str());
 						m_terminal->write_ro(RODT_ATTR(" : "));
 						m_terminal->write((int32_t)iStatus);
 					}
-				}
-
-				if(nullptr != oldname){
-					delete[] oldname;
-				}
-				if(nullptr != newname){
-					delete[] newname;
 				}
 			}else{
 				result = CMD_RESULT_ARGS_ERROR;

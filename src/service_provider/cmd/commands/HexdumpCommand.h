@@ -53,20 +53,16 @@ struct HexdumpCommand : public CommandBase {
 
 		if(nullptr != m_terminal){
 			CommandOption *cmdoptn = &m_options[0];
-			if( nullptr != cmdoptn && nullptr != cmdoptn->optionval && cmdoptn->optionvalsize > 0 ){
-				char *filename = new char[cmdoptn->optionvalsize + SessionManager::getPWD().size() + 2]();
-				if( nullptr != filename ){
-					memcpy(filename, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
-					__i_fs.appendFileSeparator(filename);
-					strncat(filename, cmdoptn->optionval, cmdoptn->optionvalsize);
-
+			pdiutil::string filename = resolveArgPath(cmdoptn);
+			if( !filename.empty() ){
+				{
 					uint32_t offset = 0;
 					uint8_t rowfilled = 0;
 					char asciibuf[16];
 
 					m_terminal->putln();
 
-					int iStatus = __i_fs.readFile(filename, 16, [&](char *data, uint32_t size)->bool{
+					int iStatus = __i_fs.readFile(filename.c_str(), 16, [&](char *data, uint32_t size)->bool{
 
 						char prefix[10];
 						char hexpair[3];
@@ -115,12 +111,10 @@ struct HexdumpCommand : public CommandBase {
 					if(iStatus < 0){
 						result = CMD_RESULT_FAILED;
 						m_terminal->write_ro(RODT_ATTR("Failed : "));
-						m_terminal->write(filename);
+						m_terminal->write(filename.c_str());
 						m_terminal->write_ro(RODT_ATTR(" : "));
 						m_terminal->write((int32_t)iStatus);
 					}
-
-					delete[] filename;
 				}
 			}else{
 				result = CMD_RESULT_ARGS_MISSING;

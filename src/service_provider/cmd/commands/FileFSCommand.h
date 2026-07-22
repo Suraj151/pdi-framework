@@ -63,30 +63,23 @@ struct FileReadCommand : public CommandBase {
 		if(nullptr != m_terminal){
 			// Get first option which must be the filename to read
 			CommandOption *cmdoptn = &m_options[0];
-			if( nullptr != cmdoptn && nullptr != cmdoptn->optionval && cmdoptn->optionvalsize > 0 ){
-				char *filename = new char[cmdoptn->optionvalsize+SessionManager::getPWD().size()+2]();
-				if( nullptr != filename ){
-					memset(filename, 0, cmdoptn->optionvalsize+SessionManager::getPWD().size()+2);
-					memcpy(filename, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
-					__i_fs.appendFileSeparator(filename);
-					strncat(filename, cmdoptn->optionval, cmdoptn->optionvalsize);
+			pdiutil::string filename = resolveArgPath(cmdoptn);
+			if( !filename.empty() ){
 
+				m_terminal->putln();
+				int iStatus = __i_fs.readFile(filename.c_str(), 10, [&](char* data, uint32_t size)->bool{
+					m_terminal->write(data, size);
+					// return true to continue reading
+					return true;
+				});
+
+				if (iStatus < 0) {
+					result = CMD_RESULT_FAILED;
 					m_terminal->putln();
-					int iStatus = __i_fs.readFile(filename, 10, [&](char* data, uint32_t size)->bool{
-						m_terminal->write(data, size);
-						// return true to continue reading
-						return true;
-					});
-
-					if (iStatus < 0) {
-						result = CMD_RESULT_FAILED;
-						m_terminal->putln();
-						m_terminal->write_ro(RODT_ATTR("Failed : "));
-						m_terminal->write(filename);
-						m_terminal->write_ro(RODT_ATTR(" : "));
-						m_terminal->write((int32_t)iStatus);
-					}
-					delete[] filename;
+					m_terminal->write_ro(RODT_ATTR("Failed : "));
+					m_terminal->write(filename.c_str());
+					m_terminal->write_ro(RODT_ATTR(" : "));
+					m_terminal->write((int32_t)iStatus);
 				}
 			}else{
 				result = CMD_RESULT_ARGS_ERROR;
@@ -244,15 +237,11 @@ struct FileWriteCommand : public CommandBase {
 	cmd_result_t updateFile( CommandOption *filenamecmdoptn, const char* data, int16_t len){
 
 		cmd_result_t result = CMD_RESULT_OK;
-		char *filename = new char[filenamecmdoptn->optionvalsize+SessionManager::getPWD().size()+2]();
-		
-		if( nullptr != filename ){
+		pdiutil::string filepath = resolveArgPath(filenamecmdoptn);
 
-			memset(filename, 0, filenamecmdoptn->optionvalsize+SessionManager::getPWD().size()+2);
-			memcpy(filename, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
-			__i_fs.appendFileSeparator(filename);
-			strncat(filename, filenamecmdoptn->optionval, filenamecmdoptn->optionvalsize);
+		if( !filepath.empty() ){
 
+			const char* filename = filepath.c_str();
 			int iStatus = 0;
 			int findWriteQuit = -1;
 			int findCancelQuit = -1;
@@ -264,7 +253,7 @@ struct FileWriteCommand : public CommandBase {
 			}
 
 			// Create temp file of existing file if exist
-			pdiutil::string tempfile = filename;
+			pdiutil::string tempfile = filepath;
 			tempfile += ".tmp";
 			const char* tempfilename = tempfile.c_str();
 			if( __i_fs.isFileExist(filename) && !__i_fs.isFileExist(tempfilename) ){
@@ -308,8 +297,6 @@ struct FileWriteCommand : public CommandBase {
 				m_terminal->write_ro(RODT_ATTR(" : "));
 				m_terminal->write((int32_t)iStatus);
 			}
-
-			delete[] filename;	
 		}
 
 		return result;

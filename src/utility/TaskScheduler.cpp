@@ -282,11 +282,11 @@ int TaskScheduler::computeScore(const task_t& _t, uint64_t _now)
 
     // Policy Weight is policy_boost * policy_cap
     int policy_cap = 50;
-    double policy_boost = 1.0;
+    double policy_boost = 320.0;
 
     switch (_t.m_task_policy) {
-        case TASK_POLICY_DEADLINE: { policy_boost = 2; break; }
-        case TASK_POLICY_FAIRSHARE: { policy_boost = 1.5; break; }
+        case TASK_POLICY_DEADLINE: { policy_boost = 2.0 * policy_boost; break; }
+        case TASK_POLICY_FAIRSHARE: { policy_boost = 1.5 * policy_boost; break; }
         default: break;
     }
 
@@ -308,7 +308,7 @@ int TaskScheduler::computeScore(const task_t& _t, uint64_t _now)
         case TASK_POLICY_FIFO:
         default:
             // Priority dominates, lateness nudges overdue tasks
-            return effective_priority * priority_weight + policy_boost * pdistd::min((int)lateness / 10, policy_cap);
+            return effective_priority * priority_weight + policy_boost * pdistd::min((int)lateness / 100, policy_cap);
     }
 }
 

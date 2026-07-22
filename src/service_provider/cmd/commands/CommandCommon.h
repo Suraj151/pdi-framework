@@ -94,6 +94,29 @@ created Date    : 1st June 2019
 #define CMD_NAME_TAIL  			    "tail"
 #define CMD_NAME_GREP  			    "grep"
 
+#ifdef ENABLE_STORAGE_SERVICE
+/**
+ * Resolve a command's path argument against the session PWD. Absolute args
+ * (leading '/') are taken as-is; relative args are joined with PWD.
+ */
+static inline pdiutil::string resolveArgPath(const CommandBase::CommandOption *opt){
+	pdiutil::string path;
+	// optionvalsize is int16_t and the parser leaves -1 for an absent
+	// positional arg — reject anything non-positive, not just zero.
+	if( nullptr == opt || nullptr == opt->optionval || 0 >= opt->optionvalsize ){
+		return path;
+	}
+	if( opt->optionval[0] == FILE_SEPARATOR[0] ){
+		path.append(opt->optionval, (pdiutil::string::size_type)opt->optionvalsize);
+	}else{
+		path = SessionManager::getPWD();
+		__i_fs.appendFileSeparator(path);
+		path.append(opt->optionval, (pdiutil::string::size_type)opt->optionvalsize);
+	}
+	return path;
+}
+#endif
+
 /* command options */
 #define CMD_OPTION_NAME_A			"a"
 #define CMD_OPTION_NAME_P			"p"

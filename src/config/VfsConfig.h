@@ -24,4 +24,11 @@ created Date    : 20th July 2026
 #define VFS_MOUNT_NAME_MAX 11
 #endif
 
+// Per-backend enable flags. Each backend adds a mount slot at boot, so keep
+// VFS_MAX_MOUNTS ≥ 1 + (number of enabled synthetic backends). Override to
+// undef in DeviceConfig.h to opt out on tight-RAM ports.
+#ifndef ENABLE_PROCFS
+#define ENABLE_PROCFS
+#endif
+
 #endif

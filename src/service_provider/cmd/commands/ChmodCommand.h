@@ -57,19 +57,16 @@ struct ChmodCommand : public CommandBase {
 		CommandOption *mopt = &m_options[0];
 		CommandOption *popt = &m_options[1];
 
-		if( nullptr == mopt || nullptr == mopt->optionval || 0 == mopt->optionvalsize ||
-		    nullptr == popt || nullptr == popt->optionval || 0 == popt->optionvalsize ){
+		if( nullptr == mopt || nullptr == mopt->optionval || 0 >= mopt->optionvalsize ||
+		    nullptr == popt || nullptr == popt->optionval || 0 >= popt->optionvalsize ){
 			return CMD_RESULT_ARGS_ERROR;
 		}
 
 		uint16_t perms = StringToOctalUint16(mopt->optionval, (uint8_t)mopt->optionvalsize) & 0777;
 
-		char path[FILE_NAME_MAX_SIZE + 1];
-		memset(path, 0, sizeof(path));
-		uint16_t plen = popt->optionvalsize < sizeof(path) - 1 ? popt->optionvalsize : sizeof(path) - 1;
-		memcpy(path, popt->optionval, plen);
+		pdiutil::string path = resolveArgPath(popt);
 
-		int rc = __i_fs.setFilePermissions(path, perms);
+		int rc = __i_fs.setFilePermissions(path.c_str(), perms);
 		if( rc < 0 ){
 			m_terminal->writeln();
 			m_terminal->write_ro(RODT_ATTR("chmod: permission denied or not found"));

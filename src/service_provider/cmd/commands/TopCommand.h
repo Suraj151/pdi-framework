@@ -96,6 +96,10 @@ struct TopCommand : public CommandBase {
 		__task_scheduler.remove_task(m_toptaskid);
 
 		m_toptaskid = __task_scheduler.register_task( [&]() {
+			if( nullptr == m_terminal ){
+				stopRunningInBackground();
+				return;
+			}
 			m_terminal->csi_erase_display();
 			m_terminal->csi_cursor_home();
 			__task_scheduler.printPsToTerminal(m_terminal, m_filter_owner);

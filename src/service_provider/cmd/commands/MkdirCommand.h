@@ -52,23 +52,16 @@ struct MkdirCommand : public CommandBase {
 
 		if(nullptr != m_terminal){
 			CommandOption *cmdoptn = &m_options[0];
-			if( nullptr != cmdoptn && nullptr != cmdoptn->optionval && cmdoptn->optionvalsize > 0 ){
-				char *dirname = new char[cmdoptn->optionvalsize+SessionManager::getPWD().size()+2]();
-				if( nullptr != dirname ){
-					memset(dirname, 0, cmdoptn->optionvalsize+SessionManager::getPWD().size()+2);
-					memcpy(dirname, SessionManager::getPWD().c_str(), SessionManager::getPWD().size());
-					__i_fs.appendFileSeparator(dirname);
-					strncat(dirname, cmdoptn->optionval, cmdoptn->optionvalsize);
-					int bStatus = __i_fs.createDirectory(dirname);
-					if (bStatus < 0) {
-						result = CMD_RESULT_FAILED;
-						m_terminal->putln();
-						m_terminal->write_ro(RODT_ATTR("Failed to create directory: "));
-						m_terminal->write(dirname);
-						m_terminal->write_ro(RODT_ATTR(" : "));
-						m_terminal->write((int32_t)bStatus);
-					}
-					delete[] dirname;
+			pdiutil::string dirname = resolveArgPath(cmdoptn);
+			if( !dirname.empty() ){
+				int bStatus = __i_fs.createDirectory(dirname.c_str());
+				if (bStatus < 0) {
+					result = CMD_RESULT_FAILED;
+					m_terminal->putln();
+					m_terminal->write_ro(RODT_ATTR("Failed to create directory: "));
+					m_terminal->write(dirname.c_str());
+					m_terminal->write_ro(RODT_ATTR(" : "));
+					m_terminal->write((int32_t)bStatus);
 				}
 			}else{
 				result = CMD_RESULT_ARGS_ERROR;
