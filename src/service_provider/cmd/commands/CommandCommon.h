@@ -56,7 +56,6 @@ created Date    : 1st June 2019
 #define CMD_NAME_USERDEL 			"userdel"
 #define CMD_NAME_GROUPS 			"groups"
 #endif
-#define CMD_NAME_GPIO 				"gpio"
 #define CMD_NAME_SERVICE 			"srvc"
 #define CMD_NAME_LS 				"ls"
 #define CMD_NAME_CD 				"cd"
@@ -93,27 +92,37 @@ created Date    : 1st June 2019
 #define CMD_NAME_HEAD  			    "head"
 #define CMD_NAME_TAIL  			    "tail"
 #define CMD_NAME_GREP  			    "grep"
+#define CMD_NAME_ECHO  			    "echo"
 
 #ifdef ENABLE_STORAGE_SERVICE
 /**
- * Resolve a command's path argument against the session PWD. Absolute args
+ * Resolve a raw path argument against the session PWD. Absolute args
  * (leading '/') are taken as-is; relative args are joined with PWD.
  */
-static inline pdiutil::string resolveArgPath(const CommandBase::CommandOption *opt){
+static inline pdiutil::string resolveArgPathStr(const char *val, int16_t len){
 	pdiutil::string path;
-	// optionvalsize is int16_t and the parser leaves -1 for an absent
-	// positional arg — reject anything non-positive, not just zero.
-	if( nullptr == opt || nullptr == opt->optionval || 0 >= opt->optionvalsize ){
+	// len is the caller-measured span; reject anything non-positive (the
+	// parser leaves -1 for an absent positional arg).
+	if( nullptr == val || 0 >= len ){
 		return path;
 	}
-	if( opt->optionval[0] == FILE_SEPARATOR[0] ){
-		path.append(opt->optionval, (pdiutil::string::size_type)opt->optionvalsize);
+	if( val[0] == FILE_SEPARATOR[0] ){
+		path.append(val, (pdiutil::string::size_type)len);
 	}else{
 		path = SessionManager::getPWD();
 		__i_fs.appendFileSeparator(path);
-		path.append(opt->optionval, (pdiutil::string::size_type)opt->optionvalsize);
+		path.append(val, (pdiutil::string::size_type)len);
 	}
 	return path;
+}
+/**
+ * Resolve a command's path argument against the session PWD.
+ */
+static inline pdiutil::string resolveArgPath(const CommandBase::CommandOption *opt){
+	if( nullptr == opt ){
+		return pdiutil::string();
+	}
+	return resolveArgPathStr(opt->optionval, opt->optionvalsize);
 }
 #endif
 

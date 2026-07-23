@@ -395,6 +395,15 @@ uint64_t DeviceControlInterface::micros_now()
 }
 
 /**
+ * return a 32-bit hardware random value (os_random reads the SDK RNG, already
+ * declared by the esp8266 core headers).
+ */
+uint32_t DeviceControlInterface::random_now()
+{
+    return (uint32_t)os_random();
+}
+
+/**
  * return currently free heap size in bytes
  */
 uint32_t DeviceControlInterface::get_free_heap()

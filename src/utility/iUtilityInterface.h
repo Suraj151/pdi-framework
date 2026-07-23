@@ -78,6 +78,20 @@ public:
   virtual void yield() = 0;
 
   /**
+   * @brief Returns a 32-bit random value. Default is a portable xorshift PRNG
+   *        seeded from micros_now() — adequate for non-cryptographic use on
+   *        ports without a hardware RNG (Arduino UNO, mock). Ports with a
+   *        hardware entropy source override this.
+   * @return A pseudo-random 32-bit value.
+   */
+  virtual uint32_t random_now(){
+    static uint32_t s = 0;
+    if( s == 0 ){ s = (uint32_t)micros_now(); if( s == 0 ) s = 0xA5A5A5A5u; }
+    s ^= s << 13; s ^= s >> 17; s ^= s << 5;
+    return s;
+  }
+
+  /**
    * @brief Returns currently free heap size in bytes, or 0 if not supported.
    */
   virtual uint32_t get_free_heap(){ return 0; }

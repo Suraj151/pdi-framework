@@ -38,12 +38,6 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   #endif
   #endif
 
-  #ifdef ENABLE_GPIO_SERVICE
-  // GpioCommand *gpiocmd = new GpioCommand();
-  // m_cmdlist.push_back(gpiocmd);
-  GpioCommand::RegisterCommand();
-  #endif
-
   // ServiceCommand *svccmd = new ServiceCommand();
   // m_cmdlist.push_back(svccmd);
   ServiceCommand::RegisterCommand();
@@ -145,6 +139,7 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
 
   HelpCommand::RegisterCommand();
   UptimeCommand::RegisterCommand();
+  EchoCommand::RegisterCommand();
 
   CommandBase::SetCommandExecutionInterface(this);
 }

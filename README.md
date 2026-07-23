@@ -13,8 +13,8 @@ PDI is a modular C++ stack for embedded devices. Application code is written onc
 - **Compile-time feature gating.** Each capability is wrapped in an `ENABLE_*` flag; disabled features contribute zero flash.
 - **Configurable task scheduler.** Inline, cooperative, and preemptive modes; priority-and-policy scheduling; POSIX nice; per-task signals (KILL/TERM/STOP/CONT) with `ps`/`top`/`kill`/`pkill`/`killall`/`renice`.
 - **Service supervisor (systemd-lite).** `srvc list / status / start / stop / restart` — every service tracks its scheduler tasks and can be paused or resumed at runtime.
-- **Virtual filesystem (VFS).** Multiple backends mounted under one tree with longest-prefix routing; POSIX-style permissions, ownership, and per-session umask enforced at the VFS layer; multi-user aware (`/etc/passwd` + `/etc/shadow`). Includes a read-only `/proc` with live system nodes.
-- **Linux-style CLI on serial / Telnet / SSH.** `ls`, `cat`, `grep`, `head`, `tail`, `wc`, `hexdump`, `df`, `mount`, `chmod`, `chown`, `umask`, `uptime`, `mv`, `cp`, `mkdir`, `touch`, `rm`, `watch`, `gpio`, `srvc`, `ps`, `top`, `kill`, `pkill`, `killall`, `renice`, `net`, `iot`, `ssh`, `tls`, `reboot`, and more.
+- **Virtual filesystem (VFS).** Multiple backends mounted under one tree with longest-prefix routing; POSIX-style permissions, ownership, and per-session umask enforced at the VFS layer; multi-user aware (`/etc/passwd` + `/etc/shadow`). Includes a read-only `/proc` with live system nodes, a read/write `/sys` exposing GPIO as files (`echo 1 > /sys/class/gpio/5/value`), a `/dev` with byte-stream nodes (`/dev/null`, `/dev/zero`, `/dev/random`), and a RAM-backed `/tmp` scratch filesystem.
+- **Linux-style CLI on serial / Telnet / SSH.** `ls`, `cat`, `echo`, `grep`, `head`, `tail`, `wc`, `hexdump`, `df`, `mount`, `chmod`, `chown`, `umask`, `uptime`, `mv`, `cp`, `mkdir`, `touch`, `rm`, `watch`, `srvc`, `ps`, `top`, `kill`, `pkill`, `killall`, `renice`, `net`, `iot`, `ssh`, `tls`, `reboot`, and more. (GPIO is driven as files via `/sys` — see below.)
 - **On-device file transfer.** `scp` (single file) and interactive `sftp` over the SSH tunnel.
 - **Web portal for configuration.** Session-based login, per-service settings pages, GPIO control, storage browser, MQTT tester, Email tester.
 - **Persistent config store.** Address-based table engine with JSON-driven codegen for schema tables.
@@ -54,10 +54,10 @@ Per-service reference in [§6 Service Providers](#6-service-providers).
 **Utilities** — Task Scheduler (inline / cooperative / preemptive), Event bus, Queues, String helpers, Data converters, Crypto, PdiSTL, Reset Factory.
 Full inventory in [§15 Utility Library](#15-utility-library).
 
-**Storage** — VFS with mountable backends (LittleFS root + `/proc` synthetic), POSIX permissions/ownership with per-session umask, multi-user file access control.
+**Storage** — VFS with mountable backends (LittleFS root + `/proc` + `/sys` + `/dev` synthetics + RAM-backed `/tmp`), POSIX permissions/ownership with per-session umask, multi-user file access control.
 Details in [§6.2.11 Storage](#6211-storage-interface-init-no-provider).
 
-**CLI** — 40+ built-in commands including `ls mkdir touch mv cp cat head tail wc hexdump grep df mount chmod chown umask gpio srvc ps top kill pkill killall renice net watch iot ssh tls reboot uptime groups useradd userdel passwd ...`.
+**CLI** — 40+ built-in commands including `ls mkdir touch mv cp cat echo head tail wc hexdump grep df mount chmod chown umask srvc ps top kill pkill killall renice net watch iot ssh tls reboot uptime groups useradd userdel passwd ...`.
 Full command reference in [§7.7 Built-in command inventory](#77-built-in-command-inventory).
 
 **Extras** — Captive portal, GPIO events over MQTT/HTTP/Email, NAT (ESP8266 lwIP — see [§2.4.1](#241-nat-and-mesh)), Mesh via ESPNOW.
@@ -1159,7 +1159,7 @@ Fully documented in [§5. Database Layer](#5-database-layer).
 | Depends on | `iGpioInterface` (folded into `__i_dvc_ctrl`), `gpio_config_table`, optionally `iTcpClientInterface` (POST sensor data), `__email_service` (event alerts) |
 | Init does | Loads `gpio_config_table`, schedules `handleGpioOperations` (mode/value tick) and `handleGpioModes` (table refresh every `GPIO_TABLE_UPDATE_DURATION = 300000 ms`) |
 | Modes | `OFF`, `DIGITAL_WRITE`, `DIGITAL_READ`, `DIGITAL_BLINK`, `ANALOG_WRITE`, `ANALOG_READ` ([GpioConfig.h](src/config/GpioConfig.h)) |
-| CLI surface | `gpio p=<pin>,m=<mode>,v=<value>` |
+| CLI surface | sysfs files at `/sys/class/gpio/<pin>/{value,mode}` — e.g. `echo 1 > /sys/class/gpio/5/value` |
 | Web surface | "GPIO" section + "GPIO Events" submenu (per-pin event conditions over `EMAIL` / `HTTP` channels) |
 
 #### 6.2.7 `MqttServiceProvider` — `__mqtt_service`
@@ -1246,7 +1246,7 @@ The working example sketch is walked through in [§11.6 DeviceIotExample](#116-d
 
 #### 6.2.11 Storage (interface init, no provider)
 
-`ENABLE_STORAGE_SERVICE` doesn't have its own `ServiceProvider` subclass — the FS is used directly by SSH/SFTP, `UserStoreService`, the file-oriented CLI commands (`ls`/`cd`/`mv`/`cp`/`rm`/`mkdir`/`touch`/`cat`/`fwrite`/`head`/`tail`/`wc`/`df`/`grep`/`hexdump`/`chmod`/`chown`/`umask`/`mount`), and any application code.
+`ENABLE_STORAGE_SERVICE` doesn't have its own `ServiceProvider` subclass — the FS is used directly by SSH/SFTP, `UserStoreService`, the file-oriented CLI commands (`ls`/`cd`/`mv`/`cp`/`rm`/`mkdir`/`touch`/`cat`/`echo`/`fwrite`/`head`/`tail`/`wc`/`df`/`grep`/`hexdump`/`chmod`/`chown`/`umask`/`mount`), and any application code.
 
 The global `__i_fs` is a **`VfsDispatcher`** ([src/interface/pdi/impl/modules/storage/VfsDispatcher.{h,cpp}](src/interface/pdi/impl/modules/storage/VfsDispatcher.h)) — an `iFileSystemInterface` implementation that routes every call to a mounted backend selected by **longest-prefix path match**. Per-device `FileSystemInterface` (LittleFS via [external/LittleFSWrapper.{h,cpp}](external/LittleFSWrapper.h) → [FileSystemInterfaceImpl](src/interface/pdi/impl/modules/storage/FileSystemInterfaceImpl.h)) is now `__i_rootfs`, mounted at `/` during `PdiStack::initialize`:
 
@@ -1255,10 +1255,19 @@ __i_fs.mount(FILE_SEPARATOR, &__i_rootfs, "rootfs", VFS_TYPE_LITTLEFS);
 #ifdef ENABLE_PROCFS
 __i_fs.mount("/proc", &__i_procfs, "procfs", VFS_TYPE_PROCFS);
 #endif
+#ifdef ENABLE_SYSFS
+__i_fs.mount("/sys", &__i_sysfs, "sysfs", VFS_TYPE_SYSFS);
+#endif
+#ifdef ENABLE_DEVFS
+__i_fs.mount("/dev", &__i_devfs, "devfs", VFS_TYPE_DEVFS);
+#endif
+#ifdef ENABLE_TMPFS
+__i_fs.mount("/tmp", &__i_tmpfs, "tmpfs", VFS_TYPE_TMPFS);
+#endif
 __i_fs.init();
 ```
 
-Mount table config lives in [config/VfsConfig.h](src/config/VfsConfig.h) — `VFS_MAX_MOUNTS` (default 3), `VFS_MOUNT_PREFIX_MAX` (15), `VFS_MOUNT_NAME_MAX` (11), plus per-backend enable flags (`ENABLE_PROCFS`, default on). Inspect the mount table at runtime with the `mount` command ([§7.7](#77-built-in-command-inventory)); `df` reports total/used/free per mount.
+Mount table config lives in [config/VfsConfig.h](src/config/VfsConfig.h) — `VFS_MAX_MOUNTS` (default 5), `VFS_MOUNT_PREFIX_MAX` (15), `VFS_MOUNT_NAME_MAX` (11), plus per-backend enable flags (`ENABLE_PROCFS`, `ENABLE_SYSFS`, `ENABLE_DEVFS`, `ENABLE_TMPFS`, all default on). The default five slots are exactly filled by rootfs + procfs + sysfs + devfs + tmpfs — enabling further synthetic backends needs `VFS_MAX_MOUNTS` raised (per-port on tight-RAM targets; `ENABLE_TMPFS` in particular is worth undefining on Arduino UNO since it holds file content in RAM). Inspect the mount table at runtime with the `mount` command ([§7.7](#77-built-in-command-inventory)); `df` reports total/used/free per mount.
 
 **procfs** ([src/interface/pdi/impl/modules/storage/ProcFs.{h,cpp}](src/interface/pdi/impl/modules/storage/ProcFs.h)) — a read-only synthetic filesystem mounted at `/proc`; node contents are generated on each read. Works with the regular file commands (`cd /proc`, `ls`, `cat`, `head`, `wc`, `hexdump`, `grep`); all nodes are `0444`, root-owned, and writes return an error.
 
@@ -1266,6 +1275,30 @@ Mount table config lives in [config/VfsConfig.h](src/config/VfsConfig.h) — `VF
 |---|---|
 | `/proc/uptime` | seconds since boot: `<sec>.<centisec> <sec>.<centisec>` (Linux layout) |
 | `/proc/version` | `PDI Stack version <RELEASE> (<CONFIG_VERSION>)` |
+
+**sysfs** ([src/interface/pdi/impl/modules/storage/SysFs.{h,cpp}](src/interface/pdi/impl/modules/storage/SysFs.h)) — a synthetic filesystem mounted at `/sys` that exposes device peripherals as **read/write** files. GPIO pins (gated on `ENABLE_GPIO_SERVICE`) are laid out one directory per pin, listing only non-exceptional pins in the unified digital+analog table:
+
+| Node | Access | Content |
+|---|---|---|
+| `/sys/class/gpio/<pin>/value` | `0666` | current reading / write value (decimal) |
+| `/sys/class/gpio/<pin>/mode` | `0666` | GPIO mode: `0`=OFF `1`=DIGITAL_WRITE `2`=DIGITAL_READ `3`=DIGITAL_BLINK `4`=ANALOG_WRITE `5`=ANALOG_READ |
+
+Reads return the value the GPIO service maintains (refreshed each operation tick for read-mode pins); writes drive `__gpio_service.m_gpio_config_copy` + persist + re-apply modes. This is the CLI path to GPIO — write mode first, then value: `echo 3 > /sys/class/gpio/4/mode` then `echo 500 > /sys/class/gpio/4/value` blinks GPIO 4 at 500 ms. Directory nodes are `0555`, all nodes root-owned. Write with the `echo` command's `>` redirection ([§7.7](#77-built-in-command-inventory)); the `fwrite` editor's tmp-file flow does not apply to synthetic nodes.
+
+**devfs** ([src/interface/pdi/impl/modules/storage/DevFs.{h,cpp}](src/interface/pdi/impl/modules/storage/DevFs.h)) — a synthetic filesystem mounted at `/dev` exposing byte-stream device nodes. All nodes are `0666`, root-owned; the `/dev` directory is `0555`.
+
+| Node | `cat` (read) | `echo … >` (write) |
+|---|---|---|
+| `/dev/null` | EOF — yields nothing | discarded |
+| `/dev/zero` | `0x00` bytes | discarded |
+| `/dev/random` | random bytes (`__i_dvc_ctrl.random_now()`) | discarded |
+| `/dev/urandom` | same as `random` (no separate entropy pool on MCU) | discarded |
+
+Unbounded reads (`/dev/zero`, `/dev/random`, `/dev/urandom`) are **capped at `DEVFS_STREAM_READ_MAX` bytes (default 64) per read call** — unlike Linux they are not infinite, so `cat /dev/zero` terminates instead of spinning the MCU into a watchdog reset. `random_now()` is an `iUtilityInterface` method: hardware RNG on esp32 (`esp_random`) / esp8266 (`os_random`), a portable micros-seeded xorshift default on UNO / mock (non-cryptographic).
+
+**tmpfs** ([src/interface/pdi/impl/modules/storage/TmpFs.{h,cpp}](src/interface/pdi/impl/modules/storage/TmpFs.h)) — a **RAM-backed read/write** filesystem mounted at `/tmp`. Unlike the synthetic proc/sys/dev backends it actually stores file content and directories in the heap (a `tmpfs_node_t` table), so the full command surface works — `mkdir`, `touch`, `echo … >`, `cat`, `head`, `tail`, `wc`, `grep`, `cp`, `mv`, `rm`, `chmod`, `chown`. Files are stamped with the creating session's uid/gid and `perms & ~umask` (same `currentOwner`/`currentUmask`/`nowEpoch` hooks the LittleFS root uses), so the dispatcher's permission gate enforces access normally. Everything is lost on reboot.
+
+Budgets live in [config/TmpFsConfig.h](src/config/TmpFsConfig.h): `TMPFS_MAX_BYTES` (total content, default 4096), `TMPFS_MAX_NODES` (files + dirs, default 24), `TMPFS_MAX_PATH` (default 63). `df` reports usage against `TMPFS_MAX_BYTES`. Example: `mkdir /tmp/work; echo hello > /tmp/work/a.txt; cat /tmp/work/a.txt`. A single `/tmp` mount is the whole RAM-filesystem surface — sufficient scratch space for the target devices without a second RAM store.
 
 **Permissions & ownership** are advisory at the wrapper (bits stored via `lfs_setattr`) and enforced at the dispatcher. `file_info_t` carries `m_type`/`m_size`/`m_name`/`m_ctime`/`m_mtime`/`m_perms`/`m_uid`/`m_gid` and every FS entry is stamped on create with the current session's uid/gid (via the protected `currentOwner()` hook, overridden in `FileSystemInterfaceImpl` to pull from `SessionManager`). Default file/dir perms are `0644` / `0755` masked by the caller's umask (`FILE_UMASK_DEFAULT 0022`, per-session via `currentUmask()`).
 
@@ -1283,7 +1316,7 @@ Missing files are treated as "allowed" (creation defer); missing uid/gid attrs o
 
 **Privileged scope** — a setuid analog. `beginPrivileged()` / `endPrivileged()` on the dispatcher increment a depth counter; while depth > 0 all three check helpers return `true`. Used by `UserStoreService::verifyPassword` / `setPassword` to read `/etc/shadow` (0600) on behalf of a non-root session during `su`/`login`/`passwd`. Scope kept as narrow as possible around the shadow read.
 
-Cross-mount `rename`/`copyFile`/`moveFile` return -1 for now (deferred until symlinks land).
+Cross-mount `copyFile`/`rename`/`moveFile` (source and destination on different backends, e.g. `cp /tmp/a.txt /home/a.txt`) stream the source file chunk-by-chunk into the destination backend — the first chunk creates/truncates, the rest append; a mid-transfer failure removes the partial destination. Directories don't cross boundaries, and an existing destination is refused. A cross-mount `mv`/`rename` is a stream-copy followed by deleting the source. Same-backend operations still route straight to that backend's native call. Symlinks (`FILE_TYPE_LINK` / `ln -s`) and runtime `mount`/`umount` remain unimplemented.
 
 #### 6.2.12 `WebServer` — `__web_server`
 
@@ -1324,7 +1357,7 @@ Full breakdown lives in [§8. Web Server](#8-web-server) — it has its own rout
 | Depends on | `__auth_service`, `SessionManager` ([§6.2.18](#6218-sessionmanager)), every command in [cmd/commands/](src/service_provider/cmd/commands/) |
 | Init does | Registers all command handlers; `PdiStack` calls `SessionManager::attach(serialTerminal)` at boot so the serial slot is populated before first input |
 | Terminal binding | `useTerminal(t)` attaches a `session_t` for terminal `t` (idempotent) and draws the login prompt. `processTerminalInput(t)` looks up the session via `SessionManager::findByTerminal(t)`, sets it as current for the tick, then dispatches. Each in-flight command carries `m_owner = session` so cross-session `getCommandWaitingForUserInput` never returns another session's prompt |
-| Built-in commands | Files (`ls`/`cd`/`pwd`/`mkdir`/`touch`/`mv`/`cp`/`rm`/`cat`/`fwrite`/`head`/`tail`/`wc`/`df`/`grep`/`hexdump`/`mount`/`chmod`/`chown`/`umask`), auth+users (`login`/`logout`/`whoami`/`id`/`who`/`su`/`passwd`/`useradd`/`userdel`/`groups`), device (`gpio`/`net`/`srvc`/`ps`/`top`/`kill`/`pkill`/`killall`/`renice`/`ssh`/`tls`/`iot`/`reboot`/`watch`/`uptime`/`cls`/`help`) — full reference in [§7.7](#77-built-in-command-inventory) |
+| Built-in commands | Files (`ls`/`cd`/`pwd`/`mkdir`/`touch`/`mv`/`cp`/`rm`/`cat`/`echo`/`fwrite`/`head`/`tail`/`wc`/`df`/`grep`/`hexdump`/`mount`/`chmod`/`chown`/`umask`), auth+users (`login`/`logout`/`whoami`/`id`/`who`/`su`/`passwd`/`useradd`/`userdel`/`groups`), device (`net`/`srvc`/`ps`/`top`/`kill`/`pkill`/`killall`/`renice`/`ssh`/`tls`/`iot`/`reboot`/`watch`/`uptime`/`cls`/`help`) — full reference in [§7.7](#77-built-in-command-inventory) |
 | Multi-session | Up to `PDI_MAX_SESSIONS` (default 3) sessions run concurrently across serial + telnet + ssh. Each has its own linebuf, cursor, history-walk, cwd, auth, username, and in-flight commands. See [§7.8](#78-multi-terminal-session-lifecycle) |
 
 #### 6.2.16 TLS (no provider; transport hookup + cert provisioning)
@@ -1530,7 +1563,7 @@ A command class:
 
 #### Parsing rules
 
-Given input `gpio p=4,m=3,v=500`:
+Given input `<cmd> p=4,m=3,v=500` (a command declaring options `p`, `m`, `v`):
 - Tokenise the **command name** at the first space (or end).
 - Look up the option separator (default `,`).
 - For each `key=value` pair, find the key in the declared options and store `optionval` + `optionvalsize`.
@@ -1592,6 +1625,7 @@ Names come from [CommandCommon.h](src/service_provider/cmd/commands/CommandCommo
 | pwd | | Print current working directory. e.g. **pwd** |
 | rm \<file_or_dir> | | Remove file or directory. Requires `+w` on the target for non-root. e.g. **rm /home/notes.txt** |
 | cat \<file> | | Print file contents to terminal (renamed from `fread`). Requires `+r` on the file for non-root. e.g. **cat /home/notes.txt**, **cat /proc/uptime** |
+| echo \<text> [> \<file>] | | Print `<text>`; with `>` redirection, write it to `<file>` via a single `writeFile` (no tmp/append dance — works on synthetic nodes). Requires `+w` on the target for non-root. e.g. **echo hello**, **echo 1 > /sys/class/gpio/5/value**, **echo x > /dev/null**. Note: comma is the shell's option separator, so `<text>` should not contain commas. |
 | fwrite \<file> | f=\<file> v=\<value> | Open file in append mode; type content line by line. Press **ESC** to save & exit. Requires `+w` on the file for non-root. e.g. **fwrite /home/notes.txt** or **fwrite f=/home/notes.txt v=hello** |
 | head \<file> [N] | | Print first N lines (default 10); constant memory. e.g. **head /home/log.txt 5** |
 | tail \<file> [N] | | Print last N lines (default 10); constant memory. e.g. **tail /home/log.txt 5** |
@@ -1615,7 +1649,6 @@ Names come from [CommandCommon.h](src/service_provider/cmd/commands/CommandCommo
 | passwd p=\<curr> n=\<new> c=\<confirm> | p, n, c (space) | Change own password. Three-phase interactive when omitted (`current:` / `new:` / `confirm:`), all echo-suppressed. Enters a privileged VFS scope for the `/etc/shadow` update. e.g. **passwd p=oldpw n=newpw c=newpw** |
 | useradd u=\<user> p=\<pass> | u, p (space) | **Root-only.** Create a new user. UID auto-assigned to next free slot ≥1; `gid = uid`; home=`/`, shell=`cmd`. Writes both `/etc/passwd` and `/etc/shadow` (rolls back on shadow failure). e.g. **useradd u=alice p=alice123** |
 | userdel u=\<user> | u (space) | **Root-only.** Delete a user from `/etc/passwd` + `/etc/shadow`. Refuses self-delete and uid=0 (root). e.g. **userdel u=alice** |
-| gpio p=\<pin>,m=\<mode>,v=\<value> | p=\<pin> m=\<mode> v=\<value> | Perform GPIO operations. Modes: OFF=0, DIGITAL_WRITE=1, DIGITAL_READ=2, DIGITAL_BLINK=3, ANALOG_WRITE=4, ANALOG_READ=5. e.g. blink GPIO 4 at 500 ms: **gpio p=4,m=3,v=500** |
 | srvc list \| status \<name> \| start \<name> \| stop \<name> \| restart \<name> | positional, space-separated | Service supervisor (systemd-lite). `list` prints every service with state; `status <name>` shows tracked PIDs; `start`/`stop`/`restart` deliver `SIG_CONT`/`SIG_STOP` (both) to every task the service owns. Root required for start/stop/restart. e.g. **srvc list**, **srvc stop GPIO** |
 | ps [\<sid>] | | List active scheduler tasks POSIX-style with owner, state, %CPU, runs, interval, name. Optional positional filter by owner session id. e.g. **ps** or **ps 1** |
 | top | i=\<ms>; n=\<iters>; u=\<sid> | Same view as `ps`, refreshed on a scheduler task at `i` ms (default 2000, min 500). `n` bounds iterations (omit for forever). Stop with Ctrl+C. e.g. **top i=1500; n=10** |
@@ -2875,7 +2908,7 @@ In addition, [src/utility/](src/utility/) ships three foundational interfaces th
 | Foundation interface | Path | Role |
 |---|---|---|
 | `iIOInterface` / `iTerminalInterface` | [src/utility/iIOInterface.h](src/utility/iIOInterface.h) | Byte/line I/O contract — base of every stream-like interface (serial, TCP client, terminal sessions) |
-| `iUtilityInterface` | [src/utility/iUtilityInterface.h](src/utility/iUtilityInterface.h) | `wait`, `millis_now`, `micros_now` (64-bit µs — powers `ps` %CPU), `yield`, `log`, optional stack measurement |
+| `iUtilityInterface` | [src/utility/iUtilityInterface.h](src/utility/iUtilityInterface.h) | `wait`, `millis_now`, `micros_now` (64-bit µs — powers `ps` %CPU), `random_now` (HW RNG on esp; xorshift default), `yield`, `log`, optional stack measurement |
 | `iInstanceInterface` | [src/utility/iInstanceInterface.h](src/utility/iInstanceInterface.h) | Factory: new TCP client/server, get utility/filesystem |
 
 ### 13.2 Naming and discovery conventions
@@ -2900,14 +2933,14 @@ Each row below: what the interface models, who implements it on a typical port, 
 | `iDeviceControlInterface` | [middlewares/iDeviceControlInterface.h](src/interface/pdi/middlewares/iDeviceControlInterface.h) | Device | `PDIStack`, every service via `__i_dvc_ctrl` | `initDeviceSpecificFeatures`, `resetDevice`, `restartDevice`, `eraseConfig`, `getDeviceId`, `getDeviceMac`, `isDeviceFactoryRequested`, `getTerminal`, `handleEvents` (+ inherited GPIO/WDT/utility/upgrade) |
 | `iDatabaseInterface` | [iDatabaseInterface.h](src/interface/pdi/iDatabaseInterface.h) | Device | `DatabaseServiceProvider`, every config table | `beginConfigs(size)`, `cleanAllConfigs`, `isValidConfigs`, `getMaxDBSize`, plus templated typed read/write |
 | `iInstanceInterface` | [src/utility/iInstanceInterface.h](src/utility/iInstanceInterface.h) | Device | Services that need fresh TCP/TLS/FS instances (MQTT pool, SSH, OTA, HTTPS) | `getNewTcpClientInstance`, `getNewTcpServerInstance`, `getNewTlsClientInstance` / `getNewTlsServerInstance` (`ENABLE_TLS_SERVICE`), `getFileSystemInstance`, `getUtilityInstance` |
-| `iUtilityInterface` | [src/utility/iUtilityInterface.h](src/utility/iUtilityInterface.h) | Inherited via `iDeviceControlInterface` | Scheduler, event bus, logger | `wait`, `millis_now`, `micros_now`, `yield`, `log`, optional `can_measure_stack` / `measure_lastfn_stack` |
+| `iUtilityInterface` | [src/utility/iUtilityInterface.h](src/utility/iUtilityInterface.h) | Inherited via `iDeviceControlInterface` | Scheduler, event bus, logger, `DevFs` (`/dev/random`) | `wait`, `millis_now`, `micros_now`, `random_now`, `yield`, `log`, optional `can_measure_stack` / `measure_lastfn_stack` |
 | `iIOInterface`, `iTerminalInterface` | [src/utility/iIOInterface.h](src/utility/iIOInterface.h) | Any stream (serial, TCP, etc.) | Logger, CLI, web body writers | `write`/`writeln` family (overloaded for all primitive types + `RODT_ATTR` strings), `with_timestamp`, `connect`/`disconnect` |
 
 #### 13.3.2 Drivers
 
 | Interface | Path | Implementer | Consumers | Key methods |
 |---|---|---|---|---|
-| `iGpioInterface` | [drivers/iGpioInterface.h](src/interface/pdi/drivers/iGpioInterface.h) | Device (via `DeviceControlInterface`) | `GpioServiceProvider`, `gpio` CLI | `gpioMode`, `gpioWrite`, `gpioRead`, `gpioFromPinMap`, `isExceptionalGpio`, blink instance create/release |
+| `iGpioInterface` | [drivers/iGpioInterface.h](src/interface/pdi/drivers/iGpioInterface.h) | Device (via `DeviceControlInterface`) | `GpioServiceProvider`, `SysFs` (`/sys/class/gpio`) | `gpioMode`, `gpioWrite`, `gpioRead`, `gpioFromPinMap`, `isExceptionalGpio`, blink instance create/release |
 | `iGpioBlinkerInterface` | same file | Device | GPIO service for blink mode | `setConfig`, `updateConfig`, `start`, `stop`, `isRunning` |
 | `iWdtInterface` | [drivers/iWdtInterface.h](src/interface/pdi/drivers/iWdtInterface.h) | Device (folded into `DeviceControlInterface`) | Long-running services, scheduler | `enableWdt(mode)`, `disableWdt`, `feedWdt` |
 

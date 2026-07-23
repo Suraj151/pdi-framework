@@ -119,6 +119,11 @@ protected:
     iFileSystemInterface* resolve(const char* path, const char** relpath_out) const;
     iFileSystemInterface* rootBackend() const;
 
+    // Stream a regular file from one backend to another (used when copy/move
+    // cross a mount boundary). Returns 0 on success, -1 otherwise.
+    int crossCopy(iFileSystemInterface* sb, const char* srel,
+                  iFileSystemInterface* db, const char* drel);
+
     vfs_mount_t m_mounts[VFS_MAX_MOUNTS];
     uint8_t m_mount_count;
     uint8_t m_priv_depth;

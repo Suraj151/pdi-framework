@@ -302,26 +302,58 @@ int VfsDispatcher::touch(const char* path) {
 
 #undef VFS_ROUTE_PATH
 
+int VfsDispatcher::crossCopy(iFileSystemInterface* sb, const char* srel, iFileSystemInterface* db, const char* drel) {
+    // Only regular files stream across a mount boundary.
+    if (!sb->isFileExist(srel) || sb->isDirectory(srel)) return -1;
+    if (db->isFileExist(drel) || db->isDirExist(drel)) return -1;
+
+    // Deliver source content in chunks; the first chunk creates/truncates the
+    // destination, the rest append. `size` here is the per-callback chunk cap.
+    bool first = true;
+    bool ok = true;
+    int rc = sb->readFile(srel, 128, [&](char* data, uint32_t n)->bool {
+        int w = db->writeFile(drel, data, n, !first);
+        first = false;
+        if (w < 0) { ok = false; return false; }
+        return true;
+    });
+    if (rc < 0 || !ok) {
+        db->deleteFile(drel);
+        return -1;
+    }
+    // Empty source: no chunk was delivered. A zero-byte writeFile does not
+    // create the file on every backend (LittleFS opens without O_CREAT for an
+    // empty write), so materialise the empty destination with createFile.
+    if (first && db->createFile(drel, "", 0) < 0) return -1;
+    return 0;
+}
+
 int VfsDispatcher::rename(const char* oldPath, const char* newPath) {
     const char *orel = nullptr, *nrel = nullptr;
     iFileSystemInterface* ob = resolve(oldPath, &orel);
     iFileSystemInterface* nb = resolve(newPath, &nrel);
-    if (!ob || ob != nb) return -1;
-    return ob->rename(orel, nrel);
+    if (!ob || !nb) return -1;
+    if (ob == nb) return ob->rename(orel, nrel);
+    // Cross-mount rename == copy to the new backend then drop the source.
+    if (crossCopy(ob, orel, nb, nrel) < 0) return -1;
+    return ob->deleteFile(orel);
 }
 int VfsDispatcher::copyFile(const char* sourcePath, const char* destPath) {
     const char *srel = nullptr, *drel = nullptr;
     iFileSystemInterface* sb = resolve(sourcePath, &srel);
     iFileSystemInterface* db = resolve(destPath, &drel);
-    if (!sb || sb != db) return -1;
-    return sb->copyFile(srel, drel);
+    if (!sb || !db) return -1;
+    if (sb == db) return sb->copyFile(srel, drel);
+    return crossCopy(sb, srel, db, drel);
 }
 int VfsDispatcher::moveFile(const char* oldPath, const char* newPath) {
     const char *orel = nullptr, *nrel = nullptr;
     iFileSystemInterface* ob = resolve(oldPath, &orel);
     iFileSystemInterface* nb = resolve(newPath, &nrel);
-    if (!ob || ob != nb) return -1;
-    return ob->moveFile(orel, nrel);
+    if (!ob || !nb) return -1;
+    if (ob == nb) return ob->moveFile(orel, nrel);
+    if (crossCopy(ob, orel, nb, nrel) < 0) return -1;
+    return ob->deleteFile(orel);
 }
 
 uint64_t VfsDispatcher::getTotalSize() {

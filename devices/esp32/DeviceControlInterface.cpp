@@ -645,6 +645,16 @@ uint64_t DeviceControlInterface::micros_now()
 }
 
 /**
+ * return a 32-bit hardware random value (esp_random reads the RNG peripheral).
+ * Forward-declared to stay independent of ESP-IDF header layout across cores.
+ */
+extern "C" uint32_t esp_random(void);
+uint32_t DeviceControlInterface::random_now()
+{
+    return esp_random();
+}
+
+/**
  * return currently free heap size in bytes
  */
 uint32_t DeviceControlInterface::get_free_heap()
