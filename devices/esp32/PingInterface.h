@@ -42,9 +42,6 @@ created Date    : 1st June 2019
 #define DEFAULT_PING_MAX_COUNT 1
 #define PING_TIMEOUT_MS 1000
 
-// This function is called when a ping is received or the request times out:
-void ICACHE_FLASH_ATTR pingResults(ping_target_id_t found_id, esp_ping_found * pf);
-
 /**
  * PingInterface class
  */
@@ -65,8 +62,11 @@ class PingInterface : public iPingInterface {
      * initialize ping
      */
     void init_ping( iWiFiInterface* _wifi ) override;
-    bool ping( void ) override;
+    bool ping( const ipaddress_t &target, uint16_t count = 1,
+               CallBackVoidPointerArgFn on_packet = nullptr ) override;
+    bool isPingComplete( void ) override;
     bool isHostRespondingToPing( void ) override;
+    const ping_stats_t &getPingStats( void ) override;
 
   protected:
     /**

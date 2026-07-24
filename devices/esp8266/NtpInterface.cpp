@@ -9,6 +9,7 @@ created Date    : 1st June 2019
 ******************************************************************************/
 
 #include "NtpInterface.h"
+#include <sys/time.h>
 
 /**
  * Set sntp update delay by defining weak function in lwip arduino build
@@ -59,6 +60,19 @@ bool NtpInterface::is_valid_ntptime()
 pdiutil::epoch_time_t NtpInterface::get_ntp_time()
 {
   return time(nullptr);
+}
+
+/**
+ * set the system clock to a unix epoch (utc seconds)
+ *
+ * @return  true on success
+ */
+bool NtpInterface::set_ntp_time(pdiutil::epoch_time_t epoch)
+{
+  struct timeval tv;
+  tv.tv_sec = (time_t)epoch;
+  tv.tv_usec = 0;
+  return (0 == settimeofday(&tv, nullptr));
 }
 
 NtpInterface __i_ntp;

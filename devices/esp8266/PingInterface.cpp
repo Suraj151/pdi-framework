@@ -16,14 +16,41 @@ created Date    : 1st June 2019
 #endif
 
 volatile bool _host_resp = false;
-static const char _pinghostname[] = "google.com";
-// IPAddress PING_TARGET(8,8,8,8);
+static volatile bool _ping_complete = false;
+static ping_stats_t _ping_stats = {0, 0, 0, 0, 0};
+static uint32_t _ping_sum_ms = 0;
+static uint16_t _ping_seq = 0;
+static uint16_t _ping_count = 0;
+static CallBackVoidPointerArgFn _ping_pkt_cb = nullptr;
 
 // This function is called when a ping is received or the request times out.
 static void ICACHE_FLASH_ATTR ping_recv_cb (void* arg, void *pdata){
 
   struct ping_resp *pingrsp = (struct ping_resp *)pdata;
+
+  // recv fires exactly once per ping (reply OR timeout), so the packet
+  // counter is the reliable completion signal — unlike the SDK's sent
+  // callback, which fires before a final packet's timeout.
+  _ping_seq++;
+  _ping_stats.m_transmitted = _ping_seq;
   _host_resp = (pingrsp->bytes > 0);
+  if (pingrsp->bytes > 0) {
+    _ping_stats.m_received++;
+    uint32_t rtt = pingrsp->resp_time;
+    if (_ping_stats.m_received == 1 || rtt < _ping_stats.m_min_ms) _ping_stats.m_min_ms = rtt;
+    if (rtt > _ping_stats.m_max_ms) _ping_stats.m_max_ms = rtt;
+    _ping_sum_ms += rtt;
+    _ping_stats.m_avg_ms = _ping_sum_ms / _ping_stats.m_received;
+  }
+  if (_ping_seq >= _ping_count) _ping_complete = true;
+
+  // deliver each packet to the caller (e.g. the `ping` command prints it live);
+  // fall through to the legacy serial log only when no callback is set.
+  if (_ping_pkt_cb) {
+    ping_pkt_t pkt = { _ping_seq, (pingrsp->bytes > 0), pingrsp->resp_time };
+    _ping_pkt_cb((void*)&pkt);
+    return;
+  }
 
 #ifdef ENABLE_CONTEXTUAL_EXECUTION
   if (
@@ -53,19 +80,10 @@ static void ICACHE_FLASH_ATTR ping_recv_cb (void* arg, void *pdata){
 #endif
 }
 
-// This function is called when a ping is sent
+// End-of-run callback. Fires ~coarse_time after the last send, which can be
+// before that packet's timeout — so completion is tracked in the recv
+// callback (per-packet count) instead of here.
 static void ICACHE_FLASH_ATTR ping_sent_cb (void* arg, void *pdata){
-
-  // struct ping_msg *pingmsg = (struct ping_msg *)pdata;
-
-  // if( nullptr != pingmsg ){
-
-  //   uint32_t delay = pingmsg->ping_start;
-  //   delay /= PING_COARSE;
-
-  //   LogFmtI("ping %d, timeout %d, payload %d bytes, %d ms\n",
-  //       pingmsg->max_count, pingmsg->timeout_count, PING_DATA_SIZE*(pingmsg->max_count - pingmsg->timeout_count), delay);
-  // }
 }
 
 /**
@@ -85,37 +103,48 @@ PingInterface::~PingInterface(){
 
 void PingInterface::init_ping( iWiFiInterface* _wifi ){
 
-  ipaddress_t defaultdns(DEFAULT_DNS_IP[0], DEFAULT_DNS_IP[1], DEFAULT_DNS_IP[2], DEFAULT_DNS_IP[3]); 
   this->m_wifi = _wifi;
   memset(&this->m_opt, 0, sizeof(struct ping_option));
-  this->m_opt.count = 1;
-  this->m_opt.ip = (uint32_t)defaultdns;// override with default dns static ip
   this->m_opt.coarse_time = 0;
-  // m_opt.sent_function = NULL;
-  // m_opt.recv_function = NULL;
-  // m_opt.reverse = NULL;
   ping_regist_sent(&this->m_opt, ping_sent_cb);
-  // ping_regist_recv(&this->m_opt, reinterpret_cast<ping_recv_function>(&PingInterface::ping_recv));
   ping_regist_recv(&this->m_opt, ping_recv_cb);
 }
 
-bool PingInterface::ping(){
+bool PingInterface::ping( const ipaddress_t &target, uint16_t count, CallBackVoidPointerArgFn on_packet ){
 
-  IPAddress _ip(this->m_opt.ip);
-  // ipaddress_t _ipt((uint32_t)_ip);
+  ipaddress_t _target = target;
+  if (!_target.isSet()) return false;
 
-  // if( nullptr != this->m_wifi ){
-  //   this->m_wifi->hostByName(_pinghostname, _ipt, 1500);
-  //   _ip = (uint32_t)_ipt;
-  //   this->m_opt.ip = (uint32_t)_ip;
-  // }
-  LogFmtI("\nPing ip: %s\n", _ip.toString().c_str());
-  return _ip.isSet() ? ping_start(&this->m_opt) : false;
+  memset(&_ping_stats, 0, sizeof(_ping_stats));
+  _ping_sum_ms = 0;
+  _ping_seq = 0;
+  _ping_count = count;
+  _ping_complete = false;
+  _ping_pkt_cb = on_packet;
+
+  this->m_opt.count = count;
+  this->m_opt.ip = (uint32_t)_target;
+  this->m_opt.coarse_time = 0;
+
+  pdiutil::string ipstr = _target;
+  LogFmtI("\nPing ip: %s\n", ipstr.c_str());
+
+  return ping_start(&this->m_opt) ? true : false;
+}
+
+bool PingInterface::isPingComplete(){
+
+  return _ping_complete;
 }
 
 bool PingInterface::isHostRespondingToPing(){
 
   return _host_resp;
+}
+
+const ping_stats_t &PingInterface::getPingStats(){
+
+  return _ping_stats;
 }
 
 PingInterface __i_ping;

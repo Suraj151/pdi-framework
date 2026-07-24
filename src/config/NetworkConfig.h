@@ -16,4 +16,16 @@ created Date    : 1st June 2019
  * network configurations for device communication
  */
 
+#ifndef HOSTS_FILE_PATH
+#define HOSTS_FILE_PATH "/etc/hosts"
+#endif
+
+#ifndef HOSTS_FILE_SEED
+#define HOSTS_FILE_SEED "127.0.0.1 localhost\n"
+#endif
+
+#ifndef DNS_RESOLVE_TIMEOUT_MS
+#define DNS_RESOLVE_TIMEOUT_MS 5000
+#endif
+
 #endif

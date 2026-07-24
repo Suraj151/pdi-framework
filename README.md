@@ -14,7 +14,7 @@ PDI is a modular C++ stack for embedded devices. Application code is written onc
 - **Configurable task scheduler.** Inline, cooperative, and preemptive modes; priority-and-policy scheduling; POSIX nice; per-task signals (KILL/TERM/STOP/CONT) with `ps`/`top`/`kill`/`pkill`/`killall`/`renice`.
 - **Service supervisor (systemd-lite).** `srvc list / status / start / stop / restart` — every service tracks its scheduler tasks and can be paused or resumed at runtime.
 - **Virtual filesystem (VFS).** Multiple backends mounted under one tree with longest-prefix routing; POSIX-style permissions, ownership, and per-session umask enforced at the VFS layer; multi-user aware (`/etc/passwd` + `/etc/shadow`). Includes a read-only `/proc` with live system nodes, a read/write `/sys` exposing GPIO as files (`echo 1 > /sys/class/gpio/5/value`), a `/dev` with byte-stream nodes (`/dev/null`, `/dev/zero`, `/dev/random`), and a RAM-backed `/tmp` scratch filesystem.
-- **Linux-style CLI on serial / Telnet / SSH.** `ls`, `cat`, `echo`, `grep`, `head`, `tail`, `wc`, `hexdump`, `df`, `mount`, `chmod`, `chown`, `umask`, `uptime`, `mv`, `cp`, `mkdir`, `touch`, `rm`, `watch`, `srvc`, `ps`, `top`, `kill`, `pkill`, `killall`, `renice`, `net`, `iot`, `ssh`, `tls`, `reboot`, and more. (GPIO is driven as files via `/sys` — see below.)
+- **Linux-style CLI on serial / Telnet / SSH.** `ls`, `cat`, `echo`, `grep`, `head`, `tail`, `wc`, `hexdump`, `df`, `mount`, `chmod`, `chown`, `umask`, `uptime`, `mv`, `cp`, `mkdir`, `touch`, `rm`, `watch`, `srvc`, `ps`, `top`, `kill`, `pkill`, `killall`, `renice`, `net`, `host`, `ping`, `date`, `tdctl`, `iot`, `ssh`, `tls`, `reboot`, and more. (GPIO is driven as files via `/sys` — see below.)
 - **On-device file transfer.** `scp` (single file) and interactive `sftp` over the SSH tunnel.
 - **Web portal for configuration.** Session-based login, per-service settings pages, GPIO control, storage browser, MQTT tester, Email tester.
 - **Persistent config store.** Address-based table engine with JSON-driven codegen for schema tables.
@@ -57,7 +57,7 @@ Full inventory in [§15 Utility Library](#15-utility-library).
 **Storage** — VFS with mountable backends (LittleFS root + `/proc` + `/sys` + `/dev` synthetics + RAM-backed `/tmp`), POSIX permissions/ownership with per-session umask, multi-user file access control.
 Details in [§6.2.11 Storage](#6211-storage-interface-init-no-provider).
 
-**CLI** — 40+ built-in commands including `ls mkdir touch mv cp cat echo head tail wc hexdump grep df mount chmod chown umask srvc ps top kill pkill killall renice net watch iot ssh tls reboot uptime groups useradd userdel passwd ...`.
+**CLI** — 40+ built-in commands including `ls mkdir touch mv cp cat echo head tail wc hexdump grep df mount chmod chown umask srvc ps top kill pkill killall renice net host ping date tdctl watch iot ssh tls reboot uptime groups useradd userdel passwd ...`.
 Full command reference in [§7.7 Built-in command inventory](#77-built-in-command-inventory).
 
 **Extras** — Captive portal, GPIO events over MQTT/HTTP/Email, NAT (ESP8266 lwIP — see [§2.4.1](#241-nat-and-mesh)), Mesh via ESPNOW.
@@ -1357,7 +1357,7 @@ Full breakdown lives in [§8. Web Server](#8-web-server) — it has its own rout
 | Depends on | `__auth_service`, `SessionManager` ([§6.2.18](#6218-sessionmanager)), every command in [cmd/commands/](src/service_provider/cmd/commands/) |
 | Init does | Registers all command handlers; `PdiStack` calls `SessionManager::attach(serialTerminal)` at boot so the serial slot is populated before first input |
 | Terminal binding | `useTerminal(t)` attaches a `session_t` for terminal `t` (idempotent) and draws the login prompt. `processTerminalInput(t)` looks up the session via `SessionManager::findByTerminal(t)`, sets it as current for the tick, then dispatches. Each in-flight command carries `m_owner = session` so cross-session `getCommandWaitingForUserInput` never returns another session's prompt |
-| Built-in commands | Files (`ls`/`cd`/`pwd`/`mkdir`/`touch`/`mv`/`cp`/`rm`/`cat`/`echo`/`fwrite`/`head`/`tail`/`wc`/`df`/`grep`/`hexdump`/`mount`/`chmod`/`chown`/`umask`), auth+users (`login`/`logout`/`whoami`/`id`/`who`/`su`/`passwd`/`useradd`/`userdel`/`groups`), device (`net`/`srvc`/`ps`/`top`/`kill`/`pkill`/`killall`/`renice`/`ssh`/`tls`/`iot`/`reboot`/`watch`/`uptime`/`cls`/`help`) — full reference in [§7.7](#77-built-in-command-inventory) |
+| Built-in commands | Files (`ls`/`cd`/`pwd`/`mkdir`/`touch`/`mv`/`cp`/`rm`/`cat`/`echo`/`fwrite`/`head`/`tail`/`wc`/`df`/`grep`/`hexdump`/`mount`/`chmod`/`chown`/`umask`), auth+users (`login`/`logout`/`whoami`/`id`/`who`/`su`/`passwd`/`useradd`/`userdel`/`groups`), network (`net`/`host`/`ping`/`date`/`tdctl`), device (`srvc`/`ps`/`top`/`kill`/`pkill`/`killall`/`renice`/`ssh`/`tls`/`iot`/`reboot`/`watch`/`uptime`/`cls`/`help`) — full reference in [§7.7](#77-built-in-command-inventory) |
 | Multi-session | Up to `PDI_MAX_SESSIONS` (default 3) sessions run concurrently across serial + telnet + ssh. Each has its own linebuf, cursor, history-walk, cwd, auth, username, and in-flight commands. See [§7.8](#78-multi-terminal-session-lifecycle) |
 
 #### 6.2.16 TLS (no provider; transport hookup + cert provisioning)
@@ -1658,6 +1658,10 @@ Names come from [CommandCommon.h](src/service_provider/cmd/commands/CommandCommo
 | renice \<nice> \<pid> | nice signed -20..19 | Change POSIX nice on a live task. Auto-triggers scheduler resort. Same owner/root gate as `kill`. e.g. **renice -5 10** |
 | ssh q=\<query>,t=\<algo> | q=\<query> t=\<algo> | SSH command. q=1 (SSH_COMMAND_QUERY_KEYGEN) creates keypair of given algo. e.g. **ssh q=1,t=2** |
 | net \<options> | ip, scansta, connsta | Query network params. **ip** shows STA/AP info; **scansta** lists nearby SSIDs; **connsta** joins one. e.g. **net connsta,\<ssid>,\<password>** |
+| host \<name> | | Resolve a hostname to an IPv4 address, trying IP-literal → `/etc/hosts` → DNS. e.g. **host example.com**, **host localhost** |
+| ping \<host> [count] | | ICMP-echo a host (resolved via the same `host` rules). Default 4 packets, max 10. Streams each reply/timeout live (`seq=N time=X ms` / `seq=N timeout`), then a `transmitted / received / loss` + `rtt min/avg/max` summary. e.g. **ping google.com**, **ping 8.8.8.8 3** |
+| date [-u] [-n] [-s \<epoch>] [+\<format>] | | Show or set the NTP clock. No arg → local time `%Y-%m-%d %H:%M:%S`; **-u** UTC; **+\<format>** custom (`%Y %y %m %b %d %H %M %S %%`); **-s \<unix-epoch>** sets the UTC clock (auth-gated); **-n** forces an NTP resync. e.g. **date**, **date -u +%H:%M**, **date -s 1753294080** |
+| tdctl | | `timedatectl` — clock status: local time, universal time, time zone, NTP sync state, NTP server. e.g. **tdctl** |
 | reboot | | Reboot the device. e.g. **reboot** |
 | watch | c=\<command> i=\<interval_ms> n=\<iterations> | Run a command periodically. Default interval 1 s, infinite iterations. Stop with Ctrl+C. Options separated by `;`. e.g. **watch c=net ip; i=3000; n=10** |
 | iot \<options> | setid, getid, sethost, gethost | Manage IoT config. **setid/getid** for device unique ID; **sethost/gethost** for IoT HTTP host. e.g. **iot setid,\<DeviceID>** or **iot sethost,\<HostAddress>** |

@@ -379,6 +379,28 @@ struct wifi_station_info_t {
 };
 
 /**
+ * @struct ping_stats_t
+ * @brief Summary of a ping run.
+ */
+struct ping_stats_t {
+    uint16_t m_transmitted; ///< packets sent
+    uint16_t m_received;    ///< replies received
+    uint32_t m_min_ms;      ///< minimum round-trip time
+    uint32_t m_max_ms;      ///< maximum round-trip time
+    uint32_t m_avg_ms;      ///< average round-trip time
+};
+
+/**
+ * @struct ping_pkt_t
+ * @brief Per-packet ping result, delivered as each reply/timeout arrives.
+ */
+struct ping_pkt_t {
+    uint16_t m_seqno;   ///< 1-based sequence number
+    bool     m_replied; ///< true if a reply was received
+    uint32_t m_rtt_ms;  ///< round-trip time (valid when m_replied)
+};
+
+/**
  * Upgrade status enums
  */
 enum upgrade_status : int8_t {

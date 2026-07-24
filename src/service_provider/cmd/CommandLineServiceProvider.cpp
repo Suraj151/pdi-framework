@@ -125,6 +125,8 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   // NetworkCommand *networkcmd = new NetworkCommand();
   // m_cmdlist.push_back(networkcmd);
   NetworkCommand::RegisterCommand();
+  HostCommand::RegisterCommand();
+  PingCommand::RegisterCommand();
   #endif
 
   // WatchCommand *watchcmd = new WatchCommand();
@@ -140,6 +142,8 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   HelpCommand::RegisterCommand();
   UptimeCommand::RegisterCommand();
   EchoCommand::RegisterCommand();
+  DateCommand::RegisterCommand();
+  TimedatectlCommand::RegisterCommand();
 
   CommandBase::SetCommandExecutionInterface(this);
 }

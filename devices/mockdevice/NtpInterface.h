@@ -33,8 +33,13 @@ class NtpInterface : public iNtpInterface {
     ~NtpInterface(){}
 
     void init_ntp_time() override{}
-    bool is_valid_ntptime() override{return 0;}
-    pdiutil::epoch_time_t get_ntp_time() override{return 0;}
+    bool is_valid_ntptime() override{return m_epoch > 0;}
+    pdiutil::epoch_time_t get_ntp_time() override{return m_epoch;}
+    bool set_ntp_time(pdiutil::epoch_time_t epoch) override{ m_epoch = epoch; return true; }
+
+  private:
+
+    pdiutil::epoch_time_t m_epoch = 0;
 };
 
 #endif

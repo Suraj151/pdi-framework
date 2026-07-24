@@ -35,6 +35,7 @@ class NtpInterface : public iNtpInterface {
     void init_ntp_time();
     bool is_valid_ntptime();
     pdiutil::epoch_time_t get_ntp_time();
+    bool set_ntp_time(pdiutil::epoch_time_t epoch);
 };
 
 #endif

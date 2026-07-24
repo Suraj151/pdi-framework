@@ -50,6 +50,7 @@ public:
   virtual void init_ntp_time() = 0;
   virtual bool is_valid_ntptime() = 0;
   virtual pdiutil::epoch_time_t get_ntp_time() = 0;
+  virtual bool set_ntp_time(pdiutil::epoch_time_t epoch) = 0;
 };
 
 // derived class must define this

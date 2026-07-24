@@ -93,6 +93,10 @@ created Date    : 1st June 2019
 #define CMD_NAME_TAIL  			    "tail"
 #define CMD_NAME_GREP  			    "grep"
 #define CMD_NAME_ECHO  			    "echo"
+#define CMD_NAME_DATE  			    "date"
+#define CMD_NAME_TIMEDATECTL	    "tdctl"
+#define CMD_NAME_HOST			    "host"
+#define CMD_NAME_PING			    "ping"
 
 #ifdef ENABLE_STORAGE_SERVICE
 /**

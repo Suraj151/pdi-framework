@@ -39,8 +39,11 @@ class PingInterface : public iPingInterface {
      * initialize ping
      */
     void init_ping( iWiFiInterface* _wifi ) override;
-    bool ping( void ) override;
+    bool ping( const ipaddress_t &target, uint16_t count = 1,
+               CallBackVoidPointerArgFn on_packet = nullptr ) override;
+    bool isPingComplete( void ) override;
     bool isHostRespondingToPing( void ) override;
+    const ping_stats_t &getPingStats( void ) override;
 
     ping_option m_opt;
     // bool host_resp;

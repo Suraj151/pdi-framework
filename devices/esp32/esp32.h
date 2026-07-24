@@ -19,6 +19,7 @@ created Date    : 1st Jan 2024
 #include <esp_wifi.h>
 #include <esp_ping.h>
 #include <ping/ping.h>
+#include <ping/ping_sock.h>
 #include <esp_event.h>
 #include <Print.h>
 

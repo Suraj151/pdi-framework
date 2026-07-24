@@ -37,8 +37,11 @@ class iPingInterface {
      * initialize ping
      */
     virtual void init_ping( iWiFiInterface* _wifi ) = 0;
-    virtual bool ping( void ) = 0;
+    virtual bool ping( const ipaddress_t &target, uint16_t count = 1,
+                       CallBackVoidPointerArgFn on_packet = nullptr ) = 0;
+    virtual bool isPingComplete( void ) = 0;
     virtual bool isHostRespondingToPing( void ) = 0;
+    virtual const ping_stats_t &getPingStats( void ) = 0;
 };
 
 extern PingInterface __i_ping;

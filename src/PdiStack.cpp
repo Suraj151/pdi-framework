@@ -26,6 +26,10 @@ created Date    : 1st June 2019
 #include <interface/pdi/impl/modules/storage/TmpFs.h>
 #endif
 
+#ifdef ENABLE_NETWORK_SERVICE
+#include <service_provider/network/NameResolver.h>
+#endif
+
 /**
  * @brief Constructor for the PDIStack class.
  *
@@ -162,6 +166,10 @@ void PDIStack::initialize(){
 
   #if defined(ENABLE_AUTH_SERVICE) && defined(ENABLE_STORAGE_SERVICE)
   __user_store_service.initService();
+  #endif
+
+  #ifdef ENABLE_NETWORK_SERVICE
+  NameResolver::ensureHostsFile();
   #endif
 
   #ifdef ENABLE_HTTP_SERVER
