@@ -46,6 +46,9 @@ typedef enum services{
 #ifdef ENABLE_WIFI_SERVICE
   SERVICE_WIFI,
 #endif
+#ifdef ENABLE_MDNS_SERVICE
+  SERVICE_MDNS,
+#endif
 #ifdef ENABLE_MQTT_SERVICE
   SERVICE_MQTT,
 #endif

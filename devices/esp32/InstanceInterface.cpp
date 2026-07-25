@@ -10,8 +10,11 @@ created Date    : 1st Jan 2024
 
 #include "InstanceInterface.h"
 #include "DeviceControlInterface.h"
+#ifdef ENABLE_NETWORK_SERVICE
 #include "TcpServerInterface.h"
 #include "TcpClientInterface.h"
+#include "UdpInterface.h"
+#endif
 #ifdef ENABLE_TLS_SERVICE
 #include "TlsServerInterface.h"
 #include "TlsClientInterface.h"
@@ -35,6 +38,7 @@ iUtilityInterface &InstanceInterface::getUtilityInstance()
     return __i_dvc_ctrl;
 }
 
+#ifdef ENABLE_NETWORK_SERVICE
 iTcpServerInterface *InstanceInterface::getNewTcpServerInstance()
 {
     return new TcpServerInterface();
@@ -44,6 +48,12 @@ iTcpClientInterface *InstanceInterface::getNewTcpClientInstance()
 {
     return new TcpClientInterface();
 }
+
+iUdpInterface *InstanceInterface::getNewUdpInstance()
+{
+    return new UdpInterface();
+}
+#endif
 
 #ifdef ENABLE_TLS_SERVICE
 iTlsServerInterface *InstanceInterface::getNewTlsServerInstance()

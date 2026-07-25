@@ -20,6 +20,10 @@ created Date    : 1st June 2019
 #define HOSTS_FILE_PATH "/etc/hosts"
 #endif
 
+#ifndef HOSTNAME_FILE_PATH
+#define HOSTNAME_FILE_PATH "/etc/hostname"
+#endif
+
 #ifndef HOSTS_FILE_SEED
 #define HOSTS_FILE_SEED "127.0.0.1 localhost\n"
 #endif

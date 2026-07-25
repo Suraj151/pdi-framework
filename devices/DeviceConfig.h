@@ -92,6 +92,11 @@ created Date    : 1st June 2019
 #define ENABLE_WIFI_SERVICE
 
 /**
+ * enable/disable mdns responder here
+ */
+#define ENABLE_MDNS_SERVICE
+
+/**
  * enable/disable telnet
  */
 #define ENABLE_TELNET_SERVICE

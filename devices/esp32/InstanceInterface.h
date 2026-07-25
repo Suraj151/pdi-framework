@@ -31,8 +31,11 @@ public:
   ~InstanceInterface();
 
   iUtilityInterface& getUtilityInstance() override;
+  #ifdef ENABLE_NETWORK_SERVICE
   iTcpServerInterface* getNewTcpServerInstance() override;
   iTcpClientInterface* getNewTcpClientInstance() override;
+  iUdpInterface* getNewUdpInstance() override;
+  #endif
   #ifdef ENABLE_TLS_SERVICE
   iTlsServerInterface* getNewTlsServerInstance() override;
   iTlsClientInterface* getNewTlsClientInstance() override;

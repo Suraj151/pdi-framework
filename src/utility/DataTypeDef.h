@@ -401,6 +401,29 @@ struct ping_pkt_t {
 };
 
 /**
+ * @struct udp_packet_t
+ * @brief One received UDP datagram, handed to the on-packet callback.
+ *        m_data points into the receive buffer and is valid only for the
+ *        duration of the callback.
+ */
+struct udp_packet_t {
+    const uint8_t *m_data;     ///< payload bytes
+    uint16_t       m_len;      ///< payload length
+    ipaddress_t    m_src_ip;   ///< sender IP address
+    uint16_t       m_src_port; ///< sender UDP port
+};
+
+/**
+ * @struct mdns_service_t
+ * @brief One advertised DNS-SD service (e.g. type "_http", proto "_tcp", 80).
+ */
+struct mdns_service_t {
+    const char *m_type;   ///< service type label, e.g. "_http"
+    const char *m_proto;  ///< transport label, e.g. "_tcp"
+    uint16_t    m_port;   ///< TCP/UDP port the service listens on
+};
+
+/**
  * Upgrade status enums
  */
 enum upgrade_status : int8_t {

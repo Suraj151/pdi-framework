@@ -45,6 +45,10 @@ created Date    : 1st June 2019
 #include "NetworkConfig.h"
 #endif
 
+#ifdef ENABLE_MDNS_SERVICE
+#include "MdnsConfig.h"
+#endif
+
 #ifdef ENABLE_TLS_SERVICE
 #include "TlsConfig.h"
 #endif

@@ -13,9 +13,10 @@ PDI is a modular C++ stack for embedded devices. Application code is written onc
 - **Compile-time feature gating.** Each capability is wrapped in an `ENABLE_*` flag; disabled features contribute zero flash.
 - **Configurable task scheduler.** Inline, cooperative, and preemptive modes; priority-and-policy scheduling; POSIX nice; per-task signals (KILL/TERM/STOP/CONT) with `ps`/`top`/`kill`/`pkill`/`killall`/`renice`.
 - **Service supervisor (systemd-lite).** `srvc list / status / start / stop / restart` — every service tracks its scheduler tasks and can be paused or resumed at runtime.
-- **Virtual filesystem (VFS).** Multiple backends mounted under one tree with longest-prefix routing; POSIX-style permissions, ownership, and per-session umask enforced at the VFS layer; multi-user aware (`/etc/passwd` + `/etc/shadow`). Includes a read-only `/proc` with live system nodes, a read/write `/sys` exposing GPIO as files (`echo 1 > /sys/class/gpio/5/value`), a `/dev` with byte-stream nodes (`/dev/null`, `/dev/zero`, `/dev/random`), and a RAM-backed `/tmp` scratch filesystem.
+- **Virtual filesystem (VFS).** Multiple backends mounted under one tree with longest-prefix routing; POSIX-style permissions, ownership, and per-session umask enforced at the VFS layer; multi-user aware (`/etc/passwd` + `/etc/shadow`), with networking config files (`/etc/hosts` for name overrides, `/etc/hostname` written with the device's mDNS name). Includes a read-only `/proc` with live system nodes, a read/write `/sys` exposing GPIO as files (`echo 1 > /sys/class/gpio/5/value`), a `/dev` with byte-stream nodes (`/dev/null`, `/dev/zero`, `/dev/random`), and a RAM-backed `/tmp` scratch filesystem.
 - **Linux-style CLI on serial / Telnet / SSH.** `ls`, `cat`, `echo`, `grep`, `head`, `tail`, `wc`, `hexdump`, `df`, `mount`, `chmod`, `chown`, `umask`, `uptime`, `mv`, `cp`, `mkdir`, `touch`, `rm`, `watch`, `srvc`, `ps`, `top`, `kill`, `pkill`, `killall`, `renice`, `net`, `host`, `ping`, `date`, `tdctl`, `iot`, `ssh`, `tls`, `reboot`, and more. (GPIO is driven as files via `/sys` — see below.)
 - **On-device file transfer.** `scp` (single file) and interactive `sftp` over the SSH tunnel.
+- **Zero-dependency mDNS + DNS-SD.** Advertises `pdi-<mac>.local` and its listening services (`_http`/`_https`, `_ssh`, `_sftp-ssh`, `_telnet._tcp`) on the LAN — a from-scratch responder built directly on lwIP UDP (no Arduino mDNS library). Reach the device by name (`ping pdi-<mac>.local`) or browse it with `avahi-browse -a`. Name resolution goes through IP-literal → `/etc/hosts` → DNS (`host <name>`).
 - **Web portal for configuration.** Session-based login, per-service settings pages, GPIO control, storage browser, MQTT tester, Email tester.
 - **Persistent config store.** Address-based table engine with JSON-driven codegen for schema tables.
 - **Cross-platform build.** Arduino Library Manager install or manual clone; single Python script switches the active device port.
@@ -366,6 +367,17 @@ Two board-level networking features rely on the vendored externals and the ESP S
 - Configuration is done at compile time / from the application; there is no web-portal page for ESPNOW.
 - Works well as a companion to WiFi station mode — the same radio serves both.
 - Related runtime knobs on the WiFi service: `ENABLE_DYNAMIC_SUBNETTING`, `ENABLE_INTERNET_BASED_CONNECTIONS` (§6.2.4) — used with ESPNOW to build a subnetting hierarchy where each device knows its hop distance from the main hub.
+
+#### 2.4.2 mDNS + DNS-SD (`ENABLE_MDNS_SERVICE`)
+
+The device is reachable by name and discoverable on the LAN via a **from-scratch multicast-DNS responder — no Arduino `ESP8266mDNS`/`ESPmDNS` dependency**. It's built on a new `iUdpInterface` (raw lwIP UDP: `udp_*` + `igmp_joingroup` on esp8266; the same wrapped in `LOCK_TCPIP_CORE` on esp32's multi-threaded stack), and runs as a normal `ServiceProvider` (`MdnsServiceProvider` / `SERVICE_MDNS`).
+
+- **Hostname.** Derived from the MAC as `pdi-<last-3-bytes>` and written to `/etc/hostname` (Linux-style, no `.local`). `cat /etc/hostname` shows it; then `ping pdi-<xxxxxx>.local` from any host on the segment.
+- **Lifecycle.** Starts on the `EVENT_WIFI_STA_GOT_IP` event (re-announces on every reconnect); joins `224.0.0.251:5353`. Receive is callback-driven, so there is **no periodic `update()`** to pump.
+- **DNS-SD service ads.** Advertises the build's listening servers so they appear in `avahi-browse -a` / Bonjour: `_http._tcp` (or `_https._tcp` when `ENABLE_HTTPS_SERVER`), `_ssh._tcp`, `_sftp-ssh._tcp`, `_telnet._tcp`. It answers A, service-enumeration PTR (`_services._dns-sd._udp.local`), per-type PTR, and instance SRV/TXT queries, and returns PTR+SRV+TXT+A as one bundle. Config (types/ttls/multicast group/service cap) lives in [config/MdnsConfig.h](src/config/MdnsConfig.h).
+- **Status.** `srvc status MDNS` shows the hostname, address, and advertised services.
+
+Clients only listen (MQTT/OTA/email/IoT), so nothing there is advertised.
 
 ### 2.5 Library Manager: how the ESP32 default works
 
@@ -1402,6 +1414,18 @@ Not a `ServiceProvider` — a static registry that owns the per-session state.
 | Login-time caching | `AuthServiceProvider::setAuthorized(true)` looks up the resolved `user_record` via `__user_store_service.findUserByName` and caches `m_uid` / `m_gid` on the session; `m_umask` is reset to `FILE_UMASK_DEFAULT` (`0022`). On logout / clear, all three reset to 0/0/`FILE_UMASK_DEFAULT`. The cache is what `VfsDispatcher` reads on every FS check (single dereference — no `/etc/passwd` scan per file op) |
 | Wire-in | `CommandLineServiceProvider::useTerminal` calls `attach`; `processTerminalInput` calls `findByTerminal` + `setCurrent`; SSH's USERAUTH_SUCCESS attaches early so auth state anchors to the SSH channel; Telnet/SSH `closeSession` calls `detach(theClient)` explicitly |
 
+#### 6.2.19 `MdnsServiceProvider` — `__mdns_service`
+
+A library-free multicast-DNS + DNS-SD responder (`SERVICE_MDNS`, `ENABLE_MDNS_SERVICE`) — see [§2.4.2](#242-mdns--dns-sd-enable_mdns_service) for the overview.
+
+| Source | [network/MdnsServiceProvider.{h,cpp}](src/service_provider/network/MdnsServiceProvider.h) |
+|---|---|
+| Config | [config/MdnsConfig.h](src/config/MdnsConfig.h) — port 5353, TTLs, multicast group `224.0.0.251`, hostname prefix `pdi-`, `MDNS_MAX_SERVICES`, DNS wire-type codes |
+| Built on | `iUdpInterface` via `__i_instance.getNewUdpInstance()` (raw lwIP UDP); `iWiFiInterface` (MAC → hostname, `EVENT_WIFI_STA_GOT_IP` trigger); `__i_fs` (writes `/etc/hostname`) |
+| Advertises | `_http`/`_https._tcp`, `_ssh._tcp`, `_sftp-ssh._tcp`, `_telnet._tcp` (gated by each server's `ENABLE_*` flag) via `addService(type, proto, port)` |
+| Responds to | A (`<host>.local`), service-enumeration PTR (`_services._dns-sd._udp.local`), per-type PTR, and instance SRV/TXT — bundling PTR+SRV+TXT+A. Receive is callback-driven (no `update()` pump); response buffers are heap-allocated per send and freed immediately |
+| No dependency | Does **not** use `ESP8266mDNS`/`ESPmDNS` — the responder is hand-rolled on lwIP UDP, so the only Arduino-lib coupling stays at the WiFi layer |
+
 ### 6.3 Init order and why it matters
 
 `PDIStack::initialize` orders the calls deliberately:
@@ -1649,7 +1673,7 @@ Names come from [CommandCommon.h](src/service_provider/cmd/commands/CommandCommo
 | passwd p=\<curr> n=\<new> c=\<confirm> | p, n, c (space) | Change own password. Three-phase interactive when omitted (`current:` / `new:` / `confirm:`), all echo-suppressed. Enters a privileged VFS scope for the `/etc/shadow` update. e.g. **passwd p=oldpw n=newpw c=newpw** |
 | useradd u=\<user> p=\<pass> | u, p (space) | **Root-only.** Create a new user. UID auto-assigned to next free slot ≥1; `gid = uid`; home=`/`, shell=`cmd`. Writes both `/etc/passwd` and `/etc/shadow` (rolls back on shadow failure). e.g. **useradd u=alice p=alice123** |
 | userdel u=\<user> | u (space) | **Root-only.** Delete a user from `/etc/passwd` + `/etc/shadow`. Refuses self-delete and uid=0 (root). e.g. **userdel u=alice** |
-| srvc list \| status \<name> \| start \<name> \| stop \<name> \| restart \<name> | positional, space-separated | Service supervisor (systemd-lite). `list` prints every service with state; `status <name>` shows tracked PIDs; `start`/`stop`/`restart` deliver `SIG_CONT`/`SIG_STOP` (both) to every task the service owns. Root required for start/stop/restart. e.g. **srvc list**, **srvc stop GPIO** |
+| srvc list \| status \<name> \| start \<name> \| stop \<name> \| restart \<name> | positional, space-separated | Service supervisor (systemd-lite). `list` prints every service with state; `status <name>` shows tracked PIDs plus a `service info :` block with each service's own detail (via its `printStatusToTerminal` — e.g. WiFi ip/gateway/rssi, mDNS hostname/services); `start`/`stop`/`restart` deliver `SIG_CONT`/`SIG_STOP` (both) to every task the service owns. Root required for start/stop/restart. e.g. **srvc list**, **srvc status MDNS**, **srvc stop GPIO** |
 | ps [\<sid>] | | List active scheduler tasks POSIX-style with owner, state, %CPU, runs, interval, name. Optional positional filter by owner session id. e.g. **ps** or **ps 1** |
 | top | i=\<ms>; n=\<iters>; u=\<sid> | Same view as `ps`, refreshed on a scheduler task at `i` ms (default 2000, min 500). `n` bounds iterations (omit for forever). Stop with Ctrl+C. e.g. **top i=1500; n=10** |
 | kill [\<sig>] \<pid> | | Deliver a signal to a scheduler task. 1 arg = pid (default TERM). 2 args = sig then pid. Accepted signals: 9 KILL / 15 TERM / 18 CONT / 19 STOP. Root can hit any task; other users only tasks they own. e.g. **kill 8** or **kill 9 8** |
@@ -2890,8 +2914,9 @@ src/interface/pdi/
 │   │                              + iTlsClientInterface (ENABLE_TLS_SERVICE)
 │   ├── iServerInterface.h         iTcpServerInterface + iTlsServerInterface
 │   │                              + iHttpServerInterface (with HTTPS hooks)
-│   ├── iNtpInterface.h            Time sync
-│   ├── iPingInterface.h           Reachability check
+│   ├── iNtpInterface.h            Time sync + clock set
+│   ├── iPingInterface.h           Reachability check + per-packet stats
+│   ├── iUdpInterface.h            Raw UDP socket (mDNS; future DHCP/syslog)
 │   └── iUpgradeInterface.h        OTA primitive
 ├── modules/                   Stand-alone feature surfaces
 │   ├── serial/iSerialInterface.h
@@ -2936,7 +2961,7 @@ Each row below: what the interface models, who implements it on a typical port, 
 |---|---|---|---|---|
 | `iDeviceControlInterface` | [middlewares/iDeviceControlInterface.h](src/interface/pdi/middlewares/iDeviceControlInterface.h) | Device | `PDIStack`, every service via `__i_dvc_ctrl` | `initDeviceSpecificFeatures`, `resetDevice`, `restartDevice`, `eraseConfig`, `getDeviceId`, `getDeviceMac`, `isDeviceFactoryRequested`, `getTerminal`, `handleEvents` (+ inherited GPIO/WDT/utility/upgrade) |
 | `iDatabaseInterface` | [iDatabaseInterface.h](src/interface/pdi/iDatabaseInterface.h) | Device | `DatabaseServiceProvider`, every config table | `beginConfigs(size)`, `cleanAllConfigs`, `isValidConfigs`, `getMaxDBSize`, plus templated typed read/write |
-| `iInstanceInterface` | [src/utility/iInstanceInterface.h](src/utility/iInstanceInterface.h) | Device | Services that need fresh TCP/TLS/FS instances (MQTT pool, SSH, OTA, HTTPS) | `getNewTcpClientInstance`, `getNewTcpServerInstance`, `getNewTlsClientInstance` / `getNewTlsServerInstance` (`ENABLE_TLS_SERVICE`), `getFileSystemInstance`, `getUtilityInstance` |
+| `iInstanceInterface` | [src/utility/iInstanceInterface.h](src/utility/iInstanceInterface.h) | Device | Services that need fresh TCP/UDP/TLS/FS instances (MQTT pool, SSH, OTA, HTTPS, mDNS) | `getNewTcpClientInstance`, `getNewTcpServerInstance`, `getNewUdpInstance`, `getNewTlsClientInstance` / `getNewTlsServerInstance` (`ENABLE_TLS_SERVICE`), `getFileSystemInstance`, `getUtilityInstance` |
 | `iUtilityInterface` | [src/utility/iUtilityInterface.h](src/utility/iUtilityInterface.h) | Inherited via `iDeviceControlInterface` | Scheduler, event bus, logger, `DevFs` (`/dev/random`) | `wait`, `millis_now`, `micros_now`, `random_now`, `yield`, `log`, optional `can_measure_stack` / `measure_lastfn_stack` |
 | `iIOInterface`, `iTerminalInterface` | [src/utility/iIOInterface.h](src/utility/iIOInterface.h) | Any stream (serial, TCP, etc.) | Logger, CLI, web body writers | `write`/`writeln` family (overloaded for all primitive types + `RODT_ATTR` strings), `with_timestamp`, `connect`/`disconnect` |
 
@@ -2958,8 +2983,9 @@ Each row below: what the interface models, who implements it on a typical port, 
 | `iTcpServerInterface` | [middlewares/iServerInterface.h](src/interface/pdi/middlewares/iServerInterface.h) | Device | Telnet, SSH, raw TCP services | `begin(port)`, `hasClient`, `accept`, `close` |
 | `iTlsServerInterface` | same file | Device | HTTPS server, future TLS-wrapped Telnet/MQTT brokers | Extends `iTcpServerInterface`: `setServerCertificatePath`, `setServerPrivateKeyPath`, `setClientCertificateAuthorityPath` (mTLS). `accept()` returns a TLS-capable client transparently |
 | `iHttpServerInterface` | same file | Device (or `impl/HttpServerInterfaceImpl`) | `WebServer` | Routing (`on`, `onNotFound`), args/headers, `send(code, mime, body, chunked)`. With TLS: `begin(port, secure=true)` plus `setServerCertificatePath` / `setServerPrivateKeyPath` / `setClientCertificateAuthorityPath` |
-| `iNtpInterface` | [middlewares/iNtpInterface.h](src/interface/pdi/middlewares/iNtpInterface.h) | Device | Logger timestamps, IoT, sessions | `init_ntp_time`, `is_valid_ntptime`, `get_ntp_time` |
-| `iPingInterface` | [middlewares/iPingInterface.h](src/interface/pdi/middlewares/iPingInterface.h) | Device | WiFi service (internet-availability check) | `init_ping(wifi)`, `ping`, `isHostRespondingToPing` |
+| `iUdpInterface` | [middlewares/iUdpInterface.h](src/interface/pdi/middlewares/iUdpInterface.h) | Device (esp8266/esp32, raw lwIP UDP) | mDNS responder (and future UDP: DHCP/syslog/SSDP) | `begin(port)`, `joinMulticastGroup`, `send`, `setOnPacketCallback` (delivers `udp_packet_t`), `close`. Allocated via `iInstanceInterface::getNewUdpInstance()` |
+| `iNtpInterface` | [middlewares/iNtpInterface.h](src/interface/pdi/middlewares/iNtpInterface.h) | Device | Logger timestamps, IoT, sessions, `date`/`tdctl` | `init_ntp_time`, `is_valid_ntptime`, `get_ntp_time`, `set_ntp_time` (clock set via `date -s`) |
+| `iPingInterface` | [middlewares/iPingInterface.h](src/interface/pdi/middlewares/iPingInterface.h) | Device | WiFi service (internet check), `ping` CLI | `init_ping(wifi)`, `ping(target, count, on_packet)`, `isPingComplete`, `isHostRespondingToPing`, `getPingStats` (per-packet callback + tx/rx/rtt stats) |
 | `iUpgradeInterface` | [middlewares/iUpgradeInterface.h](src/interface/pdi/middlewares/iUpgradeInterface.h) | Device (folded into `DeviceControlInterface`) | `OtaServiceProvider` | `Upgrade(path, version) → upgrade_status_t` |
 
 #### 13.3.4 Modules
@@ -3055,6 +3081,7 @@ devices/esp32/
 ├── HttpServerInterface.{h,cpp}      If ENABLE_WIFI_SERVICE / HTTP_SERVER
 ├── TcpClientInterface.{h,cpp}       If ENABLE_NETWORK_SERVICE
 ├── TcpServerInterface.{h,cpp}       If ENABLE_NETWORK_SERVICE
+├── UdpInterface.{h,cpp}             If ENABLE_NETWORK_SERVICE
 ├── NtpInterface.{h,cpp}             If ENABLE_NETWORK_SERVICE
 ├── PingInterface.{h,cpp}            If ENABLE_NETWORK_SERVICE
 ├── TlsClientInterface.{h,cpp}       If ENABLE_TLS_SERVICE  (esp8266 → BearSSL, esp32 → mbedTLS)

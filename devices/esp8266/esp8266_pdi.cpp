@@ -29,6 +29,7 @@ created Date    : 1st Jan 2024
 #include "PingInterface.cpp"
 #include "TcpClientInterface.cpp"
 #include "TcpServerInterface.cpp"
+#include "UdpInterface.cpp"
 #endif
 #ifdef ENABLE_TLS_SERVICE
 #include "BearSSLCertLoader.cpp"

@@ -228,6 +228,10 @@ private:
 			m_terminal->write(buf);
 		}
 		m_terminal->writeln();
+
+		// common header for the service-specific detail each service appends
+		// m_terminal->writeln_ro(RODT_ATTR("service info :"));
+		svc->printStatusToTerminal(m_terminal);
 	}
 
 	bool requireRoot(){

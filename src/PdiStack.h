@@ -28,6 +28,10 @@ created Date    : 1st June 2019
 #include <service_provider/network/WiFiServiceProvider.h>
 #endif
 
+#ifdef ENABLE_MDNS_SERVICE
+#include <service_provider/network/MdnsServiceProvider.h>
+#endif
+
 #ifdef ENABLE_TELNET_SERVICE
 #include <service_provider/transport/TelnetServiceProvider.h>
 #endif

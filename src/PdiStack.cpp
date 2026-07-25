@@ -172,6 +172,10 @@ void PDIStack::initialize(){
   NameResolver::ensureHostsFile();
   #endif
 
+  #ifdef ENABLE_MDNS_SERVICE
+  __mdns_service.initService();
+  #endif
+
   #ifdef ENABLE_HTTP_SERVER
   __web_server.initService( this->m_server );
   #endif

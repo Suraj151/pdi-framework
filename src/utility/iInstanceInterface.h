@@ -19,6 +19,7 @@ class iTcpServerInterface;
 class iTcpClientInterface;
 class iTlsServerInterface;
 class iTlsClientInterface;
+class iUdpInterface;
 class iFileSystemInterface;
 
 // forward declaration of derived class for this interface
@@ -45,6 +46,7 @@ public:
   #ifdef ENABLE_NETWORK_SERVICE
   virtual iTcpServerInterface* getNewTcpServerInstance() { return nullptr; }      // get new TCP server instance
   virtual iTcpClientInterface* getNewTcpClientInstance() { return nullptr; }      // get new TCP client instance
+  virtual iUdpInterface* getNewUdpInstance() { return nullptr; }                  // get new UDP socket instance
   #endif
 
   #ifdef ENABLE_TLS_SERVICE
