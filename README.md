@@ -598,7 +598,7 @@ The most common foot-gun is enabling a service whose dependency is off. The rule
 - `ENABLE_HTTPS_SERVER` ⇒ `ENABLE_TLS_SERVICE` **and** `ENABLE_HTTP_SERVER` **and** `ENABLE_STORAGE_SERVICE` (cert/key are loaded from FS at `/etc/http/server.{crt,key}`). Optional `ENABLE_HTTPS_SERVER_MTLS` adds `/etc/http/client-ca.crt` mTLS verification.
 - `ENABLE_TLS_CERT_GENERATION` ⇒ `ENABLE_TLS_SERVICE` **and** `DEVICE_ESP32` (mbedTLS issuer API). The `tls` CLI command is gated on this flag.
 - `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` ⇒ `ENABLE_TLS_CERT_GENERATION`. Registers a listener on `EVENT_WIFI_STA_GOT_IP` that mints a self-signed cert for the device IP the first time it boots without one.
-- `ENABLE_SYSLOG_SERVICE` ⇒ `ENABLE_STORAGE_SERVICE` (the file sink needs a mounted filesystem). It is auto-defined inside that guard in [DeviceConfig.h](devices/DeviceConfig.h) and absent on storage-less ports such as uno.
+- `ENABLE_SYSLOG_SERVICE` ⇒ `ENABLE_STORAGE_SERVICE` (the file sink needs a mounted filesystem). It is auto-defined inside that guard in [DeviceConfig.h](devices/DeviceConfig.h) and absent on storage-less ports such as uno. `ENABLE_SYSLOG_FORWARD` (remote forwarding) additionally ⇒ `ENABLE_NETWORK_SERVICE`, and is auto-defined when both are on.
 
 The header guards in [devices/DeviceConfig.h](devices/DeviceConfig.h) enforce most of these by structurally wrapping the dependent flags inside `#ifdef ENABLE_NETWORK_SERVICE`. The rest you are responsible for.
 
@@ -2214,9 +2214,9 @@ To add a `/metrics` page that shows live counters:
 
 ## 9. Logger
 
-The logger is deliberately one of the smallest subsystems in the framework. There is **no per-tag filtering and no JSON formatter** — four levels, a printf-style varargs formatter, and one shared logger object. It splits along a single axis: **console** logs go to the serial terminal only; **syslog** logs go to the serial terminal *and* a file under `/var/log`. The cleverness is in *how it disappears*: when a level's console gate is off, every `LogI(...)` / `LogE(...)` site for that level compiles to nothing — zero flash, zero RAM, zero runtime cost.
+The logger is deliberately one of the smallest subsystems in the framework. There is **no per-tag filtering and no JSON formatter** — four levels, a printf-style varargs formatter, and one shared logger object. It splits along a single axis: **console** logs go to the serial terminal only; **syslog** logs go to the serial terminal, a file under `/var/log`, and (optionally) a remote collector. The cleverness is in *how it disappears*: when a level's console gate is off, every `LogI(...)` / `LogE(...)` site for that level compiles to nothing — zero flash, zero RAM, zero runtime cost.
 
-Implementation: [src/interface/pdi/impl/log/LogManager.{h,cpp}](src/interface/pdi/impl/log/LogManager.h) (the one logger), [src/interface/pdi/impl/log/LogMacros.h](src/interface/pdi/impl/log/LogMacros.h) (the one macro home), [src/interface/pdi/iLoggerInterface.h](src/interface/pdi/iLoggerInterface.h) (the logger contract), [src/utility/DataTypeDef.h](src/utility/DataTypeDef.h) (default no-op macros), [src/config/SyslogConfig.h](src/config/SyslogConfig.h) (file paths and sizes).
+Implementation: [src/interface/pdi/impl/log/LogManager.{h,cpp}](src/interface/pdi/impl/log/LogManager.h) (the one logger), [src/interface/pdi/impl/log/LogMacros.h](src/interface/pdi/impl/log/LogMacros.h) (the one macro home), [src/interface/pdi/iLoggerInterface.h](src/interface/pdi/iLoggerInterface.h) (the logger contract), [src/service_provider/network/SyslogServiceProvider.{h,cpp}](src/service_provider/network/SyslogServiceProvider.h) (the syslog file + forward sink), [src/utility/DataTypeDef.h](src/utility/DataTypeDef.h) (default no-op macros), [src/config/SyslogConfig.h](src/config/SyslogConfig.h) (paths, sizes, forward target).
 
 ### 9.1 One logger — `LogManager`
 
@@ -2230,6 +2230,8 @@ __log_manager.init(__i_dvc_ctrl.getTerminal());   // getTerminal() returns an iI
 ```
 
 `init()` stores the terminal and opens it at 115200 baud if it isn't already. There is no separate lifecycle macro to remember to call — `PdiStack::initialize` does this for you.
+
+For a `SysLog*` line, `LogManager` formats it and echoes it to the console, then hands it to a registered **sink** — the syslog service ([§9.7](#97-where-syslog-goes)) — which owns file persistence and any remote forwarding. `LogManager` itself never touches the filesystem or the network; when no sink is registered, `SysLog*` is simply a console line.
 
 ### 9.2 Levels
 
@@ -2252,7 +2254,7 @@ Because every call routes through the formatter, a plain message must not contai
 ### 9.3 Console vs syslog
 
 - **`Log*`** — console only. Writes to the serial terminal. Gated per level by `ENABLE_CONSOLE_LOG_*`.
-- **`SysLog*`** — console **and** file. Writes the same line to the serial terminal *and* appends it to `/var/log/syslog.<level>`. Active when `ENABLE_SYSLOG_SERVICE` is defined; when it is off, `SysLog*` degrades to the matching `Log*` (console-only), so call sites need no `#ifdef`.
+- **`SysLog*`** — console **and** file (**and** a remote collector when forwarding is on). Writes the line to the serial terminal, appends it to `/var/log/syslog.<level>`, and — with `ENABLE_SYSLOG_FORWARD` — ships it to a syslog collector. Active when `ENABLE_SYSLOG_SERVICE` is defined; when it is off, `SysLog*` degrades to the matching `Log*` (console-only), so call sites need no `#ifdef`.
 
 Use `Log*` for chatty, dev-time tracing you never want on flash storage; use `SysLog*` for lines worth surviving a reboot (errors, lifecycle milestones). The framework's app layer — `service_provider/`, `transports/`, `helpers/` — routes its error-level lines through `SysLogE`.
 
@@ -2268,11 +2270,12 @@ Console gates (in [devices/DeviceConfig.h](devices/DeviceConfig.h)):
 | `ENABLE_CONSOLE_LOG_SUCCESS` | Enables `LogS` |
 | `ENABLE_CONSOLE_LOG_ALL` | Shorthand for *all of the above* |
 
-Syslog gate:
+Syslog gates:
 
 | Flag | Effect |
 |---|---|
 | `ENABLE_SYSLOG_SERVICE` | Enables the file sink behind `SysLog*`. Requires `ENABLE_STORAGE_SERVICE`; auto-defined inside that guard in [DeviceConfig.h](devices/DeviceConfig.h), so it is simply absent on storage-less ports (uno). |
+| `ENABLE_SYSLOG_FORWARD` | Also ships each `SysLog*` line to a remote collector (RFC 3164 over UDP). Requires `ENABLE_SYSLOG_SERVICE` **and** `ENABLE_NETWORK_SERVICE`; auto-defined when both are on. Idle until `SYSLOG_REMOTE_HOST` is set. |
 
 With every console gate off and `ENABLE_SYSLOG_SERVICE` off, the shipping configuration is **silent** — release builds emit nothing on serial and write no files.
 
@@ -2319,7 +2322,9 @@ The formatter is the framework's own, not libc's, and understands only `%d %u %x
 
 ### 9.7 Where syslog goes
 
-When `ENABLE_SYSLOG_SERVICE` is on, `SysLog*` lines are appended to a file chosen by level:
+`LogManager` never writes files or sockets itself. It formats a `SysLog*` line, echoes it to the console, and hands it to the **syslog service** ([SyslogServiceProvider](src/service_provider/network/SyslogServiceProvider.h)), which owns everything downstream — the file write and, when enabled, the remote forward. The service registers itself as the logger's sink during boot (before the other services start, so their boot-time `SysLog*` lines are captured), and `SysLog*` call sites stay oblivious to where the line lands.
+
+**Files.** When `ENABLE_SYSLOG_SERVICE` is on, each line is appended to a file chosen by level:
 
 | Level | File |
 |---|---|
@@ -2328,9 +2333,11 @@ When `ENABLE_SYSLOG_SERVICE` is on, `SysLog*` lines are appended to a file chose
 | `WARNING_LOG` | `/var/log/syslog.warning` |
 | `SUCCESS_LOG` | `/var/log/syslog.success` |
 
-Files split by **level** only — the logger carries no service/unit identity, so level is the only axis. The `/var/log` directory is created lazily on the first write (after storage mounts). Each file grows to `SYSLOG_FILE_MAX_SIZE` (8 KB) and then restarts from empty — a simple truncate-and-restart rotation, no numbered archives. A single assembled line is capped at `SYSLOG_LINE_MAX` (200 bytes). All three limits and the paths live in [SyslogConfig.h](src/config/SyslogConfig.h) and can be overridden per port. A re-entry guard prevents an FS-internal log from recursing while a syslog write is in flight.
+Files split by **level** only — the logger carries no service/unit identity, so level is the only axis. Every file line is **timestamped**: the service prefixes each line with the NTP date (`SYSLOG_FILE_TS_FMT`, default `"%Y-%m-%d %H:%M:%S "`), re-stamping after any newline embedded in the message and closing each entry on its own line; before the clock syncs the field renders as dashes. The `/var/log` directory is created lazily on the first write. Each file grows to `SYSLOG_FILE_MAX_SIZE` (8 KB) then restarts from empty — a truncate-and-restart rotation, no numbered archives. A single assembled line is capped at `SYSLOG_LINE_MAX` (200 bytes). All limits, paths, and the timestamp format live in [SyslogConfig.h](src/config/SyslogConfig.h). A re-entry guard drops any log emitted from inside a syslog write, so the sink can't recurse.
 
-Read them from the CLI like any other file: `cat /var/log/syslog.error`, `tail /var/log/syslog.info 20`, `grep ^E /var/log/syslog.error`.
+Read them from the CLI like any other file: `cat /var/log/syslog.error`, `tail /var/log/syslog.info 20`, `grep MQTT /var/log/syslog.info`.
+
+**Remote forwarding.** Setting `ENABLE_SYSLOG_FORWARD` makes the same service *also* ship each line to a collector as an **RFC 3164** datagram over UDP (`SYSLOG_REMOTE_PORT`, default 514), built directly on `iUdpInterface` — no vendor syslog library. Point it at a collector with `SYSLOG_REMOTE_HOST` (empty ⇒ compiled but idle); the address is resolved through [`NameResolver`](src/service_provider/network/NameResolver.h) once the station has an IP. Each datagram is `<PRI>timestamp hostname pdi: message` — PRI from the level (`local0` facility), timestamp from NTP (omitted until synced), hostname = the device IP. `srvc status syslog` shows the collector, whether it resolved, and the socket state. The file write and the forward are independent: file logging works with no network, and forwarding rides on top when the network is present.
 
 ### 9.8 Gotchas
 
@@ -2339,7 +2346,7 @@ Read them from the CLI like any other file: `cat /var/log/syslog.error`, `tail /
 - **No runtime level filtering.** Disabling `ENABLE_CONSOLE_LOG_INFO` removes every `LogI` from the binary; you cannot turn one back on without recompiling.
 - **`SysLog*` needs storage.** On a port without `ENABLE_STORAGE_SERVICE` (uno), `ENABLE_SYSLOG_SERVICE` is never defined and `SysLog*` silently falls back to console-only `Log*`.
 - **The logger and the CLI share the serial terminal.** Both write through the same `iIOInterface`, so on a single-UART board their output interleaves on one stream — expected.
-- **No timestamping.** Lines arrive as-written, no prefix. Prepend your own with `LogI("[%u] ...", (uint32_t)millis())` if you want one — there's no global setting.
+- **Console output is un-prefixed; syslog *files* are timestamped.** `Log*` lines (and the console echo of `SysLog*` lines) arrive exactly as written — prepend your own with `LogI("[%u] ...", (uint32_t)millis())` if you want one. The `/var/log/syslog.*` file lines get an automatic NTP date prefix ([§9.7](#97-where-syslog-goes)); the console does not.
 
 ---
 

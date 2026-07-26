@@ -13,12 +13,12 @@ created Date    : 25th July 2026
 
 #ifdef ENABLE_SYSLOG_SERVICE
 #include <utility/StringOperations.h>
-#include <interface/pdi/impl/modules/storage/VfsDispatcher.h>
-// guards against re-entry (e.g. an FS-internal log while we are mid-write)
-static bool s_syslog_busy = false;
 #endif
 
 LogManager::LogManager() : m_io(nullptr)
+#ifdef ENABLE_SYSLOG_SERVICE
+  , m_sink(nullptr)
+#endif
 {
 }
 
@@ -109,38 +109,6 @@ void LogManager::log(logger_type_t log_type, const char *format, ...)
 
 #ifdef ENABLE_SYSLOG_SERVICE
 
-const char *LogManager::fileForType(logger_type_t type)
-{
-  switch (type)
-  {
-    case ERROR_LOG:   return SYSLOG_FILE_ERROR;
-    case WARNING_LOG: return SYSLOG_FILE_WARNING;
-    case SUCCESS_LOG: return SYSLOG_FILE_SUCCESS;
-    case INFO_LOG:
-    default:          return SYSLOG_FILE_INFO;
-  }
-}
-
-void LogManager::writeLine(logger_type_t type, const char *line, uint16_t len)
-{
-  if (s_syslog_busy || nullptr == line || 0 == len) return;
-  s_syslog_busy = true;
-
-  // ensure the log directory once (storage is mounted after log init)
-  if (!__i_fs.isDirExist(SYSLOG_DIR))
-  {
-    __i_fs.createDirectory(SYSLOG_DIR);
-  }
-
-  const char *path = fileForType(type);
-  // append while under the threshold; once crossed, start the file over
-  int64_t sz = __i_fs.getFileSize(path);
-  bool append = (sz >= 0 && sz < SYSLOG_FILE_MAX_SIZE);
-  __i_fs.writeFile(path, line, len, append);
-
-  s_syslog_busy = false;
-}
-
 void LogManager::syslog(logger_type_t log_type, const char *format, ...)
 {
   // RO/PROGMEM format -> dynamic RAM (auto-freed) -> owned string
@@ -159,7 +127,10 @@ void LogManager::syslog(logger_type_t log_type, const char *format, ...)
   {
     m_io->write(line);   // console (via the held io terminal)
   }
-  writeLine(log_type, line, len);   // file
+  if (nullptr != m_sink)
+  {
+    m_sink(log_type, line, len);   // file + remote (via the syslog service)
+  }
 }
 
 #endif

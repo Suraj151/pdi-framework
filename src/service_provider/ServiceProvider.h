@@ -50,6 +50,9 @@ typedef enum services{
 #ifdef ENABLE_MDNS_SERVICE
   SERVICE_MDNS,
 #endif
+#ifdef ENABLE_SYSLOG_SERVICE
+  SERVICE_SYSLOG,
+#endif
 #ifdef ENABLE_MQTT_SERVICE
   SERVICE_MQTT,
 #endif

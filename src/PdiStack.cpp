@@ -126,6 +126,11 @@ void PDIStack::initialize(){
   SessionManager::attach(terminal);
   #endif
 
+  // start the syslog sink first so subsequent services' SysLog lines are persisted
+  #ifdef ENABLE_SYSLOG_SERVICE
+  __syslog_service.initService();
+  #endif
+
   __database_service.initService();
 
   #ifdef ENABLE_SERIAL_SERVICE

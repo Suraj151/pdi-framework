@@ -36,6 +36,10 @@ created Date    : 1st June 2019
 #include <interface/pdi/impl/log/LogManager.h>
 #endif
 
+#ifdef ENABLE_SYSLOG_SERVICE
+#include <service_provider/network/SyslogServiceProvider.h>
+#endif
+
 #ifdef ENABLE_TELNET_SERVICE
 #include <service_provider/transport/TelnetServiceProvider.h>
 #endif

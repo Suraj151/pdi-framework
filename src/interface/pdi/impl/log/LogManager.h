@@ -19,9 +19,10 @@ created Date    : 25th July 2026
  *
  * The single logger for the whole stack. `log` streams a formatted line to the
  * held io (serial terminal) character by character — no line buffer, so it fits
- * even the smallest RAM. `syslog` additionally persists the line to
- * /var/log/syslog.<type> and is compiled only when the storage-backed syslog
- * feature is enabled.
+ * even the smallest RAM. `syslog` formats the line, echoes it to the same io,
+ * then hands it to a registered sink (the syslog service) which owns file
+ * persistence and any remote forwarding; it is compiled only when the
+ * storage-backed syslog feature is enabled.
  */
 class LogManager : public iLoggerInterface
 {
@@ -38,17 +39,21 @@ public:
 
 #ifdef ENABLE_SYSLOG_SERVICE
 
-  /* like log, but also append the assembled line to the type's syslog file */
-  void syslog(logger_type_t log_type, const char *format, ...);
+  /* the syslog line sink — a service registers here to persist the assembled
+     line to file (and optionally forward it); nullptr = console-only syslog */
+  typedef void (*SyslogSinkFn)(logger_type_t log_type, const char *line, uint16_t len);
+  void setSyslogSink(SyslogSinkFn sink) { m_sink = sink; }
 
-protected:
-  void writeLine(logger_type_t log_type, const char *line, uint16_t len);
-  const char *fileForType(logger_type_t log_type);
+  /* like log, but also hands the assembled line to the sink */
+  void syslog(logger_type_t log_type, const char *format, ...);
 
 #endif
 
 private:
   iIOInterface *m_io;
+#ifdef ENABLE_SYSLOG_SERVICE
+  SyslogSinkFn m_sink;
+#endif
 };
 
 extern LogManager __log_manager;
