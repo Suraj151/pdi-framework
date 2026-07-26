@@ -13,7 +13,6 @@ created Date    : 1st June 2019
 
 #include "mockdevice.h"
 #include <interface/pdi/middlewares/iPingInterface.h>
-#include "LoggerInterface.h"
 
 /**
  * PingInterface class

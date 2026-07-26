@@ -41,16 +41,16 @@ struct http_req_t
 
 	void print()
 	{
-		LogFmtI("http_req_t host : %s\r\n", host);
-		LogFmtI("http_req_t port : %d\r\n", port);
-		LogFmtI("http_req_t timeout : %d\r\n", timeout);
-		LogFmtI("http_req_t uri : %s\r\n", uri);
-		LogFmtI("http_req_t isHttps : %d\r\n", isHttps);
+		LogI("http_req_t host : %s\r\n", host);
+		LogI("http_req_t port : %d\r\n", port);
+		LogI("http_req_t timeout : %d\r\n", timeout);
+		LogI("http_req_t uri : %s\r\n", uri);
+		LogI("http_req_t isHttps : %d\r\n", isHttps);
 		for (size_t i = 0; i < headers.size(); i++)
 		{
 			if (nullptr != headers[i].key && nullptr != headers[i].value)
 			{
-				LogFmtI("http_req_t header[%s] : %s\r\n", headers[i].key, headers[i].value);
+				LogI("http_req_t header[%s] : %s\r\n", headers[i].key, headers[i].value);
 			}
 		}
 	}
@@ -79,15 +79,15 @@ struct http_resp_t
 
 	void print()
 	{
-		LogFmtI("http_resp_t response : %s\r\n", response);
-		LogFmtI("http_resp_t status_code : %d\r\n", status_code);
-		LogFmtI("http_resp_t resp_length : %d\r\n", resp_length);
-		LogFmtI("http_resp_t max_resp_length : %d\r\n", max_resp_length);
+		LogI("http_resp_t response : %s\r\n", response);
+		LogI("http_resp_t status_code : %d\r\n", status_code);
+		LogI("http_resp_t resp_length : %d\r\n", resp_length);
+		LogI("http_resp_t max_resp_length : %d\r\n", max_resp_length);
 		for (size_t i = 0; i < headers.size(); i++)
 		{
 			if (nullptr != headers[i].key && nullptr != headers[i].value)
 			{
-				LogFmtI("http_resp_t header[%s] : %s\r\n", headers[i].key, headers[i].value);
+				LogI("http_resp_t header[%s] : %s\r\n", headers[i].key, headers[i].value);
 			}
 		}
 	}

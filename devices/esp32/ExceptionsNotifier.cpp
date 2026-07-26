@@ -204,7 +204,7 @@ void readCrashFileToBuffer(String &_filepath, String &_filedata, uint16_t &_size
 // 		_file.close();
 // 	}
 
-// 	LogFmtI("\nStack Trace saved to file : %s\n", CRASHFILEPATH);
+// 	LogI("\nStack Trace saved to file : %s\n", CRASHFILEPATH);
 // }
 
 /**

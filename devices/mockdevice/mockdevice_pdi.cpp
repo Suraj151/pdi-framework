@@ -13,7 +13,6 @@ created Date    : 1st Jan 2024
 
 #include "mockdevice_pdi.h"
 
-LoggerInterface __i_logger;
 DatabaseInterface __i_db;
 DeviceControlInterface __i_dvc_ctrl;
 #ifdef ENABLE_WIFI_SERVICE

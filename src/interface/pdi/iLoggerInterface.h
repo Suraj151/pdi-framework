@@ -15,9 +15,6 @@ created Date    : 1st Jan 2024
 #include <utility/iIOInterface.h>
 
 
-// forward declaration of derived class for this interface
-class LoggerInterface;
-
 /**
  * iLoggerInterface class
  */
@@ -35,29 +32,7 @@ public:
   virtual ~iLoggerInterface() {}
 
   virtual void init(iIOInterface *io = nullptr) = 0;
-  virtual void log(logger_type_t log_type, const char *content) = 0;
-  virtual void log_info(const char *info) = 0;
-  virtual void log_error(const char *error) = 0;
-  virtual void log_warning(const char *warning) = 0;
-  virtual void log_success(const char *success) = 0;
-  virtual void log_format(const char *format, logger_type_t log_type, ...) = 0;
+  virtual void log(logger_type_t log_type, const char *format, ...) = 0;
 };
-
-// derived class must define this
-extern LoggerInterface __i_logger;
-
-
-// // redefine these in derived interface
-// #define LOGBEGIN
-
-// #define LogI(v) // info log
-// #define LogE(v) // error log
-// #define LogW(v) // warning log
-// #define LogS(v) // success log
-
-// #define LogFmtI(f, args...)
-// #define LogFmtE(f, args...)
-// #define LogFmtW(f, args...)
-// #define LogFmtS(f, args...)
 
 #endif

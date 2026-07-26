@@ -189,16 +189,16 @@ public:
       __i_dvc_ctrl.yield();
 
       LogI("\nSubmitted info :\n");
-      LogFmtI("sta ssid : %s\n", _sta_ssid.c_str());
-      LogFmtI("sta password : %s\n", _sta_pswd.c_str());
-      LogFmtI("sta local ip : %s\n", _sta_lip.c_str());
-      LogFmtI("sta gateway : %s\n", _sta_gip.c_str());
-      LogFmtI("sta subnet : %s\n", _sta_sip.c_str());
-      LogFmtI("ap ssid : %s\n", _ap_ssid.c_str());
-      LogFmtI("ap password : %s\n", _ap_pswd.c_str());
-      LogFmtI("ap local ip : %s\n", _ap_lip.c_str());
-      LogFmtI("ap gateway : %s\n", _ap_gip.c_str());
-      LogFmtI("ap subnet : %s\n\n", _ap_sip.c_str());
+      LogI("sta ssid : %s\n", _sta_ssid.c_str());
+      LogI("sta password : %s\n", _sta_pswd.c_str());
+      LogI("sta local ip : %s\n", _sta_lip.c_str());
+      LogI("sta gateway : %s\n", _sta_gip.c_str());
+      LogI("sta subnet : %s\n", _sta_sip.c_str());
+      LogI("ap ssid : %s\n", _ap_ssid.c_str());
+      LogI("ap password : %s\n", _ap_pswd.c_str());
+      LogI("ap local ip : %s\n", _ap_lip.c_str());
+      LogI("ap gateway : %s\n", _ap_gip.c_str());
+      LogI("ap subnet : %s\n\n", _ap_sip.c_str());
       __i_dvc_ctrl.yield();
 
       if (_sta_ssid.size() <= WIFI_CONFIGS_BUF_SIZE && _sta_pswd.size() <= WIFI_CONFIGS_BUF_SIZE

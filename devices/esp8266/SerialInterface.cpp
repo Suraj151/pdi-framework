@@ -13,7 +13,7 @@ created Date    : 1st June 2019
 
 // extern int __heap_start, *__brkval; int v; 
 // int ramavail = (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
-// LogFmtI("available ram %d, %d\n", ramavail, sizeof(task_t));
+// LogI("available ram %d, %d\n", ramavail, sizeof(task_t));
 
 
 // initialize instances with respective type or nullptr

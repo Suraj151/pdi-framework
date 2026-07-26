@@ -100,8 +100,8 @@ public:
 			pdiutil::string _device_iot_host = this->m_web_resource->m_server->arg("dhst");
 
 			LogI("\nSubmitted info :\n");
-			LogFmtI("device Unique Id : %s\n", _device_iot_duid.c_str());
-			LogFmtI("device reg. host : %s\n\n", _device_iot_host.c_str());
+			LogI("device Unique Id : %s\n", _device_iot_duid.c_str());
+			LogI("device reg. host : %s\n\n", _device_iot_host.c_str());
 
 			device_iot_config_table _device_iot_configs;
 			this->m_web_resource->m_db_conn->get_device_iot_config_table(&_device_iot_configs);

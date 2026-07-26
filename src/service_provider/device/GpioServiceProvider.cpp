@@ -140,7 +140,7 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isEventPost ){
       this->m_http_client->AddReqHeader(HTTP_HEADER_KEY_CONTENT_TYPE, "application/json");
       this->m_http_client->SetTimeout(2*MILLISECOND_DURATION_1000);
 
-      LogFmtI("posting data : %s\n", _payload->c_str());
+      LogI("posting data : %s\n", _payload->c_str());
 
       status = ( HTTP_RESP_OK == this->m_http_client->Post( posturl.c_str(), _payload->c_str() ) );
       
@@ -264,7 +264,7 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
  */
 void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payload_length, pdiutil::vector<pdiutil::string> *allowedlist ){
 
-  LogFmtI("Applying GPIO from Json Payload : %s\n", _payload);
+  LogI("Applying GPIO from Json Payload : %s\n", _payload);
 
   if(
     0 <= __strstr( _payload, (char*)GPIO_PAYLOAD_DATA_KEY, _payload_length - strlen(GPIO_PAYLOAD_DATA_KEY) ) &&
@@ -323,7 +323,7 @@ void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payloa
 
           if( __get_from_json( _pin_data, GPIO_PAYLOAD_VALUE_KEY, _pin_value, _pin_values_max_len ) ){
 
-            LogFmtI("Applying to : %s, mode : %s, value : %s\n", _pin_label_uppercase, _pin_mode, _pin_value);
+            LogI("Applying to : %s, mode : %s, value : %s\n", _pin_label_uppercase, _pin_mode, _pin_value);
 
             if( !__are_arrays_equal(_pin_mode, NOT_APPLICABLE, 2) ){
 
@@ -364,7 +364,7 @@ void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payloa
  */
 void GpioServiceProvider::applyGpioEventJsonPayload( char* _payload, uint16_t _payload_length, pdiutil::vector<pdiutil::string> *allowedlist ){
 
-  LogFmtI("Applying GPIO Events from Json Payload : %s\n", _payload);
+  LogI("Applying GPIO Events from Json Payload : %s\n", _payload);
 
   if(
     0 <= __strstr( _payload, (char*)GPIO_EVENT_COMPARATOR_KEY, _payload_length - strlen(GPIO_PAYLOAD_DATA_KEY) ) &&
@@ -446,7 +446,7 @@ void GpioServiceProvider::applyGpioEventJsonPayload( char* _payload, uint16_t _p
 
               if( __get_from_json( _iface_data + _iface_data_index, GPIO_PAYLOAD_VALUE_KEY, _iface_value, _iface_keys_max_len ) ){
 
-                LogFmtI("Applying to : %s, cmp : %s, value : %s\n", _iface_label_uppercase, _iface_comparator, _iface_value);
+                LogI("Applying to : %s, cmp : %s, value : %s\n", _iface_label_uppercase, _iface_comparator, _iface_value);
 
                 uint8_t _comparator = StringToUint8( _iface_comparator, _iface_keys_max_len );
                 uint16_t _value = StringToUint16( _iface_value, _iface_keys_max_len );
@@ -569,7 +569,7 @@ void GpioServiceProvider::handleGpioOperations(){
             this->m_digital_blinker[_pin] = __i_dvc_ctrl.createGpioBlinkerInstance( _pin, this->m_gpio_config_copy.gpio_readings[_pin] );
           }
         }else{
-          LogFmtW("\nOut Of Range GPIO blink Config : %d", _pin);
+          LogW("\nOut Of Range GPIO blink Config : %d", _pin);
         }
         break;
       }
@@ -608,7 +608,7 @@ void GpioServiceProvider::handleGpioOperations(){
 
       if(_is_event_condition){
 
-        LogFmtI("\nGPIO Event %d occured\n", (int)_evtidx);
+        LogI("\nGPIO Event %d occured\n", (int)_evtidx);
       }else{
 
         // Reduce the last event millis once event stop occuring for few countdowns

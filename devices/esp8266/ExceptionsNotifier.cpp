@@ -192,7 +192,7 @@ extern "C" void custom_crash_callback(struct rst_info *rst_info, uint32_t stack,
 		_file.close();
 	}
 
-	LogFmtI("\nStack Trace saved to file : %s\n", CRASHFILEPATH);
+	LogI("\nStack Trace saved to file : %s\n", CRASHFILEPATH);
 }
 
 /**

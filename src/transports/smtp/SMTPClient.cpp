@@ -47,7 +47,7 @@ bool SMTPClient::begin( iClientInterface *_client, char *_host, uint16_t _port, 
   this->m_isSecure = _isSecure;
 
   if( this->m_isSecure && nullptr != this->m_client && !this->m_client->isSecure() ){
-    LogE("SMTP: secure mode requested but client is not TLS-capable\n");
+    SysLogE("SMTP: secure mode requested but client is not TLS-capable\n");
     return false;
   }
 
@@ -163,8 +163,8 @@ void SMTPClient::waitForResponse( uint16_t _timeOut ) {
  		this->readResponse();
 	} while( SMTP_RESPONSE_WAITING == this->m_responseReaderStatus );
 
-	LogFmtI("SMTP status: %d\n", this->m_responseReaderStatus);
-	LogFmtI("SMTP response: %s\n", nullptr != this->m_responseBuffer ? this->m_responseBuffer : " ");
+	LogI("SMTP status: %d\n", this->m_responseReaderStatus);
+	LogI("SMTP response: %s\n", nullptr != this->m_responseBuffer ? this->m_responseBuffer : " ");
 }
 
 bool SMTPClient::waitForExpectedResponse(	char *expectedResponse, uint16_t _timeOut ){
@@ -173,7 +173,7 @@ bool SMTPClient::waitForExpectedResponse(	char *expectedResponse, uint16_t _time
 
 	this->waitForResponse( _timeOut );
 
-	LogFmtI("SMTP espected response: %s\n", expectedResponse);
+	LogI("SMTP espected response: %s\n", expectedResponse);
 
   if( nullptr != this->m_responseBuffer ){
     status = ( __strstr( (char*)this->m_responseBuffer, expectedResponse ) > 0 );
@@ -186,7 +186,7 @@ bool SMTPClient::sendCommandAndExpect( char *command, char *expectedResponse, ui
 
   bool status = false;
 
-	LogFmtI("SMTP sending command: %s\n", command);
+	LogI("SMTP sending command: %s\n", command);
 
   if( nullptr != this->m_client ){
 
@@ -208,7 +208,7 @@ int16_t SMTPClient::sendCommandAndGetCode( const char * command, uint16_t _timeO
 
   int16_t respcode = SMTP_STATUS_MAX;
 
-	LogFmtI("SMTP sending command: %s\n", command);
+	LogI("SMTP sending command: %s\n", command);
 
   if( nullptr != this->m_client ){
 
@@ -237,7 +237,7 @@ int16_t SMTPClient::sendCommandAndGetCode( char *command, uint16_t _timeOut ){
 
   int16_t respcode = SMTP_STATUS_MAX;
 
-	LogFmtI("SMTP sending command: %s\n", command);
+	LogI("SMTP sending command: %s\n", command);
 
   if( nullptr != this->m_client ){
 
@@ -378,7 +378,7 @@ bool SMTPClient::sendDataBody( pdiutil::string &body ){
 
   int16_t respcode = SMTP_STATUS_MAX;
 
-	LogFmtI("SMTP sending data: %s\n", body.c_str());
+	LogI("SMTP sending data: %s\n", body.c_str());
 
   if( nullptr != this->m_client ){
     sendPacket( this->m_client, (uint8_t*)body.c_str(), body.size() );
@@ -392,7 +392,7 @@ bool SMTPClient::sendDataBody( char *body ){
 
   int16_t respcode = SMTP_STATUS_MAX;
 
-	LogFmtI("SMTP sending data: %s\n", body);
+	LogI("SMTP sending data: %s\n", body);
 
   if( nullptr != this->m_client ){
     sendPacket( this->m_client, (uint8_t*)body, strlen(body) );
@@ -406,7 +406,7 @@ bool SMTPClient::sendDataBody( const char * body ){
 
   int16_t respcode = SMTP_STATUS_MAX;
 
-	LogFmtI("SMTP sending data: %s\n", body);
+	LogI("SMTP sending data: %s\n", body);
 
   if( nullptr != this->m_client ){
     this->m_client->write((const uint8_t*)body);

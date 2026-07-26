@@ -72,7 +72,7 @@ bool MqttServiceProvider::initService( void *arg ){
  */
 void MqttServiceProvider::handleMqttPublish(bool sync){
 
-  LogFmtI("MQTT: handling mqtt publish interval, %d\n", (int)sync);
+  LogI("MQTT: handling mqtt publish interval, %d\n", (int)sync);
   if( !this->m_mqtt_client.is_mqtt_connected() ) return;
 
   mqtt_pubsub_config_table _mqtt_pubsub_configs;
@@ -83,7 +83,7 @@ void MqttServiceProvider::handleMqttPublish(bool sync){
     __find_and_replace( _mqtt_pubsub_configs.publish_topics[i].topic, "[mac]", __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
     if( nullptr != this->m_mqtt_payload && strlen(_mqtt_pubsub_configs.publish_topics[i].topic) > 0 ){
 
-      LogFmtI("MQTT: publishing on topic : %s\n", _mqtt_pubsub_configs.publish_topics[i].topic);
+      LogI("MQTT: publishing on topic : %s\n", _mqtt_pubsub_configs.publish_topics[i].topic);
 
       #ifdef ENABLE_MQTT_DEFAULT_PAYLOAD
 

@@ -23,4 +23,6 @@ created Date    : 1st Jan 2024
 #define FLASH_KEY_PRESS_COUNT_THR 5
 
 
+#include <interface/pdi/impl/log/LogMacros.h>
+
 #endif // _ARDUINOUNO_COMMON_CONFIG_H_

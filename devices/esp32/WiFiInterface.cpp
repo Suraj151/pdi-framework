@@ -9,7 +9,6 @@ created Date    : 1st June 2019
 ******************************************************************************/
 
 #include "WiFiInterface.h"
-#include "LoggerInterface.h"
 #include "DeviceControlInterface.h"
 
 // extern "C" void preinit() {
@@ -739,7 +738,7 @@ void WiFiInterface::enableNetworkStatusIndication()
   __task_scheduler.setInterval( [&]() { 
 
       LogI("Handling LED Status Indications\n");
-      LogFmtI("RSSI : %d\n", this->m_wifi->RSSI());
+      LogI("RSSI : %d\n", this->m_wifi->RSSI());
 
       if( !this->m_wifi->localIP() != INADDR_NONE || !this->m_wifi->isConnected() || ( this->m_wifi->RSSI() < (int)WIFI_RSSI_THRESHOLD ) ){
 
@@ -762,7 +761,7 @@ void WiFiInterface::enableNAPT(bool enable)
 {
   #if defined( ENABLE_NAPT )
   bool bStatus = this->m_wifi->AP.enableNAPT(enable);
-  LogFmtS("NAPT enable status : %d\n", (int)bStatus);
+  LogS("NAPT enable status : %d\n", (int)bStatus);
   #endif
 }
 
@@ -774,7 +773,7 @@ void WiFiInterface::wifi_event_handler_cb(arduino_event_t *_event)
 {
   if( nullptr != _event ){
 
-    LogFmtI("\nesp event : %d\n", (int)_event->event_id);
+    LogI("\nesp event : %d\n", (int)_event->event_id);
     event_name_t e = EVENT_NAME_MAX;
 
     if ( ARDUINO_EVENT_WIFI_STA_CONNECTED == _event->event_id ) {

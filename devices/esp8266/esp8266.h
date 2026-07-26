@@ -66,4 +66,6 @@ extern "C"
   #define NAPT_INIT_DURATION_AFTER_WIFI_CONNECT MILLISECOND_DURATION_5000
 #endif
 
+#include <interface/pdi/impl/log/LogMacros.h>
+
 #endif // _ESP8266_COMMON_CONFIG_H_

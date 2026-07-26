@@ -15,6 +15,7 @@ created Date    : 1st June 2019
 #include <interface/pdi.h>
 #include <config/Config.h>
 #include <utility/Utility.h>
+#include <interface/pdi/impl/log/LogMacros.h>
 
 
 /**

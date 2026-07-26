@@ -300,13 +300,13 @@ bool TlsClientInterface::beginServer(const char* certPath, const char* keyPath, 
     }
 
     if (!TlsCryptoLoader::loadCertChain(certPath, m_bear->certChain, m_bear->certChainCount, m_bear->certBacking)) {
-        LogFmtE("TLS beginServer: loadCertChain failed: %s\n", certPath);
+        LogE("TLS beginServer: loadCertChain failed: %s\n", certPath);
         bearReset(0);
         return false;
     }
 
     if (!TlsCryptoLoader::loadPrivateKey(keyPath, m_bear->skey)) {
-        LogFmtE("TLS beginServer: loadPrivateKey failed: %s\n", keyPath);
+        LogE("TLS beginServer: loadPrivateKey failed: %s\n", keyPath);
         bearReset(0);
         return false;
     }
@@ -350,7 +350,7 @@ bool TlsClientInterface::beginServer(const char* certPath, const char* keyPath, 
             br_ssl_engine_get_ec(&m_bear->sc.eng),
             br_ecdsa_i15_sign_asn1);
     } else {
-        LogFmtE("TLS beginServer: unsupported key type %d\n", keyType);
+        LogE("TLS beginServer: unsupported key type %d\n", keyType);
         bearReset(0);
         return false;
     }
@@ -368,7 +368,7 @@ bool TlsClientInterface::beginServer(const char* certPath, const char* keyPath, 
     if (clientCaPath && clientCaPath[0]) {
         if (!TlsCryptoLoader::loadTrustAnchors(clientCaPath,
                 m_bear->trustAnchors, m_bear->trustAnchorsCount)) {
-            LogFmtE("TLS beginServer: loadTrustAnchors failed: %s\n", clientCaPath);
+            LogE("TLS beginServer: loadTrustAnchors failed: %s\n", clientCaPath);
             bearReset(0);
             return false;
         }
@@ -408,7 +408,7 @@ bool TlsClientInterface::startTlsWorker() {
             &__i_cooperative_scheduler, m_taskId,
             TASK_MODE_COOPERATIVE, TLS_TASK_STACK_SIZE);
 
-        LogFmtI("TLS startTlsWorker : %d\n", status);
+        LogI("TLS startTlsWorker : %d\n", status);
         if(status < 0){
             close();
         }
@@ -424,7 +424,7 @@ void TlsClientInterface::stopTlsWorker() {
     pdiutil::task_id_t taskid = m_taskId;
     m_taskId = -1;
 
-    LogFmtI("TLS stopTlsWorker : %d\n", taskid);
+    LogI("TLS stopTlsWorker : %d\n", taskid);
 
     task_t* t = __task_scheduler.get_task(taskid);
     if (t && t->_task_exec) {
@@ -498,11 +498,11 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
                 __i_dvc_ctrl.wait(1);
             }
             if (m_dns.in_flight) {
-                LogFmtE("TLS connect: DNS timeout for %s\n", hostname);
+                LogE("TLS connect: DNS timeout for %s\n", hostname);
                 return -100;
             }
             if (!m_dns.found) {
-                LogFmtE("TLS connect: DNS resolution failed for %s\n", hostname);
+                LogE("TLS connect: DNS resolution failed for %s\n", hostname);
                 return -100;
             }
             serverIp = m_dns.addr;
@@ -626,13 +626,13 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
         unsigned engState = m_bear ? br_ssl_engine_current_state(&m_bear->cc.eng) : 0;
         int      engErr   = m_bear ? br_ssl_engine_last_error(&m_bear->cc.eng) : -1;
         uint32_t elapsed  = __i_dvc_ctrl.millis_now() - start;
-        LogFmtE("TLS connect: timeout after %u ms (tcp.connected=%d engState=%u engErr=%d rxQ=%u)\n",
+        LogE("TLS connect: timeout after %u ms (tcp.connected=%d engState=%u engErr=%d rxQ=%u)\n",
             (unsigned)elapsed, (int)m_isConnected, engState, engErr, (unsigned)m_rxQueueLen);
         close();
         return -101;
     }
 
-    // LogFmtI("TLS connect: handshake done in %u ms\n",
+    // LogI("TLS connect: handshake done in %u ms\n",
     //     (unsigned)(__i_dvc_ctrl.millis_now() - start));
     return 0;
 }
@@ -877,7 +877,7 @@ err_t TlsClientInterface::onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf
 
     uint32_t newSize = self->m_rxQueueLen + p->tot_len;
     if((newSize+self->m_rxQueueLen) > (0.90*TLS_IBUF_SIZE)){
-        // LogFmtE("TLS onReceive: rxQ cap, in=%u rxQ=%u\n",
+        // LogE("TLS onReceive: rxQ cap, in=%u rxQ=%u\n",
         //     (unsigned)p->tot_len, (unsigned)self->m_rxQueueLen);
         return ERR_MEM;
     }
@@ -890,7 +890,7 @@ err_t TlsClientInterface::onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
         self->m_mutex.critical_unlock();
         #endif
-        LogFmtE("TLS onReceive: alloc fail, in=%u rxQ=%u\n",
+        LogE("TLS onReceive: alloc fail, in=%u rxQ=%u\n",
             (unsigned)p->tot_len, (unsigned)self->m_rxQueueLen);
         return ERR_MEM;
     }
@@ -912,7 +912,7 @@ err_t TlsClientInterface::onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf
 void TlsClientInterface::onError(void* arg, err_t err) {
     TlsClientInterface* self = static_cast<TlsClientInterface*>(arg);
     if (!self) return;
-    // LogFmtE("TLS onError: lwIP err=%d\n", (int)err);
+    // LogE("TLS onError: lwIP err=%d\n", (int)err);
     self->m_pcb = nullptr;
     self->flush();
     self->m_isConnected = false;
@@ -1021,7 +1021,7 @@ void TlsClientInterface::serviceRx() {
     if (state & BR_SSL_CLOSED) {
         int err = br_ssl_engine_last_error(eng);
         if (err != BR_ERR_OK) {
-            LogFmtE("TLS serviceRx: engine closed with err=%d\n", err);
+            LogE("TLS serviceRx: engine closed with err=%d\n", err);
             m_bear->engineFatal = true;
         }
     }
@@ -1062,7 +1062,7 @@ void TlsClientInterface::pumpEngine() {
         if (state & BR_SSL_CLOSED) {
             int err = br_ssl_engine_last_error(eng);
             if (err != BR_ERR_OK) {
-                LogFmtE("TLS pumpEngine: engine closed with err=%d\n", err);
+                LogE("TLS pumpEngine: engine closed with err=%d\n", err);
                 m_bear->engineFatal = true;
             }
             break;
@@ -1108,7 +1108,7 @@ void TlsClientInterface::pumpEngine() {
         __i_dvc_ctrl.yield();
 
         if (err != ERR_OK) {
-            LogFmtE("TLS pumpEngine: tcp_write err=%d\n", (int)err);
+            LogE("TLS pumpEngine: tcp_write err=%d\n", (int)err);
             if (err != ERR_MEM && m_bear) m_bear->engineFatal = true;
             break;
         }

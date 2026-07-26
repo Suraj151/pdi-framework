@@ -210,13 +210,22 @@ created Date    : 1st June 2019
 #define CONFIG_CLEAR_TO_DEFAULT_ON_FACTORY_RESET
 
 /**
- * enable/disable logs here
+ * enable/disable console (serial) logs here
  */
-// #define ENABLE_LOG_ALL
-// #define ENABLE_LOG_INFO
-// #define ENABLE_LOG_WARNING
-// #define ENABLE_LOG_ERROR
-// #define ENABLE_LOG_SUCCESS
+// #define ENABLE_CONSOLE_LOG_ALL
+// #define ENABLE_CONSOLE_LOG_INFO
+// #define ENABLE_CONSOLE_LOG_WARNING
+// #define ENABLE_CONSOLE_LOG_ERROR
+// #define ENABLE_CONSOLE_LOG_SUCCESS
+
+/**
+ * enable/disable syslog — persists log lines to /var/log/syslog.<type> files
+ * via the LogManager service. Optional; requires the storage service. Use the
+ * SysLog* macros for lines you want on console AND in the file.
+ */
+#if defined(ENABLE_STORAGE_SERVICE)
+// #define ENABLE_SYSLOG_SERVICE
+#endif
 
 /**
  * consts

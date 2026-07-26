@@ -9,7 +9,6 @@ created Date    : 1st June 2019
 ******************************************************************************/
 
 #include "PingInterface.h"
-#include "LoggerInterface.h"
 #include <string.h>
 
 volatile bool _host_resp = false;
@@ -115,7 +114,7 @@ bool PingInterface::ping( const ipaddress_t &target, uint16_t count, CallBackVoi
   cbs.on_ping_end = on_ping_end;
 
   pdiutil::string ipstr = _target;
-  LogFmtI("\nPing ip: %s\n", ipstr.c_str());
+  LogI("\nPing ip: %s\n", ipstr.c_str());
 
   if( esp_ping_new_session(&config, &cbs, &_ping_hdl) != ESP_OK ){
     _ping_hdl = nullptr;

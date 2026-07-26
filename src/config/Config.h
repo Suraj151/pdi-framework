@@ -49,6 +49,10 @@ created Date    : 1st June 2019
 #include "MdnsConfig.h"
 #endif
 
+#ifdef ENABLE_SYSLOG_SERVICE
+#include "SyslogConfig.h"
+#endif
+
 #ifdef ENABLE_TLS_SERVICE
 #include "TlsConfig.h"
 #endif

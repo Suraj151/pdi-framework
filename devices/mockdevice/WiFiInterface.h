@@ -13,7 +13,6 @@ created Date    : 1st June 2019
 
 #include "mockdevice.h"
 #include <interface/pdi/modules/wifi/iWiFiInterface.h>
-#include "LoggerInterface.h"
 #include "DeviceControlInterface.h"
 
 // declare device specific

@@ -77,7 +77,7 @@ bool HttpServer::initService(void *arg)
     //   m_terminal->writeln_ro(RODT_ATTR(" Controller"));
     // }
   
-    // LogFmtI("Booting: %s controller\n", Controller::m_controllers[i].controller->m_controller_name);
+    // LogI("Booting: %s controller\n", Controller::m_controllers[i].controller->m_controller_name);
     Controller::m_controllers[i].controller->boot();
   }
 

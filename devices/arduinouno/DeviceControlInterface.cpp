@@ -9,7 +9,6 @@ created Date    : 1st Jan 2024
 ******************************************************************************/
 
 #include "DeviceControlInterface.h"
-#include "LoggerInterface.h"
 #include "SerialInterface.h"
 #include <avr/wdt.h>
 
@@ -261,7 +260,7 @@ bool DeviceControlInterface::isDeviceFactoryRequested()
     if (__i_dvc_ctrl.gpioRead(DIGITAL_READ, FLASH_KEY_PIN) == LOW)
     {
         m_flash_key_pressed++;
-        LogFmtI("Flash Key pressed : %d\n", m_flash_key_pressed);
+        LogI("Flash Key pressed : %d\n", m_flash_key_pressed);
     }
     else
     {
@@ -324,8 +323,8 @@ uint64_t DeviceControlInterface::micros_now()
  */
 void DeviceControlInterface::log(logger_type_t log_type, const char *content)
 {
-  #if defined(LOGBEGIN) && ( defined(ENABLE_LOG_ALL) || defined(ENABLE_LOG_INFO) || defined(ENABLE_LOG_ERROR) || defined(ENABLE_LOG_WARNING) || defined(ENABLE_LOG_SUCCESS) )
-  __i_logger.log(log_type, content);
+  #if ( defined(ENABLE_CONSOLE_LOG_ALL) || defined(ENABLE_CONSOLE_LOG_INFO) || defined(ENABLE_CONSOLE_LOG_ERROR) || defined(ENABLE_CONSOLE_LOG_WARNING) || defined(ENABLE_CONSOLE_LOG_SUCCESS) )
+  __log_manager.log(log_type, RODT_ATTR("%s"), content);
   #endif
 }
 

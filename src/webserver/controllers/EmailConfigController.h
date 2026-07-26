@@ -155,16 +155,16 @@ public:
 			__i_dvc_ctrl.yield();
 
 			LogI("\nSubmitted info :\n");
-			LogFmtI("mail domain : %s\n",_mail_domain.c_str());
-			LogFmtI("mail server : %s\n",_mail_server.c_str());
-			LogFmtI("mail port : %s\n",_mail_port.c_str());
-			LogFmtI("mail username : %s\n",_mail_username.c_str());
-			LogFmtI("mail password : %s\n",_mail_password.c_str());
-			LogFmtI("mail from : %s\n",_mail_from.c_str());
-			LogFmtI("mail from name : %s\n",_mail_from_name.c_str());
-			LogFmtI("mail to : %s\n",_mail_to.c_str());
-			LogFmtI("mail subject : %s\n",_mail_subject.c_str());
-			LogFmtI("test mail : %s\n\n",_test_mail.c_str());
+			LogI("mail domain : %s\n",_mail_domain.c_str());
+			LogI("mail server : %s\n",_mail_server.c_str());
+			LogI("mail port : %s\n",_mail_port.c_str());
+			LogI("mail username : %s\n",_mail_username.c_str());
+			LogI("mail password : %s\n",_mail_password.c_str());
+			LogI("mail from : %s\n",_mail_from.c_str());
+			LogI("mail from name : %s\n",_mail_from_name.c_str());
+			LogI("mail to : %s\n",_mail_to.c_str());
+			LogI("mail subject : %s\n",_mail_subject.c_str());
+			LogI("test mail : %s\n\n",_test_mail.c_str());
 			__i_dvc_ctrl.yield();
 
 			if (_mail_domain.size() <= DEFAULT_SENDING_DOMAIN_MAX_SIZE && _mail_server.size() <= DEFAULT_MAIL_HOST_MAX_SIZE &&

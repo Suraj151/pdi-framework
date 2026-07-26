@@ -76,7 +76,7 @@ DeviceIotTable __device_iot_table;
 #ifdef AUTO_FACTORY_RESET_ON_INVALID_CONFIGS
 static void factoryResetOnInvalidConfigs(){
     if ( !__i_db.isValidConfigs() ){
-      LogE("\n\nFound invalid configs.. starting factory reset..!\n\n");
+      SysLogE("\n\nFound invalid configs.. starting factory reset..!\n\n");
       // __database_service.clear_default_tables();
       __factory_reset.factory_reset();
     }

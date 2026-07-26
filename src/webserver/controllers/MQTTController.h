@@ -188,13 +188,13 @@ public:
       __i_dvc_ctrl.yield();
 
       LogI("\nSubmitted info :\n");
-      LogFmtI("mqtt host : %s\n", _mqtt_host.c_str());
-      LogFmtI("mqtt port : %s\n", _mqtt_port.c_str());
-      LogFmtI("client id : %s\n", _client_id.c_str());
-      LogFmtI("username : %s\n", _username.c_str());
-      LogFmtI("password : %s\n", _password.c_str());
-      LogFmtI("keep alive : %s\n", _keep_alive.c_str());
-      LogFmtI("clean session : %s\n\n", _clean_session.c_str());
+      LogI("mqtt host : %s\n", _mqtt_host.c_str());
+      LogI("mqtt port : %s\n", _mqtt_port.c_str());
+      LogI("client id : %s\n", _client_id.c_str());
+      LogI("username : %s\n", _username.c_str());
+      LogI("password : %s\n", _password.c_str());
+      LogI("keep alive : %s\n", _keep_alive.c_str());
+      LogI("clean session : %s\n\n", _clean_session.c_str());
       __i_dvc_ctrl.yield();
 
       mqtt_general_config_table *_mqtt_general_configs = new mqtt_general_config_table;
@@ -310,10 +310,10 @@ public:
       pdiutil::string _will_retain = this->m_web_resource->m_server->arg(CHARPTR_WRAP("wrtn"));
 
       LogI("\nSubmitted info :\n");
-      LogFmtI("will topic : %s\n", _will_topic.c_str());
-      LogFmtI("will message : %s\n", _will_message.c_str());
-      LogFmtI("will qos : %s\n", _will_qos.c_str());
-      LogFmtI("will retain : %s\n\n", _will_retain.c_str());
+      LogI("will topic : %s\n", _will_topic.c_str());
+      LogI("will message : %s\n", _will_message.c_str());
+      LogI("will qos : %s\n", _will_qos.c_str());
+      LogI("will retain : %s\n\n", _will_retain.c_str());
       __i_dvc_ctrl.yield();
 
       mqtt_lwt_config_table *_mqtt_lwt_configs = new mqtt_lwt_config_table;
@@ -513,7 +513,7 @@ public:
         _mqtt_pubsub_configs->publish_topics[i].qos = StringToUint8(_qos.c_str());
         _mqtt_pubsub_configs->publish_topics[i].retain = (int)(_retain == "retain");
 
-        LogFmtI("%d : Topic(%s), Qos(%s), Retain(%s)\n", i, _topic.c_str(),_qos.c_str(),_retain.c_str());
+        LogI("%d : Topic(%s), Qos(%s), Retain(%s)\n", i, _topic.c_str(),_qos.c_str(),_retain.c_str());
       }
       __i_dvc_ctrl.yield();
 
@@ -533,7 +533,7 @@ public:
         strncpy(_mqtt_pubsub_configs->subscribe_topics[i].topic, _topic.c_str(), _topic.size());
         _mqtt_pubsub_configs->subscribe_topics[i].qos = StringToUint8(_qos.c_str());
 
-        LogFmtI("%d : Topic(%s), Qos(%s), Retain(%s)\n", i, _topic.c_str(),_qos.c_str());
+        LogI("%d : Topic(%s), Qos(%s), Retain(%s)\n", i, _topic.c_str(),_qos.c_str());
       }
       _mqtt_pubsub_configs->publish_frequency = StringToUint16(this->m_web_resource->m_server->arg("pfrq").c_str());
 

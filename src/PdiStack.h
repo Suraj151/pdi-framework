@@ -32,6 +32,10 @@ created Date    : 1st June 2019
 #include <service_provider/network/MdnsServiceProvider.h>
 #endif
 
+#ifdef ENABLE_SYSLOG_SERVICE
+#include <interface/pdi/impl/log/LogManager.h>
+#endif
+
 #ifdef ENABLE_TELNET_SERVICE
 #include <service_provider/transport/TelnetServiceProvider.h>
 #endif

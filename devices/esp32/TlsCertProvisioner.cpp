@@ -144,23 +144,23 @@ bool generateCert(const char* certPath, const char* keyPath, const CertParams& p
     int rc = 0;
 
     rc = mbedtls_ctr_drbg_seed(&rng, mbedtls_entropy_func, &entropy, nullptr, 0);
-    if (rc != 0) { LogFmtE("CertProvisioner: ctr_drbg_seed=%d\n", rc); goto done; }
+    if (rc != 0) { LogE("CertProvisioner: ctr_drbg_seed=%d\n", rc); goto done; }
 
     if (params.algo == KEY_ALGO_RSA) {
         rc = mbedtls_pk_setup(&key, mbedtls_pk_info_from_type(MBEDTLS_PK_RSA));
-        if (rc != 0) { LogFmtE("CertProvisioner: pk_setup_rsa=%d\n", rc); goto done; }
+        if (rc != 0) { LogE("CertProvisioner: pk_setup_rsa=%d\n", rc); goto done; }
         int bits = (params.keySize > 0) ? params.keySize : 2048;
         rc = mbedtls_rsa_gen_key(mbedtls_pk_rsa(key),
                                   mbedtls_ctr_drbg_random, &rng,
                                   bits, 65537);
-        if (rc != 0) { LogFmtE("CertProvisioner: rsa_gen_key=%d\n", rc); goto done; }
+        if (rc != 0) { LogE("CertProvisioner: rsa_gen_key=%d\n", rc); goto done; }
     } else {
         rc = mbedtls_pk_setup(&key, mbedtls_pk_info_from_type(MBEDTLS_PK_ECKEY));
-        if (rc != 0) { LogFmtE("CertProvisioner: pk_setup_ec=%d\n", rc); goto done; }
+        if (rc != 0) { LogE("CertProvisioner: pk_setup_ec=%d\n", rc); goto done; }
         rc = mbedtls_ecp_gen_key(ecGroupForSize(params.keySize),
                                   mbedtls_pk_ec(key),
                                   mbedtls_ctr_drbg_random, &rng);
-        if (rc != 0) { LogFmtE("CertProvisioner: ecp_gen_key=%d\n", rc); goto done; }
+        if (rc != 0) { LogE("CertProvisioner: ecp_gen_key=%d\n", rc); goto done; }
     }
 
     char cnBuf[CN_BUF_SIZE];
@@ -180,7 +180,7 @@ bool generateCert(const char* certPath, const char* keyPath, const CertParams& p
     snprintf(dnBuf, sizeof(dnBuf), "CN=%s", cnBuf);
 
     rc = mbedtls_x509write_crt_set_subject_name(&crt, dnBuf);
-    if (rc != 0) { LogFmtE("CertProvisioner: set_subject=%d\n", rc); goto done; }
+    if (rc != 0) { LogE("CertProvisioner: set_subject=%d\n", rc); goto done; }
 
     if (params.issuerCn && params.issuerCn[0]) {
         char issuerDn[CN_BUF_SIZE + 8];
@@ -189,7 +189,7 @@ bool generateCert(const char* certPath, const char* keyPath, const CertParams& p
     } else {
         rc = mbedtls_x509write_crt_set_issuer_name(&crt, dnBuf);
     }
-    if (rc != 0) { LogFmtE("CertProvisioner: set_issuer=%d\n", rc); goto done; }
+    if (rc != 0) { LogE("CertProvisioner: set_issuer=%d\n", rc); goto done; }
 
     mbedtls_x509write_crt_set_subject_key(&crt, &key);
     mbedtls_x509write_crt_set_issuer_key(&crt, &key);
@@ -198,21 +198,21 @@ bool generateCert(const char* certPath, const char* keyPath, const CertParams& p
     {
         unsigned char serialBytes[1] = { 0x01 };
         rc = mbedtls_x509write_crt_set_serial_raw(&crt, serialBytes, sizeof(serialBytes));
-        if (rc != 0) { LogFmtE("CertProvisioner: set_serial=%d\n", rc); goto done; }
+        if (rc != 0) { LogE("CertProvisioner: set_serial=%d\n", rc); goto done; }
     }
 
     rc = mbedtls_x509write_crt_set_validity(&crt,
             "20200101000000", "20990101000000");
-    if (rc != 0) { LogFmtE("CertProvisioner: set_validity=%d\n", rc); goto done; }
+    if (rc != 0) { LogE("CertProvisioner: set_validity=%d\n", rc); goto done; }
 
     rc = mbedtls_x509write_crt_set_basic_constraints(&crt,
             params.isCa ? 1 : 0,
             params.isCa ? 0 : -1);
-    if (rc != 0) { LogFmtE("CertProvisioner: set_bc=%d\n", rc); goto done; }
+    if (rc != 0) { LogE("CertProvisioner: set_bc=%d\n", rc); goto done; }
 
     rc = mbedtls_x509write_crt_set_key_usage(&crt,
             MBEDTLS_X509_KU_DIGITAL_SIGNATURE | MBEDTLS_X509_KU_KEY_ENCIPHERMENT);
-    if (rc != 0) { LogFmtE("CertProvisioner: set_ku=%d\n", rc); goto done; }
+    if (rc != 0) { LogE("CertProvisioner: set_ku=%d\n", rc); goto done; }
 
     if (params.ip_v4 != 0 || (params.dns_name && params.dns_name[0])) {
         uint8_t sanBuf[SAN_BUF_SIZE];
@@ -226,7 +226,7 @@ bool generateCert(const char* certPath, const char* keyPath, const CertParams& p
                 MBEDTLS_OID_SUBJECT_ALT_NAME,
                 MBEDTLS_OID_SIZE(MBEDTLS_OID_SUBJECT_ALT_NAME),
                 0, sanBuf, sanLen);
-        if (rc != 0) { LogFmtE("CertProvisioner: set_san=%d\n", rc); goto done; }
+        if (rc != 0) { LogE("CertProvisioner: set_san=%d\n", rc); goto done; }
     }
 
     certPem = static_cast<uint8_t*>(malloc(PEM_BUF_SIZE));
@@ -238,17 +238,17 @@ bool generateCert(const char* certPath, const char* keyPath, const CertParams& p
 
     rc = mbedtls_x509write_crt_pem(&crt, certPem, PEM_BUF_SIZE,
                                     mbedtls_ctr_drbg_random, &rng);
-    if (rc != 0) { LogFmtE("CertProvisioner: crt_pem=%d\n", rc); goto done; }
+    if (rc != 0) { LogE("CertProvisioner: crt_pem=%d\n", rc); goto done; }
 
     rc = mbedtls_pk_write_key_pem(&key, keyPem, PEM_BUF_SIZE);
-    if (rc != 0) { LogFmtE("CertProvisioner: key_pem=%d\n", rc); goto done; }
+    if (rc != 0) { LogE("CertProvisioner: key_pem=%d\n", rc); goto done; }
 
     {
         iFileSystemInterface& fs = __i_instance.getFileSystemInstance();
         int w1 = fs.writeFile(certPath, (const char*)certPem, strlen((const char*)certPem), false);
-        if (w1 < 0) { LogFmtE("CertProvisioner: writeFile cert=%d\n", w1); goto done; }
+        if (w1 < 0) { LogE("CertProvisioner: writeFile cert=%d\n", w1); goto done; }
         int w2 = fs.writeFile(keyPath, (const char*)keyPem, strlen((const char*)keyPem), false);
-        if (w2 < 0) { LogFmtE("CertProvisioner: writeFile key=%d\n", w2); goto done; }
+        if (w2 < 0) { LogE("CertProvisioner: writeFile key=%d\n", w2); goto done; }
     }
 
     ok = true;

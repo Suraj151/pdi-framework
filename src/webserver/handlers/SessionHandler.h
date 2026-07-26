@@ -122,7 +122,7 @@ public:
       char _session_cookie[EW_COOKIE_BUFF_MAX_SIZE];
       this->build_session_cookie(_session_cookie, true, EW_COOKIE_BUFF_MAX_SIZE);
 
-      LogFmtI("Found cookie: %s\n", cookie.c_str());
+      LogI("Found cookie: %s\n", cookie.c_str());
 
       if (cookie.find(_session_cookie) != pdiutil::string::npos)
       {
@@ -158,7 +158,7 @@ public:
       char _session_cookie[EW_COOKIE_BUFF_MAX_SIZE];
       this->build_session_cookie(_session_cookie, false, EW_COOKIE_BUFF_MAX_SIZE);
 
-      LogFmtI("Found cookie: %s\n", cookie.c_str());
+      LogI("Found cookie: %s\n", cookie.c_str());
 
       if (cookie.find(_session_cookie) != pdiutil::string::npos)
       {

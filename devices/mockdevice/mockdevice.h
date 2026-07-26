@@ -70,4 +70,6 @@ created Date    : 1st Jan 2024
 //   #define NAPT_INIT_DURATION_AFTER_WIFI_CONNECT MILLISECOND_DURATION_5000
 // #endif
 
+#include <interface/pdi/impl/log/LogMacros.h>
+
 #endif // _MOCKDEVICE_COMMON_CONFIG_H_

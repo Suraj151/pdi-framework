@@ -22,13 +22,13 @@ bool connectToServer(iClientInterface *client, char *host, uint16_t port, uint16
 
   if (nullptr != client && nullptr != host)
   {
-    LogFmtI("Client: Connecting to %s : %d\n", host, port);
+    LogI("Client: Connecting to %s : %d\n", host, port);
     client->setTimeout(timeout);
     // client->keepAlive();
     result = client->connect((const uint8_t *)host, port);
   }
 
-  LogFmtI("Client Connect result : %d\n", result);
+  LogI("Client Connect result : %d\n", result);
 
   return result >= 0;
 }
@@ -74,7 +74,7 @@ bool sendPacket(iClientInterface *client, uint8_t *buffer, uint16_t len, uint16_
       }
       if (!status)
       {
-        LogE("Client: send packet - timeout on availableforwrite\n");
+        SysLogE("Client: send packet - timeout on availableforwrite\n");
         client->close();
         break;
       }
@@ -87,9 +87,9 @@ bool sendPacket(iClientInterface *client, uint8_t *buffer, uint16_t len, uint16_
       // LogI("Client: sending packets : ");
       // for (int i = 0; i < sendlen; i++)
       // {
-      //   LogFmtI("%c", (char)_buff_pointer[i]);
+      //   LogI("%c", (char)_buff_pointer[i]);
       // }
-      LogFmtI("\nClient: sent %d/%d\n", sentBytes, _buf_len);
+      LogI("\nClient: sent %d/%d\n", sentBytes, _buf_len);
 
       if (len == 0)
       {
@@ -99,7 +99,7 @@ bool sendPacket(iClientInterface *client, uint8_t *buffer, uint16_t len, uint16_
 
       if (_sent != sendlen)
       {
-        LogE("Client: send packet - failed to send\n");
+        SysLogE("Client: send packet - failed to send\n");
         status = false;
         break;
       }
@@ -113,7 +113,7 @@ bool sendPacket(iClientInterface *client, uint8_t *buffer, uint16_t len, uint16_
   }
   else
   {
-    LogE("Client: send packet - notConnected/bufferIsNull\n");
+    SysLogE("Client: send packet - notConnected/bufferIsNull\n");
   }
 
   return status;

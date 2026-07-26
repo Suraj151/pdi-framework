@@ -164,7 +164,7 @@ void WiFiServiceProvider::handleInternetConnectivity(){
     #endif
   }
 
-  LogFmtI("\nHandeling internet connectivity : %d : %d\n", (int)__status_wifi.internet_available, 
+  LogI("\nHandeling internet connectivity : %d : %d\n", (int)__status_wifi.internet_available, 
   (__i_dvc_ctrl.millis_now()-__status_wifi.last_internet_millis) );
 }
 
@@ -211,11 +211,11 @@ bool WiFiServiceProvider::configure_wifi_station( wifi_config_table* _wifi_crede
     return false;
   }
 
-  LogFmtI("\nWiFi Connecing To %s", _wifi_credentials->sta_ssid);
+  LogI("\nWiFi Connecing To %s", _wifi_credentials->sta_ssid);
 
   if (nullptr != mac)
   {
-    LogFmtI(" : %x%x%x%x%x%x",
+    LogI(" : %x%x%x%x%x%x",
             mac[0], mac[1], mac[2],
             mac[3], mac[4], mac[5]);
   }
@@ -252,15 +252,15 @@ bool WiFiServiceProvider::configure_wifi_station( wifi_config_table* _wifi_crede
 
   wifi_status_t stat = this->m_wifi->status();
   if( CONN_STATUS_CONNECTED == stat ){
-    LogFmtI("WiFi Connected to %s\n", _wifi_credentials->sta_ssid);
-    LogFmtI("IP address: %s\n", ((pdiutil::string)this->m_wifi->localIP()).c_str());
+    LogI("WiFi Connected to %s\n", _wifi_credentials->sta_ssid);
+    LogI("IP address: %s\n", ((pdiutil::string)this->m_wifi->localIP()).c_str());
     // this->m_wifi->setAutoConnect(true);
     // this->m_wifi->setAutoReconnect(true);
     return true;
   }else if( CONN_STATUS_NOT_AVAILABLE == stat ){
-    LogFmtW("%s Not Found/reachable. Make sure it's availability.\n", _wifi_credentials->sta_ssid);
+    LogW("%s Not Found/reachable. Make sure it's availability.\n", _wifi_credentials->sta_ssid);
   }else if( CONN_STATUS_CONNECTION_FAILED == stat || CONN_STATUS_CONFIG_ERROR == stat ){
-    LogFmtW("%s is available but not connecting. Please check password.\n", _wifi_credentials->sta_ssid);
+    LogW("%s is available but not connecting. Please check password.\n", _wifi_credentials->sta_ssid);
   }else{
     LogW("WiFi Not Connecting. Will try later soon..\n");
   }
@@ -354,7 +354,7 @@ bool WiFiServiceProvider::configure_wifi_access_point( wifi_config_table* _wifi_
     return false;
   }
 
-  LogFmtI("Configuring WiFi access point %s..\n", _wifi_credentials->ap_ssid);
+  LogI("Configuring WiFi access point %s..\n", _wifi_credentials->ap_ssid);
 
   ipaddress_t local_IP(
     _wifi_credentials->ap_local_ip[0],_wifi_credentials->ap_local_ip[1],_wifi_credentials->ap_local_ip[2],_wifi_credentials->ap_local_ip[3]
@@ -371,10 +371,10 @@ bool WiFiServiceProvider::configure_wifi_access_point( wifi_config_table* _wifi_
   if( this->m_wifi->softAPConfig( local_IP, gateway, subnet ) &&
     this->m_wifi->softAP( _wifi_credentials->ap_ssid, _wifi_credentials->ap_password, 1, 0, 8 )
   ){
-    LogFmtI("AP IP address: %s\n", ((pdiutil::string)this->m_wifi->softAPIP()).c_str());
+    LogI("AP IP address: %s\n", ((pdiutil::string)this->m_wifi->softAPIP()).c_str());
     return true;
   }else{
-    LogE("Configuring WiFi access point failed!\n");
+    SysLogE("Configuring WiFi access point failed!\n");
     return false;
   }
 }
@@ -387,7 +387,7 @@ bool WiFiServiceProvider::configure_wifi_access_point( wifi_config_table* _wifi_
  */
 void WiFiServiceProvider::scan_aps_and_configure_wifi_station_async( int _scanCount ){
 
-  LogFmtI("Scanning AP's and configuring stations. stations count is %d\n", _scanCount);
+  LogI("Scanning AP's and configuring stations. stations count is %d\n", _scanCount);
 
   wifi_config_table _wifi_credentials;
   __database_service.get_wifi_config_table(&_wifi_credentials);
@@ -422,7 +422,7 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
   }
 
   LogI("\nHandeling WiFi Connectivity\n");
-  LogFmtI("FreeHeap: %u\n", (unsigned)__i_dvc_ctrl.get_free_heap());
+  LogI("FreeHeap: %u\n", (unsigned)__i_dvc_ctrl.get_free_heap());
 
   uint32_t now = __i_dvc_ctrl.millis_now();
 
@@ -431,7 +431,7 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
 
     // Edge: reconnected after being down — clear state machine
     if( !__status_wifi.wifi_connected || 0 != this->m_disconnect_start_ms ){
-      LogFmtI("WiFi recovered after %u ms (attempts=%u)\n",
+      LogI("WiFi recovered after %u ms (attempts=%u)\n",
         (unsigned)(this->m_disconnect_start_ms ? (now - this->m_disconnect_start_ms) : 0),
         (unsigned)this->m_reconnect_attempt);
       this->m_disconnect_start_ms = 0;
@@ -440,7 +440,7 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
     }
     __status_wifi.wifi_connected = true;
 
-    LogFmtI("IP address: gateway(%s) : local(%s) : softap(%s)\n",
+    LogI("IP address: gateway(%s) : local(%s) : softap(%s)\n",
       ((pdiutil::string)this->m_wifi->gatewayIP()).c_str(),
       ((pdiutil::string)this->m_wifi->localIP()).c_str(),
       ((pdiutil::string)this->m_wifi->softAPIP()).c_str());
@@ -482,7 +482,7 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
   // Per-tier backoff: skip if last attempt was too recent
   if( tier != 5 && 0 != this->m_last_reconnect_attempt_ms &&
       (now - this->m_last_reconnect_attempt_ms) < attempt_gap_ms ){
-    LogFmtI("WiFi down %u ms, tier %u backoff (%u/%u)\n",
+    LogI("WiFi down %u ms, tier %u backoff (%u/%u)\n",
       (unsigned)down_ms, (unsigned)tier,
       (unsigned)(now - this->m_last_reconnect_attempt_ms),
       (unsigned)attempt_gap_ms);
@@ -492,7 +492,7 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
   this->m_last_reconnect_attempt_ms = now;
   this->m_reconnect_attempt++;
 
-  LogFmtI("WiFi down %u ms, tier %u, attempt %u\n",
+  LogI("WiFi down %u ms, tier %u, attempt %u\n",
     (unsigned)down_ms, (unsigned)tier, (unsigned)this->m_reconnect_attempt);
 
   switch( tier ){

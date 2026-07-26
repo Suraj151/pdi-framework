@@ -191,7 +191,7 @@ void SerialServiceProvider::appendSerialJsonPayload(pdiutil::string &_payload, p
  */
 void SerialServiceProvider::applySerialJsonPayload(char *_payload, uint16_t _payload_length, pdiutil::vector<pdiutil::string> *allowedlist){
 
-  LogFmtI("Applying Serial from Json Payload : %s\n", _payload);
+  LogI("Applying Serial from Json Payload : %s\n", _payload);
 
   if(
     0 <= __strstr( _payload, (char*)SERIAL_PAYLOAD_DATA_KEY, _payload_length - strlen(SERIAL_PAYLOAD_DATA_KEY) ) &&
@@ -219,7 +219,7 @@ void SerialServiceProvider::applySerialJsonPayload(char *_payload, uint16_t _pay
           __get_from_json( _iface_json_data, SERIAL_PAYLOAD_VALUE_KEY, _iface_data, _iface_json_data_max_len ) 
         ){
 
-            LogFmtI("Applying to : %s%d, mode : %s, value : %s\n", SERIAL_INTERFACE_UART, _port, _iface_mode, _iface_data);
+            LogI("Applying to : %s%d, mode : %s, value : %s\n", SERIAL_INTERFACE_UART, _port, _iface_mode, _iface_data);
 
             if( !__are_arrays_equal(_iface_mode, NOT_APPLICABLE, 2) ){
 
@@ -250,7 +250,7 @@ void SerialServiceProvider::applySerialJsonPayload(char *_payload, uint16_t _pay
           __get_from_json( _iface_json_data, SERIAL_PAYLOAD_VALUE_KEY, _iface_data, _iface_json_data_max_len ) 
         ){
 
-            LogFmtI("Applying to : %s%d, mode : %s, value : %s\n", SERIAL_INTERFACE_SPI, _port, _iface_mode, _iface_data);
+            LogI("Applying to : %s%d, mode : %s, value : %s\n", SERIAL_INTERFACE_SPI, _port, _iface_mode, _iface_data);
 
             uint8_t _mode = StringToUint8( _iface_mode, _iface_keys_max_len );
             // todo send data on serial
@@ -271,7 +271,7 @@ void SerialServiceProvider::applySerialJsonPayload(char *_payload, uint16_t _pay
           __get_from_json( _iface_json_data, SERIAL_PAYLOAD_VALUE_KEY, _iface_data, _iface_json_data_max_len ) 
         ){
 
-            LogFmtI("Applying to : %s%d, mode : %s, value : %s\n", SERIAL_INTERFACE_I2C, _port, _iface_mode, _iface_data);
+            LogI("Applying to : %s%d, mode : %s, value : %s\n", SERIAL_INTERFACE_I2C, _port, _iface_mode, _iface_data);
 
             uint8_t _mode = StringToUint8( _iface_mode, _iface_keys_max_len );
             // todo send data on serial
@@ -292,7 +292,7 @@ void SerialServiceProvider::applySerialJsonPayload(char *_payload, uint16_t _pay
           __get_from_json( _iface_json_data, SERIAL_PAYLOAD_VALUE_KEY, _iface_data, _iface_json_data_max_len ) 
         ){
 
-            LogFmtI("Applying to : %s%d, mode : %s, value : %s\n", SERIAL_INTERFACE_CAN, _port, _iface_mode, _iface_data);
+            LogI("Applying to : %s%d, mode : %s, value : %s\n", SERIAL_INTERFACE_CAN, _port, _iface_mode, _iface_data);
 
             uint8_t _mode = StringToUint8( _iface_mode, _iface_keys_max_len );
             // todo send data on serial

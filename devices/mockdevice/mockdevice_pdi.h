@@ -11,7 +11,6 @@ created Date    : 1st Jan 2024
 #ifndef _MOCKDEVICE_PORTABLE_DEVICE_INTERFACE_H_
 #define _MOCKDEVICE_PORTABLE_DEVICE_INTERFACE_H_
 
-#include "LoggerInterface.h"
 #include "DatabaseInterface.h"
 #include "DeviceControlInterface.h"
 #include "ServerInterface.h"

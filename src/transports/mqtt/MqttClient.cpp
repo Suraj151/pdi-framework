@@ -76,7 +76,7 @@ void mqttDataCb(uint32_t *args, const char *topic, uint32_t topic_len, const cha
 
   if (nullptr != topicBuf && nullptr != dataBuf)
   {
-    LogFmtI("MQTT: data cb\nMQTT: Receive topic: %s, data: %s \r\n", topicBuf, dataBuf);
+    LogI("MQTT: data cb\nMQTT: Receive topic: %s, data: %s \r\n", topicBuf, dataBuf);
   }
 
   if (nullptr != topicBuf)
@@ -201,11 +201,11 @@ void MQTTClient::mqtt_client_recv()
 
   int len = this->readFullPacket(this->m_mqttClient.mqtt_state.in_buffer, this->m_mqttClient.mqtt_state.in_buffer_length, MQTT_READ_TIMEOUT * 20);
 
-  LogFmtI("MQTT: recieved packet size : %d\n", len);
+  LogI("MQTT: recieved packet size : %d\n", len);
   LogI("MQTT: recieved packets : ");
   for (int i = 0; i < len; i++)
   {
-    LogFmtI("%c", this->m_mqttClient.mqtt_state.in_buffer[i]);
+    LogI("%c", this->m_mqttClient.mqtt_state.in_buffer[i]);
     __i_dvc_ctrl.wait(0);
   }
   LogI("\n");
@@ -225,7 +225,7 @@ void MQTTClient::mqtt_client_recv()
       this->m_mqttClient.sendTimeout = MQTT_SEND_TIMEOUT;
     }
 
-    LogFmtI("MQTT: recieved msg type(%d), qos(%d)\n", msg_type, msg_qos);
+    LogI("MQTT: recieved msg type(%d), qos(%d)\n", msg_type, msg_qos);
 
     switch (this->m_mqttClient.connState)
     {
@@ -235,7 +235,7 @@ void MQTTClient::mqtt_client_recv()
       {
         if (MQTT_MSG_TYPE_CONNECT != this->m_mqttClient.mqtt_state.pending_msg_type)
         {
-          LogE("MQTT: Invalid packet recieved\n");
+          SysLogE("MQTT: Invalid packet recieved\n");
           this->m_mqttClient.connState = MQTT_HOST_RECONNECT_REQ;
         }
         else
@@ -305,7 +305,7 @@ void MQTTClient::mqtt_client_recv()
         }
         if (1 == msg_qos || 2 == msg_qos)
         {
-          LogFmtI("MQTT: Queue response QoS: %d\r\n", msg_qos);
+          LogI("MQTT: Queue response QoS: %d\r\n", msg_qos);
           if (QUEUE_Puts(&this->m_mqttClient.msgQueue, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length) == -1)
           {
             LogW("MQTT: Queue full\n");
@@ -405,7 +405,7 @@ void MQTTClient::mqtt_client_connect()
   this->m_mqttClient.mqtt_state.pending_msg_id = mqtt_get_id(this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length);
 
   this->m_mqttClient.sendTimeout = MQTT_SEND_TIMEOUT;
-  LogFmtI("MQTT: Sending, type: %d, id: %x\r\n", this->m_mqttClient.mqtt_state.pending_msg_type, this->m_mqttClient.mqtt_state.pending_msg_id);
+  LogI("MQTT: Sending, type: %d, id: %x\r\n", this->m_mqttClient.mqtt_state.pending_msg_type, this->m_mqttClient.mqtt_state.pending_msg_id);
   bool result = sendPacket(this->m_client, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length);
 
   if (result)
@@ -416,7 +416,7 @@ void MQTTClient::mqtt_client_connect()
   }
   else
   {
-    LogE("MQTT: connect packet send failed\n");
+    SysLogE("MQTT: connect packet send failed\n");
     this->m_mqttClient.connState = MQTT_CONNECT_FAILED;
     this->m_mqttClient.host_connect_tick = 0;
     this->disconnectServer();
@@ -432,7 +432,7 @@ void MQTTClient::mqtt_client_disconnect()
   this->m_mqttClient.mqtt_state.pending_msg_id = mqtt_get_id(this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length);
 
   this->m_mqttClient.sendTimeout = MQTT_SEND_TIMEOUT;
-  LogFmtI("MQTT: Sending, type: %d, id: %x\r\n", this->m_mqttClient.mqtt_state.pending_msg_type, this->m_mqttClient.mqtt_state.pending_msg_id);
+  LogI("MQTT: Sending, type: %d, id: %x\r\n", this->m_mqttClient.mqtt_state.pending_msg_type, this->m_mqttClient.mqtt_state.pending_msg_id);
   bool result = sendPacket(this->m_client, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length);
 
   if (result)
@@ -443,7 +443,7 @@ void MQTTClient::mqtt_client_disconnect()
   }
   else
   {
-    LogE("MQTT: disconnect packet send failed\n");
+    SysLogE("MQTT: disconnect packet send failed\n");
     this->m_mqttClient.connState = MQTT_DISCONNECT_FAILED;
     this->m_mqttClient.host_connect_tick = 0;
   }
@@ -453,14 +453,14 @@ void MQTTClient::mqtt_client_disconnect()
 
 void MQTTClient::mqtt_send_keepalive()
 {
-  LogFmtI("\r\nMQTT: Send keepalive packet to %s:%d!\r\n", this->m_host, this->m_port);
+  LogI("\r\nMQTT: Send keepalive packet to %s:%d!\r\n", this->m_host, this->m_port);
   this->m_mqttClient.mqtt_state.outbound_message = mqtt_msg_pingreq(&this->m_mqttClient.mqtt_state.mqtt_connection);
   // this->m_mqttClient.mqtt_state.pending_msg_type = MQTT_MSG_TYPE_PINGREQ;
   this->m_mqttClient.mqtt_state.pending_msg_type = mqtt_get_type(this->m_mqttClient.mqtt_state.outbound_message->data);
   this->m_mqttClient.mqtt_state.pending_msg_id = mqtt_get_id(this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length);
 
   this->m_mqttClient.sendTimeout = MQTT_SEND_TIMEOUT;
-  LogFmtI("MQTT: Sending, type: %d, id: %x\r\n", this->m_mqttClient.mqtt_state.pending_msg_type, this->m_mqttClient.mqtt_state.pending_msg_id);
+  LogI("MQTT: Sending, type: %d, id: %x\r\n", this->m_mqttClient.mqtt_state.pending_msg_type, this->m_mqttClient.mqtt_state.pending_msg_id);
   bool result = sendPacket(this->m_client, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length);
 
   if (result)
@@ -482,7 +482,7 @@ void MQTTClient::mqtt_send_keepalive()
 void MQTTClient::MQTT_Task()
 {
 
-  LogFmtI("MQTT: Task %d\n", (int)this->m_mqttClient.connState);
+  LogI("MQTT: Task %d\n", (int)this->m_mqttClient.connState);
 
   uint8_t dataBuffer[MQTT_BUF_SIZE];
   uint16_t dataLen;
@@ -506,10 +506,10 @@ void MQTTClient::MQTT_Task()
   case MQTT_HOST_CONNECTING:
     if (isConnected(this->m_client))
     {
-      LogFmtI("MQTT: Connected to broker %s:%d\r\n", this->m_host, this->m_port);
+      LogI("MQTT: Connected to broker %s:%d\r\n", this->m_host, this->m_port);
       this->mqtt_client_connect();
     }else{
-      LogE("MQTT: Unable to connect to broker\r\n");
+      SysLogE("MQTT: Unable to connect to broker\r\n");
     }
     break;
   case MQTT_DISCONNECT_REQ:
@@ -530,7 +530,7 @@ void MQTTClient::MQTT_Task()
       LogI("MQTT: getting queue packets :");
       for (int i = 0; i < dataLen; i++)
       {
-        LogFmtI("%c", (char)dataBuffer[i]);
+        LogI("%c", (char)dataBuffer[i]);
         __i_dvc_ctrl.wait(0);
       }
       LogI("\n");
@@ -546,13 +546,13 @@ void MQTTClient::MQTT_Task()
 
       if (result)
       {
-        LogFmtI("MQTT: data packet sent of id: %d\n", this->m_mqttClient.mqtt_state.pending_msg_id);
+        LogI("MQTT: data packet sent of id: %d\n", this->m_mqttClient.mqtt_state.pending_msg_id);
         this->m_mqttClient.connState = (MQTT_MSG_TYPE_PUBLISH == msg_type && 0 == msg_qos) ? MQTT_DATA : MQTT_DATA_SENT;
         this->m_mqttClient.readTimeout = 0;
       }
       else
       {
-        LogE("MQTT: data packet send failed\n");
+        SysLogE("MQTT: data packet send failed\n");
         this->m_mqttClient.connState = MQTT_DATA_FAILED;
         this->m_mqttClient.host_connect_tick = 0;
         this->disconnectServer();
@@ -655,7 +655,7 @@ bool MQTTClient::Subscribe(char *topic, uint8_t qos)
                                                                       topic, qos,
                                                                       &this->m_mqttClient.mqtt_state.pending_msg_id);
 
-  LogFmtI("MQTT: queue subscribe, topic \"%s\", id: %d\r\n", topic, this->m_mqttClient.mqtt_state.pending_msg_id);
+  LogI("MQTT: queue subscribe, topic \"%s\", id: %d\r\n", topic, this->m_mqttClient.mqtt_state.pending_msg_id);
   // bool result = sendPacket(this->m_client, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length );
 
   while (QUEUE_Puts(&this->m_mqttClient.msgQueue, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length) == -1)
@@ -663,7 +663,7 @@ bool MQTTClient::Subscribe(char *topic, uint8_t qos)
     LogW("MQTT: Queue full\n");
     if (QUEUE_Gets(&this->m_mqttClient.msgQueue, dataBuffer, &dataLen, MQTT_BUF_SIZE) == -1)
     {
-      LogE("MQTT: Serious buffer error\n");
+      SysLogE("MQTT: Serious buffer error\n");
       return false;
     }
   }
@@ -687,14 +687,14 @@ bool MQTTClient::UnSubscribe(char *topic)
                                                                         topic,
                                                                         &this->m_mqttClient.mqtt_state.pending_msg_id);
 
-  LogFmtI("MQTT: queue un-subscribe, topic \"%s\", id: %d\r\n", topic, this->m_mqttClient.mqtt_state.pending_msg_id);
+  LogI("MQTT: queue un-subscribe, topic \"%s\", id: %d\r\n", topic, this->m_mqttClient.mqtt_state.pending_msg_id);
 
   while (QUEUE_Puts(&this->m_mqttClient.msgQueue, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length) == -1)
   {
     LogW("MQTT: Queue full\n");
     if (QUEUE_Gets(&this->m_mqttClient.msgQueue, dataBuffer, &dataLen, MQTT_BUF_SIZE) == -1)
     {
-      LogE("MQTT: Serious buffer error\n");
+      SysLogE("MQTT: Serious buffer error\n");
       return false;
     }
   }
@@ -716,23 +716,23 @@ bool MQTTClient::Publish(const char *topic, const char *data, size_t data_length
     return false;
   }
 
-  // LogFmtI("MQTT: publish, topic: %s, data: %s, datalen: %d, qos: %d, retain: %d, pendmsg: %d\r\n", topic, data, data_length, qos, retain, this->m_mqttClient.mqtt_state.pending_msg_id);
+  // LogI("MQTT: publish, topic: %s, data: %s, datalen: %d, qos: %d, retain: %d, pendmsg: %d\r\n", topic, data, data_length, qos, retain, this->m_mqttClient.mqtt_state.pending_msg_id);
   this->m_mqttClient.mqtt_state.outbound_message = mqtt_msg_publish(&this->m_mqttClient.mqtt_state.mqtt_connection,
                                                                     topic, data, data_length,
                                                                     qos, retain,
                                                                     &this->m_mqttClient.mqtt_state.pending_msg_id);
   if (0 == this->m_mqttClient.mqtt_state.outbound_message->length)
   {
-    LogE("MQTT: Queuing publish failed\n");
+    SysLogE("MQTT: Queuing publish failed\n");
     return false;
   }
-  LogFmtI("MQTT: queuing publish, length: %d, queue size(%d/%d)\r\n", this->m_mqttClient.mqtt_state.outbound_message->length, this->m_mqttClient.msgQueue.rb.fill_cnt, this->m_mqttClient.msgQueue.rb.size);
+  LogI("MQTT: queuing publish, length: %d, queue size(%d/%d)\r\n", this->m_mqttClient.mqtt_state.outbound_message->length, this->m_mqttClient.msgQueue.rb.fill_cnt, this->m_mqttClient.msgQueue.rb.size);
   while (QUEUE_Puts(&this->m_mqttClient.msgQueue, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length) == -1)
   {
     LogW("MQTT: Queue full\n");
     if (QUEUE_Gets(&this->m_mqttClient.msgQueue, dataBuffer, &dataLen, MQTT_BUF_SIZE) == -1)
     {
-      LogE("MQTT: Serious buffer error\n");
+      SysLogE("MQTT: Serious buffer error\n");
       return false;
     }
   }
@@ -945,11 +945,11 @@ void MQTTClient::InitLWT(char *will_topic, char *will_msg, uint8_t will_qos, uin
 void MQTTClient::mqtt_timer()
 {
 
-  LogFmtI("MQTT: mqtt timer : %d\t mqtt state : %d\n", (int)isConnected(this->m_client), (int)this->m_mqttClient.connState);
+  LogI("MQTT: mqtt timer : %d\t mqtt state : %d\n", (int)isConnected(this->m_client), (int)this->m_mqttClient.connState);
   LogI("MQTT: subscribed topics(QoS) : ");
   for (uint16_t i = 0; i < this->m_mqttClient.subscribed_topics.size(); i++)
   {
-    LogFmtI("%s(%d), ", this->m_mqttClient.subscribed_topics[i].topic, this->m_mqttClient.subscribed_topics[i].qos);
+    LogI("%s(%d), ", this->m_mqttClient.subscribed_topics[i].topic, this->m_mqttClient.subscribed_topics[i].qos);
   }
   LogI("\n");
   // if( this->m_mqttClient.connState == MQTT_DELETING ) return;
@@ -998,7 +998,7 @@ void MQTTClient::mqtt_timer()
     if (this->m_mqttClient.host_connect_tick > MQTT_HOST_CONNECT_TIMEOUT)
     {
       this->m_mqttClient.host_connect_tick = 0;
-      LogE("MQTT: host connect error. trying reconnect\n");
+      SysLogE("MQTT: host connect error. trying reconnect\n");
       this->m_mqttClient.connState = MQTT_HOST_RECONNECT;
       this->MQTT_Task();
     }

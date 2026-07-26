@@ -85,8 +85,25 @@ PDIStack::~PDIStack(){
  */
 void PDIStack::initialize(){
 
-  LOGBEGIN;
-  // LogFmtI("\n________________________\n\nInitializing PDI Stack\nRelease : %s\nConfig  : %s\n________________________\n", RELEASE, CONFIG_VERSION);
+  __log_manager.init(__i_dvc_ctrl.getTerminal());
+  // LogI("\n________________________\n\nInitializing PDI Stack\nRelease : %s\nConfig  : %s\n________________________\n", RELEASE, CONFIG_VERSION);
+
+  #ifdef ENABLE_STORAGE_SERVICE
+  __i_fs.mount(FILE_SEPARATOR, &__i_rootfs, "rootfs", VFS_TYPE_LITTLEFS);
+  #ifdef ENABLE_PROCFS
+  __i_fs.mount("/proc", &__i_procfs, "procfs", VFS_TYPE_PROCFS);
+  #endif
+  #ifdef ENABLE_SYSFS
+  __i_fs.mount("/sys", &__i_sysfs, "sysfs", VFS_TYPE_SYSFS);
+  #endif
+  #ifdef ENABLE_DEVFS
+  __i_fs.mount("/dev", &__i_devfs, "devfs", VFS_TYPE_DEVFS);
+  #endif
+  #ifdef ENABLE_TMPFS
+  __i_fs.mount("/tmp", &__i_tmpfs, "tmpfs", VFS_TYPE_TMPFS);
+  #endif
+  __i_fs.init();
+  #endif
 
   __i_dvc_ctrl.initDeviceSpecificFeatures();
 
@@ -105,7 +122,9 @@ void PDIStack::initialize(){
 
   // Set the terminal interface for the service providers
   ServiceProvider::setTerminal(terminal);
+  #ifdef ENABLE_CMD_SERVICE
   SessionManager::attach(terminal);
+  #endif
 
   __database_service.initService();
 
@@ -145,23 +164,6 @@ void PDIStack::initialize(){
 
   #ifdef ENABLE_AUTH_SERVICE
   __auth_service.initService();
-  #endif
-
-  #ifdef ENABLE_STORAGE_SERVICE
-  __i_fs.mount(FILE_SEPARATOR, &__i_rootfs, "rootfs", VFS_TYPE_LITTLEFS);
-  #ifdef ENABLE_PROCFS
-  __i_fs.mount("/proc", &__i_procfs, "procfs", VFS_TYPE_PROCFS);
-  #endif
-  #ifdef ENABLE_SYSFS
-  __i_fs.mount("/sys", &__i_sysfs, "sysfs", VFS_TYPE_SYSFS);
-  #endif
-  #ifdef ENABLE_DEVFS
-  __i_fs.mount("/dev", &__i_devfs, "devfs", VFS_TYPE_DEVFS);
-  #endif
-  #ifdef ENABLE_TMPFS
-  __i_fs.mount("/tmp", &__i_tmpfs, "tmpfs", VFS_TYPE_TMPFS);
-  #endif
-  __i_fs.init();
   #endif
 
   #if defined(ENABLE_AUTH_SERVICE) && defined(ENABLE_STORAGE_SERVICE)
@@ -231,8 +233,8 @@ void PDIStack::serve(){
 void PDIStack::handleLogPrints(){
 
   #ifdef ENABLE_NETWORK_SERVICE
-  LogFmtI("\nNTP Validity : %d\n", __i_ntp.is_valid_ntptime());
-  LogFmtI("NTP Time : %d\n", (int32_t)__i_ntp.get_ntp_time());
+  LogI("\nNTP Validity : %d\n", __i_ntp.is_valid_ntptime());
+  LogI("NTP Time : %d\n", (int32_t)__i_ntp.get_ntp_time());
   #endif
 }
 

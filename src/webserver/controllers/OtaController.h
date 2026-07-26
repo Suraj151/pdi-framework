@@ -120,8 +120,8 @@ public:
 			pdiutil::string _ota_port = this->m_web_resource->m_server->arg("prt");
 
 			LogI("\nSubmitted info :\n");
-			LogFmtI("ota host : %s\n", _ota_host.c_str());
-			LogFmtI("ota port : %s\n\n", _ota_port.c_str());
+			LogI("ota host : %s\n", _ota_host.c_str());
+			LogI("ota port : %s\n\n", _ota_port.c_str());
 
 			ota_config_table _ota_configs;
 			// this->m_web_resource->m_db_conn->get_ota_config_table(&_ota_configs);

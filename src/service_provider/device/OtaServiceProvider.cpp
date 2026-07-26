@@ -71,7 +71,7 @@ void OtaServiceProvider::handleOta()
 
   http_ota_status _stat = this->handle();
 
-  LogFmtI("OTA status : %d\n", (int)_stat);
+  LogI("OTA status : %d\n", (int)_stat);
 
   if (_stat == UPDATE_OK)
   {
@@ -146,8 +146,8 @@ http_ota_status OtaServiceProvider::handle()
         {
           _firm_version = StringToUint32(_version_buf);
 
-          LogFmtI("Http OTA current version : %d\n", _global_configs.firmware_version);
-          LogFmtI("Http OTA got version : %d\n", _firm_version);
+          LogI("Http OTA current version : %d\n", _global_configs.firmware_version);
+          LogI("Http OTA got version : %d\n", _firm_version);
         }
         else
         {
@@ -228,7 +228,7 @@ http_ota_status OtaServiceProvider::handle()
   }
   else
   {
-    LogE("Http OTA Update not initializing or failed or Not Configured Correctly\n");
+    SysLogE("Http OTA Update not initializing or failed or Not Configured Correctly\n");
   }
   return _status;
 }

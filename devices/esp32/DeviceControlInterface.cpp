@@ -10,7 +10,6 @@ created Date    : 1st Jan 2024
 
 #include "DeviceControlInterface.h"
 #include "ExceptionsNotifier.h"
-#include "LoggerInterface.h"
 #include "PingInterface.h"
 #include "SerialInterface.h"
 #ifdef ENABLE_TLS_CERT_GENERATION
@@ -580,7 +579,7 @@ bool DeviceControlInterface::isDeviceFactoryRequested()
     if (FLASH_KEY_PIN >= 0 && __i_dvc_ctrl.gpioRead(DIGITAL_READ, FLASH_KEY_PIN) == LOW)
     {
         m_flash_key_pressed++;
-        LogFmtI("Flash Key pressed : %d\n", m_flash_key_pressed);
+        LogI("Flash Key pressed : %d\n", m_flash_key_pressed);
     }
     else
     {
@@ -667,8 +666,8 @@ uint32_t DeviceControlInterface::get_free_heap()
  */
 void DeviceControlInterface::log(logger_type_t log_type, const char *content)
 {
-    #if defined(LOGBEGIN) && ( defined(ENABLE_LOG_ALL) || defined(ENABLE_LOG_INFO) || defined(ENABLE_LOG_ERROR) || defined(ENABLE_LOG_WARNING) || defined(ENABLE_LOG_SUCCESS) )
-    __i_logger.log(log_type, content);
+    #if ( defined(ENABLE_CONSOLE_LOG_ALL) || defined(ENABLE_CONSOLE_LOG_INFO) || defined(ENABLE_CONSOLE_LOG_ERROR) || defined(ENABLE_CONSOLE_LOG_WARNING) || defined(ENABLE_CONSOLE_LOG_SUCCESS) )
+    __log_manager.log(log_type, RODT_ATTR("%s"), content);
     #endif
 }
 
@@ -708,11 +707,11 @@ upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *v
     int64_t got = http->DownloadStream(path, [&begin_called](const uint8_t *buf, uint32_t sz) -> bool {
         if (!begin_called) {
             begin_called = true;
-            LogFmtI("OTA Size  : %u\n", sz);
+            LogI("OTA Size  : %u\n", sz);
             // uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
             size_t begin_size = (nullptr == buf && sz > 0) ? (size_t)sz : (size_t)UPDATE_SIZE_UNKNOWN;
             if (!Update.begin(begin_size, U_FLASH)) {
-                LogFmtE("DEVICE_UPGRADE_BEGIN_FAILED : %d\n", (int)Update.getError());
+                LogE("DEVICE_UPGRADE_BEGIN_FAILED : %d\n", (int)Update.getError());
                 return false;
             }
             if (nullptr == buf) return true;
@@ -720,7 +719,7 @@ upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *v
         __i_dvc_ctrl.yield();
         size_t written = Update.write((uint8_t*)buf, sz);
         if (written != sz) {
-            LogFmtE("DEVICE_UPGRADE_WRITE_SHORT : %u/%u err=%d\n",
+            LogE("DEVICE_UPGRADE_WRITE_SHORT : %u/%u err=%d\n",
                     (unsigned)written, (unsigned)sz, (int)Update.getError());
             return false;
         }
@@ -728,11 +727,11 @@ upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *v
     });
 
     if (got <= 0 || !Update.end(false)) {
-        LogFmtE("DEVICE_UPGRADE_END_FAILED : got=%d err=%d\n", (int)got, (int)Update.getError());
+        LogE("DEVICE_UPGRADE_END_FAILED : got=%d err=%d\n", (int)got, (int)Update.getError());
         return UPGRADE_STATUS_FAILED;
     }
 
-    LogFmtS("DEVICE_UPGRADE_OK size=%d\n", (int)got);
+    LogS("DEVICE_UPGRADE_OK size=%d\n", (int)got);
     return UPGRADE_STATUS_SUCCESS;
 
 #elif defined(MAKE_STORAGE_DEPENDENT_OTA_UPGRADE)
@@ -751,13 +750,13 @@ upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *v
 
     int64_t got = http->DownloadFile(path, tmp_path.c_str());
     if (got <= 0) {
-        LogFmtE("DEVICE_UPGRADE_DOWNLOAD_FAILED : %d\n", (int)got);
+        LogE("DEVICE_UPGRADE_DOWNLOAD_FAILED : %d\n", (int)got);
         __i_fs.deleteFile(tmp_path.c_str());
         return UPGRADE_STATUS_FAILED;
     }
 
     if (!Update.begin((size_t)got, U_FLASH)) {
-        LogFmtE("DEVICE_UPGRADE_BEGIN_FAILED : %d\n", (int)Update.getError());
+        LogE("DEVICE_UPGRADE_BEGIN_FAILED : %d\n", (int)Update.getError());
         __i_fs.deleteFile(tmp_path.c_str());
         return UPGRADE_STATUS_FAILED;
     }
@@ -771,14 +770,14 @@ upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *v
     });
 
     if (bytes_read != got) {
-        LogFmtE("DEVICE_UPGRADE_READ_SHORT : %d/%d\n", (int)bytes_read, (int)got);
+        LogE("DEVICE_UPGRADE_READ_SHORT : %d/%d\n", (int)bytes_read, (int)got);
         write_ok = false;
     }
 
     __i_fs.deleteFile(tmp_path.c_str());
 
     if (!write_ok || !Update.end(false)) {
-        LogFmtE("DEVICE_UPGRADE_END_FAILED : %d\n", (int)Update.getError());
+        LogE("DEVICE_UPGRADE_END_FAILED : %d\n", (int)Update.getError());
         return UPGRADE_STATUS_FAILED;
     }
 

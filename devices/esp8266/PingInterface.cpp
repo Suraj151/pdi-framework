@@ -9,7 +9,6 @@ created Date    : 1st June 2019
 ******************************************************************************/
 
 #include "PingInterface.h"
-#include "LoggerInterface.h"
 #include "SerialInterface.h"
 #ifdef ENABLE_CONTEXTUAL_EXECUTION
 #include "threading/Preemptive.h"
@@ -58,13 +57,13 @@ static void ICACHE_FLASH_ATTR ping_recv_cb (void* arg, void *pdata){
     !__i_preemptive_scheduler.is_sched_active()
   ) {
     if (_host_resp) {
-      LogFmtI("\nPing: Reply bytes=%d time=%dms\n", pingrsp->bytes, pingrsp->resp_time);
+      LogI("\nPing: Reply bytes=%d time=%dms\n", pingrsp->bytes, pingrsp->resp_time);
     } else {
       LogI("\nPing: Request timed out\n");
     }
   } else if (__serial_uart.m_mutex.try_lock()) {
     if (_host_resp) {
-      LogFmtI("\nPing: Reply bytes=%d time=%dms\n", pingrsp->bytes, pingrsp->resp_time);
+      LogI("\nPing: Reply bytes=%d time=%dms\n", pingrsp->bytes, pingrsp->resp_time);
     } else {
       LogI("\nPing: Request timed out\n");
     }
@@ -73,7 +72,7 @@ static void ICACHE_FLASH_ATTR ping_recv_cb (void* arg, void *pdata){
   // else: serial mutex held by another task — skip this log to avoid deadlock.
 #else
   if (_host_resp) {
-    LogFmtI("\nPing: Reply bytes=%d time=%dms\n", pingrsp->bytes, pingrsp->resp_time);
+    LogI("\nPing: Reply bytes=%d time=%dms\n", pingrsp->bytes, pingrsp->resp_time);
   } else {
     LogI("\nPing: Request timed out\n");
   }
@@ -127,7 +126,7 @@ bool PingInterface::ping( const ipaddress_t &target, uint16_t count, CallBackVoi
   this->m_opt.coarse_time = 0;
 
   pdiutil::string ipstr = _target;
-  LogFmtI("\nPing ip: %s\n", ipstr.c_str());
+  LogI("\nPing ip: %s\n", ipstr.c_str());
 
   return ping_start(&this->m_opt) ? true : false;
 }

@@ -157,20 +157,20 @@ bool TlsClientInterface::beginServer(const char* certPath, const char* keyPath, 
 
     int rc = mbedtls_ctr_drbg_seed(&m_tls->rng, mbedtls_entropy_func, &m_tls->entropy, nullptr, 0);
     if (rc != 0) {
-        LogFmtE("TLS beginServer: ctr_drbg_seed=%d\n", rc);
+        LogE("TLS beginServer: ctr_drbg_seed=%d\n", rc);
         tlsReset(0);
         return false;
     }
 
     if (!TlsCryptoLoader::loadCertChain(certPath, &m_tls->ownCert)) {
-        LogFmtE("TLS beginServer: loadCertChain failed: %s\n", certPath);
+        LogE("TLS beginServer: loadCertChain failed: %s\n", certPath);
         tlsReset(0);
         return false;
     }
     m_tls->ownCertLoaded = true;
 
     if (!TlsCryptoLoader::loadPrivateKey(keyPath, &m_tls->ownKey, &m_tls->rng)) {
-        LogFmtE("TLS beginServer: loadPrivateKey failed: %s\n", keyPath);
+        LogE("TLS beginServer: loadPrivateKey failed: %s\n", keyPath);
         tlsReset(0);
         return false;
     }
@@ -181,7 +181,7 @@ bool TlsClientInterface::beginServer(const char* certPath, const char* keyPath, 
         MBEDTLS_SSL_TRANSPORT_STREAM,
         MBEDTLS_SSL_PRESET_DEFAULT);
     if (rc != 0) {
-        LogFmtE("TLS beginServer: config_defaults=%d\n", rc);
+        LogE("TLS beginServer: config_defaults=%d\n", rc);
         tlsReset(0);
         return false;
     }
@@ -190,7 +190,7 @@ bool TlsClientInterface::beginServer(const char* certPath, const char* keyPath, 
 
     if (clientCaPath && clientCaPath[0]) {
         if (!TlsCryptoLoader::loadTrustAnchors(clientCaPath, &m_tls->caChain)) {
-            LogFmtE("TLS beginServer: loadTrustAnchors failed: %s\n", clientCaPath);
+            LogE("TLS beginServer: loadTrustAnchors failed: %s\n", clientCaPath);
             tlsReset(0);
             return false;
         }
@@ -203,14 +203,14 @@ bool TlsClientInterface::beginServer(const char* certPath, const char* keyPath, 
 
     rc = mbedtls_ssl_conf_own_cert(&m_tls->conf, &m_tls->ownCert, &m_tls->ownKey);
     if (rc != 0) {
-        LogFmtE("TLS beginServer: conf_own_cert=%d\n", rc);
+        LogE("TLS beginServer: conf_own_cert=%d\n", rc);
         tlsReset(0);
         return false;
     }
 
     rc = mbedtls_ssl_setup(&m_tls->ssl, &m_tls->conf);
     if (rc != 0) {
-        LogFmtE("TLS beginServer: ssl_setup=%d\n", rc);
+        LogE("TLS beginServer: ssl_setup=%d\n", rc);
         tlsReset(0);
         return false;
     }
@@ -342,7 +342,7 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
             lwip_freeaddrinfo(res);
         } else {
             if (res) lwip_freeaddrinfo(res);
-            LogFmtE("TLS connect: DNS resolution failed for %s\n", hostname);
+            LogE("TLS connect: DNS resolution failed for %s\n", hostname);
             return -100;
         }
     }
@@ -356,13 +356,13 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
 
     int rc = mbedtls_ctr_drbg_seed(&m_tls->rng, mbedtls_entropy_func, &m_tls->entropy, nullptr, 0);
     if (rc != 0) {
-        LogFmtE("TLS connect: ctr_drbg_seed=%d\n", rc);
+        LogE("TLS connect: ctr_drbg_seed=%d\n", rc);
         return tlsReset(-97);
     }
 
     if (m_verifyPeer && !m_caPath.empty()) {
         if (!TlsCryptoLoader::loadTrustAnchors(m_caPath.c_str(), &m_tls->caChain)) {
-            LogFmtE("TLS connect: loadTrustAnchors failed: %s\n", m_caPath.c_str());
+            LogE("TLS connect: loadTrustAnchors failed: %s\n", m_caPath.c_str());
             return tlsReset(-3);
         }
         m_tls->caLoaded = true;
@@ -373,7 +373,7 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
         MBEDTLS_SSL_TRANSPORT_STREAM,
         MBEDTLS_SSL_PRESET_DEFAULT);
     if (rc != 0) {
-        LogFmtE("TLS connect: config_defaults=%d\n", rc);
+        LogE("TLS connect: config_defaults=%d\n", rc);
         return tlsReset(-5);
     }
 
@@ -390,32 +390,32 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
 
     if (!m_certPath.empty() && !m_keyPath.empty()) {
         if (!TlsCryptoLoader::loadCertChain(m_certPath.c_str(), &m_tls->ownCert)) {
-            LogFmtE("TLS connect: loadCertChain failed: %s\n", m_certPath.c_str());
+            LogE("TLS connect: loadCertChain failed: %s\n", m_certPath.c_str());
             return tlsReset(-4);
         }
         m_tls->ownCertLoaded = true;
         if (!TlsCryptoLoader::loadPrivateKey(m_keyPath.c_str(), &m_tls->ownKey, &m_tls->rng)) {
-            LogFmtE("TLS connect: loadPrivateKey failed: %s\n", m_keyPath.c_str());
+            LogE("TLS connect: loadPrivateKey failed: %s\n", m_keyPath.c_str());
             return tlsReset(-4);
         }
         m_tls->ownKeyLoaded = true;
         rc = mbedtls_ssl_conf_own_cert(&m_tls->conf, &m_tls->ownCert, &m_tls->ownKey);
         if (rc != 0) {
-            LogFmtE("TLS connect: conf_own_cert=%d\n", rc);
+            LogE("TLS connect: conf_own_cert=%d\n", rc);
             return tlsReset(-4);
         }
     }
 
     rc = mbedtls_ssl_setup(&m_tls->ssl, &m_tls->conf);
     if (rc != 0) {
-        LogFmtE("TLS connect: ssl_setup=%d\n", rc);
+        LogE("TLS connect: ssl_setup=%d\n", rc);
         return tlsReset(-5);
     }
 
     const char* sni = m_sniHostname.empty() ? hostname : m_sniHostname.c_str();
     rc = mbedtls_ssl_set_hostname(&m_tls->ssl, sni);
     if (rc != 0) {
-        LogFmtE("TLS connect: set_hostname=%d\n", rc);
+        LogE("TLS connect: set_hostname=%d\n", rc);
         return tlsReset(-5);
     }
 
@@ -453,7 +453,7 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
 
     if (!connected()) {
         uint32_t elapsed = __i_dvc_ctrl.millis_now() - start;
-        LogFmtE("TLS connect: timeout after %u ms (tcp.connected=%d rxQ=%u)\n",
+        LogE("TLS connect: timeout after %u ms (tcp.connected=%d rxQ=%u)\n",
             (unsigned)elapsed, (int)m_isConnected, (unsigned)m_rxQueueLen);
         close();
         return -101;
@@ -588,7 +588,7 @@ int32_t TlsClientInterface::write(const uint8_t* data, uint32_t size) {
             __i_dvc_ctrl.wait(1);
             continue;
         }
-        LogFmtE("TLS write: ssl_write=%d\n", rc);
+        LogE("TLS write: ssl_write=%d\n", rc);
         m_tls->engineFatal = true;
         break;
     }
@@ -620,7 +620,7 @@ int32_t TlsClientInterface::read(uint8_t* buffer, uint32_t size) {
         m_isConnected = false;
         return (int32_t)total;
     }
-    LogFmtE("TLS read: ssl_read=%d\n", rc);
+    LogE("TLS read: ssl_read=%d\n", rc);
     m_tls->engineFatal = true;
     m_isConnected = false;
     return (int32_t)total;
@@ -653,7 +653,7 @@ int32_t TlsClientInterface::available() {
         m_isConnected = false;
         return 0;
     }
-    LogFmtE("TLS available: ssl_read=%d\n", rc);
+    LogE("TLS available: ssl_read=%d\n", rc);
     m_tls->engineFatal = true;
     m_isConnected = false;
     return 0;
@@ -763,7 +763,7 @@ err_t TlsClientInterface::onReceive(void* arg, struct tcp_pcb*, struct pbuf* p, 
 
     uint8_t* newBuf = pdiutil::safe_new_array<uint8_t>(newSize);
     if (!newBuf) {
-        LogFmtE("TLS onReceive: alloc fail, in=%u rxQ=%u\n",
+        LogE("TLS onReceive: alloc fail, in=%u rxQ=%u\n",
             (unsigned)p->tot_len, (unsigned)self->m_rxQueueLen);
         return ERR_MEM;
     }
@@ -817,7 +817,7 @@ void TlsClientInterface::serviceTls() {
         if (rc == 0) {
             m_tls->handshakeDone = true;
         } else if (rc != MBEDTLS_ERR_SSL_WANT_READ && rc != MBEDTLS_ERR_SSL_WANT_WRITE) {
-            LogFmtE("TLS serviceTls: handshake=%d\n", rc);
+            LogE("TLS serviceTls: handshake=%d\n", rc);
             m_tls->engineFatal = true;
         }
     }

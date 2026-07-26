@@ -103,7 +103,7 @@ void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_t
     }
   }
 
-  LogFmtI("Handling device otp Http Request : %s\n", otpurl.c_str());
+  LogI("Handling device otp Http Request : %s\n", otpurl.c_str());
 
   if( otpurl.size() > 5 && nullptr != this->m_http_client ){
 
@@ -118,7 +118,7 @@ void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_t
     int16_t httl_resp_len = 0;
     this->m_http_client->GetResponse( http_resp, httl_resp_len );
 
-    LogFmtI("Http device otp Response code : %d\n", _httpCode );
+    LogI("Http device otp Response code : %d\n", _httpCode );
     if ( _httpCode == HTTP_RESP_OK && nullptr != http_resp && httl_resp_len <= DEVICE_IOT_OTP_API_RESP_LENGTH ) {
 
       _response = http_resp;
@@ -142,7 +142,7 @@ void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_t
 
     this->m_http_client->End(true);
   }else{
-    LogE("Device otp Request not initializing or failed or Not Configured Correctly\n");
+    SysLogE("Device otp Request not initializing or failed or Not Configured Correctly\n");
   }
 }
 
@@ -174,7 +174,7 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
     configurl.replace( duid_index, 6, this->m_device_iot_configs.device_iot_duid );
   }
 
-  LogFmtI("Handling device iot config Request : %s\n", configurl.c_str());
+  LogI("Handling device iot config Request : %s\n", configurl.c_str());
 
   if( valid_host && nullptr != this->m_http_client ){
 
@@ -200,9 +200,9 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
           
           if(  _json_result && strlen( this->m_server_configurable_channel_token ) && strlen( this->m_server_configurable_channel_write ) && strlen( this->m_server_configurable_channel_read ) ){
 
-            LogFmtI("Got Token : %s\n", this->m_server_configurable_channel_token );
-            LogFmtI("Got Write Channel : %s\n", this->m_server_configurable_channel_write );
-            LogFmtI("Got Read Channel : %s\n", this->m_server_configurable_channel_read );
+            LogI("Got Token : %s\n", this->m_server_configurable_channel_token );
+            LogI("Got Write Channel : %s\n", this->m_server_configurable_channel_write );
+            LogI("Got Read Channel : %s\n", this->m_server_configurable_channel_read );
 
             this->handleServerConfigurableParameters( http_resp );
 
@@ -235,7 +235,7 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
     this->m_http_client->End(true);
   }else{
 
-    LogE("Device iot config request not initializing or failed or Not Configured Correctly\n");
+    SysLogE("Device iot config request not initializing or failed or Not Configured Correctly\n");
   }
 }
 
@@ -246,7 +246,7 @@ void DeviceIotServiceProvider::handleConnectivityCheck(){
 
 #if defined(ENABLE_MQTT_SERVICE)
   bool _is_mqtt_connected = __mqtt_service.m_mqtt_client.is_mqtt_connected();
-  LogFmtI("Device iot mqtt connection check cycle : %d\n", (int)_is_mqtt_connected );
+  LogI("Device iot mqtt connection check cycle : %d\n", (int)_is_mqtt_connected );
   if( !_is_mqtt_connected ) {
     this->m_token_validity = false;
     __mqtt_service.stop();
@@ -356,20 +356,20 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
   if( _json_result && 0 < device_id && device_id <= UINT64_MAX ){
 
     this->m_server_configurable_device_id = device_id;
-    LogFmtI("Got Device ID : %d\n", (int)this->m_server_configurable_device_id);
+    LogI("Got Device ID : %d\n", (int)this->m_server_configurable_device_id);
   }
 
   memset( this->m_server_configurable_channel_host, 0, DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE );
   _json_result = __get_from_json( json_resp, DEVICE_IOT_CONFIG_CHANNEL_HOST_KEY, this->m_server_configurable_channel_host, DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE-1 );
   if( _json_result && strlen(this->m_server_configurable_channel_host) > 5 ){
 
-    LogFmtI("Got Channel Host : %s\n", this->m_server_configurable_channel_host);
+    LogI("Got Channel Host : %s\n", this->m_server_configurable_channel_host);
   }else{
 
     // else parse the host from iot host config
     http_req_t httpreq; httpreq.init(this->m_device_iot_configs.device_iot_host);
     memcpy( this->m_server_configurable_channel_host, httpreq.host, pdistd::min((int)strlen( httpreq.host ), (int)(DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE-1)) );
-    LogFmtW("Using Iot Channel Host : %s\n", this->m_server_configurable_channel_host);
+    LogW("Using Iot Channel Host : %s\n", this->m_server_configurable_channel_host);
   }
 
   memset( _value_buff, 0, 100 );
@@ -377,7 +377,7 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
   if( _json_result && 0 < this->m_server_configurable_channel_port && this->m_server_configurable_channel_port <= UINT16_MAX ){
 
     this->m_server_configurable_channel_port = (pdiutil::net_port_t)StringToUint32( _value_buff, 31 );
-    LogFmtI("Got Channel Port : %d\n", (int)this->m_server_configurable_channel_port);
+    LogI("Got Channel Port : %d\n", (int)this->m_server_configurable_channel_port);
   }else{
     this->m_server_configurable_channel_port = DEVICE_IOT_DEFAULT_CHANNEL_DATA_PORT;
   }
@@ -388,14 +388,14 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
   if( _json_result && SENSOR_DATA_PUBLISH_FREQ_MIN_LIMIT <= data_rate && data_rate <= SENSOR_DATA_PUBLISH_FREQ_MAX_LIMIT ){
 
     this->m_server_configurable_sensor_data_publish_freq = data_rate;
-    LogFmtI("Got Data rate : %d\n", data_rate);
+    LogI("Got Data rate : %d\n", data_rate);
   }
 
   uint16_t sample_rate = round ( this->m_server_configurable_sensor_data_publish_freq / ( ( SENSOR_DATA_SAMPLES_PER_PUBLISH_MAX_LIMIT * 0.125 ) * ( log(this->m_server_configurable_sensor_data_publish_freq) ) ) );
   if( 0 < sample_rate && sample_rate <= SENSOR_DATA_SAMPLES_PER_PUBLISH_MAX_LIMIT ){
 
     this->m_server_configurable_sample_per_publish = sample_rate;
-    LogFmtI("Got Sample rate : %d\n", sample_rate);
+    LogI("Got Sample rate : %d\n", sample_rate);
   }
 
   memset( _value_buff, 0, 100 );
@@ -404,7 +404,7 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
   if( _json_result && DEVICE_IOT_MQTT_KEEP_ALIVE_MIN <= keep_alive && keep_alive <= DEVICE_IOT_MQTT_KEEP_ALIVE_MAX ){
 
     this->m_server_configurable_mqtt_keep_alive = keep_alive;
-    LogFmtI("Got keep alive : %d\n", keep_alive);
+    LogI("Got keep alive : %d\n", keep_alive);
   }
 
   memset( _value_buff, 0, 100 );
@@ -423,7 +423,7 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
     }
     this->m_server_configurable_interface_read.push_back( pdiutil::string( _value_buff + lastcommaindex, i - lastcommaindex ) );
 
-    LogFmtI("Got Read Interface : %s\n", _value_buff);
+    LogI("Got Read Interface : %s\n", _value_buff);
 
     for(uint16_t i = 0; i < this->m_server_configurable_interface_read.size(); i++ ){
       
@@ -477,7 +477,7 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
     }
     this->m_server_configurable_interface_write.push_back( pdiutil::string( _value_buff + lastcommaindex, i - lastcommaindex ) );
 
-    LogFmtI("Got Write Interface : %s\n", _value_buff);
+    LogI("Got Write Interface : %s\n", _value_buff);
 
     for(uint16_t i = 0; i < this->m_server_configurable_interface_write.size(); i++ ){
 
@@ -594,7 +594,7 @@ void DeviceIotServiceProvider::handleSensorData(){
     return;
   }
 
-  LogFmtI("Handling sensor data samples: %d\n", this->m_sample_index);
+  LogI("Handling sensor data samples: %d\n", this->m_sample_index);
 
   this->m_device_iot->sampleHook();
 

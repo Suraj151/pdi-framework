@@ -104,14 +104,14 @@ void DeviceIotSensor::dataHook( pdiutil::string &_payload ){
     float _total = 0;
     for (int i = 0; i < this->m_sensor_sample_index; i++) {
       _total += this->m_sensor_samples[i];
-      LogFmtI("%f ", this->m_sensor_samples[i]);
+      LogI("%f ", this->m_sensor_samples[i]);
     }
 
     this->m_sensor_sample_value = _total/this->m_sensor_sample_index;
     this->m_sensor_sample_index = 0;
     char tembuff[25];  memset(tembuff, 0, 25);  __sprintf(tembuff, "%f", this->m_sensor_sample_value);
 
-    LogFmtI("\nAverage : %f\n", this->m_sensor_sample_value);
+    LogI("\nAverage : %f\n", this->m_sensor_sample_value);
 
     _payload += "{\"count\":1,\"value\":[";
     _payload += tembuff;

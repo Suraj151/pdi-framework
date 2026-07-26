@@ -498,7 +498,7 @@ int16_t Http_Client::SendRequest(const char *type, const char *url, const char *
 
         if (bStatus && m_request.isHttps && !m_client->isSecure())
         {
-            LogE("Http_Client: https URL requires a secure client\n");
+            SysLogE("Http_Client: https URL requires a secure client\n");
             respStatus = HTTP_RESP_MAX;
             bStatus = false;
         }
@@ -766,7 +766,7 @@ int16_t Http_Client::handleResponse()
         if (m_response.resp_length)
         {
             max_timeout = HTTP_CLIENT_MAX_READ_MS;
-            // LogFmtI("ReadResponse (%d) : %s\r\n", m_response.resp_length, m_response.response);
+            // LogI("ReadResponse (%d) : %s\r\n", m_response.resp_length, m_response.response);
             // trim response
             char* line = __strtrim(buf);
             line = __strtrim_val(line, '\n');
@@ -922,7 +922,7 @@ bool Http_Client::streamBodyTo(int32_t &max_timeout)
                 if (got == 0) { ok = false; break; }
                 max_timeout = HTTP_CLIENT_MAX_READ_MS;
                 if (!m_stream_writer(scratch, got)) {
-                    LogFmtE("Http_Client: writer rejected %u bytes\n", (unsigned)got);
+                    SysLogE("Http_Client: writer rejected %u bytes\n", (unsigned)got);
                     ok = false;
                     break;
                 }
@@ -932,7 +932,7 @@ bool Http_Client::streamBodyTo(int32_t &max_timeout)
                 if (content_length > 0) {
                     int pct = (int)((m_stream_bytes_written * 100) / content_length);
                     if (pct >= last_logged_pct + 1) {
-                        LogFmtI("Http_Client: download %u%\n", (unsigned)pct);
+                        LogI("Http_Client: download %u%\n", (unsigned)pct);
                         last_logged_pct = pct;
                     }
                 }
@@ -963,7 +963,7 @@ bool Http_Client::streamBodyTo(int32_t &max_timeout)
             max_timeout = HTTP_CLIENT_MAX_READ_MS;
 
             if (!m_stream_writer(scratch, got)) {
-                LogFmtE("Http_Client: writer rejected %u bytes\n", (unsigned)got);
+                SysLogE("Http_Client: writer rejected %u bytes\n", (unsigned)got);
                 ok = false;
                 break;
             }
@@ -973,7 +973,7 @@ bool Http_Client::streamBodyTo(int32_t &max_timeout)
             if (content_length > 0) {
                 int pct = (int)((m_stream_bytes_written * 100) / content_length);
                 if (pct >= last_logged_pct + 1) {
-                    LogFmtI("Http_Client: download %u%\n", (unsigned)pct);
+                    LogI("Http_Client: download %u%\n", (unsigned)pct);
                     last_logged_pct = pct;
                 }
             }
@@ -1004,7 +1004,7 @@ int64_t Http_Client::DownloadFile(const char *url, const char *dest_path)
         }
         int written = __i_fs.writeFile(path.c_str(), (const char*)buf, sz, true);
         if (written != (int)sz) {
-            LogFmtE("Http_Client: writeFile failed (%d/%u)\n", written, (unsigned)sz);
+            SysLogE("Http_Client: writeFile failed (%d/%u)\n", written, (unsigned)sz);
             return false;
         }
         return true;

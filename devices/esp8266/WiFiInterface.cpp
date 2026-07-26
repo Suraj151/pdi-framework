@@ -9,7 +9,6 @@ created Date    : 1st June 2019
 ******************************************************************************/
 
 #include "WiFiInterface.h"
-#include "LoggerInterface.h"
 #include "DeviceControlInterface.h"
 #include "SerialInterface.h"
 #ifdef ENABLE_CONTEXTUAL_EXECUTION
@@ -718,7 +717,7 @@ void WiFiInterface::enableNetworkStatusIndication()
   __task_scheduler.setInterval( [&]() { 
 
       LogI("Handling LED Status Indications\n");
-      LogFmtI("RSSI : %d\n", this->m_wifi->RSSI());
+      LogI("RSSI : %d\n", this->m_wifi->RSSI());
 
       if( !this->m_wifi->localIP().isSet() || !this->m_wifi->isConnected() || ( this->m_wifi->RSSI() < (int)WIFI_RSSI_THRESHOLD ) ){
 
@@ -756,7 +755,7 @@ void WiFiInterface::enableNAPT(bool enable)
   IPAddress _ip((uint32_t)dns);
 
   dhcps_set_DNS(_ip);
-  LogFmtS("NAPT(lwip %d) initialization done\n", (int)LWIP_VERSION_MAJOR);
+  LogS("NAPT(lwip %d) initialization done\n", (int)LWIP_VERSION_MAJOR);
 #elif defined( ENABLE_NAPT_FEATURE_LWIP_V2 )
   // Initialize the NAPT feature
   err_t ret = ip_napt_init(IP_NAPT_MAX, IP_PORTMAP_MAX);
@@ -764,7 +763,7 @@ void WiFiInterface::enableNAPT(bool enable)
     // Enable NAT on the AP interface
     ret = ip_napt_enable_no(SOFTAP_IF, enable);
     if (ret == ERR_OK) {
-      LogFmtS("NAPT(lwip %d) initialization done\n", (int)LWIP_VERSION_MAJOR);
+      LogS("NAPT(lwip %d) initialization done\n", (int)LWIP_VERSION_MAJOR);
       // Set the DNS server for clients of the AP to the one we also use for the STA interface
       // IPAddress _ip((uint32_t)__i_wifi.dnsIP(0));
 
@@ -793,14 +792,14 @@ void WiFiInterface::wifi_event_handler_cb(System_Event_t *_event)
 
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
         if (__i_preemptive_scheduler.is_task_context() || !__i_preemptive_scheduler.is_sched_active()) {
-          LogFmtI("\nwifi event : %d\n", (int)_event->event);
+          LogI("\nwifi event : %d\n", (int)_event->event);
         } else if (__serial_uart.m_mutex.try_lock()) {
-          LogFmtI("\nwifi event : %d\n", (int)_event->event);
+          LogI("\nwifi event : %d\n", (int)_event->event);
           __serial_uart.m_mutex.unlock();
         }
         // else: serial mutex held by another task — skip this log to avoid deadlock.
     #else
-        LogFmtI("\nwifi event : %d\n", (int)_event->event);
+        LogI("\nwifi event : %d\n", (int)_event->event);
     #endif
 
     event_name_t e = EVENT_NAME_MAX;

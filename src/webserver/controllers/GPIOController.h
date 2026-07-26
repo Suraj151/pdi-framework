@@ -321,9 +321,9 @@ public:
 			pdiutil::string _post_freq = this->m_web_resource->m_server->arg("frq");
 
 			LogI("\nSubmitted info :\n");
-			LogFmtI("gpio host : %s\n", _gpio_host.c_str());
-			LogFmtI("gpio port : %s\n", _gpio_port.c_str());
-			LogFmtI("post freq : %s\n\n", _post_freq.c_str());
+			LogI("gpio host : %s\n", _gpio_host.c_str());
+			LogI("gpio port : %s\n", _gpio_port.c_str());
+			LogI("post freq : %s\n\n", _post_freq.c_str());
 			__i_dvc_ctrl.yield();
 
 			strncpy(__gpio_service.m_gpio_config_copy.gpio_host, _gpio_host.c_str(), _gpio_host.size());
@@ -436,7 +436,7 @@ public:
 				uint8_t _val = StringToUint8(this->m_web_resource->m_server->arg(_label).c_str());
 				__gpio_service.m_gpio_config_copy.gpio_mode[_pin] = !__i_dvc_ctrl.isExceptionalGpio(_pin) ? _val : 0;
 
-				LogFmtI("Pin D%d : %d\n", _pin, _val);
+				LogI("Pin D%d : %d\n", _pin, _val);
 
 				if (__gpio_service.m_gpio_config_copy.gpio_mode[_pin] == OFF || __gpio_service.m_gpio_config_copy.gpio_mode[_pin] == DIGITAL_WRITE || __gpio_service.m_gpio_config_copy.gpio_mode[_pin] == ANALOG_WRITE)
 				{
@@ -452,7 +452,7 @@ public:
 				uint16_t _val = StringToUint16(this->m_web_resource->m_server->arg(_label).c_str());
 				__gpio_service.m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS + _pin] = !__i_dvc_ctrl.isExceptionalGpio(MAX_DIGITAL_GPIO_PINS + _pin) ? _val : 0;
 
-				LogFmtI("Pin A%d : %d\n", _pin, _val);
+				LogI("Pin A%d : %d\n", _pin, _val);
 
 				if (__gpio_service.m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS + _pin] == OFF)
 				{
@@ -582,7 +582,7 @@ public:
 				{
 					__gpio_service.m_gpio_config_copy.gpio_readings[_pin] = __i_dvc_ctrl.isExceptionalGpio(_pin) ? 0 : _val;
 
-					LogFmtI("Pin %d : %d\n", _pin, _val);
+					LogI("Pin %d : %d\n", _pin, _val);
 					_is_posted = true;
 				}
 			}
@@ -802,7 +802,7 @@ public:
 						);
 
 						if( ret ){
-							LogFmtI("Adding Event for %s : %d\n", _enabled_gpios[selectedIfaceIndex].c_str(), (int)gpionumber);
+							LogI("Adding Event for %s : %d\n", _enabled_gpios[selectedIfaceIndex].c_str(), (int)gpionumber);
 							_is_posted = true;
 						}
 					}
@@ -832,7 +832,7 @@ public:
 							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventConditionValue = StringToUint16(this->m_web_resource->m_server->arg(_label).c_str());
 							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventChannel = StringToUint8(this->m_web_resource->m_server->arg(_event_label).c_str());
 
-							LogFmtI("Pin D%d : %d : %d\n", gpionumber, 
+							LogI("Pin D%d : %d : %d\n", gpionumber, 
 							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventConditionValue, 
 							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventChannel);
 
@@ -855,7 +855,7 @@ public:
 							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventConditionValue = StringToUint16(this->m_web_resource->m_server->arg(_event_value).c_str());
 							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventChannel = StringToUint8(this->m_web_resource->m_server->arg(_event_label).c_str());
 
-							LogFmtI("Pin A%d : %d : %d : %d\n", gpionumber, 
+							LogI("Pin A%d : %d : %d : %d\n", gpionumber, 
 							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventCondition, 
 							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventConditionValue, 
 							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventChannel);

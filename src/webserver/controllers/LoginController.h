@@ -141,8 +141,8 @@ class LoginController : public Controller {
         pdiutil::string _password = this->m_web_resource->m_server->arg("pswd");
 
         LogI("\nSubmitted info :\n");
-        LogFmtI("Username : %s\n", _username.c_str());
-        LogFmtI("Password : %s\n\n", _password.c_str());
+        LogI("Username : %s\n", _username.c_str());
+        LogI("Password : %s\n\n", _password.c_str());
 
         if( _username.size() <= LOGIN_CONFIGS_BUF_SIZE && _password.size() <= LOGIN_CONFIGS_BUF_SIZE &&
           _username.size() > MIN_ACCEPTED_ARG_SIZE && _password.size() > MIN_ACCEPTED_ARG_SIZE

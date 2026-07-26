@@ -201,7 +201,7 @@ Interfaces are grouped by *role* rather than by feature:
 | `middlewares/` | `iClientInterface`, `iServerInterface`, `iNtpInterface`, `iPingInterface`, `iDeviceControlInterface`, `iUpgradeInterface` | Device adapter | OTA, MQTT, Email, HTTP, IoT services |
 | `modules/serial`, `modules/storage`, `modules/wifi` | `iSerialInterface`, `iStorageInterface`, `iFileSystemInterface`, `iWiFiInterface`, `iHttpServerInterface` | Device adapter | Serial, Storage, WiFi services |
 | `threading/` | `iExecution`, `iMutex`, `iCondvar`, `iContext` + `cooperative/`, `preemptive/` | Device adapter (if supported) | Task scheduler in contextual mode |
-| Top-level | `iDatabaseInterface`, `iLoggerInterface`, `iDeviceIotInterface` | Device adapter (DB, logger) / framework (IoT) | Database service, logger macros, IoT service |
+| Top-level | `iDatabaseInterface`, `iDeviceIotInterface` | Device adapter (DB) / framework (IoT) | Database service, IoT service |
 
 A device port is considered "complete" when it provides at least: `iDeviceControlInterface`, `iDatabaseInterface`, `iSerialInterface` (if `ENABLE_SERIAL_SERVICE`), and any group required by the feature flags it intends to support. See [devices/esp32/esp32_pdi.h](devices/esp32/esp32_pdi.h) for the canonical aggregator pattern — note how each include is itself wrapped in the matching `ENABLE_*` guard so an unused interface costs zero code size.
 
@@ -511,7 +511,8 @@ Every `ENABLE_*` (and `ALLOW_*` / `IGNORE_*` / `AUTO_*`) flag lives in [devices/
 | `ALLOW_MQTT_CONFIG_MODIFICATION`, `ALLOW_OTA_CONFIG_MODIFICATION` | Same for MQTT / OTA forms |
 | `AUTO_FACTORY_RESET_ON_INVALID_CONFIGS` | If DB checksum invalid at boot, reset to defaults instead of halting |
 | `CONFIG_CLEAR_TO_DEFAULT_ON_FACTORY_RESET` | Factory reset writes default structs back instead of zeroing |
-| `ENABLE_LOG_ALL` / `_INFO` / `_WARNING` / `_ERROR` / `_SUCCESS` | Per-level log gates; if none are set, the logger interface is dropped entirely |
+| `ENABLE_CONSOLE_LOG_ALL` / `_INFO` / `_WARNING` / `_ERROR` / `_SUCCESS` | Per-level console (serial) log gates; if none are set, every `Log*` call compiles to nothing |
+| `ENABLE_SYSLOG_SERVICE` | Persist log lines to `/var/log/syslog.<type>` files (the `SysLog*` macros); storage-gated |
 
 #### 3.3.3 Per-device limits
 
@@ -597,7 +598,7 @@ The most common foot-gun is enabling a service whose dependency is off. The rule
 - `ENABLE_HTTPS_SERVER` ⇒ `ENABLE_TLS_SERVICE` **and** `ENABLE_HTTP_SERVER` **and** `ENABLE_STORAGE_SERVICE` (cert/key are loaded from FS at `/etc/http/server.{crt,key}`). Optional `ENABLE_HTTPS_SERVER_MTLS` adds `/etc/http/client-ca.crt` mTLS verification.
 - `ENABLE_TLS_CERT_GENERATION` ⇒ `ENABLE_TLS_SERVICE` **and** `DEVICE_ESP32` (mbedTLS issuer API). The `tls` CLI command is gated on this flag.
 - `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` ⇒ `ENABLE_TLS_CERT_GENERATION`. Registers a listener on `EVENT_WIFI_STA_GOT_IP` that mints a self-signed cert for the device IP the first time it boots without one.
-- Disabling **all** `ENABLE_LOG_*` removes `iLoggerInterface` from the build — your port may then omit its `LoggerInterface.{h,cpp}`.
+- `ENABLE_SYSLOG_SERVICE` ⇒ `ENABLE_STORAGE_SERVICE` (the file sink needs a mounted filesystem). It is auto-defined inside that guard in [DeviceConfig.h](devices/DeviceConfig.h) and absent on storage-less ports such as uno.
 
 The header guards in [devices/DeviceConfig.h](devices/DeviceConfig.h) enforce most of these by structurally wrapping the dependent flags inside `#ifdef ENABLE_NETWORK_SERVICE`. The rest you are responsible for.
 
@@ -611,7 +612,7 @@ A few preset configurations contributors typically reach for:
 | **Offline gateway** | Add `STORAGE`, `AUTH` | Everything network |
 | **Headless networked node** | Add `NETWORK`, `WIFI`, `MQTT`, `OTA`, `NTP` | `HTTP_SERVER`, `SSH`, `EMAIL` |
 | **Full portal** | Default `DeviceConfig.h` (everything on) | — |
-| **Diagnostics build** | Default + `ENABLE_LOG_ALL` | — |
+| **Diagnostics build** | Default + `ENABLE_CONSOLE_LOG_ALL` (optionally `ENABLE_SYSLOG_SERVICE`) | — |
 | **Concurrent demo** (esp8266 or esp32) | Default + `ENABLE_CONTEXTUAL_EXECUTION` | — |
 | **HTTPS portal** | Default + `ENABLE_TLS_SERVICE` + `ENABLE_HTTPS_SERVER` (esp32 also: `ENABLE_TLS_CERT_GENERATION`) | `ENABLE_NAPT` on esp8266 |
 | **HTTPS + mTLS** | Above + `ENABLE_HTTPS_SERVER_MTLS` | — |
@@ -2213,155 +2214,132 @@ To add a `/metrics` page that shows live counters:
 
 ## 9. Logger
 
-The logger is intentionally the smallest subsystem in the framework. There is **no log buffer, no rotating sink, no per-tag filtering, no JSON formatter** — just four levels, a printf-style varargs helper, and an interface that ports usually implement with one line per method. The cleverness is in *how it disappears*: when no log level is enabled, every `LogI(...)` / `LogE(...)` / `LogFmtI(...)` site in the codebase compiles to nothing — zero flash, zero RAM, zero runtime cost.
+The logger is deliberately one of the smallest subsystems in the framework. There is **no per-tag filtering and no JSON formatter** — four levels, a printf-style varargs formatter, and one shared logger object. It splits along a single axis: **console** logs go to the serial terminal only; **syslog** logs go to the serial terminal *and* a file under `/var/log`. The cleverness is in *how it disappears*: when a level's console gate is off, every `LogI(...)` / `LogE(...)` site for that level compiles to nothing — zero flash, zero RAM, zero runtime cost.
 
-Implementation: [src/interface/pdi/iLoggerInterface.h](src/interface/pdi/iLoggerInterface.h) (port contract), [src/utility/DataTypeDef.h](src/utility/DataTypeDef.h) (default no-op macros), `devices/<board>/LoggerInterface.{h,cpp}` (port-side overrides).
+Implementation: [src/interface/pdi/impl/log/LogManager.{h,cpp}](src/interface/pdi/impl/log/LogManager.h) (the one logger), [src/interface/pdi/impl/log/LogMacros.h](src/interface/pdi/impl/log/LogMacros.h) (the one macro home), [src/interface/pdi/iLoggerInterface.h](src/interface/pdi/iLoggerInterface.h) (the logger contract), [src/utility/DataTypeDef.h](src/utility/DataTypeDef.h) (default no-op macros), [src/config/SyslogConfig.h](src/config/SyslogConfig.h) (file paths and sizes).
 
-### 9.1 Levels
+### 9.1 One logger — `LogManager`
 
-| `logger_type_t` | Macro | Format-macro | When to use |
+`LogManager` (`extern LogManager __log_manager;`) is the single logger for the whole stack, on every port. It implements [`iLoggerInterface`](src/interface/pdi/iLoggerInterface.h) — a two-method contract, `init(iIOInterface*)` and `log(logger_type_t, const char* fmt, ...)` — and holds one pointer: the serial terminal it writes to, as an `iIOInterface*`.
+
+The device port does **not** implement the logger. Its only responsibility is to expose its serial terminal; the stack wires it in during boot:
+
+```cpp
+// PdiStack::initialize
+__log_manager.init(__i_dvc_ctrl.getTerminal());   // getTerminal() returns an iIOInterface*
+```
+
+`init()` stores the terminal and opens it at 115200 baud if it isn't already. There is no separate lifecycle macro to remember to call — `PdiStack::initialize` does this for you.
+
+### 9.2 Levels
+
+| `logger_type_t` | Console macro | Syslog macro | When to use |
 |---|---|---|---|
-| `INFO_LOG` | `LogI(msg)` | `LogFmtI(fmt, args...)` | State transitions, lifecycle ("`Starting MQTT Service`") |
-| `ERROR_LOG` | `LogE(msg)` | `LogFmtE(fmt, args...)` | Recoverable failures, validation rejects |
-| `WARNING_LOG` | `LogW(msg)` | `LogFmtW(fmt, args...)` | Unusual conditions, deprecated paths |
-| `SUCCESS_LOG` | `LogS(msg)` | `LogFmtS(fmt, args...)` | Confirmation of high-value operations (`"OTA applied"`) |
+| `INFO_LOG` | `LogI(fmt, ...)` | `SysLogI(fmt, ...)` | State transitions, lifecycle ("`Starting MQTT Service`") |
+| `ERROR_LOG` | `LogE(fmt, ...)` | `SysLogE(fmt, ...)` | Recoverable failures, validation rejects |
+| `WARNING_LOG` | `LogW(fmt, ...)` | `SysLogW(fmt, ...)` | Unusual conditions, deprecated paths |
+| `SUCCESS_LOG` | `LogS(fmt, ...)` | `SysLogS(fmt, ...)` | Confirmation of high-value operations (`"OTA applied"`) |
 
-Plus one lifecycle macro:
+Each macro is a single **variadic** form — the same macro takes a plain string or a format string with arguments:
 
-- **`LOGBEGIN`** — expands to `__i_logger.init()`, called once from [`PDIStack::initialize`](src/PdiStack.cpp) to set up the logger sink (typically `Serial.begin(115200)`).
+```cpp
+LogI("Starting WiFi service");        // plain
+LogI("NTP validity : %d", valid);     // formatted
+```
 
-### 9.2 The four feature flags
+Because every call routes through the formatter, a plain message must not contain an unescaped `%` (see [§9.8](#98-gotchas)).
+
+### 9.3 Console vs syslog
+
+- **`Log*`** — console only. Writes to the serial terminal. Gated per level by `ENABLE_CONSOLE_LOG_*`.
+- **`SysLog*`** — console **and** file. Writes the same line to the serial terminal *and* appends it to `/var/log/syslog.<level>`. Active when `ENABLE_SYSLOG_SERVICE` is defined; when it is off, `SysLog*` degrades to the matching `Log*` (console-only), so call sites need no `#ifdef`.
+
+Use `Log*` for chatty, dev-time tracing you never want on flash storage; use `SysLog*` for lines worth surviving a reboot (errors, lifecycle milestones). The framework's app layer — `service_provider/`, `transports/`, `helpers/` — routes its error-level lines through `SysLogE`.
+
+### 9.4 Feature flags
+
+Console gates (in [devices/DeviceConfig.h](devices/DeviceConfig.h)):
 
 | Flag | Effect |
 |---|---|
-| `ENABLE_LOG_INFO` | Enables `LogI` / `LogFmtI` |
-| `ENABLE_LOG_ERROR` | Enables `LogE` / `LogFmtE` |
-| `ENABLE_LOG_WARNING` | Enables `LogW` / `LogFmtW` |
-| `ENABLE_LOG_SUCCESS` | Enables `LogS` / `LogFmtS` |
-| `ENABLE_LOG_ALL` | Shorthand for *all of the above* |
+| `ENABLE_CONSOLE_LOG_INFO` | Enables `LogI` |
+| `ENABLE_CONSOLE_LOG_ERROR` | Enables `LogE` |
+| `ENABLE_CONSOLE_LOG_WARNING` | Enables `LogW` |
+| `ENABLE_CONSOLE_LOG_SUCCESS` | Enables `LogS` |
+| `ENABLE_CONSOLE_LOG_ALL` | Shorthand for *all of the above* |
 
-All five are commented out by default in [devices/DeviceConfig.h](devices/DeviceConfig.h). The shipping configuration is **silent** — release builds emit nothing on Serial.
+Syslog gate:
 
-### 9.3 The disappearing-macro pattern
+| Flag | Effect |
+|---|---|
+| `ENABLE_SYSLOG_SERVICE` | Enables the file sink behind `SysLog*`. Requires `ENABLE_STORAGE_SERVICE`; auto-defined inside that guard in [DeviceConfig.h](devices/DeviceConfig.h), so it is simply absent on storage-less ports (uno). |
 
-The trick that makes the logger zero-cost when off is a two-layer macro definition. **Layer 1** lives in [DataTypeDef.h](src/utility/DataTypeDef.h) and is the unconditional stub:
+With every console gate off and `ENABLE_SYSLOG_SERVICE` off, the shipping configuration is **silent** — release builds emit nothing on serial and write no files.
+
+### 9.5 The disappearing-macro pattern
+
+Console macros are zero-cost when off via a two-layer definition. **Layer 1** lives in [DataTypeDef.h](src/utility/DataTypeDef.h) (included early everywhere) as the unconditional no-op stub:
 
 ```cpp
-#define LOGBEGIN
-#define LogI(v)              // info log
-#define LogE(v)              // error log
-#define LogW(v)              // warning log
-#define LogS(v)              // success log
-#define LogFmtI(f, args...)
-#define LogFmtE(f, args...)
-#define LogFmtW(f, args...)
-#define LogFmtS(f, args...)
+#define LogI(f, args...) // info log
+#define LogE(f, args...) // error log
+#define LogW(f, args...) // warning log
+#define LogS(f, args...) // success log
 ```
 
-Every translation unit that includes any utility header sees these — so `LogI("...")` is always legal C++, even on a build with no logger. It just expands to nothing.
+So `LogI("...")` is always legal C++, even on a build with no logger — it just expands to nothing.
 
-**Layer 2** lives in the *device's* `LoggerInterface.h` (e.g. [devices/esp32/LoggerInterface.h](devices/esp32/LoggerInterface.h)) and runs only if (a) that header is actually included and (b) the matching `ENABLE_LOG_*` is on:
+**Layer 2** lives in [LogMacros.h](src/interface/pdi/impl/log/LogMacros.h) and upgrades a level's stub to the real call only when its gate is on:
 
 ```cpp
-#if defined(LogI) && (defined(ENABLE_LOG_INFO) || defined(ENABLE_LOG_ALL))
+#if defined(LogI) && ( defined(ENABLE_CONSOLE_LOG_INFO) || defined(ENABLE_CONSOLE_LOG_ALL) )
 #undef LogI
-#define LogI(v) __i_logger.log_info(RODT_ATTR(v))
+#define LogI(f, args...) __log_manager.log(INFO_LOG, RODT_ATTR(f), ##args)
 #endif
 ```
 
-Whether the device's `LoggerInterface.h` gets included is itself gated in the per-board aggregator ([devices/esp32/esp32_pdi.h](devices/esp32/esp32_pdi.h)):
+`LogMacros.h` has **no include guard** on purpose: the `#if defined(...)` / `#undef` / `#define` dance is idempotent, so re-including it after the gates become visible simply upgrades the no-op defaults in place. It reaches both layers of the codebase:
+
+- **Service layer + PdiStack** — [ServiceProvider.h](src/service_provider/ServiceProvider.h) includes it, so every service and `PdiStack` inherit it.
+- **Device layer** — each device base header (`devices/<port>/<port>.h`) includes it at its end, so every device `.cpp` inherits it.
+
+Net effect: a *zero-byte* console logger for any disabled level, identical to hand-`#ifdef`-stripping every call site — but written naturally.
+
+### 9.6 The flash-string convention
+
+Each console macro wraps its format string in `RODT_ATTR(...)`:
 
 ```cpp
-#if defined(LOGBEGIN) && \
-    (defined(ENABLE_LOG_ALL) || defined(ENABLE_LOG_INFO) || \
-     defined(ENABLE_LOG_ERROR) || defined(ENABLE_LOG_WARNING) || \
-     defined(ENABLE_LOG_SUCCESS))
-#include "LoggerInterface.h"
-#endif
+#define LogI(f, args...) __log_manager.log(INFO_LOG, RODT_ATTR(f), ##args)
 ```
 
-So the cascade is:
+That keeps the literal in flash (`PROGMEM` on AVR, `.rodata` on ESP) rather than RAM — a few hundred log call sites cost flash they were going to occupy anyway, and zero RAM. `LogManager::log` copies the flash format into a short-lived RAM buffer (`CHARPTR_WRAP_RO`, auto-freed) before walking it.
 
-```
-No ENABLE_LOG_* set
-    ↓
-devices/<board>/LoggerInterface.h is NOT included
-    ↓
-Layer-2 #undef/#define never runs
-    ↓
-Macros stay as the empty stubs from DataTypeDef.h
-    ↓
-Every Log* call site compiles to nothing
-    ↓
-__i_logger symbol is never referenced → linker drops it
-```
+The formatter is the framework's own, not libc's, and understands only `%d %u %x %c %f %s` — no width, precision, or length modifiers (no `%lu`, `%.2f`). Cast a 64-bit value down before logging it. The console path streams straight to the terminal character by character with no line buffer, which is what keeps it usable even on the RAM-starved uno.
 
-Net effect: a *zero-byte* logger when disabled, identical to manually `#ifdef`-stripping every call site — but written naturally.
+### 9.7 Where syslog goes
 
-### 9.4 The port contract — `iLoggerInterface`
+When `ENABLE_SYSLOG_SERVICE` is on, `SysLog*` lines are appended to a file chosen by level:
 
-Pure-virtual sink with `init()` (called once via `LOGBEGIN`), a generic `log(type, content)` dispatcher, per-level fast paths (`log_info` / `log_error` / `log_warning` / `log_success`), and a printf-style `log_format(fmt, type, ...)`. Singleton: `extern LoggerInterface __i_logger;`. The per-device subclass typically just forwards each method to `Serial.print` — see [LoggerInterface.cpp](devices/esp32/LoggerInterface.cpp).
+| Level | File |
+|---|---|
+| `INFO_LOG` | `/var/log/syslog.info` |
+| `ERROR_LOG` | `/var/log/syslog.error` |
+| `WARNING_LOG` | `/var/log/syslog.warning` |
+| `SUCCESS_LOG` | `/var/log/syslog.success` |
 
-### 9.5 The flash-string convention
+Files split by **level** only — the logger carries no service/unit identity, so level is the only axis. The `/var/log` directory is created lazily on the first write (after storage mounts). Each file grows to `SYSLOG_FILE_MAX_SIZE` (8 KB) and then restarts from empty — a simple truncate-and-restart rotation, no numbered archives. A single assembled line is capped at `SYSLOG_LINE_MAX` (200 bytes). All three limits and the paths live in [SyslogConfig.h](src/config/SyslogConfig.h) and can be overridden per port. A re-entry guard prevents an FS-internal log from recursing while a syslog write is in flight.
 
-Every macro wraps the argument in `RODT_ATTR(...)`:
+Read them from the CLI like any other file: `cat /var/log/syslog.error`, `tail /var/log/syslog.info 20`, `grep ^E /var/log/syslog.error`.
 
-```cpp
-#define LogI(v) __i_logger.log_info(RODT_ATTR(v))
-```
+### 9.8 Gotchas
 
-That means the literal string lives in flash memory (`PROGMEM` on AVR, `.rodata` on ESP), and the logger reads through it as a flash pointer. On AVR/ESP8266 this is what keeps a verbose `LogI("...")` from chewing through RAM — a few hundred log call sites cost flash space they were going to occupy anyway, and zero RAM.
-
-The implementation side has to honour this: `log_info(const char* s)` may be receiving a *flash pointer*, not a RAM pointer. The default device impl uses `Serial.print` which handles both transparently on Arduino cores. A custom port that writes through a non-Arduino API must call the flash-aware variant (`strlen_P`, `memcpy_P`, the `rofn::to_charptr` helper in [esp32_pdi.cpp](devices/esp32/esp32_pdi.cpp)).
-
-### 9.6 Where logs go
-
-The default sink is the device's serial port at 115200 baud — `LoggerInterface::init()` calls `Serial.begin(115200)`. There is **no** built-in routing to:
-
-- Telnet / SSH sessions (those have their own terminal lanes via `iTerminalInterface`)
-- The file system (no rotating log file)
-- The web portal (the dashboard doesn't show log lines)
-- A remote syslog / HTTP sink
-
-If you need any of those, write a custom `LoggerInterface` for your port whose methods fan out to multiple sinks (Serial + your destination). The interface contract supports it; the framework just doesn't ship the wiring.
-
-### 9.7 Typical usage in framework code
-
-Three patterns recur across services:
-
-```cpp
-LogBegin (in PdiStack::initialize)              // boot the logger sink
-
-LogI("Starting WiFi service");                  // simple level
-LogE("Found invalid configs.. starting factory reset!");
-
-LogFmtI("NTP Validity : %d\n", __i_ntp.is_valid_ntptime());   // formatted
-LogFmtE("OTA failed for %s -> %d", url, status);
-```
-
-There is **no** convention for module tags (`"[wifi] starting"` etc.) — services prepend their name in-line if they want one. Keep messages short; long strings cost flash.
-
-### 9.8 Enabling logs on a running build
-
-To turn logs on:
-
-1. Uncomment one or more `ENABLE_LOG_*` in [devices/DeviceConfig.h](devices/DeviceConfig.h):
-   ```c
-   #define ENABLE_LOG_INFO
-   #define ENABLE_LOG_ERROR
-   // or just: #define ENABLE_LOG_ALL
-   ```
-2. Recompile and flash. Open Serial Monitor at 115200.
-
-There is no runtime toggle. To selectively log only one service, the practical option is to gate that service's calls behind a custom macro (`#define LogMqtt(v) LogI(v)` and only include it in MQTT files), then leave only `ENABLE_LOG_INFO` on. The framework doesn't ship per-tag filters.
-
-### 9.9 Gotchas
-
-- **`LOGBEGIN` must be called or `Serial` is never started.** [`PDIStack::initialize`](src/PdiStack.cpp) does this on your behalf — don't `Serial.begin()` again in your sketch's `setup()` or you'll race the logger.
-- **`Log*("constant string")` works; `Log*(my_var)` may not.** `RODT_ATTR(v)` only does the right thing when `v` is a string literal. If you want to log a `const char*` variable, use `LogFmtI("%s", my_var)` — the format string is a literal, the variable is just a `%s` argument.
-- **No level-filtering at runtime.** Disabling `ENABLE_LOG_INFO` removes every `LogI` from the binary; you cannot turn one back on without recompiling.
-- **`SerialServiceProvider` and the logger share the same serial port by default.** On boards with only one UART, this is fine because both call `Serial.print`. On boards where you've remapped the CLI to a second UART, the logger still goes to `Serial` — override `LoggerInterface::log_*` to route there too if you want them unified.
-- **No timestamping.** Lines arrive as-written, no prefix. If you want timestamps, prepend them with `LogFmtI("[%lu] ...", millis())` — there's no global setting.
+- **Plain messages must not contain a bare `%`.** Every `Log*` / `SysLog*` call goes through the formatter, so `LogI("100% done")` mis-parses the `%`. Escape it (`%%`) or pass it as an argument (`LogI("%s", "100% done")`).
+- **Only `%d %u %x %c %f %s` are supported, no length modifiers.** Use `%d`/`%u` for 32-bit ints and cast 64-bit values down first — `%lu` / `%lld` are not understood.
+- **No runtime level filtering.** Disabling `ENABLE_CONSOLE_LOG_INFO` removes every `LogI` from the binary; you cannot turn one back on without recompiling.
+- **`SysLog*` needs storage.** On a port without `ENABLE_STORAGE_SERVICE` (uno), `ENABLE_SYSLOG_SERVICE` is never defined and `SysLog*` silently falls back to console-only `Log*`.
+- **The logger and the CLI share the serial terminal.** Both write through the same `iIOInterface`, so on a single-UART board their output interleaves on one stream — expected.
+- **No timestamping.** Lines arrive as-written, no prefix. Prepend your own with `LogI("[%u] ...", (uint32_t)millis())` if you want one — there's no global setting.
 
 ---
 
@@ -2642,7 +2620,7 @@ __task_scheduler.scheduleUnderExecSched(
 
 Maps directly to [§4. Task Scheduler](#4-task-scheduler) — particularly §4.4 (API by use case) and §4.8 (contextual scheduling).
 
-**Disable `ENABLE_LOG_*`** before running this example, or the framework's own log output will interleave with the demo prints and obscure the schedule.
+**Disable `ENABLE_CONSOLE_LOG_*`** before running this example, or the framework's own log output will interleave with the demo prints and obscure the schedule.
 
 ### 11.3 `AddingDatabaseTable` — app-side persistence without codegen
 
@@ -3001,7 +2979,7 @@ Each row below: what the interface models, who implements it on a typical port, 
 
 | Interface | Path | Implementer | Consumers | Notes |
 |---|---|---|---|---|
-| `iLoggerInterface` | [iLoggerInterface.h](src/interface/pdi/iLoggerInterface.h) | Device | `LOG*` macros | `init`, `log(type, msg)`, type-specific helpers, `log_format(fmt, type, …)` |
+| `iLoggerInterface` | [iLoggerInterface.h](src/interface/pdi/iLoggerInterface.h) | **Framework** ([`LogManager`](src/interface/pdi/impl/log/LogManager.h), not the device) | `Log*` / `SysLog*` macros | `init(iIOInterface*)`, `log(type, fmt, …)`. The device supplies only its serial terminal (`iIOInterface`) via `getTerminal()`; `LogManager` is the sole implementer |
 | `iDeviceIotInterface` | [iDeviceIotInterface.h](src/interface/pdi/iDeviceIotInterface.h) | **Application** (not device) | `DeviceIotServiceProvider` | `sampleHook`, `dataHook(payload)`, `resetSampleHook` — implemented in the user's sketch to feed IoT payloads |
 
 > Note: `iDeviceIotInterface` is the only `i*Interface` whose implementer is the *application*, not the device port. It is the framework's intentional extension point for "what to publish, on what schedule".
@@ -3072,7 +3050,6 @@ devices/esp32/
 ├── esp32_pdi.c                   (Optional) C-side aggregator for pure-C sources
 ├── DeviceControlInterface.{h,cpp}   Required — implements iDeviceControlInterface
 ├── DatabaseInterface.{h,cpp}        Required — implements iDatabaseInterface
-├── LoggerInterface.{h,cpp}          Optional — only if logging is enabled
 ├── InstanceInterface.{h,cpp}        Required — factory for runtime instances
 ├── SerialInterface.{h,cpp}          If ENABLE_SERIAL_SERVICE
 ├── StorageInterface.{h,cpp}         If ENABLE_STORAGE_SERVICE
@@ -3111,7 +3088,7 @@ esp32 currently uses FreeRTOS task / mutex / semaphore primitives under the hood
 Compare with the minimal end of the spectrum:
 
 - [devices/mockdevice/](devices/mockdevice/) — header-only stub used when no `DEVICE_*` is defined; lets the framework compile for static analysis or off-device unit tests.
-- [devices/arduinouno/](devices/arduinouno/) — no WiFi/Network/HTTP/Storage; ships only `DeviceControl`, `Database`, `Serial`, `Storage` (EEPROM-only), `FileSystem`, `Instance`, `Logger`.
+- [devices/arduinouno/](devices/arduinouno/) — no WiFi/Network/HTTP/Storage; ships only `DeviceControl`, `Database`, `Serial`, `Storage` (EEPROM-only), `FileSystem`, `Instance`.
 
 ### 14.2 Which interfaces are required vs optional
 
@@ -3120,7 +3097,6 @@ Compare with the minimal end of the spectrum:
 | `iDeviceControlInterface` | **Always** | — | GPIO, reset, WDT, yield, events, terminal accessor |
 | `iDatabaseInterface` | **Always** | — | NVM read/write for the config DB |
 | `iInstanceInterface` | **Always** | — | Factory for fresh TCP client/server and FS handles |
-| `iLoggerInterface` | Conditional | `ENABLE_LOG_*` | Skipped if no log level is enabled |
 | `iSerialInterface` | Conditional | `ENABLE_SERIAL_SERVICE` | Powers the serial terminal |
 | `iStorageInterface` + `iFileSystemInterface` | Conditional | `ENABLE_STORAGE_SERVICE` | LittleFS / SPIFFS / SD adapter |
 | `iWiFiInterface`, `iHttpServerInterface` | Conditional | `ENABLE_WIFI_SERVICE` | WiFi STA+AP control, embedded HTTP server |
@@ -3188,7 +3164,6 @@ Each port instantiates exactly one object per interface and names it according t
 | `__i_dvc_ctrl` | [DeviceControlInterface.cpp](devices/esp32/DeviceControlInterface.cpp) | Always |
 | `__i_db` | [DatabaseInterface.cpp](devices/esp32/DatabaseInterface.cpp) | Always |
 | `__i_instance` | [InstanceInterface.cpp](devices/esp32/InstanceInterface.cpp) | Always |
-| `__i_logger` | [LoggerInterface.cpp](devices/esp32/LoggerInterface.cpp) | Any `ENABLE_LOG_*` |
 | `__i_serial` | [SerialInterface.cpp](devices/esp32/SerialInterface.cpp) | `ENABLE_SERIAL_SERVICE` |
 | `__i_storage`, `__i_fs` | [StorageInterface.cpp](devices/esp32/StorageInterface.cpp), [FileSystemInterface.cpp](devices/esp32/FileSystemInterface.cpp) | `ENABLE_STORAGE_SERVICE` |
 | `__i_wifi`, `__i_http_server` | [WiFiInterface.cpp](devices/esp32/WiFiInterface.cpp), [HttpServerInterface.cpp](devices/esp32/HttpServerInterface.cpp) | `ENABLE_WIFI_SERVICE` |
@@ -3611,7 +3586,7 @@ NVM is in an invalid state (corrupt checksum, mismatched schema after a struct e
 WiFi STA connect is timing out. `WIFI_STATION_CONNECT_ATTEMPT_TIMEOUT` defaults to 1 s ([§3.3.3](#3-configuration-system)) — short. Usually means the configured STA credentials are stale. Hold the flash button 6-7 s to factory-reset (assuming `CONFIG_CLEAR_TO_DEFAULT_ON_FACTORY_RESET`), reconnect to AP, set fresh credentials.
 
 **`PdiStack.initialize()` runs to completion but `LogI` calls print nothing.**
-No `ENABLE_LOG_*` flag is set in [devices/DeviceConfig.h](devices/DeviceConfig.h) — every `Log*` site compiled to nothing. Uncomment at least `ENABLE_LOG_INFO`. See [§9.8](#9-logger).
+No `ENABLE_CONSOLE_LOG_*` flag is set in [devices/DeviceConfig.h](devices/DeviceConfig.h) — every `Log*` site compiled to nothing. Uncomment at least `ENABLE_CONSOLE_LOG_INFO`. See [§9.8](#9-logger).
 
 **Application code runs once and stops.**
 Almost always missing `PdiStack.serve()` in `loop()`. Without it the inline scheduler never advances and nothing periodic fires. The minimal sketch is [examples/PdiStack/PdiStack.ino](examples/PdiStack/PdiStack.ino).
@@ -3708,7 +3683,7 @@ Ed25519 keypair + Curve25519 ECDH + AES-CTR streaming + per-session protocol sta
 Yes. After the first boot, every persisted config in NVM can be changed via the web portal, the CLI, or another sketch that calls `__database_service.set_*_table`. Flash only changes *defaults* ([§3.8](#3-configuration-system)).
 
 **Q. Where do logs go?**
-Serial at 115200 only, by default. The framework doesn't ship file/telnet/SSH/syslog/HTTP routing for logs — implement a custom `LoggerInterface` if you need fan-out ([§9.6](#9-logger)).
+Console (`Log*`) lines go to the serial terminal at 115200. With `ENABLE_SYSLOG_SERVICE` on, `SysLog*` lines additionally land in `/var/log/syslog.<level>` on the filesystem ([§9.7](#97-where-syslog-goes)). There is no built-in telnet/SSH/HTTP/remote-syslog fan-out.
 
 **Q. How do I enable TLS?**
 TLS ships in-tree as of the last release. Set `ENABLE_TLS_SERVICE` in [devices/DeviceConfig.h](devices/DeviceConfig.h) — esp8266 uses BearSSL, esp32 uses mbedTLS. Add `ENABLE_HTTPS_SERVER` for the inbound web portal (cert/key at `/etc/http/server.{crt,key}`), `ENABLE_HTTPS_SERVER_MTLS` for client-cert auth (`/etc/http/client-ca.crt`), `ENABLE_TLS_CERT_GENERATION` + `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` (esp32 only) for on-boot auto-mint. Cost is significant — see [§12.4](#124-the-expensive-features-called-out). On esp8266 `ENABLE_TLS_SERVICE` cannot coexist with `ENABLE_NAPT`. Full reference: [§6.2.16](#6-service-providers).
@@ -3738,7 +3713,7 @@ GitHub: <https://github.com/Suraj151/pdi-framework>.
 
 The best signal-to-noise loop on an unknown problem:
 
-1. **Enable logs.** Uncomment `ENABLE_LOG_ALL` in [devices/DeviceConfig.h](devices/DeviceConfig.h), flash, watch serial @ 115200.
+1. **Enable logs.** Uncomment `ENABLE_CONSOLE_LOG_ALL` in [devices/DeviceConfig.h](devices/DeviceConfig.h), flash, watch serial @ 115200.
 2. **List services.** `srvc list` over the terminal — confirms what actually booted, with per-service state and task counts.
 3. **Print a service's status.** `srvc status <name>` — state, tracked PIDs, ready to correlate against `ps`.
 4. **List active tasks.** `ps` — column `%CPU` is your CPU-hog detector; the `OWN` column ties tasks back to their owning session or kernel.

@@ -198,18 +198,11 @@ namespace rofn{
 #define CHARPTR_WRAP_RO(x) (char*)rofn::ROPTR(x)
 
 
-// redefine these in derived interface
-#define LOGBEGIN
-
-#define LogI(v) // info log
-#define LogE(v) // error log
-#define LogW(v) // warning log
-#define LogS(v) // success log
-
-#define LogFmtI(f, args...)
-#define LogFmtE(f, args...)
-#define LogFmtW(f, args...)
-#define LogFmtS(f, args...)
+// fallback no-op console log macros (LogMacros.h redefines when logging is enabled)
+#define LogI(f, args...) // info log
+#define LogE(f, args...) // error log
+#define LogW(f, args...) // warning log
+#define LogS(f, args...) // success log
 
 
 /* Connection status enums */
