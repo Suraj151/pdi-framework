@@ -121,7 +121,9 @@ created Date    : 1st June 2019
 /**
  * enable/disable device iot feature here
  */
+#ifdef ENABLE_MQTT_SERVICE
 #define ENABLE_DEVICE_IOT
+#endif
 
 /**
  * ignore free relay connections created by same ssid

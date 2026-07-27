@@ -7,6 +7,7 @@ Create sets of C++ header config based on provided device
 import os
 import sys
 import re
+import shutil
 
 
 # consts
@@ -39,7 +40,9 @@ def expand_token(template, token, tokenvalue, endl=False):
 def format_file(formatter, filepath):
 
     if formatter == "clang":
-        # Format the file with clang-formatter
+        if shutil.which("clang-format") is None:
+            print("clang-format not found on PATH, skipping formatting of %s" % filepath)
+            return
         clangCmd = "clang-format --style=Microsoft -i " + filepath
         os.system(clangCmd)
 

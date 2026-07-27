@@ -51,7 +51,7 @@ if __name__ == "__main__":
     outpath = args.outpath
 
     tracked_headers = glob.glob(os.path.join(outpath, '*.h'))
-    if tracked_headers:
+    if tracked_headers and shutil.which('git'):
         subprocess.run(
             ['git', 'update-index', '--skip-worktree'] + tracked_headers,
             check=False,
@@ -63,7 +63,8 @@ if __name__ == "__main__":
     else:
         os.makedirs(outpath)
 
-    os.system('python3 JsonToCpp.py -s ' + schema + ' -o ' + outpath)
+    scriptpath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "JsonToCpp.py")
+    subprocess.run([sys.executable, scriptpath, "-s", schema, "-o", outpath])
     
     # except Exception as ex:
         # print("Exception : %s" %ex)

@@ -6,6 +6,7 @@ Create sets of C++ header config based on provided device
 
 import argparse
 import os
+import subprocess
 import sys
 
 
@@ -71,7 +72,8 @@ def create_db_source(device):
         schemafile = devicerootpath + "/config/DBTableSchema.json"
         if os.path.exists(schemafile):
             print("Generating DB table files for device %s" % device)
-            os.system('python3 CreateDBSourceFromJson.py --schema ' + schemafile)
+            scriptpath = os.path.join(os.path.dirname(os.path.abspath(__file__)), "CreateDBSourceFromJson.py")
+            subprocess.run([sys.executable, scriptpath, "--schema", schemafile])
         else:
             print("No schema file found for device %s" % device)
     else:
