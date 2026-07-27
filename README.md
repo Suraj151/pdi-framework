@@ -326,9 +326,26 @@ This writes [devices/DeviceSetup.h](devices/DeviceSetup.h) with `#define DEVICE_
    git clone https://github.com/Suraj151/pdi-framework.git
    cd pdi-framework
    ```
-   Linux/macOS: `~/Arduino/libraries/`. Windows: `%USERPROFILE%\AppData\Local\Arduino15\packages\<vendor>\hardware\<arch>\<ver>\libraries\` (cross-arch install) **or** `Documents\Arduino\libraries\` (per-user).
-3. (Optional) `python3 scripts/DeviceSetup.py -d <board>` if you need a non-ESP32 target.
+   Linux/macOS: `~/Arduino/libraries/`. 
+
+   Windows: `%USERPROFILE%\AppData\Local\Arduino15\packages\<vendor>\hardware\<arch>\<ver>\libraries\` (cross-arch install) **or** `Documents\Arduino\libraries\` (per-user). 
+3. (Optional) `python3 scripts/DeviceSetup.py -d <board>` if you need a non-ESP32 target. open terminal to the sketchbook location as shown in below image.
+
+   <table>
+     <tr>
+       <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/sketch-location-arduino.png" width="100%"></td>
+       <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/script-devicesetup-arduino.png" width="100%"></td>
+     </tr>
+   </table>
+
 4. Open the bundled example, select your board, compile, flash.
+
+   <table>
+     <tr>
+       <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/esp32-tool-arduino.png" width="100%"></td>
+       <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/open-example-arduino.png" width="100%"></td>
+     </tr>
+   </table>
 
 LittleFS is now vendored in-tree under [external/littlefs/](external/littlefs/) — no submodules to pull.
 
