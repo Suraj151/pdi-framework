@@ -308,8 +308,8 @@ Two paths — Library Manager (recommended) or manual git clone.
    <table>
      <tr>
        <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/library-install-arduino.png" width="100%"></td>
-     </tr>
        <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/open-example-arduino.png" width="100%"></td>
+     </tr>
    </table>
 
 That's it for ESP32. The library ships with placeholder DB-table headers and a [`__has_include("DeviceSetup.h")`](devices/DeviceConfig.h) guard in `devices/DeviceConfig.h` that falls back to ESP32 when no `DeviceSetup.h` is present, so a fresh Library Manager install builds out of the box for ESP32 with no extra steps.
