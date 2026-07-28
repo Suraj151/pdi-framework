@@ -305,6 +305,12 @@ Two paths — Library Manager (recommended) or manual git clone.
 1. **Install the device's Arduino board package** at the version above through the Boards Manager.
 2. **Install pdi-framework** from Tools → Manage Libraries → search for `pdi-framework`.
 3. **Open the bundled example** in the IDE: File → Examples → pdi-framework → PdiStack. Select an **ESP32** board, compile, flash.
+   <table>
+     <tr>
+       <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/library-install-arduino.png" width="100%"></td>
+     </tr>
+       <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/open-example-arduino.png" width="100%"></td>
+   </table>
 
 That's it for ESP32. The library ships with placeholder DB-table headers and a [`__has_include("DeviceSetup.h")`](devices/DeviceConfig.h) guard in `devices/DeviceConfig.h` that falls back to ESP32 when no `DeviceSetup.h` is present, so a fresh Library Manager install builds out of the box for ESP32 with no extra steps.
 
@@ -329,13 +335,6 @@ This writes [devices/DeviceSetup.h](devices/DeviceSetup.h) with `#define DEVICE_
    Linux/macOS: `~/Arduino/libraries/`. 
 
    Windows: `%USERPROFILE%\AppData\Local\Arduino15\packages\<vendor>\hardware\<arch>\<ver>\libraries\` (cross-arch install) **or** `Documents\Arduino\libraries\` (per-user). 
-
-   OR install from arduino library manager as showin in below image
-   <table>
-     <tr>
-       <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/library-install-arduino.png" width="100%"></td>
-     </tr>
-   </table>
 3. (Optional) `python3 scripts/DeviceSetup.py -d <board>` if you need a non-ESP32 target. open terminal to the sketchbook location as shown in below image.
 
    <table>
