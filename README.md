@@ -329,6 +329,13 @@ This writes [devices/DeviceSetup.h](devices/DeviceSetup.h) with `#define DEVICE_
    Linux/macOS: `~/Arduino/libraries/`. 
 
    Windows: `%USERPROFILE%\AppData\Local\Arduino15\packages\<vendor>\hardware\<arch>\<ver>\libraries\` (cross-arch install) **or** `Documents\Arduino\libraries\` (per-user). 
+
+   OR install from arduino library manager as showin in below image
+   <table>
+     <tr>
+       <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/library-install-arduino.png" width="100%"></td>
+     </tr>
+   </table>
 3. (Optional) `python3 scripts/DeviceSetup.py -d <board>` if you need a non-ESP32 target. open terminal to the sketchbook location as shown in below image.
 
    <table>
