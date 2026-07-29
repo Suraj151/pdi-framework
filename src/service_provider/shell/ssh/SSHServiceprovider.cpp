@@ -783,39 +783,27 @@ void LWSSH::SSHServer::handleChannelSubsystemRequest(pdiutil::vector<uint8_t>& d
     // Parse the exec request packet
     if (m_session->current_channel.subsystem_req.subsystem.find("sftp") == 0) {
 
-        int32_t payloadoffset = 0;
-        bool datahandled = false;
+        pdiutil::vector<uint8_t> &accum = m_session->current_channel.subsystem_req.sftp.rx_accum;
+        accum.insert(accum.end(), data.begin(), data.end());
 
-        do{
+        while (accum.size() >= 4) {
 
-            data.erase(data.begin(), data.begin() + payloadoffset);
-            payloadoffset = 0; // Reset offset for the next iteration
+            uint32_t packetlen = (accum[0] << 24) | (accum[1] << 16) | (accum[2] << 8) | accum[3];
 
-            if (payloadoffset + 4 > data.size()){
-
+            if (packetlen > SSH_SFTP_MAX_RX_PACKET) {
+                accum.clear();
                 m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
-                datahandled = true; // Data not handled, close session
-            }else{
-
-                int32_t packetlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
-                payloadoffset += 4;
-
-                if ( (payloadoffset + packetlen) > data.size() ){
-
-                    m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
-                    datahandled = true;
-                }else if( (payloadoffset + packetlen) < data.size() ){
-
-                    handleChannelSubsystemSftpRequest(data);
-                }else{
-
-                    handleChannelSubsystemSftpRequest(data);
-                    datahandled = true; // Data handled successfully
-                }
-
-                payloadoffset += packetlen; // Move the offset to the next packet
+                break;
             }
-        } while (!datahandled);            
+
+            if (accum.size() < (4 + packetlen)) {
+                break;
+            }
+
+            pdiutil::vector<uint8_t> onepacket(accum.begin(), accum.begin() + 4 + packetlen);
+            handleChannelSubsystemSftpRequest(onepacket);
+            accum.erase(accum.begin(), accum.begin() + 4 + packetlen);
+        }
     }
 }
 
