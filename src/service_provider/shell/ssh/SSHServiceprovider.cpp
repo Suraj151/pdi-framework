@@ -639,10 +639,35 @@ void LWSSH::SSHServer::handleChannelRequest(){
                         }else{
                             m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
                         }
+                    }else if (recvreqst.want_reply && recvreqst.request_type == "exec") {
+
+                        pdiutil::string execcmd;
+                        int32_t execoff = 0;
+                        read_ssh_string(recvreqst.request_specific_data, execcmd, execoff);
+
+                        bool isscp = (execcmd.find("scp") == 0);
+
+                        pdiutil::vector<uint8_t> reply;
+                        reply.push_back(isscp ? SSH2_MSG_CHANNEL_SUCCESS : SSH2_MSG_CHANNEL_FAILURE);
+                        reply.push_back((m_session->current_channel.client_channel_id >> 24) & 0xFF);
+                        reply.push_back((m_session->current_channel.client_channel_id >> 16) & 0xFF);
+                        reply.push_back((m_session->current_channel.client_channel_id >> 8) & 0xFF);
+                        reply.push_back(m_session->current_channel.client_channel_id & 0xFF);
+
+                        if(send_server_ssh_packet(m_session, reply, true)){
+
+                            if(isscp){
+                                pdiutil::string scperr = CHARPTR_WRAP("\x02legacy SCP not supported on this device, use sftp instead\n");
+                                // const char *scperr = "\x02legacy SCP not supported on this device, use sftp instead\n";
+                                send_channel_data(m_session, scperr.c_str(), scperr.length());
+                            }
+                            m_session->current_channel.ischannelreqsuccess = -1;
+                        }
+                        m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
                     }
                 }else{
                     m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
-                } 
+                }
             }else if(msg_type == SSH2_MSG_CHANNEL_DATA){
 
                 SSHChannelData chdata;
