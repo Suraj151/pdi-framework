@@ -1381,6 +1381,7 @@ Full breakdown lives in [§8. Web Server](#8-web-server) — it has its own rout
 | Source | [shell/ssh/SSHServiceprovider.{h,cpp}](src/service_provider/shell/ssh/SSHServiceprovider.h) (in `LWSSH` namespace) |
 | Depends on | `iTcpServerInterface`, `iFileSystemInterface`, crypto primitives ([src/utility/crypto/](src/utility/crypto/)), `__auth_service` |
 | Key algorithms | See `SSHKeyAlgorithm` enum in [SshConfig.h](src/config/SshConfig.h) — Ed25519 / Curve25519-based |
+| Transport crypto | `curve25519-sha256` key exchange, `ssh-ed25519` host key, `aes128-ctr` cipher, and a **negotiated MAC**: `hmac-sha2-256` (preferred) or `hmac-sha1`, Encrypt-and-MAC. The server advertises both in `prepare_server_kexinit` and selects the client's first supported choice (client preference, per RFC 4253) in `handleChannelRequest`, storing its length in `session->mac_len` (32 or 20) |
 | File transfer | SFTP subsystem implemented on top of the file system; supports interactive `sftp` (REALPATH, STAT, OPENDIR/READDIR, OPEN/READ/WRITE, MKDIR/RMDIR, REMOVE, RENAME, FSTAT; SETSTAT is no-op; READLINK/SYMLINK report unsupported) and SCP via `scp -s` (see [§7.9 SFTP / SCP file transfer](#79-sftp--scp-file-transfer)) |
 | Cost | **Highest of any service** — keys, hash, symmetric AES, large per-session buffers |
 
@@ -3294,7 +3295,7 @@ Most of these have appeared in passing in earlier sections. This section is the 
 | **Safe alloc** | `SafeAlloc.{h,cpp}` | Heap-checked `pdiutil::safe_new<T>(args...)` / `safe_new_array<T>(n)` + `safe_delete` / `safe_delete_array` (null-safe). Refuses allocations that would breach `PDI_SAFE_ALLOC_HEAP_MARGIN` (default 2 KB headroom). Used by the TLS path to bail cleanly on tight heap |
 | **Queue / RingBuf / Proto** | `queue/queue.{h,cpp}`, `queue/ringbuf.{h,cpp}`, `queue/proto.{h,cpp}` | Byte queues and a length-prefixed parser |
 | **Utility umbrella** | `Utility.{h,cpp}` | Single `#include <utility/Utility.h>` that pulls the lot in (conditional on `ENABLE_*`) |
-| **Crypto** | `crypto/` | SHA-1/256/512, HMAC-SHA1, AES (ECB/CBC/CTR), Curve25519, Ed25519 |
+| **Crypto** | `crypto/` | SHA-1/256/512, HMAC-SHA1/256, AES (ECB/CBC/CTR), Curve25519, Ed25519 |
 | **PdiSTL** | `pdistl/` | A trimmed C++ standard library subset for memory-constrained devices |
 | **Fiber** | `fiber/` | Reserved namespace, currently empty |
 
@@ -3342,6 +3343,7 @@ The framework ships a minimal but production-quality crypto kit. Everything is p
 | SHA-256 | [hash/sha256.h](src/utility/crypto/hash/sha256.h) | `sha256_init/update/final`, one-shot `sha256(msg, len, out)` |
 | SHA-512 | [hash/sha512.h](src/utility/crypto/hash/sha512.h) | `sha512_init/update/final`, one-shot `sha512(msg, len, out)` |
 | HMAC-SHA1 | [hmac/hmac_sha1.h](src/utility/crypto/hmac/hmac_sha1.h) | One-shot `hmac_sha1(key, klen, data, dlen, out)` |
+| HMAC-SHA256 | [hmac/hmac_sha256.h](src/utility/crypto/hmac/hmac_sha256.h) | One-shot `hmac_sha256(key, klen, data, dlen, out)` |
 
 #### Symmetric
 
