@@ -209,8 +209,9 @@ struct LWSSHSession {
     uint8_t derived_iv_stoc[16];      // 'B' key type Derived IV for server-to-client
     uint8_t derived_enc_key_ctos[16]; // 'C' key type Derived encryption key for client-to-server
     uint8_t derived_enc_key_stoc[16]; // 'D' key type Derived encryption key for server-to-client
-    uint8_t derived_mac_key_ctos[20]; // 'E' key type Derived MAC key for client-to-server
-    uint8_t derived_mac_key_stoc[20]; // 'F' key type Derived MAC key for server-to-client
+    uint8_t derived_mac_key_ctos[32]; // 'E' key type Derived MAC key for client-to-server
+    uint8_t derived_mac_key_stoc[32]; // 'F' key type Derived MAC key for server-to-client
+    uint8_t mac_len = 20; // Negotiated MAC length in bytes (20 hmac-sha1, 32 hmac-sha2-256)
 
     AES_ctx aes_ctx_ctos; // AES context for client-to-server encryption
     AES_ctx aes_ctx_stoc; // AES context for server-to-client encryption

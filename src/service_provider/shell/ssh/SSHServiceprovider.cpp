@@ -326,8 +326,18 @@ void SSHServer::handleKeyExchange(){
                 // Handle key exchange initialization
                 SSHKexInitFields kex_init_fields;
                 if(parse_kex_init_fields(m_session->m_sshpacket.payload, kex_init_fields)){
-                    // Successfully parsed key exchange initialization fields
-                    m_session->m_state = LWSSHSession::SESSION_STATE_KEX_INIT_SEND;
+
+                    m_session->mac_len = 0;
+                    for (size_t i = 0; i < kex_init_fields.mac_algorithms_ctos.size(); ++i) {
+                        if (kex_init_fields.mac_algorithms_ctos[i] == "hmac-sha2-256") { m_session->mac_len = 32; break; }
+                        if (kex_init_fields.mac_algorithms_ctos[i] == "hmac-sha1") { m_session->mac_len = 20; break; }
+                    }
+
+                    if (m_session->mac_len == 0) {
+                        m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+                    } else {
+                        m_session->m_state = LWSSHSession::SESSION_STATE_KEX_INIT_SEND;
+                    }
                 }else{
                     m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
                 }

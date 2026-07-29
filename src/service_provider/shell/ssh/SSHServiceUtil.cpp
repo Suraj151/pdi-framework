@@ -17,9 +17,18 @@ created Date    : 6th Apr 2025
 #include <utility/crypto/asymmetric/curve25519/curve25519.h>
 #include <utility/crypto/hash/sha256.h>
 #include <utility/crypto/hmac/hmac_sha1.h>
+#include <utility/crypto/hmac/hmac_sha256.h>
 #include <utility/crypto/asymmetric/ed25519/ed25519.h>
 
 using namespace LWSSH;
+
+static void compute_ssh_mac(uint8_t mac_len, const uint8_t *key, const uint8_t *data, uint32_t data_len, uint8_t *out){
+    if (mac_len == 32) {
+        hmac_sha256(key, mac_len, data, data_len, out);
+    } else {
+        hmac_sha1(key, mac_len, data, data_len, out);
+    }
+}
 
 
 /**
@@ -81,8 +90,8 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
         return -1; // No active session or client
     }
     
-    // check whether it has minimum length as per hmac-sha1 MAC + payload
-    if (session->m_client->available() < (4 + 20)) {
+    // check whether it has minimum length as per negotiated MAC + payload
+    if (session->m_client->available() < (4 + session->mac_len)) {
         return 1; // Not enough data available for a valid packet
     }
 
@@ -127,7 +136,7 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
             // read next chunk of data. max 512 bytes
             for (uint32_t i = 0; i < 512 && 0 < session->m_client->available(); ++i) {
 
-                if( _totalBytesRead < (packet_length + 20) ){
+                if( _totalBytesRead < (packet_length + session->mac_len) ){
 
                     packetvec.push_back(session->m_client->read());
                     __i_dvc_ctrl.yield();
@@ -135,10 +144,10 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
                 }
             }
 
-            islastchunk = _totalBytesRead == (packet_length + 20);
+            islastchunk = _totalBytesRead == (packet_length + session->mac_len);
 
-            uint32_t bytes_remaining = (packet_length + 20) - _totalBytesRead;
-            if( bytes_remaining > 0 && bytes_remaining <= (padding_length + 20) ){
+            uint32_t bytes_remaining = (packet_length + session->mac_len) - _totalBytesRead;
+            if( bytes_remaining > 0 && bytes_remaining <= (padding_length + session->mac_len) ){
                 __i_dvc_ctrl.yield();
                 continue;
             }
@@ -147,8 +156,8 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
             if( islastchunk ){
 
                 // seperate out MAC data
-                pdiutil::vector<uint8_t> recv_mac(20);
-                for (int32_t i = 20; i > 0; i--) {
+                pdiutil::vector<uint8_t> recv_mac(session->mac_len);
+                for (int32_t i = session->mac_len; i > 0; i--) {
                     recv_mac[i-1] = packetvec.back();
                     packetvec.pop_back();
                 }
@@ -168,8 +177,8 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
                 _mac_input.insert(_mac_input.end(), _packetseqbuf, _packetseqbuf + 4);
                 _mac_input.insert(_mac_input.end(), packetvec.begin(), packetvec.end());
 
-                uint8_t _computed_mac[20];
-                hmac_sha1(session->derived_mac_key_ctos, 20, _mac_input.data(), _mac_input.size(), _computed_mac);
+                uint8_t _computed_mac[32];
+                compute_ssh_mac(session->mac_len, session->derived_mac_key_ctos, _mac_input.data(), _mac_input.size(), _computed_mac);
 
                 // Intentionally considering MAC verification succeeded. 
                 // as we are unable to provide big bolus data to MAC calculation
@@ -248,15 +257,15 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
         return 1; // Bolus chunks handled, no need to parse further
     }
 
-    // take next packet_len bytes + 20 byte MAC part to form complete packet
-    for (uint32_t i = 0; session->m_client->available() && i < packet_length + 20; ++i) {
+    // take next packet_len bytes + MAC part to form complete packet
+    for (uint32_t i = 0; session->m_client->available() && i < packet_length + session->mac_len; ++i) {
         packetvec.push_back(session->m_client->read());
         __i_dvc_ctrl.yield();
     }
 
     // seperate out MAC data
-    pdiutil::vector<uint8_t> recv_mac(20);
-    for (int32_t i = 20; i > 0; i--) {
+    pdiutil::vector<uint8_t> recv_mac(session->mac_len);
+    for (int32_t i = session->mac_len; i > 0; i--) {
         recv_mac[i-1] = packetvec.back();
         packetvec.pop_back();
     }
@@ -276,10 +285,10 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
     mac_input.insert(mac_input.end(), packetseqbuf, packetseqbuf + 4);
     mac_input.insert(mac_input.end(), packetvec.begin(), packetvec.end());
 
-    uint8_t computed_mac[20];
-    hmac_sha1(session->derived_mac_key_ctos, 20, mac_input.data(), mac_input.size(), computed_mac);
+    uint8_t computed_mac[32];
+    compute_ssh_mac(session->mac_len, session->derived_mac_key_ctos, mac_input.data(), mac_input.size(), computed_mac);
 
-    if (memcmp(recv_mac.data(), computed_mac, 20) != 0) {
+    if (memcmp(recv_mac.data(), computed_mac, session->mac_len) != 0) {
         // MAC verification failed
         return -1;
     }else{
@@ -412,7 +421,7 @@ void LWSSH::prepare_server_kexinit(pdiutil::vector<uint8_t> &payload){
     ssh_name_list kex_algorithms; kex_algorithms.push_back(CHARPTR_WRAP("curve25519-sha256"));
     ssh_name_list server_host_key_algorithms; server_host_key_algorithms.push_back(CHARPTR_WRAP("ssh-ed25519"));
     ssh_name_list encryption_algorithms; encryption_algorithms.push_back(CHARPTR_WRAP("aes128-ctr"));
-    ssh_name_list mac_algorithms; mac_algorithms.push_back(CHARPTR_WRAP("hmac-sha1"));
+    ssh_name_list mac_algorithms; mac_algorithms.push_back(CHARPTR_WRAP("hmac-sha2-256")); mac_algorithms.push_back(CHARPTR_WRAP("hmac-sha1"));
     ssh_name_list compression_algorithms; compression_algorithms.push_back(CHARPTR_WRAP("none"));
     ssh_name_list languages; // empty
 
@@ -453,8 +462,8 @@ void LWSSH::encrypt_ssh_payload(LWSSHSession* session, pdiutil::vector<uint8_t> 
     // put packetseqbuf in payload at front. (packet sequence || ssh packet)
     payload.insert(payload.begin(), packetseqbuf, packetseqbuf + sizeof(packetseqbuf));
 
-    uint8_t computed_mac[20];
-    hmac_sha1(session->derived_mac_key_stoc, sizeof(computed_mac), payload.data(), payload.size(), computed_mac);
+    uint8_t computed_mac[32];
+    compute_ssh_mac(session->mac_len, session->derived_mac_key_stoc, payload.data(), payload.size(), computed_mac);
 
     // remove packetseqbuf in payload from front. packet sequence can not be sent over wire
     payload.erase(payload.begin(), payload.begin() + sizeof(packetseqbuf));
@@ -463,7 +472,7 @@ void LWSSH::encrypt_ssh_payload(LWSSHSession* session, pdiutil::vector<uint8_t> 
     AES_CTR_xcrypt_buffer(&session->aes_ctx_stoc, payload.data(), payload.size());
 
     // Append MAC to encrypted packet
-    payload.insert(payload.end(), computed_mac, computed_mac + sizeof(computed_mac));
+    payload.insert(payload.end(), computed_mac, computed_mac + session->mac_len);
 }
 
 /**
