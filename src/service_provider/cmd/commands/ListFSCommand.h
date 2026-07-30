@@ -107,21 +107,15 @@ struct ListFSCommand : public CommandBase {
 			uint8_t cachedCount = 0;
 #endif
 
+			const char rwx[3] = { 'r', 'w', 'x' };
 			for (file_info_t item : itemlist) {
-				if( item.m_type == FILE_TYPE_DIR ){
-					m_terminal->write_ro(RODT_ATTR("D "));
-				}else {
-					m_terminal->write_ro(RODT_ATTR("F "));
+				char permbuf[12];
+				permbuf[0] = (item.m_type == FILE_TYPE_DIR) ? 'd' : '-';
+				for (int b = 0; b < 9; b++) {
+					permbuf[1 + b] = (item.m_perms & (1 << (8 - b))) ? rwx[b % 3] : '-';
 				}
-
-				// Permissions as 4 octal digits (chmod style), e.g. 0644 / 0755.
-				char permbuf[6];
-				permbuf[0] = '0' + ((item.m_perms >> 9) & 7);
-				permbuf[1] = '0' + ((item.m_perms >> 6) & 7);
-				permbuf[2] = '0' + ((item.m_perms >> 3) & 7);
-				permbuf[3] = '0' + (item.m_perms & 7);
-				permbuf[4] = ' ';
-				permbuf[5] = '\0';
+				permbuf[10] = ' ';
+				permbuf[11] = '\0';
 				m_terminal->write(permbuf);
 
 				char fallbackId[8];
@@ -178,17 +172,12 @@ struct ListFSCommand : public CommandBase {
 				m_terminal->write_pad(fallbackId, 6);
 #endif
 
-				char tsbuf[16];
+				char sizebuf[12];
+				Uint32ToString((uint32_t)item.m_size, sizebuf, sizeof(sizebuf) - 1, 10);
+				m_terminal->write_pad(sizebuf, 10);
+				m_terminal->write(' ');
 
-				// // Ctime column, ls-style: shift UTC by TZ then pick fmt by year.
-				// uint32_t ctimeLocal = item.m_ctime ? item.m_ctime + (uint32_t)TZ_SEC : 0;
-				// char cYear[5];
-				// EpochToDateTimeString(ctimeLocal, cYear, sizeof(cYear), "%Y");
-				// const char* cfmt = __are_arrays_equal(cYear, nowYear, 4)
-				// 	? "%b %d %H:%M" : "%b %d  %Y";
-				// EpochToDateTimeString(ctimeLocal, tsbuf, sizeof(tsbuf), cfmt);
-				// m_terminal->write(tsbuf);
-				// m_terminal->write(' ');
+				char tsbuf[16];
 
 				// Mtime column, ls-style: shift UTC by TZ then pick fmt by year.
 				uint32_t mtimeLocal = item.m_mtime ? item.m_mtime + (uint32_t)TZ_SEC : 0;
@@ -198,11 +187,6 @@ struct ListFSCommand : public CommandBase {
 					? "%b %d %H:%M" : "%b %d  %Y";
 				EpochToDateTimeString(mtimeLocal, tsbuf, sizeof(tsbuf), mfmt);
 				m_terminal->write(tsbuf);
-				m_terminal->write(' ');
-
-				char sizebuf[12];
-				Uint32ToString((uint32_t)item.m_size, sizebuf, sizeof(sizebuf) - 1, 10);
-				m_terminal->write(sizebuf);
 				m_terminal->write(' ');
 
 				m_terminal->writeln(item.m_name);

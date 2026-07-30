@@ -68,6 +68,11 @@ struct SSHSubsystemRequest {
             pdiutil::string name;
             uint64_t size = 0;
             bool is_dir = false;
+            uint16_t uid = 0;
+            uint16_t gid = 0;
+            uint16_t perms = 0;
+            uint32_t ctime = 0;
+            uint32_t mtime = 0;
         };
         bool is_dir = false;
         uint32_t readdir_offset = 0;

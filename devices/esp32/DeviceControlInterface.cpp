@@ -25,6 +25,10 @@ created Date    : 1st Jan 2024
 #include <Update.h>
 #include <esp_timer.h>
 
+#ifdef ENABLE_PROGRAM_EXEC
+#include "cmd/ElfLoadCommand.h"
+#endif
+
 /**
  * DeviceControlInterface constructor.
  */
@@ -471,6 +475,10 @@ void DeviceControlInterface::releaseGpioBlinkerInstance(iGpioBlinkerInterface *i
 void DeviceControlInterface::initDeviceSpecificFeatures()
 {
     __i_ping.init_ping( &__i_wifi );
+
+    #ifdef ENABLE_PROGRAM_EXEC
+    ElfLoadCommand::RegisterCommand();
+    #endif
 
     #ifdef ENABLE_EXCEPTION_NOTIFIER
     beginCrashHandler();

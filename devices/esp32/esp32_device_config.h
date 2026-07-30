@@ -83,6 +83,7 @@ extern portMUX_TYPE __pdi_critical_mux;
 #define DEVICE_SUPPORTS_TLS
 #define DEVICE_SUPPORTS_CONTEXTUAL_EXECUTION
 #define DEVICE_SUPPORTS_TLS_CERT_GENERATION
+#define DEVICE_SUPPORTS_PROGRAM_EXEC
 
 /**
  * enable/disable ota upgrade strategies

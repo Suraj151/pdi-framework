@@ -470,8 +470,9 @@ typedef enum TaskState task_state_t;
 
 /**
  * POSIX-style signal numbers delivered to tasks via TaskScheduler::sendSignal.
- * Only SIG_KILL and SIG_TERM are honored today (both reap the task); SIG_STOP /
- * SIG_CONT / SIG_HUP reserved for future steps.
+ * SIG_KILL / SIG_TERM reap the task. SIG_STOP / SIG_CONT suspend and resume it
+ * (inline tasks are skipped by the scheduler; preemptive tasks are suspended and
+ * resumed at the thread level). SIG_HUP is reserved.
  */
 enum Signal : uint8_t {
     SIG_NONE = 0,
@@ -501,6 +502,8 @@ struct task_t {
     uint32_t m_run_count;                       ///< Times the callback has fired
     uint64_t m_total_exec_us;                   ///< Cumulative execution time (µs) since registration
     uint8_t m_pending_sig;                      ///< Pending signal number to consume on next tick (SIG_NONE = idle)
+    bool m_stoppable;                           ///< false = ignore SIG_STOP / SIG_CONT (e.g. exec'd programs)
+    CallBackVoidArgFn m_finalizer;              ///< Teardown hook run once when the task is reaped (natural exit or kill)
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
     iExecutive* m_task_exec = nullptr;          ///< Task executive
     #endif
@@ -526,6 +529,8 @@ struct task_t {
         m_run_count = 0;
         m_total_exec_us = 0;
         m_pending_sig = SIG_NONE;
+        m_stoppable = true;
+        m_finalizer = nullptr;
         // #ifdef ENABLE_CONTEXTUAL_EXECUTION
         // if(m_task_exec != nullptr){
         //     delete m_task_exec;
@@ -553,6 +558,8 @@ struct task_t {
         m_run_count = t.m_run_count;
         m_total_exec_us = t.m_total_exec_us;
         m_pending_sig = t.m_pending_sig;
+        m_stoppable = t.m_stoppable;
+        m_finalizer = t.m_finalizer;
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
         m_task_exec = t.m_task_exec;
         #endif
@@ -580,6 +587,8 @@ struct task_t {
             m_run_count = t.m_run_count;
             m_total_exec_us = t.m_total_exec_us;
             m_pending_sig = t.m_pending_sig;
+            m_stoppable = t.m_stoppable;
+            m_finalizer = t.m_finalizer;
             #ifdef ENABLE_CONTEXTUAL_EXECUTION
             m_task_exec = t.m_task_exec;
             #endif

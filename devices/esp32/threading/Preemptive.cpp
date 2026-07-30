@@ -16,10 +16,12 @@ static void preemptive_trampoline(void *arg) {
     Preemptive* f = static_cast<Preemptive*>(arg);
 
     if (f){
+        f->state = PreemptiveState::Running;
         f->entry(f->arg);
-        if (f->state == PreemptiveState::Running) {
-            f->state = PreemptiveState::Finished;
-        }
+        CRITICAL_SECTION_ENTER
+        f->handle = nullptr;
+        f->state = PreemptiveState::Finished;
+        CRITICAL_SECTION_EXIT
     }
 
     vTaskDelete(NULL);
@@ -45,25 +47,25 @@ PreemptiveScheduler::~PreemptiveScheduler(){
 
 int PreemptiveScheduler::schedule_task(task_t* task, uint32_t stacksize){
 
-    if(task->_task_mode != TASK_MODE_PREEMPTIVE) return -1;
+    if(task->m_task_mode != TASK_MODE_PREEMPTIVE) return -1;
     Preemptive* f = pdiutil::safe_new<Preemptive>();
     if (!f) return -2;
-    task->_task_exec = f;
+    task->m_task_exec = f;
 
     f->stack      = nullptr;
     f->stack_size = stacksize;
     f->state      = PreemptiveState::Ready;
-    f->task_id    = task->_task_id;
+    f->task_id    = task->m_task_id;
     f->arg        = static_cast<void*>(f);
     f->entry      = [](void* arg){
         Preemptive* f = static_cast<Preemptive*>(arg);
         if(f){
             task_t* t = __task_scheduler.get_task(f->task_id);
-            if(t && t->_task) t->_task();
+            if(t && t->m_task) t->m_task();
         }
     };
 
-    UBaseType_t prio = (UBaseType_t)task->_task_priority + tskIDLE_PRIORITY + 1;
+    UBaseType_t prio = (UBaseType_t)task->m_task_priority + tskIDLE_PRIORITY + 1;
     if (prio >= configMAX_PRIORITIES) prio = configMAX_PRIORITIES - 1;
 
     BaseType_t ok = xTaskCreatePinnedToCore(
@@ -78,7 +80,7 @@ int PreemptiveScheduler::schedule_task(task_t* task, uint32_t stacksize){
 
     if (ok != pdPASS) {
         pdiutil::safe_delete(f);
-        task->_task_exec = nullptr;
+        task->m_task_exec = nullptr;
         return -3;
     }
 
@@ -96,6 +98,37 @@ Preemptive* PreemptiveScheduler::current_from_handle(TaskHandle_t h){
         if (f && f->handle == h) return f;
     }
     return nullptr;
+}
+
+void Preemptive::suspend(){
+    if (handle && state != PreemptiveState::Mute && state != PreemptiveState::Finished) {
+        state = PreemptiveState::Mute;
+        vTaskSuspend(handle);
+    }
+}
+
+void Preemptive::resume(){
+    if (handle && state == PreemptiveState::Mute) {
+        state = PreemptiveState::Running;
+        vTaskResume(handle);
+    }
+}
+
+void Preemptive::terminate(){
+    if (handle) {
+        TaskHandle_t h = handle;
+        handle = nullptr;
+        vTaskDelete(h);
+    }
+    state = PreemptiveState::Finished;
+}
+
+bool Preemptive::is_finished(){
+    return state == PreemptiveState::Finished;
+}
+
+void Preemptive::reap(){
+    __i_preemptive_scheduler.destroy_preemptive(this);
 }
 
 void PreemptiveScheduler::mute(){

@@ -21,6 +21,12 @@ public:
     virtual ~Cooperative();
 
     XtensaContext ctx;
+
+    void suspend() override;
+    void resume() override;
+    void terminate() override;
+    bool is_finished() override;
+    void reap() override;
 };
 
 // Cooperative(fiber) scheduler

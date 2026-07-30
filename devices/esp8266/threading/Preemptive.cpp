@@ -112,11 +112,11 @@ PreemptiveScheduler::~PreemptiveScheduler(){
 int PreemptiveScheduler::schedule_task(task_t* task, uint32_t stacksize){
 
     // Init new Preemptive
-    // if(task->_task_exec) { delete task->_task_exec; }
-    if(task->_task_mode != TASK_MODE_PREEMPTIVE) return -1;
+    // if(task->m_task_exec) { delete task->m_task_exec; }
+    if(task->m_task_mode != TASK_MODE_PREEMPTIVE) return -1;
     Preemptive* f = pdiutil::safe_new<Preemptive>();
     if (!f) return -2;
-    task->_task_exec = f;
+    task->m_task_exec = f;
 
     // Allocate with padding to guarantee a 16-byte aligned top-of-stack
     const uint32_t raw_bytes = stacksize + 64;
@@ -124,7 +124,7 @@ int PreemptiveScheduler::schedule_task(task_t* task, uint32_t stacksize){
     f->stack_raw = pdiutil::safe_new_array<uint8_t>(raw_bytes);
     if (!f->stack_raw) {
         pdiutil::safe_delete(f);
-        task->_task_exec = nullptr;
+        task->m_task_exec = nullptr;
         return -2;
     }
     memset(f->stack_raw, 0, raw_bytes);
@@ -144,11 +144,11 @@ int PreemptiveScheduler::schedule_task(task_t* task, uint32_t stacksize){
         if(f){
             // Serial.printf("[preemptive_entry_task] preemptive=%p\n", f);
             task_t* t = __task_scheduler.get_task(f->task_id);
-            if(t && t->_task) t->_task();
+            if(t && t->m_task) t->m_task();
         }
     };
     f->arg = static_cast<void*>(f);
-    f->task_id = task->_task_id;
+    f->task_id = task->m_task_id;
 
     // Initialize context for first restore
     // a1 (SP), sp mirror
@@ -479,7 +479,7 @@ Preemptive* PreemptiveScheduler::pick_next_ready() {
         int32_t p = 0; // default priority
         task_t* t = __task_scheduler.get_task(f->task_id);
 
-        if(t) p = t->_task_priority;
+        if(t) p = t->m_task_priority;
         if (!t && f != nonpreemptive) {
             // todo: think on this dangling pointer ?
             continue;
@@ -553,6 +553,38 @@ bool PreemptiveScheduler::is_task_context() const {
     // callbacks fire while `current` is a different preemptive task on its
     // own stack (the most common deadlock we've observed).
     return false;
+}
+
+void Preemptive::suspend(){
+    if (state == PreemptiveState::Mute) return;
+    CRITICAL_SECTION_ENTER
+    __i_preemptive_scheduler.remove_from_ready(this);
+    __i_preemptive_scheduler.remove_from_sleepers(this);
+    state = PreemptiveState::Mute;
+    CRITICAL_SECTION_EXIT
+}
+
+void Preemptive::resume(){
+    if (state != PreemptiveState::Mute) return;
+    CRITICAL_SECTION_ENTER
+    __i_preemptive_scheduler.add_to_ready(this);
+    CRITICAL_SECTION_EXIT
+}
+
+void Preemptive::terminate(){
+    CRITICAL_SECTION_ENTER
+    __i_preemptive_scheduler.remove_from_ready(this);
+    __i_preemptive_scheduler.remove_from_sleepers(this);
+    state = PreemptiveState::Finished;
+    CRITICAL_SECTION_EXIT
+}
+
+bool Preemptive::is_finished(){
+    return state == PreemptiveState::Finished;
+}
+
+void Preemptive::reap(){
+    __i_preemptive_scheduler.destroy_preemptive(this);
 }
 
 PreemptiveScheduler __i_preemptive_scheduler;

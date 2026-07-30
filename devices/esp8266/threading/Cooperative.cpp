@@ -64,11 +64,11 @@ CooperativeScheduler::~CooperativeScheduler(){
 int CooperativeScheduler::schedule_task(task_t* task, uint32_t stacksize){
 
     // Init new Cooperative
-    // if(task->_task_exec) { delete task->_task_exec; }
-    if(task->_task_mode != TASK_MODE_COOPERATIVE) return -1;
+    // if(task->m_task_exec) { delete task->m_task_exec; }
+    if(task->m_task_mode != TASK_MODE_COOPERATIVE) return -1;
     Cooperative* f = pdiutil::safe_new<Cooperative>();
     if (!f) return -2;
-    task->_task_exec = f;
+    task->m_task_exec = f;
 
     // Allocate with padding to guarantee a 16-byte aligned top-of-stack
     const uint32_t raw_bytes = stacksize + 64;
@@ -76,7 +76,7 @@ int CooperativeScheduler::schedule_task(task_t* task, uint32_t stacksize){
     f->stack_raw = pdiutil::safe_new_array<uint8_t>(raw_bytes);
     if (!f->stack_raw) {
         pdiutil::safe_delete(f);
-        task->_task_exec = nullptr;
+        task->m_task_exec = nullptr;
         return -2;
     }
     memset(f->stack_raw, 0, raw_bytes);
@@ -96,11 +96,11 @@ int CooperativeScheduler::schedule_task(task_t* task, uint32_t stacksize){
         if(f){
             // Serial.printf("[cooperative_entry_task] cooperative=%p\n", f);
             task_t* t = __task_scheduler.get_task(f->task_id);
-            if(t && t->_task) t->_task();
+            if(t && t->m_task) t->m_task();
         }
     };
     f->arg = static_cast<void*>(f);
-    f->task_id = task->_task_id;
+    f->task_id = task->m_task_id;
 
     // Initialize context for first restore
     // a1 (SP), sp mirror
@@ -336,7 +336,7 @@ Cooperative* CooperativeScheduler::pick_next_ready() {
         if (!t) continue;
 
         // Aging: score(effective priority) = base_priority + wait_ticks
-        int32_t score = t->_task_priority + f->wait_ticks;
+        int32_t score = t->m_task_priority + f->wait_ticks;
 
         if (score > bestScore) {
             bestScore = score;
@@ -400,6 +400,38 @@ void CooperativeScheduler::sleep_from_othersched(uint32_t ms) {
     __base_ctx_saved = false;
 
     othersched_active = false;
+}
+
+void Cooperative::suspend(){
+    if (state == CooperativeState::Mute) return;
+    CRITICAL_SECTION_ENTER
+    __i_cooperative_scheduler.remove_from_ready(this);
+    __i_cooperative_scheduler.remove_from_sleepers(this);
+    state = CooperativeState::Mute;
+    CRITICAL_SECTION_EXIT
+}
+
+void Cooperative::resume(){
+    if (state != CooperativeState::Mute) return;
+    CRITICAL_SECTION_ENTER
+    __i_cooperative_scheduler.add_to_ready(this);
+    CRITICAL_SECTION_EXIT
+}
+
+void Cooperative::terminate(){
+    CRITICAL_SECTION_ENTER
+    __i_cooperative_scheduler.remove_from_ready(this);
+    __i_cooperative_scheduler.remove_from_sleepers(this);
+    state = CooperativeState::Finished;
+    CRITICAL_SECTION_EXIT
+}
+
+bool Cooperative::is_finished(){
+    return state == CooperativeState::Finished;
+}
+
+void Cooperative::reap(){
+    __i_cooperative_scheduler.destroy_cooperative(this);
 }
 
 CooperativeScheduler __i_cooperative_scheduler;

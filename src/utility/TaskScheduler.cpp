@@ -389,7 +389,44 @@ void TaskScheduler::handle_tasks()
         auto &_task = this->m_tasks[_priority_indices[i]];
 
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        if( _task.m_task_mode != TASK_MODE_INLINE ) continue;
+        if( _task.m_task_mode != TASK_MODE_INLINE ){
+
+            if( nullptr != _task.m_task_exec ){
+
+                iExecutive *_exec = _task.m_task_exec;
+
+                if( _task.m_pending_sig != SIG_NONE ){
+                    uint8_t sig = _task.m_pending_sig;
+                    CRITICAL_SECTION_ENTER
+                    _task.m_pending_sig = SIG_NONE;
+                    CRITICAL_SECTION_EXIT
+                    if( sig == SIG_STOP ){
+                        if( _task.m_stoppable ){
+                            _exec->suspend();
+                            _task.m_state = TASK_STATE_STOPPED;
+                        }
+                    } else if( sig == SIG_CONT ){
+                        if( _task.m_stoppable ){
+                            _exec->resume();
+                            if( _task.m_state == TASK_STATE_STOPPED ) _task.m_state = TASK_STATE_SLEEPING;
+                        }
+                    } else if( sig == SIG_KILL || sig == SIG_TERM ){
+                        _exec->terminate();
+                    }
+                }
+
+                if( _exec->is_finished() ){
+                    _exec->reap();
+                    if( _task.m_finalizer ){
+                        CallBackVoidArgFn _fin = _task.m_finalizer;
+                        _task.m_finalizer = nullptr;
+                        _fin();
+                    }
+                }
+            }
+
+            continue;
+        }
         #endif
 
         // --- Consume pending signal (arrives from sendSignal/sendSignalByName)
@@ -540,6 +577,9 @@ bool TaskScheduler::remove_task(pdiutil::task_id_t _id)
             this->m_tasks[i].m_max_attempts = 0;
             this->m_tasks[i].m_task = nullptr;
             this->m_tasks[i].m_state = TASK_STATE_ZOMBIE;
+            #ifdef ENABLE_CONTEXTUAL_EXECUTION
+            this->m_tasks[i].m_task_exec = nullptr;
+            #endif
             CRITICAL_SECTION_EXIT
             _removed = true;
         }

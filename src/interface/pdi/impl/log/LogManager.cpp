@@ -109,6 +109,29 @@ void LogManager::log(logger_type_t log_type, const char *format, ...)
 
 #ifdef ENABLE_SYSLOG_SERVICE
 
+static inline bool isConsoleLogEnabled(logger_type_t log_type)
+{
+#if defined(ENABLE_CONSOLE_LOG_ALL)
+  (void)log_type;
+  return true;
+#else
+#if defined(ENABLE_CONSOLE_LOG_INFO)
+  if (INFO_LOG == log_type) return true;
+#endif
+#if defined(ENABLE_CONSOLE_LOG_ERROR)
+  if (ERROR_LOG == log_type) return true;
+#endif
+#if defined(ENABLE_CONSOLE_LOG_WARNING)
+  if (WARNING_LOG == log_type) return true;
+#endif
+#if defined(ENABLE_CONSOLE_LOG_SUCCESS)
+  if (SUCCESS_LOG == log_type) return true;
+#endif
+  (void)log_type;
+  return false;
+#endif
+}
+
 void LogManager::syslog(logger_type_t log_type, const char *format, ...)
 {
   // RO/PROGMEM format -> dynamic RAM (auto-freed) -> owned string
@@ -123,7 +146,7 @@ void LogManager::syslog(logger_type_t log_type, const char *format, ...)
 
   uint16_t len = (n >= SYSLOG_LINE_MAX) ? (uint16_t)(SYSLOG_LINE_MAX - 1) : (uint16_t)n;
 
-  if (nullptr != m_io)
+  if (nullptr != m_io && isConsoleLogEnabled(log_type))
   {
     m_io->write(line);   // console (via the held io terminal)
   }

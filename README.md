@@ -12,6 +12,7 @@ PDI is a modular C++ stack for embedded devices. Application code is written onc
 - **Bundled services.** WiFi captive portal, HTTP/HTTPS web portal, MQTT client, OTA updates, SSH server, Telnet server, SFTP subsystem, SMTP client, GPIO control (local + MQTT/HTTP), NVM database, TLS (BearSSL / mbedTLS), ESPNOW mesh, Auth, Device-IoT.
 - **Compile-time feature gating.** Each capability is wrapped in an `ENABLE_*` flag; disabled features contribute zero flash.
 - **Configurable task scheduler.** Inline, cooperative, and preemptive modes; priority-and-policy scheduling; POSIX nice; per-task signals (KILL/TERM/STOP/CONT) with `ps`/`top`/`kill`/`pkill`/`killall`/`renice`.
+- **Dynamic program execution (esp32).** `elfload <path>` loads an external relocatable ELF app from the filesystem and launches it as a **background** preemptive task — returns immediately with a pid, managed via `ps` / `kill`. `dlopen`-style, no reflash. See [§7.13](#713-dynamic-app-loading-esp32).
 - **Service supervisor (systemd-lite).** `srvc list / status / start / stop / restart` — every service tracks its scheduler tasks and can be paused or resumed at runtime.
 - **Virtual filesystem (VFS).** Multiple backends mounted under one tree with longest-prefix routing; POSIX-style permissions, ownership, and per-session umask enforced at the VFS layer; multi-user aware (`/etc/passwd` + `/etc/shadow`), with networking config files (`/etc/hosts` for name overrides, `/etc/hostname` written with the device's mDNS name). Includes a read-only `/proc` with live system nodes, a read/write `/sys` exposing GPIO as files (`echo 1 > /sys/class/gpio/5/value`), a `/dev` with byte-stream nodes (`/dev/null`, `/dev/zero`, `/dev/random`), and a RAM-backed `/tmp` scratch filesystem.
 - **Linux-style CLI on serial / Telnet / SSH.** `ls`, `cat`, `echo`, `grep`, `head`, `tail`, `wc`, `hexdump`, `df`, `mount`, `chmod`, `chown`, `umask`, `uptime`, `mv`, `cp`, `mkdir`, `touch`, `rm`, `watch`, `srvc`, `ps`, `top`, `kill`, `pkill`, `killall`, `renice`, `net`, `host`, `ping`, `date`, `tdctl`, `iot`, `ssh`, `tls`, `reboot`, and more. (GPIO is driven as files via `/sys` — see below.)
@@ -770,7 +771,7 @@ Every registration entry point (`register_task`, `setInterval`, `setTimeout`, `u
 
 1. Reads `now = m_util->millis_now()`.
 2. Builds an array of indices and sorts it via `getSortedTaskList` using `computeScore` plus a 3 ms tolerance window on due-times. `computeScore` folds `m_nice` in as `effective_priority = m_task_priority - m_nice` before weighting by policy. **The vector itself is not reordered** — only an indirection table — so task ids stay stable.
-3. Iterates the sorted indices, skipping any task whose `m_task_mode != TASK_MODE_INLINE` when contextual execution is compiled in.
+3. Iterates the sorted indices. A task on a contextual lane (`m_task_mode != TASK_MODE_INLINE`) is not dispatched inline — instead its `m_pending_sig` is delivered to the lane executive (`SIG_STOP` → suspend, `SIG_CONT` → resume, `SIG_KILL` / `SIG_TERM` → terminate) and a finished task is reaped (its finalizer, if any, then runs), after which iteration `continue`s. So `kill` / STOP / CONT reach cooperative and preemptive tasks too, not just inline ones. The remaining signal/dispatch steps apply to inline tasks.
 4. **Consumes `m_pending_sig` before scheduling.** Under one critical section: the sig is cleared, then dispatched as
    - `SIG_KILL` / `SIG_TERM` → task marked ZOMBIE, callback nulled, `m_max_attempts = 0`; iteration `continue`s.
    - `SIG_STOP` → `m_state = TASK_STATE_STOPPED`.
@@ -1717,6 +1718,7 @@ Names come from [CommandCommon.h](src/service_provider/cmd/commands/CommandCommo
 | help | | List every registered command with its one-line usage (from each command's `getUsage()`; name column padded to 12 chars for alignment). Available before login. Tab-completion works on partial names. e.g. **help** |
 | uptime | | Time since boot as `up Xd Yh Zm Ws`. Wraps at ~49.7 days. e.g. **uptime** |
 | tls q=\<query>,t=\<algo>,l=\<bits>,n=\<CN/DNS>,i=\<IPv4> | q (1=CERTGEN), t (0=EC, 1=RSA), l (key bits / curve size), n (CN or DNS SAN), i (IPv4 SAN) | On-device TLS cert generation. esp32 builds with `ENABLE_TLS_CERT_GENERATION` only. Output at `TLS_DEFAULT_SERVER_CERT_PATH` / `TLS_DEFAULT_SERVER_KEY_PATH`. e.g. **tls q=1,t=0,l=256,n=device.local,i=192.168.1.50** |
+| elfload \<path> | | **esp32 only** (`ENABLE_PROGRAM_EXEC`). Load an external relocatable ELF program from the filesystem and launch it as a **background** preemptive task; returns immediately with its pid. Manage it with `ps` / `kill <pid>`; `SIG_STOP`/`SIG_CONT` don't apply. Image freed on exit or kill. See [§7.13](#713-dynamic-app-loading-esp32). e.g. **elfload /apps/hello.app.elf** |
 
 Each command's implementation lives in [src/service_provider/cmd/commands/](src/service_provider/cmd/commands/) — one `<Name>Command.h` per verb, with names registered in [CommandCommon.h](src/service_provider/cmd/commands/CommandCommon.h).
 
@@ -1874,6 +1876,29 @@ To add `temp` (read a temperature sensor):
 - **`watch` semicolon-separates options because the inner command can use commas.** When chaining your own composite commands, pick a separator that doesn't appear in payloads.
 - **`fwrite` blocks the line until ESC.** Don't run it over telnet/SSH if you also rely on the watchdog firing inside the session — it does, but the terminal is unavailable for `srvc` / `ps` until you exit.
 - **No quoted args.** Values cannot contain `,` (or whichever separator), `=`, or spaces inside an option value. Escape at the producer or accept the constraint.
+
+### 7.13 Dynamic app loading (esp32)
+
+With `ENABLE_PROGRAM_EXEC` the `elfload` command loads a relocatable ELF from the filesystem into RAM, resolves its external symbols against the firmware, runs its entry point (`int main(int argc, char *argv[])`), and frees it — `dlopen`-style loading without reflashing.
+
+```
+elfload /apps/hello.app.elf
+```
+
+It is **esp32-only** (uses the vendored Espressif ELF loader in [devices/esp32/elf_loader/](devices/esp32/elf_loader/)) and requires `ENABLE_STORAGE_SERVICE`; it pulls in `ENABLE_CONTEXTUAL_EXECUTION` since the program runs on a preemptive task. The flag is off by default; enable it in [devices/DeviceConfig.h](devices/DeviceConfig.h), with loader tuning in [devices/esp32/config/ElfLoaderConfig.h](devices/esp32/config/ElfLoaderConfig.h). The path is read through the normal VFS (absolute or relative, subject to permissions), so apps arrive by the usual routes — SFTP or HTTP upload.
+
+The program starts as a **background preemptive task**: `elfload` returns to the prompt immediately with the task's pid, and the app runs concurrently (its `printf` output goes to the console asynchronously). List it with `ps`, stop it with `kill <pid>`. It ends when its `main()` returns or when killed; `SIG_STOP` / `SIG_CONT` do **not** apply to it (only exit or kill). The loaded image is freed automatically on both paths.
+
+The app must be a small position-independent ELF built for the loader (not an ESP-IDF firmware image), calling only symbols the firmware exports (libc `printf`/`memcpy`/`sleep`/… are already available). Build one with the [`elf_loader`](https://components.espressif.com/components/espressif/elf_loader) component's template — with ESP-IDF installed and its environment activated:
+
+```bash
+idf.py create-project-from-example "espressif/elf_loader=*:build_elf_file_example"
+cd build_elf_file_example        # edit main/main.c — keep int main(int argc, char *argv[])
+idf.py set-target esp32          # plain esp32 (no PSRAM), matches the loader config
+idf.py elf                       # -> build/hello_world.app.elf  (a small ET_DYN)
+```
+
+Upload `build/hello_world.app.elf` to the device (SFTP or HTTP upload) and run `elfload /hello_world.app.elf`. What makes it loadable is the two lines in the project's top `CMakeLists.txt` — `include(elf_loader)` then `project_elf(<name>)`.
 
 ---
 

@@ -999,14 +999,13 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
 
                     // (Optional: parse flags if present, for LSTAT usually not needed)
 
-                    // Check if dir/file exists and get attributes 
-                    bool file_exists = __i_fs.isFileExist(filename.c_str());
-                    bool dir_exists = __i_fs.isDirExist(filename.c_str());
+                    // Fetch attributes (uid/gid/perms/times) in one metadata call
+                    file_info_t meta;
+                    if (__i_fs.getFileMeta(filename.c_str(), meta) == 0) {
+                        bool isDir = (meta.m_type == FILE_TYPE_DIR);
 
-                    if (file_exists || dir_exists) {
-                        // Prepare SSH_FXP_ATTRS reply (type 105)
-                        // For demo: only size and permissions, fill as needed for your FS
-                        uint32_t reply_len = 1 + 4 + 4 + 8 + 4; // type + reqid + flags + size + permissions
+                        // type + reqid + flags + size + uid + gid + perms + atime + mtime
+                        uint32_t reply_len = 1 + 4 + 4 + 8 + 4 + 4 + 4 + 4 + 4;
                         sftp_reply.push_back((reply_len >> 24) & 0xFF);
                         sftp_reply.push_back((reply_len >> 16) & 0xFF);
                         sftp_reply.push_back((reply_len >> 8) & 0xFF);
@@ -1021,15 +1020,14 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                         sftp_reply.push_back((request_id >> 8) & 0xFF);
                         sftp_reply.push_back(request_id & 0xFF);
 
-                        // Flags: SSH_FILEXFER_ATTR_SIZE | SSH_FILEXFER_ATTR_PERMISSIONS
-                        uint32_t flags = SSH_FILEXFER_ATTR_SIZE | SSH_FILEXFER_ATTR_PERMISSIONS;
+                        // attrs (SFTP v3 order): flags, size, uid, gid, permissions, atime, mtime
+                        uint32_t flags = SSH_FILEXFER_ATTR_SIZE | SSH_FILEXFER_ATTR_UIDGID | SSH_FILEXFER_ATTR_PERMISSIONS | SSH_FILEXFER_ATTR_ACMODTIME;
                         sftp_reply.push_back((flags >> 24) & 0xFF);
                         sftp_reply.push_back((flags >> 16) & 0xFF);
                         sftp_reply.push_back((flags >> 8) & 0xFF);
                         sftp_reply.push_back(flags & 0xFF);
 
-                        // File size
-                        uint64_t filesize = dir_exists ? 0 : __i_fs.getFileSize(filename.c_str());
+                        uint64_t filesize = isDir ? 0 : meta.m_size;
                         sftp_reply.push_back((filesize >> 56) & 0xFF);
                         sftp_reply.push_back((filesize >> 48) & 0xFF);
                         sftp_reply.push_back((filesize >> 40) & 0xFF);
@@ -1039,13 +1037,35 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                         sftp_reply.push_back((filesize >> 8) & 0xFF);
                         sftp_reply.push_back(filesize & 0xFF);
 
-                        // Permissions (S_IFREG | 0644) OR (S_IFDIR | 0755); S_IFREG = 0100000, S_IFDIR = 0040000
-                        // todo: for now end general permissions until we dont support permissions in file system
-                        uint32_t perms = dir_exists ? 0040755 : 0100644;
+                        uint32_t uid = meta.m_uid;
+                        sftp_reply.push_back((uid >> 24) & 0xFF);
+                        sftp_reply.push_back((uid >> 16) & 0xFF);
+                        sftp_reply.push_back((uid >> 8) & 0xFF);
+                        sftp_reply.push_back(uid & 0xFF);
+
+                        uint32_t gid = meta.m_gid;
+                        sftp_reply.push_back((gid >> 24) & 0xFF);
+                        sftp_reply.push_back((gid >> 16) & 0xFF);
+                        sftp_reply.push_back((gid >> 8) & 0xFF);
+                        sftp_reply.push_back(gid & 0xFF);
+
+                        uint32_t perms = (isDir ? 0040000u : 0100000u) | (meta.m_perms & 07777);
                         sftp_reply.push_back((perms >> 24) & 0xFF);
                         sftp_reply.push_back((perms >> 16) & 0xFF);
                         sftp_reply.push_back((perms >> 8) & 0xFF);
                         sftp_reply.push_back(perms & 0xFF);
+
+                        uint32_t atime = meta.m_ctime;
+                        sftp_reply.push_back((atime >> 24) & 0xFF);
+                        sftp_reply.push_back((atime >> 16) & 0xFF);
+                        sftp_reply.push_back((atime >> 8) & 0xFF);
+                        sftp_reply.push_back(atime & 0xFF);
+
+                        uint32_t mtime = meta.m_mtime;
+                        sftp_reply.push_back((mtime >> 24) & 0xFF);
+                        sftp_reply.push_back((mtime >> 16) & 0xFF);
+                        sftp_reply.push_back((mtime >> 8) & 0xFF);
+                        sftp_reply.push_back(mtime & 0xFF);
                     } else {
                         // Status code: SSH_FX_NO_SUCH_FILE (2)
                         errcode = SSH_FX_NO_SUCH_FILE;
@@ -1196,6 +1216,11 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                                     e.name = (item.m_name ? item.m_name : "");
                                     e.size = item.m_size;
                                     e.is_dir = (item.m_type == FILE_TYPE_DIR);
+                                    e.uid = item.m_uid;
+                                    e.gid = item.m_gid;
+                                    e.perms = item.m_perms;
+                                    e.ctime = item.m_ctime;
+                                    e.mtime = item.m_mtime;
                                     sftp.dir_entries.push_back(e);
                                     if (item.m_name) delete[] item.m_name;
                                 }
@@ -1255,23 +1280,42 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                             //   we add size+perms so +4+8+4 = +16)
                             // Use ATTR_SIZE|ATTR_PERMISSIONS so sftp client can do ls -l.
                             uint32_t reply_len = 1 + 4 + 4;
-                            char longbuf[96];
-                            // Pre-format longnames so we know sizes
+                            uint32_t nowLocal = __i_ntp.is_valid_ntptime()
+                                ? (uint32_t)__i_ntp.get_ntp_time() + (uint32_t)TZ_SEC
+                                : 0;
+                            char nowYear[5];
+                            EpochToDateTimeString(nowLocal, nowYear, sizeof(nowYear), "%Y");
+
+                            char longbuf[160];
+                            char permstr[11];
+                            char datebuf[16];
+                            static const char rwx[3] = { 'r', 'w', 'x' };
                             pdiutil::vector<pdiutil::string> longnames;
                             longnames.reserve(batch);
                             for (uint32_t i = 0; i < batch; i++) {
                                 const auto &e = sftp.dir_entries[sftp.readdir_offset + i];
+
+                                permstr[0] = e.is_dir ? 'd' : '-';
+                                for (int b = 0; b < 9; b++) {
+                                    permstr[1 + b] = (e.perms & (1 << (8 - b))) ? rwx[b % 3] : '-';
+                                }
+                                permstr[10] = '\0';
+
+                                uint32_t mtimeLocal = e.mtime ? e.mtime + (uint32_t)TZ_SEC : 0;
+                                char mYear[5];
+                                EpochToDateTimeString(mtimeLocal, mYear, sizeof(mYear), "%Y");
+                                const char* mfmt = __are_arrays_equal(mYear, nowYear, 4)
+                                    ? "%b %d %H:%M" : "%b %d  %Y";
+                                EpochToDateTimeString(mtimeLocal, datebuf, sizeof(datebuf), mfmt);
+
                                 memset(longbuf, 0, sizeof(longbuf));
-                                // longname is human-display only; clients use attrs for real data.
-                                // Include only what we actually know: type marker + size + name.
-                                // %lu (32-bit) is used because __snprintf does not support %llu.
-                                __snprintf(longbuf, sizeof(longbuf), "%c %10lu %s",
-                                    e.is_dir ? 'd' : '-',
-                                    (unsigned long)e.size, e.name.c_str());
+                                __snprintf(longbuf, sizeof(longbuf), "%s 1 %lu %lu %10lu %s %s",
+                                    permstr, (unsigned long)e.uid, (unsigned long)e.gid,
+                                    (unsigned long)e.size, datebuf, e.name.c_str());
                                 longnames.push_back(pdiutil::string(longbuf));
-                                reply_len += 4 + e.name.length();          // filename
-                                reply_len += 4 + longnames[i].length();     // longname
-                                reply_len += 4 + 8 + 4;                     // attrs: flags + size(uint64) + perms(uint32)
+                                reply_len += 4 + e.name.length();
+                                reply_len += 4 + longnames[i].length();
+                                reply_len += 4 + 8 + 8 + 4 + 8;
                             }
 
                             sftp_reply.push_back((reply_len >> 24) & 0xFF);
@@ -1310,8 +1354,8 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                                 sftp_reply.push_back(ll & 0xFF);
                                 sftp_reply.insert(sftp_reply.end(), ln.begin(), ln.end());
 
-                                // attrs: flags = SIZE | PERMISSIONS
-                                uint32_t flags = SSH_FILEXFER_ATTR_SIZE | SSH_FILEXFER_ATTR_PERMISSIONS;
+                                // attrs (SFTP v3 order): flags, size, uid, gid, permissions, atime, mtime
+                                uint32_t flags = SSH_FILEXFER_ATTR_SIZE | SSH_FILEXFER_ATTR_UIDGID | SSH_FILEXFER_ATTR_PERMISSIONS | SSH_FILEXFER_ATTR_ACMODTIME;
                                 sftp_reply.push_back((flags >> 24) & 0xFF);
                                 sftp_reply.push_back((flags >> 16) & 0xFF);
                                 sftp_reply.push_back((flags >> 8) & 0xFF);
@@ -1327,11 +1371,35 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                                 sftp_reply.push_back((sz >> 8) & 0xFF);
                                 sftp_reply.push_back(sz & 0xFF);
 
-                                uint32_t perms = e.is_dir ? 0040755 : 0100644;
+                                uint32_t uid = e.uid;
+                                sftp_reply.push_back((uid >> 24) & 0xFF);
+                                sftp_reply.push_back((uid >> 16) & 0xFF);
+                                sftp_reply.push_back((uid >> 8) & 0xFF);
+                                sftp_reply.push_back(uid & 0xFF);
+
+                                uint32_t gid = e.gid;
+                                sftp_reply.push_back((gid >> 24) & 0xFF);
+                                sftp_reply.push_back((gid >> 16) & 0xFF);
+                                sftp_reply.push_back((gid >> 8) & 0xFF);
+                                sftp_reply.push_back(gid & 0xFF);
+
+                                uint32_t perms = (e.is_dir ? 0040000u : 0100000u) | (e.perms & 07777);
                                 sftp_reply.push_back((perms >> 24) & 0xFF);
                                 sftp_reply.push_back((perms >> 16) & 0xFF);
                                 sftp_reply.push_back((perms >> 8) & 0xFF);
                                 sftp_reply.push_back(perms & 0xFF);
+
+                                uint32_t atime = e.ctime;
+                                sftp_reply.push_back((atime >> 24) & 0xFF);
+                                sftp_reply.push_back((atime >> 16) & 0xFF);
+                                sftp_reply.push_back((atime >> 8) & 0xFF);
+                                sftp_reply.push_back(atime & 0xFF);
+
+                                uint32_t mtime = e.mtime;
+                                sftp_reply.push_back((mtime >> 24) & 0xFF);
+                                sftp_reply.push_back((mtime >> 16) & 0xFF);
+                                sftp_reply.push_back((mtime >> 8) & 0xFF);
+                                sftp_reply.push_back(mtime & 0xFF);
                             }
 
                             sftp.readdir_offset += batch;
@@ -1384,10 +1452,18 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                                 errcode = SSH_FX_INVALID_HANDLE;
                             } else {
                                 // Build SSH_FXP_ATTRS reply (mirrors the STAT branch).
-                                bool dir_exists = sftp.is_dir;
-                                uint64_t filesize = dir_exists ? 0 : __i_fs.getFileSize(sftp.filepath.c_str());
+                                file_info_t meta;
+                                bool haveMeta = (__i_fs.getFileMeta(sftp.filepath.c_str(), meta) == 0);
+                                bool isDir = haveMeta ? (meta.m_type == FILE_TYPE_DIR) : sftp.is_dir;
+                                uint64_t filesize = isDir ? 0 : (haveMeta ? meta.m_size : (uint64_t)__i_fs.getFileSize(sftp.filepath.c_str()));
+                                uint32_t uid = haveMeta ? meta.m_uid : 0;
+                                uint32_t gid = haveMeta ? meta.m_gid : 0;
+                                uint32_t perms = (isDir ? 0040000u : 0100000u) | (haveMeta ? (meta.m_perms & 07777) : (isDir ? 0755u : 0644u));
+                                uint32_t atime = haveMeta ? meta.m_ctime : 0;
+                                uint32_t mtime = haveMeta ? meta.m_mtime : 0;
 
-                                uint32_t reply_len = 1 + 4 + 4 + 8 + 4; // type + reqid + flags + size + permissions
+                                // type + reqid + flags + size + uid + gid + perms + atime + mtime
+                                uint32_t reply_len = 1 + 4 + 4 + 8 + 4 + 4 + 4 + 4 + 4;
                                 sftp_reply.push_back((reply_len >> 24) & 0xFF);
                                 sftp_reply.push_back((reply_len >> 16) & 0xFF);
                                 sftp_reply.push_back((reply_len >> 8) & 0xFF);
@@ -1400,7 +1476,8 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                                 sftp_reply.push_back((request_id >> 8) & 0xFF);
                                 sftp_reply.push_back(request_id & 0xFF);
 
-                                uint32_t flags = SSH_FILEXFER_ATTR_SIZE | SSH_FILEXFER_ATTR_PERMISSIONS;
+                                // attrs (SFTP v3 order): flags, size, uid, gid, permissions, atime, mtime
+                                uint32_t flags = SSH_FILEXFER_ATTR_SIZE | SSH_FILEXFER_ATTR_UIDGID | SSH_FILEXFER_ATTR_PERMISSIONS | SSH_FILEXFER_ATTR_ACMODTIME;
                                 sftp_reply.push_back((flags >> 24) & 0xFF);
                                 sftp_reply.push_back((flags >> 16) & 0xFF);
                                 sftp_reply.push_back((flags >> 8) & 0xFF);
@@ -1415,11 +1492,30 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                                 sftp_reply.push_back((filesize >> 8) & 0xFF);
                                 sftp_reply.push_back(filesize & 0xFF);
 
-                                uint32_t perms = dir_exists ? 0040755 : 0100644;
+                                sftp_reply.push_back((uid >> 24) & 0xFF);
+                                sftp_reply.push_back((uid >> 16) & 0xFF);
+                                sftp_reply.push_back((uid >> 8) & 0xFF);
+                                sftp_reply.push_back(uid & 0xFF);
+
+                                sftp_reply.push_back((gid >> 24) & 0xFF);
+                                sftp_reply.push_back((gid >> 16) & 0xFF);
+                                sftp_reply.push_back((gid >> 8) & 0xFF);
+                                sftp_reply.push_back(gid & 0xFF);
+
                                 sftp_reply.push_back((perms >> 24) & 0xFF);
                                 sftp_reply.push_back((perms >> 16) & 0xFF);
                                 sftp_reply.push_back((perms >> 8) & 0xFF);
                                 sftp_reply.push_back(perms & 0xFF);
+
+                                sftp_reply.push_back((atime >> 24) & 0xFF);
+                                sftp_reply.push_back((atime >> 16) & 0xFF);
+                                sftp_reply.push_back((atime >> 8) & 0xFF);
+                                sftp_reply.push_back(atime & 0xFF);
+
+                                sftp_reply.push_back((mtime >> 24) & 0xFF);
+                                sftp_reply.push_back((mtime >> 16) & 0xFF);
+                                sftp_reply.push_back((mtime >> 8) & 0xFF);
+                                sftp_reply.push_back(mtime & 0xFF);
                             }
                         }
                     }

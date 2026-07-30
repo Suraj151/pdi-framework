@@ -33,8 +33,15 @@ public:
     uint8_t* stack = nullptr;       // allocated stack memory
     uint32_t stack_size;
     pdiutil::task_id_t task_id = -1; // link back to corresponding task_t
-    void (*entry)(void*) = nullptr; // entry function 
-    void* arg = nullptr; // argument    
+    void (*entry)(void*) = nullptr; // entry function
+    void* arg = nullptr; // argument
+
+    // signal / lifecycle control (device executives override)
+    virtual void suspend() {}
+    virtual void resume() {}
+    virtual void terminate() {}
+    virtual bool is_finished() { return false; }
+    virtual void reap() {}
 };
 
 /**

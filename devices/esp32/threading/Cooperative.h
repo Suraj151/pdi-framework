@@ -23,6 +23,12 @@ public:
 
     TaskHandle_t handle = nullptr;
     SemaphoreHandle_t resume_sem = nullptr;
+
+    void suspend() override;
+    void resume() override;
+    void terminate() override;
+    bool is_finished() override;
+    void reap() override;
 };
 
 class CooperativeScheduler : public iCooperativeScheduler {

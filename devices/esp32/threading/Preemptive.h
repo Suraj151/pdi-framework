@@ -21,6 +21,12 @@ public:
     virtual ~Preemptive();
 
     TaskHandle_t handle = nullptr;
+
+    void suspend() override;
+    void resume() override;
+    void terminate() override;
+    bool is_finished() override;
+    void reap() override;
 };
 
 class PreemptiveScheduler : public iPreemptiveScheduler {

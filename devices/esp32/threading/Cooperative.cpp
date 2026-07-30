@@ -20,7 +20,7 @@ static void coop_trampoline(void *arg) {
 
     if (f->state == CooperativeState::Running) {
         task_t* t = __task_scheduler.get_task(f->task_id);
-        if (t && t->_task) t->_task();
+        if (t && t->m_task) t->m_task();
     }
 
     f->state = CooperativeState::Finished;
@@ -57,28 +57,28 @@ CooperativeScheduler::~CooperativeScheduler(){
 
 int CooperativeScheduler::schedule_task(task_t* task, uint32_t stacksize){
 
-    if (task->_task_mode != TASK_MODE_COOPERATIVE) return -1;
+    if (task->m_task_mode != TASK_MODE_COOPERATIVE) return -1;
     Cooperative* f = pdiutil::safe_new<Cooperative>();
     if (!f) return -2;
-    task->_task_exec = f;
+    task->m_task_exec = f;
 
     f->resume_sem = xSemaphoreCreateBinary();
     if (!f->resume_sem) {
         pdiutil::safe_delete(f);
-        task->_task_exec = nullptr;
+        task->m_task_exec = nullptr;
         return -3;
     }
 
     f->stack      = nullptr;
     f->stack_size = stacksize;
     f->state      = CooperativeState::Ready;
-    f->task_id    = task->_task_id;
+    f->task_id    = task->m_task_id;
     f->arg        = static_cast<void*>(f);
     f->entry      = [](void* arg){
         Cooperative* f = static_cast<Cooperative*>(arg);
         if (f) {
             task_t* t = __task_scheduler.get_task(f->task_id);
-            if (t && t->_task) t->_task();
+            if (t && t->m_task) t->m_task();
         }
     };
 
@@ -95,7 +95,7 @@ int CooperativeScheduler::schedule_task(task_t* task, uint32_t stacksize){
     if (ok != pdPASS) {
         vSemaphoreDelete(f->resume_sem);
         pdiutil::safe_delete(f);
-        task->_task_exec = nullptr;
+        task->m_task_exec = nullptr;
         return -4;
     }
 
@@ -200,6 +200,34 @@ void CooperativeScheduler::destroy_cooperative(Cooperative* f) {
     pdiutil::safe_delete(f);
 }
 
+void Cooperative::suspend(){
+    if (state == CooperativeState::Mute) return;
+    CRITICAL_SECTION_ENTER
+    __i_cooperative_scheduler.remove_from_ready(this);
+    __i_cooperative_scheduler.remove_from_sleepers(this);
+    CRITICAL_SECTION_EXIT
+    state = CooperativeState::Mute;
+}
+
+void Cooperative::resume(){
+    if (state != CooperativeState::Mute) return;
+    CRITICAL_SECTION_ENTER
+    __i_cooperative_scheduler.add_to_ready(this);
+    CRITICAL_SECTION_EXIT
+}
+
+void Cooperative::terminate(){
+    state = CooperativeState::Finished;
+}
+
+bool Cooperative::is_finished(){
+    return state == CooperativeState::Finished;
+}
+
+void Cooperative::reap(){
+    __i_cooperative_scheduler.destroy_cooperative(this);
+}
+
 void CooperativeScheduler::add_to_ready(Cooperative* f) {
     if (!f) return;
     for (auto* r : ready) {
@@ -257,7 +285,7 @@ Cooperative* CooperativeScheduler::pick_next_ready() {
         task_t* t = __task_scheduler.get_task(f->task_id);
         if (!t) continue;
 
-        int32_t score = t->_task_priority + f->wait_ticks;
+        int32_t score = t->m_task_priority + f->wait_ticks;
         if (score > bestScore) {
             bestScore = score;
             best = f;

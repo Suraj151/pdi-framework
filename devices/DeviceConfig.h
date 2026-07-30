@@ -239,6 +239,20 @@ created Date    : 1st June 2019
 #endif
 
 /**
+ * enable/disable dynamic program loading — load a compiled program from the
+ * filesystem into RAM and run it at runtime. Each device maps this to its own
+ * loadable-binary format (esp32: ELF). Supported only on devices that declare
+ * DEVICE_SUPPORTS_PROGRAM_EXEC and with the storage service.
+ */
+#define ENABLE_PROGRAM_EXEC
+#if defined(ENABLE_PROGRAM_EXEC) && (!defined(DEVICE_SUPPORTS_PROGRAM_EXEC) || !defined(ENABLE_STORAGE_SERVICE))
+#undef ENABLE_PROGRAM_EXEC
+#endif
+#if defined(ENABLE_PROGRAM_EXEC)
+#define ENABLE_CONTEXTUAL_EXECUTION
+#endif
+
+/**
  * consts
  */
 #define NOT_APPLICABLE "NA"
