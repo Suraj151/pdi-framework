@@ -601,7 +601,7 @@ Each persisted table is wrapped on NVM with a small framing record (table id + c
 | [DeviceIotConfig.h](src/config/DeviceIotConfig.h) | `device_iot_config_table` | Config/OTP URLs, channel keys, sampling/keepalive bounds |
 | [SerialConfig.h](src/config/SerialConfig.h) | — | `SERIAL_MODE`, baud, interface enum |
 | [StorageConfig.h](src/config/StorageConfig.h) | — | Mount point, max path, FS limits |
-| [SshConfig.h](src/config/SshConfig.h) | — | `SSHKeyAlgorithm`, key/file size caps, `SSH_MAX_SESSIONS`, `ssh_config_t` (auth policy), sshconfig / authorized_keys paths |
+| [SshConfig.h](src/config/SshConfig.h) | — | `SSHKeyAlgorithm` (Ed25519 / RSA), `SSH_RSA_KEY_BITS` (2048), key/file size caps, `SSH_MAX_SESSIONS`, `ssh_config_t` (auth policy), sshconfig / authorized_keys paths |
 | [NetworkConfig.h](src/config/NetworkConfig.h) | — | Network-wide timeouts |
 | [EventConfig.h](src/config/EventConfig.h) | — | `event_name` enum, channel registry |
 
@@ -1381,9 +1381,9 @@ Full breakdown lives in [§8. Web Server](#8-web-server) — it has its own rout
 |---|---|
 | Source | [shell/ssh/SSHServiceprovider.{h,cpp}](src/service_provider/shell/ssh/SSHServiceprovider.h) (in `LWSSH` namespace) |
 | Depends on | `iTcpServerInterface`, `iFileSystemInterface`, crypto primitives ([src/utility/crypto/](src/utility/crypto/)), `__auth_service` |
-| Key algorithms | See `SSHKeyAlgorithm` enum in [SshConfig.h](src/config/SshConfig.h) — Ed25519 / Curve25519-based |
-| Transport crypto | `curve25519-sha256` key exchange, `ssh-ed25519` host key, `aes128-ctr` cipher, and a **negotiated MAC**: `hmac-sha2-256` (preferred) or `hmac-sha1`, Encrypt-and-MAC. The server advertises both in `prepare_server_kexinit` and selects the client's first supported choice (client preference, per RFC 4253) in `handleChannelRequest`, storing its length in `session->mac_len` (32 or 20) |
-| Authentication | Two methods, chosen per session. **password** — verified against `/etc/shadow` through `__auth_service`. **publickey** — Ed25519 keys listed in `~/.ssh/authorized_keys` (standard OpenSSH `ssh-ed25519 <base64> comment` lines); the client signature over the session id is checked with `ed25519_verify`. Policy comes from `/etc/ssh/sshconfig` — `PasswordAuthentication` and `PubkeyAuthentication` (`yes`/`no`), both enabled by default; the file is auto-created on first boot if absent. On a failed attempt the server advertises exactly the methods still allowed. See [§7.9.1 SSH authentication](#791-ssh-authentication) |
+| Key algorithms | See `SSHKeyAlgorithm` enum in [SshConfig.h](src/config/SshConfig.h) — **Ed25519** and **RSA** (2048-bit, `SSH_RSA_KEY_BITS`), both host-key and user-auth |
+| Transport crypto | `curve25519-sha256` key exchange, `aes128-ctr` cipher, and a **negotiated MAC**: `hmac-sha2-256` (preferred) or `hmac-sha1`, Encrypt-and-MAC. The host key is whichever key the device holds — `ssh-ed25519`, or RSA signed with `rsa-sha2-512` / `rsa-sha2-256`; the server advertises the algorithms it actually has (`get_supported_hostkey_algos`) and picks the client's first supported choice (client preference, per RFC 4253). It also sends the RFC 8308 `server-sig-algs` extension so modern clients offer RSA user keys. MAC choice is stored in `session->mac_len` (32 or 20) |
+| Authentication | Two methods, chosen per session. **password** — verified against `/etc/shadow` through `__auth_service`. **publickey** — **Ed25519 or RSA** keys listed in `~/.ssh/authorized_keys` (standard OpenSSH `ssh-ed25519 <base64> comment` / `ssh-rsa <base64> comment` lines); the client signature over the session id is checked with `ed25519_verify` or RSASSA-PKCS1-v1_5 (`rsa-sha2-256`/`rsa-sha2-512`). Policy comes from `/etc/ssh/sshconfig` — `PasswordAuthentication` and `PubkeyAuthentication` (`yes`/`no`), both enabled by default; the file is auto-created on first boot if absent. On a failed attempt the server advertises exactly the methods still allowed. See [§7.9.1 SSH authentication](#791-ssh-authentication) |
 | Concurrency | Up to `SSH_MAX_SESSIONS` ([SshConfig.h](src/config/SshConfig.h), default 2) SSH connections are accepted and serviced concurrently. Graphical SFTP clients (FileZilla / WinSCP) keep a directory-browse connection open and open a **second** connection to transfer or edit a file; the pool serves both |
 | File transfer | SFTP subsystem implemented on top of the file system; supports interactive `sftp` (REALPATH, STAT, OPENDIR/READDIR, OPEN/READ/WRITE, MKDIR/RMDIR, REMOVE, RENAME, FSTAT; SETSTAT is no-op; READLINK/SYMLINK report unsupported), remote edit/save from graphical clients, and SCP via `scp -s` (see [§7.9 SFTP / SCP file transfer](#79-sftp--scp-file-transfer)) |
 | Cost | **Highest of any service** — keys, hash, symmetric AES, large per-session buffers (× `SSH_MAX_SESSIONS`) |
@@ -1708,7 +1708,7 @@ Names come from [CommandCommon.h](src/service_provider/cmd/commands/CommandCommo
 | pkill [\<sig>] \<name> | | Same as `kill` but matches by task name; hits every task with that name. 1 arg = name (default TERM). 2 args = sig then name. Prints `signaled N task(s)`. e.g. **pkill MQTT** or **pkill 19 MQTT** |
 | killall [\<sig>] \<name> | | Like `pkill` but default signal is `SIG_KILL` (impolite). e.g. **killall GPIO** |
 | renice \<nice> \<pid> | nice signed -20..19 | Change POSIX nice on a live task. Auto-triggers scheduler resort. Same owner/root gate as `kill`. e.g. **renice -5 10** |
-| ssh q=\<query>,t=\<algo> | q=\<query> t=\<algo> | SSH command. q=1 (SSH_COMMAND_QUERY_KEYGEN) creates keypair of given algo. e.g. **ssh q=1,t=2** |
+| ssh q=\<query>,t=\<algo> | q (1=KEYGEN), t (1=Ed25519, 2/3=RSA 2048-bit) | SSH command. q=1 generates a host keypair of the given algorithm. RSA keygen is **slow on-device** — roughly **6 minutes on ESP8266**, **~1 minute on ESP32** (Ed25519 is near-instant). e.g. **ssh q=1,t=1** (Ed25519) or **ssh q=1,t=2** (RSA) |
 | net \<options> | ip, scansta, connsta | Query network params. **ip** shows STA/AP info; **scansta** lists nearby SSIDs; **connsta** joins one. e.g. **net connsta,\<ssid>,\<password>** |
 | host \<name> | | Resolve a hostname to an IPv4 address, trying IP-literal → `/etc/hosts` → DNS. e.g. **host example.com**, **host localhost** |
 | ping \<host> [count] | | ICMP-echo a host (resolved via the same `host` rules). Default 4 packets, max 10. Streams each reply/timeout live (`seq=N time=X ms` / `seq=N timeout`), then a `transmitted / received / loss` + `rtt min/avg/max` summary. e.g. **ping google.com**, **ping 8.8.8.8 3** |
@@ -1790,21 +1790,22 @@ PubkeyAuthentication   yes
 ```
 
 - **Password** — checked against the device user store (`/etc/shadow`) via `__auth_service`; the same credentials as the serial / telnet login.
-- **Public key** — Ed25519 only. Add the peer's public key (one per line, standard OpenSSH `ssh-ed25519 <base64> comment` format — copy it from your `~/.ssh/id_ed25519.pub`) to the device's `~/.ssh/authorized_keys`:
+- **Public key** — **Ed25519 or RSA (2048-bit)**. Add the peer's public key (one per line, standard OpenSSH `ssh-ed25519 <base64> comment` or `ssh-rsa <base64> comment` format — copy it from your `~/.ssh/id_ed25519.pub` or `~/.ssh/id_rsa.pub`) to the device's `~/.ssh/authorized_keys`:
 
 ```
-fedit ~/.ssh/authorized_keys        # paste the ssh-ed25519 line, then !w to save
+fedit ~/.ssh/authorized_keys        # paste the ssh-ed25519 / ssh-rsa line, then !w to save
 ```
 
 Set either key to `no` to disable that method. With `PasswordAuthentication no`, only clients holding an authorized private key can log in:
 
 ```
 ssh -i ~/.ssh/id_ed25519 pdiStack@<device-ip>
+ssh -i ~/.ssh/id_rsa     pdiStack@<device-ip>
 ```
 
 Notes:
 - `authorized_keys` is a single file under the device home directory (not per-user).
-- The server's own host key is stored as raw bytes in `~/.ssh/ed25519{,.pub,.seed}` (generate with `ssh q=1`) and presented to clients in standard SSH wire format during the handshake.
+- The server's own host key is either Ed25519 — stored as raw bytes in `~/.ssh/ed25519{,.pub,.seed}` (generate with `ssh q=1,t=1`) — or RSA, in `~/.ssh/rsa{,.pub}` (`ssh q=1,t=2`). RSA host-key generation is slow on-device (~6 min on ESP8266, ~1 min on ESP32); Ed25519 is near-instant. The key is presented to clients in standard SSH wire format during the handshake.
 
 #### User-facing commands
 
@@ -3351,7 +3352,7 @@ Most of these have appeared in passing in earlier sections. This section is the 
 | **Safe alloc** | `SafeAlloc.{h,cpp}` | Heap-checked `pdiutil::safe_new<T>(args...)` / `safe_new_array<T>(n)` + `safe_delete` / `safe_delete_array` (null-safe). Refuses allocations that would breach `PDI_SAFE_ALLOC_HEAP_MARGIN` (default 2 KB headroom). Used by the TLS path to bail cleanly on tight heap |
 | **Queue / RingBuf / Proto** | `queue/queue.{h,cpp}`, `queue/ringbuf.{h,cpp}`, `queue/proto.{h,cpp}` | Byte queues and a length-prefixed parser |
 | **Utility umbrella** | `Utility.{h,cpp}` | Single `#include <utility/Utility.h>` that pulls the lot in (conditional on `ENABLE_*`) |
-| **Crypto** | `crypto/` | SHA-1/256/512, HMAC-SHA1/256, AES (ECB/CBC/CTR), Curve25519, Ed25519 |
+| **Crypto** | `crypto/` | SHA-1/256/512, HMAC-SHA1/256, AES (ECB/CBC/CTR), Curve25519, Ed25519, RSA (bignum + PKCS#1) |
 | **PdiSTL** | `pdistl/` | A trimmed C++ standard library subset for memory-constrained devices |
 | **Fiber** | `fiber/` | Reserved namespace, currently empty |
 
@@ -3415,8 +3416,9 @@ The framework ships a minimal but production-quality crypto kit. Everything is p
 |---|---|---|
 | Curve25519 (X25519 ECDH) | [asymmetric/curve25519/curve25519.h](src/utility/crypto/asymmetric/curve25519/curve25519.h) | `crypto_scalarmult_base(q, n)`, `crypto_scalarmult(q, n, p)`, `curve25519_create_keypair(pub, priv)`, `curve25519_create_keypair_with_ed25519privkey(pub, priv, ed_priv)` |
 | Ed25519 (signing) | [asymmetric/ed25519/ed25519.h](src/utility/crypto/asymmetric/ed25519/ed25519.h) | `ed25519_create_seed`, `ed25519_create_keypair(pub, priv, seed)`, `ed25519_sign(sig, msg, len, pub, priv)`, `ed25519_verify(sig, msg, len, pub) → int`, `ed25519_key_exchange(shared, pub, priv)`, `ed25519_private_to_curve25519` for SSH bridging |
+| RSA (signing) | [asymmetric/rsa/rsa.h](src/utility/crypto/asymmetric/rsa/rsa.h), [rsa/bignum.h](src/utility/crypto/asymmetric/rsa/bignum.h) | Portable big-integer (Montgomery mod-exp, Miller-Rabin) + RSASSA-PKCS1-v1_5. `rsa_generate_keypair(key, bits, rng)`, `rsa_sign_pkcs1` / `rsa_verify_pkcs1` (SHA-256 & SHA-512, CRT sign). Caps at `RSA_MAX_KEY_BITS` (2048). Keygen is heavy — see [§7.9.1](#791-ssh-authentication) for on-device timings |
 
-All asymmetric primitives are upstream from the standard portable Ed25519 reference (see [ed25519/readme.md](src/utility/crypto/asymmetric/ed25519/readme.md)). They are used by [src/service_provider/shell/ssh/](src/service_provider/shell/ssh/) for SSH host key generation, the key exchange handshake, and signing the SSH banner. AES-CTR powers the SSH transport encryption.
+The Curve25519 / Ed25519 primitives are upstream from the standard portable Ed25519 reference (see [ed25519/readme.md](src/utility/crypto/asymmetric/ed25519/readme.md)); the RSA + bignum code is a self-contained device-agnostic implementation (caller injects the RNG and a watchdog-yield hook). They are used by [src/service_provider/shell/ssh/](src/service_provider/shell/ssh/) for SSH host key generation, the key exchange handshake, host-key signing, and public-key user authentication. AES-CTR powers the SSH transport encryption.
 
 #### `fixedint.h`
 
@@ -3437,7 +3439,7 @@ A trimmed subset of the C++ standard library for memory-constrained targets. Ado
 - **`fiber/` is empty.** It's a reserved namespace for future coroutine/fiber primitives. Don't try to import from it.
 - **`pdiutil::string` is not `std::string`.** Some methods are missing or renamed; check the header before relying on a particular API. SBO size and allocator semantics differ from libstdc++.
 - **`StringOperations` always takes a length.** Don't drop the default — the framework's NVM strings are often non-null-terminated up to their buffer size, and the default-300 cap is what keeps the helpers safe.
-- **Crypto routines are constant-time only where the upstream made them so.** Ed25519 verify is, AES is table-based and timing-side-channel sensitive. Don't run on a network where timing attacks are in the threat model without auditing.
+- **Crypto routines are constant-time only where the upstream made them so.** Ed25519 verify is, AES is table-based and timing-side-channel sensitive, and the RSA big-integer path (Montgomery mod-exp / CRT sign) is not timing-hardened. Don't run on a network where timing attacks are in the threat model without auditing.
 - **`Base64` has no decode.** Plan for that if your code path needs round-trip Base64.
 - **`PROTO_PARSER` keeps state across calls.** Don't share one parser across two connections; allocate one per stream.
 - **The umbrella header has a transitive cost.** It pulls 20+ headers. If a file *only* needs `StringOperations`, include that one directly to keep your TU lean — `Utility.h` is for files that genuinely consume the whole surface.
@@ -3732,11 +3734,11 @@ Most likely `ENABLE_NAPT` is also on. The two cannot coexist on esp8266 — both
 The CLI uses the same login row as the web portal (`login_credential_table`). If you've changed credentials via the web, telnet/SSH inherits them. If `srvc status Auth` shows defaults, factory reset.
 
 **SSH won't accept any client.**
-You probably never generated a key pair. From the CLI:
+You probably never generated a host key pair. From the CLI:
 ```
 ssh q=1,t=1
 ```
-(`q=1` is `SSH_COMMAND_QUERY_KEYGEN`, `t=1` selects the algorithm — see [SshConfig.h](src/config/SshConfig.h)).
+(`q=1` is `SSH_COMMAND_QUERY_KEYGEN`, `t` selects the algorithm — `1`=Ed25519, `2`/`3`=RSA 2048-bit — see [SshConfig.h](src/config/SshConfig.h)). Prefer `t=1`: Ed25519 generates instantly, whereas on-device RSA keygen takes ~6 min on ESP8266 and ~1 min on ESP32.
 
 **`scp -s …` is slow.**
 By design — the framework streams SFTP in small bolus chunks (≤256 B) and has overwrite overhead on flash filesystems. Expected throughput 0.2-1 KB/s ([§6.2.14](#6-service-providers), [§7.9](#7-command-line--terminal)). Use OTA, not SFTP, for firmware.
@@ -3765,7 +3767,7 @@ In sketch code, yes. In framework code, no — `String`'s allocator differs by c
 `CMD_SIZE_MAX = 8` and `CMD_OPTION_SIZE_MAX = 3` are sized for AVR-class RAM. Loosening them costs RAM proportional to `MAX_SCHEDULABLE_TASKS × CMD_OPTION_MAX × CMD_OPTION_SIZE_MAX`. The trade-off was made for UNO.
 
 **Q. Why is SSH so heavy?**
-Ed25519 keypair + Curve25519 ECDH + AES-CTR streaming + per-session protocol state. Roughly +150 KB flash and +8-16 KB heap per session ([§12.4](#124-the-expensive-features-called-out)). It's why ESP32 is the recommended target for SSH builds.
+Ed25519 / RSA host keys + Curve25519 ECDH + AES-CTR streaming + per-session protocol state. Roughly +150 KB flash and +8-16 KB heap per session ([§12.4](#124-the-expensive-features-called-out)). It's why ESP32 is the recommended target for SSH builds. RSA also adds a big-integer keygen path that is very slow on ESP8266 (~6 min) versus ~1 min on ESP32 — Ed25519 host keys avoid that cost entirely.
 
 **Q. Can the device be configured without flashing — e.g. from a USB serial bootstrap?**
 Yes. After the first boot, every persisted config in NVM can be changed via the web portal, the CLI, or another sketch that calls `__database_service.set_*_table`. Flash only changes *defaults* ([§3.8](#3-configuration-system)).

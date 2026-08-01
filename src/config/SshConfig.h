@@ -27,6 +27,19 @@ created Date    : 1st June 2025
 #define SSH_ED25519_KEY_TYPE_STR CHARPTR_WRAP("ssh-ed25519")
 #define SSH_ED25519_SIG_SIZE 64
 
+#define SSH_RSA_KEY_TYPE_STR CHARPTR_WRAP("ssh-rsa")
+#define SSH_RSA_SIG_ALGO_SHA256_STR CHARPTR_WRAP("rsa-sha2-256")
+#define SSH_RSA_SIG_ALGO_SHA512_STR CHARPTR_WRAP("rsa-sha2-512")
+
+#define SSH_EXT_INFO_C_STR CHARPTR_WRAP("ext-info-c")
+#define SSH_EXT_INFO_S_STR CHARPTR_WRAP("ext-info-s")
+#define SSH_EXT_SERVER_SIG_ALGS_STR CHARPTR_WRAP("server-sig-algs")
+#define SSH_SERVER_SIG_ALGS_VALUE_STR CHARPTR_WRAP("rsa-sha2-512,rsa-sha2-256,ssh-ed25519")
+
+#ifndef SSH_RSA_KEY_BITS
+#define SSH_RSA_KEY_BITS 2048
+#endif
+
 /* SSH server configuration file and its option keys */
 #define SSH_CONFIG_DIR CHARPTR_WRAP("/etc/ssh")
 #define SSH_CONFIG_FILE CHARPTR_WRAP("/etc/ssh/sshconfig")
@@ -37,7 +50,8 @@ created Date    : 1st June 2025
 enum SSHKeyAlgorithm{
     SSH_KEY_ALGO_MIN = 0,
     SSH_KEY_ALGO_ED25519,
-    // SSH_KEY_ALGO_RSA,
+    SSH_KEY_ALGO_RSA_SHA256,
+    SSH_KEY_ALGO_RSA_SHA512,
     SSH_KEY_ALGO_MAX
 };
 

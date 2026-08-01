@@ -210,6 +210,14 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
         dontecho = true;
       }
     }
+
+    bool ownRender = false;
+    for (int16_t i = 0; !ownRender && i < m_cmdlist.size(); i++){
+      if( nullptr != m_cmdlist[i] && m_cmdlist[i]->m_owner == session &&
+          m_cmdlist[i]->isWaitingForOption() && m_cmdlist[i]->managesLineRender() ){
+        ownRender = true;
+      }
+    }
     
     while (terminal->available())
     {
@@ -228,19 +236,21 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
         inseq = c == '\b' ? CMD_TERM_INSEQ_BACKSPACE_CHAR : CMD_TERM_INSEQ_DELETE_CHAR;
         if (session->m_linebuf.size() > 0 && session->m_cursor > 0) {
 
-          // putty can visualize 0x7F but not every terminal like linux.
-          // so sending backspace irespective of incoming char
-          terminal->write('\b');  // echo
-
           session->m_linebuf.erase(session->m_cursor - 1, 1);
           session->m_cursor--;
 
-          // Redraw the tail from the new cursor position.
-          uint16_t tailSize = session->m_linebuf.size() - session->m_cursor;
-          terminal->csi_erase_in_line(0);
-          if(tailSize > 0){
-            terminal->write((char*)(session->m_linebuf.c_str() + session->m_cursor), tailSize);
-            terminal->csi_cursor_move_left(tailSize);
+          if(!ownRender){
+            // putty can visualize 0x7F but not every terminal like linux.
+            // so sending backspace irespective of incoming char
+            terminal->write('\b');  // echo
+
+            // Redraw the tail from the new cursor position.
+            uint16_t tailSize = session->m_linebuf.size() - session->m_cursor;
+            terminal->csi_erase_in_line(0);
+            if(tailSize > 0){
+              terminal->write((char*)(session->m_linebuf.c_str() + session->m_cursor), tailSize);
+              terminal->csi_cursor_move_left(tailSize);
+            }
           }
         }
       }else if (c == '\t') {
@@ -341,12 +351,14 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
 
                     session->m_linebuf.erase(session->m_cursor, 1);
 
-                    // Redraw only the tail from current cursor position.
-                    uint16_t tailSize = session->m_linebuf.size() - session->m_cursor;
-                    terminal->csi_erase_in_line(0);
-                    if(tailSize > 0){
-                      terminal->write((char*)(session->m_linebuf.c_str() + session->m_cursor), tailSize);
-                      terminal->csi_cursor_move_left(tailSize);
+                    if(!ownRender){
+                      // Redraw only the tail from current cursor position.
+                      uint16_t tailSize = session->m_linebuf.size() - session->m_cursor;
+                      terminal->csi_erase_in_line(0);
+                      if(tailSize > 0){
+                        terminal->write((char*)(session->m_linebuf.c_str() + session->m_cursor), tailSize);
+                        terminal->csi_cursor_move_left(tailSize);
+                      }
                     }
 
                     shouldEcho = false; // skip echo as of now
@@ -381,7 +393,7 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
 
             // process as special escape sequence case
 
-            if( shouldEcho ){
+            if( shouldEcho && !ownRender ){
               // echo escape sequence
               terminal->write(escseq, seqlen);
             }
@@ -400,7 +412,7 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
         session->m_linebuf.insert(session->m_cursor, 1, c);
         session->m_cursor++;
 
-        if(!dontecho){
+        if(!dontecho && !ownRender){
           // Echo only the newly inserted char plus any tail to its right,
           // then walk the cursor back so it sits after the new char. For
           // typing at end-of-line this collapses to a single byte written.
@@ -427,11 +439,11 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
     // terminal->write_ro(RODT_ATTR("]\r\n"));
 
     // check if line ending is entered
-    if( ( 
-        dontecho && 
+    if( !ownRender && ( (
+        dontecho &&
         inseq != CMD_TERM_INSEQ_ENTER &&
         inseq != CMD_TERM_INSEQ_CTRL_C &&
-        inseq != CMD_TERM_INSEQ_CTRL_Z 
+        inseq != CMD_TERM_INSEQ_CTRL_Z
       ) || (
         inseq != CMD_TERM_INSEQ_ENTER &&
         inseq != CMD_TERM_INSEQ_CTRL_C &&
@@ -440,7 +452,7 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
         inseq != CMD_TERM_INSEQ_UP_ARROW &&
         inseq != CMD_TERM_INSEQ_DOWN_ARROW &&
         inseq != CMD_TERM_INSEQ_TAB
-    )){
+    ) )){
 #ifdef ENABLE_STORAGE_SERVICE      
       session->m_historyIdx = -1;
 #endif

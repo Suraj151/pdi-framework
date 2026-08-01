@@ -426,7 +426,7 @@ public:
    *
    * Initializes the iTerminalInterface object.
    */
-  iTerminalInterface(): m_terminal_type(TERMINAL_TYPE_SERIAL) {}
+  iTerminalInterface(): m_terminal_type(TERMINAL_TYPE_SERIAL), m_column_width(80), m_row_count(24) {}
 
   /**
    * @brief Destructor for the iTerminalInterface class.
@@ -491,7 +491,7 @@ public:
    * @param y The y-coordinate (row) to move to.
    * @return None
    */
-  void csi_cursor_move(uint8_t x, uint8_t y)
+  void csi_cursor_move(uint16_t x, uint16_t y)
   {
     write_ro(RODT_ATTR(TERMINAL_ESCAPE_SEQ));
     write((int32_t)y);
@@ -632,8 +632,46 @@ public:
     return m_terminal_type;
   }
 
+  /**
+   * @brief Sets the terminal width in columns.
+   * @param columns The number of columns; ignored when zero.
+   */
+  void set_column_width(uint16_t columns)
+  {
+    if( columns > 0 ) m_column_width = columns;
+  }
+
+  /**
+   * @brief Gets the terminal width in columns.
+   * @return The current column width.
+   */
+  uint16_t get_column_width() const
+  {
+    return m_column_width;
+  }
+
+  /**
+   * @brief Sets the terminal height in rows.
+   * @param rows The number of rows; ignored when zero.
+   */
+  void set_row_count(uint16_t rows)
+  {
+    if( rows > 0 ) m_row_count = rows;
+  }
+
+  /**
+   * @brief Gets the terminal height in rows.
+   * @return The current row count.
+   */
+  uint16_t get_row_count() const
+  {
+    return m_row_count;
+  }
+
   private:
     terminal_types_t m_terminal_type;
+    uint16_t m_column_width;
+    uint16_t m_row_count;
 };
 
 #endif

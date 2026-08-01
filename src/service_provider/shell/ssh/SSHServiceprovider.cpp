@@ -13,6 +13,7 @@ created Date    : 6th Apr 2025
 #if defined(ENABLE_SSH_SERVICE)
 
 #include "SSHServiceprovider.h"
+#include <utility/SafeAlloc.h>
 #include <service_provider/session/SessionManager.h>
 #ifdef ENABLE_CMD_SERVICE
 #include <service_provider/cmd/CommandLineServiceProvider.h>
@@ -371,7 +372,8 @@ void SSHServer::handleVersionExchange() {
             __i_dvc_ctrl.wait(1);
         }
 
-        if (m_session->m_client_version.length() > 4 && m_session->m_client_version.substr(0, 4) == "SSH-") {
+        pdiutil::string ssh_prefix = CHARPTR_WRAP("SSH-");
+        if (m_session->m_client_version.length() > 4 && m_session->m_client_version.substr(0, 4) == ssh_prefix) {
             m_session->m_state = LWSSHSession::SESSION_STATE_KEX_INIT_RECV;
         }
 
@@ -404,13 +406,21 @@ void SSHServer::handleKeyExchange(){
                 SSHKexInitFields kex_init_fields;
                 if(parse_kex_init_fields(m_session->m_sshpacket.payload, kex_init_fields)){
 
+                    pdiutil::string mac_sha2_256 = CHARPTR_WRAP("hmac-sha2-256");
+                    pdiutil::string mac_sha1 = CHARPTR_WRAP("hmac-sha1");
                     m_session->mac_len = 0;
                     for (size_t i = 0; i < kex_init_fields.mac_algorithms_ctos.size(); ++i) {
-                        if (kex_init_fields.mac_algorithms_ctos[i] == "hmac-sha2-256") { m_session->mac_len = 32; break; }
-                        if (kex_init_fields.mac_algorithms_ctos[i] == "hmac-sha1") { m_session->mac_len = 20; break; }
+                        if (kex_init_fields.mac_algorithms_ctos[i] == mac_sha2_256) { m_session->mac_len = 32; break; }
+                        if (kex_init_fields.mac_algorithms_ctos[i] == mac_sha1) { m_session->mac_len = 20; break; }
                     }
 
-                    if (m_session->mac_len == 0) {
+                    m_session->m_negotiated_hostkey_algo =
+                        negotiate_hostkey_algo(kex_init_fields.server_host_key_algorithms);
+
+                    m_session->m_client_ext_info =
+                        client_advertised_ext_info(kex_init_fields.kex_algorithms);
+
+                    if (m_session->mac_len == 0 || m_session->m_negotiated_hostkey_algo == SSH_KEY_ALGO_MIN) {
                         m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
                     } else {
                         m_session->m_state = LWSSHSession::SESSION_STATE_KEX_INIT_SEND;
@@ -447,9 +457,40 @@ void SSHServer::handleKeyExchange(){
         }
     }else if(m_session->m_state == LWSSHSession::SESSION_STATE_KEXDH_INIT_SEND){
 
-        pdiutil::vector<uint8_t> server_host_pubkey, server_host_privkey, payload;
+        pdiutil::vector<uint8_t> payload;
+        bool bstatus = false;
 
-        bool bstatus = getSSHKeyPairs(SSH_KEY_ALGO_ED25519, server_host_pubkey, server_host_privkey);
+        if (m_session->m_negotiated_hostkey_algo == SSH_KEY_ALGO_ED25519) {
+
+            pdiutil::vector<uint8_t> server_host_pubkey, server_host_privkey;
+            bstatus = getSSHKeyPairs(SSH_KEY_ALGO_ED25519, server_host_pubkey, server_host_privkey);
+            if (bstatus) {
+                bstatus = prepare_server_ecdh_reply(
+                    m_session,
+                    m_session->m_ecdh_init_packet.client_pubkey, // client public key from ECDH_INIT
+                    server_host_pubkey,  // server host public key (Ed25519)
+                    server_host_privkey, // server host private key (Ed25519)
+                    payload
+                );
+            }
+        } else {
+
+            rsa_key *rsakey = pdiutil::safe_new<rsa_key>();
+            if (rsakey) {
+                bstatus = load_rsa_host_key(*rsakey);
+                if (bstatus) {
+                    bstatus = prepare_server_ecdh_reply_rsa(
+                        m_session,
+                        m_session->m_ecdh_init_packet.client_pubkey,
+                        *rsakey,
+                        m_session->m_negotiated_hostkey_algo,
+                        payload
+                    );
+                }
+                pdiutil::safe_delete(rsakey);
+            }
+        }
+
         if (!bstatus) {
             if(__i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)){
                 __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln();
@@ -458,14 +499,6 @@ void SSHServer::handleKeyExchange(){
             m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
             return; // No SSH keys found, cannot proceed
         }
-
-        bstatus = prepare_server_ecdh_reply(
-            m_session, 
-            m_session->m_ecdh_init_packet.client_pubkey, // client public key from ECDH_INIT
-            server_host_pubkey, // server host public key (Ed25519)
-            server_host_privkey, // server host private key (Ed25519)
-            payload
-        );
 
         bstatus &= send_server_ssh_packet(m_session, payload);
 
@@ -561,6 +594,12 @@ void LWSSH::SSHServer::handleAuthentication(){
                     AES_init_ctx_iv(&m_session->aes_ctx_stoc, m_session->derived_enc_key_stoc, m_session->derived_iv_stoc);
 
                     m_session->m_state = LWSSHSession::SESSION_STATE_AUTHENTICATION_REQUEST;
+
+                    if(m_session->m_client_ext_info){
+                        pdiutil::vector<uint8_t> extinfo;
+                        build_ext_info_packet(extinfo);
+                        send_server_ssh_packet(m_session, extinfo, true);
+                    }
                 }else{
                     m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
                 }
@@ -571,7 +610,7 @@ void LWSSH::SSHServer::handleAuthentication(){
                     m_session->m_ssh_config_loaded = true;
                 }
 
-                pdiutil::string userauth = "ssh-userauth";
+                pdiutil::string userauth = CHARPTR_WRAP("ssh-userauth");
                 pdiutil::vector<uint8_t> userauthvec(userauth.begin(), userauth.end());
 
                 pdiutil::vector<uint8_t> payload;
@@ -590,11 +629,12 @@ void LWSSH::SSHServer::handleAuthentication(){
                 bool authed = false;
                 bool sent_pk_ok = false;
 
-                if( parsed && authreq.method == "publickey" && cfg.m_pubkey_auth ){
+                pdiutil::string method_publickey = CHARPTR_WRAP("publickey");
+                pdiutil::string method_password = CHARPTR_WRAP("password");
 
-                    pdiutil::vector<uint8_t> rawkey;
-                    bool keyok = extract_ed25519_blob_field(authreq.pubkey_blob, rawkey, ED25519_PUBKEY_SIZE) &&
-                                 is_authorized_pubkey(rawkey);
+                if( parsed && authreq.method == method_publickey && cfg.m_pubkey_auth ){
+
+                    bool keyok = is_authorized_pubkey(authreq.pubkey_blob);
 
                     if( keyok && !authreq.has_signature ){
                         // Probe: confirm the offered key is acceptable
@@ -605,12 +645,12 @@ void LWSSH::SSHServer::handleAuthentication(){
                         send_server_ssh_packet(m_session, reply, true);
                         sent_pk_ok = true;
                     }else if( keyok && authreq.has_signature ){
-                        authed = verify_pubkey_signature(m_session, authreq, rawkey);
+                        authed = verify_pubkey_signature(m_session, authreq);
                         if( authed ){
                             __auth_service.setVerifiedUsername(authreq.username.c_str());
                         }
                     }
-                }else if( parsed && authreq.method == "password" && cfg.m_password_auth ){
+                }else if( parsed && authreq.method == method_password && cfg.m_password_auth ){
 
                     if( authreq.username.size() > 1 && authreq.password.size() > 1 ){
                         authed = __auth_service.isAuthorized(authreq.username.c_str(), authreq.password.c_str());
@@ -631,10 +671,10 @@ void LWSSH::SSHServer::handleAuthentication(){
                     pdiutil::vector<uint8_t> reply;
                     reply.push_back(SSH2_MSG_USERAUTH_FAILURE); // 51
                     pdiutil::string methods;
-                    if( cfg.m_pubkey_auth ){ methods += "publickey"; }
+                    if( cfg.m_pubkey_auth ){ methods += method_publickey; }
                     if( cfg.m_password_auth ){
                         if( !methods.empty() ){ methods += ","; }
-                        methods += "password";
+                        methods += method_password;
                     }
                     pdiutil::vector<uint8_t> methodvec(methods.begin(), methods.end());
                     append_ssh_string(reply, methodvec);
@@ -694,18 +734,38 @@ void LWSSH::SSHServer::handleChannelRequest(){
 
                 if(bstatus){
 
-                    m_session->current_channel.req_type = recvreqst.request_type;
+                    pdiutil::string rt_pty = CHARPTR_WRAP("pty-req");
+                    pdiutil::string rt_shell = CHARPTR_WRAP("shell");
+                    pdiutil::string rt_env = CHARPTR_WRAP("env");
+                    pdiutil::string rt_subsystem = CHARPTR_WRAP("subsystem");
+                    pdiutil::string rt_exec = CHARPTR_WRAP("exec");
+                    pdiutil::string rt_window_change = CHARPTR_WRAP("window-change");
 
-                    if( recvreqst.request_type == "pty-req" ){
+                    // window-change is transient; keep the channel's active mode
+                    if( recvreqst.request_type != rt_window_change ){
+                        m_session->current_channel.req_type = recvreqst.request_type;
+                    }
+
+                    if( recvreqst.request_type == rt_pty ){
 
                         // parse the pty-req channel request type specific data
                         parse_channel_request_pty_req(m_session, recvreqst.request_specific_data);
-                    }else if( recvreqst.request_type == "shell" ){
+                    }else if( recvreqst.request_type == rt_window_change ){
 
-                    }else if( recvreqst.request_type == "env" ){
+                        if( recvreqst.request_specific_data.size() >= 8 && m_session->m_sshclient ){
+                            uint32_t w = (recvreqst.request_specific_data[0] << 24) | (recvreqst.request_specific_data[1] << 16) | (recvreqst.request_specific_data[2] << 8) | recvreqst.request_specific_data[3];
+                            uint32_t h = (recvreqst.request_specific_data[4] << 24) | (recvreqst.request_specific_data[5] << 16) | (recvreqst.request_specific_data[6] << 8) | recvreqst.request_specific_data[7];
+                            m_session->current_channel.pty_req.width_chars = w;
+                            m_session->current_channel.pty_req.height_rows = h;
+                            m_session->m_sshclient->set_column_width((uint16_t)w);
+                            m_session->m_sshclient->set_row_count((uint16_t)h);
+                        }
+                    }else if( recvreqst.request_type == rt_shell ){
+
+                    }else if( recvreqst.request_type == rt_env ){
 
                     // todo: update section when environment variables are supported
-                    }else if( recvreqst.request_type == "subsystem" ){
+                    }else if( recvreqst.request_type == rt_subsystem ){
 
                         int32_t offset = 0;
                         if (offset + 4 > recvreqst.request_specific_data.size()){
@@ -728,9 +788,9 @@ void LWSSH::SSHServer::handleChannelRequest(){
                     }
 
                     // send reply if want
-                    if (recvreqst.want_reply && (recvreqst.request_type == "shell" || 
-                        recvreqst.request_type == "pty-req" ||
-                        recvreqst.request_type == "subsystem"
+                    if (recvreqst.want_reply && (recvreqst.request_type == rt_shell ||
+                        recvreqst.request_type == rt_pty ||
+                        recvreqst.request_type == rt_subsystem
                     )) {
                         pdiutil::vector<uint8_t> reply;
                         reply.push_back(SSH2_MSG_CHANNEL_SUCCESS); // 99
@@ -747,13 +807,14 @@ void LWSSH::SSHServer::handleChannelRequest(){
                         }else{
                             m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
                         }
-                    }else if (recvreqst.want_reply && recvreqst.request_type == "exec") {
+                    }else if (recvreqst.want_reply && recvreqst.request_type == rt_exec) {
 
                         pdiutil::string execcmd;
                         int32_t execoff = 0;
                         read_ssh_string(recvreqst.request_specific_data, execcmd, execoff);
 
-                        bool isscp = (execcmd.find("scp") == 0);
+                        pdiutil::string scp_prefix = CHARPTR_WRAP("scp");
+                        bool isscp = (execcmd.find(scp_prefix) == 0);
 
                         pdiutil::vector<uint8_t> reply;
                         reply.push_back(isscp ? SSH2_MSG_CHANNEL_SUCCESS : SSH2_MSG_CHANNEL_FAILURE);
@@ -783,8 +844,13 @@ void LWSSH::SSHServer::handleChannelRequest(){
 
                 if( bstatus ){
 
-                    if( m_session->current_channel.req_type == "shell" ||
-                        m_session->current_channel.req_type == "pty-req"
+                    pdiutil::string rt_shell = CHARPTR_WRAP("shell");
+                    pdiutil::string rt_pty = CHARPTR_WRAP("pty-req");
+                    pdiutil::string rt_exec = CHARPTR_WRAP("exec");
+                    pdiutil::string rt_subsystem = CHARPTR_WRAP("subsystem");
+
+                    if( m_session->current_channel.req_type == rt_shell ||
+                        m_session->current_channel.req_type == rt_pty
                     ){
                         if( m_session->m_sshclient ){
                             m_session->m_sshclient->setReceivedChannelData(chdata.data);
@@ -803,9 +869,9 @@ void LWSSH::SSHServer::handleChannelRequest(){
                             }
                             #endif
                         }
-                    }else if( m_session->current_channel.req_type == "exec" ){
+                    }else if( m_session->current_channel.req_type == rt_exec ){
 
-                    }else if( m_session->current_channel.req_type == "subsystem" ){
+                    }else if( m_session->current_channel.req_type == rt_subsystem ){
                         handleChannelSubsystemRequest(chdata.data);
                     }
                 }
@@ -832,8 +898,8 @@ void LWSSH::SSHServer::handleChannelRequest(){
                     reply.push_back((m_session->current_channel.client_channel_id >> 8) & 0xFF);
                     reply.push_back(m_session->current_channel.client_channel_id & 0xFF);
                     // append equest type "exit-status"
-                    const char* reqtype = "exit-status";
-                    append_ssh_string(reply, reqtype, strlen(reqtype));
+                    pdiutil::string reqtype = CHARPTR_WRAP("exit-status");
+                    append_ssh_string(reply, reqtype.c_str(), reqtype.length());
                     // append want reply flag
                     reply.push_back(0); // false, we don't want reply for exit-status
                     // append exit status
@@ -906,8 +972,10 @@ void LWSSH::SSHServer::handleChannelRequest(){
 
             m_session->current_channel.ischannelreqsuccess = 2;
 
-            if( m_session->current_channel.req_type == "shell" ||
-                m_session->current_channel.req_type == "pty-req"
+            pdiutil::string rt_shell = CHARPTR_WRAP("shell");
+            pdiutil::string rt_pty = CHARPTR_WRAP("pty-req");
+            if( m_session->current_channel.req_type == rt_shell ||
+                m_session->current_channel.req_type == rt_pty
             ){
                 #ifdef ENABLE_CMD_SERVICE
                 __cmd_service.useTerminal(m_session->m_sshclient);
@@ -924,7 +992,8 @@ void LWSSH::SSHServer::handleChannelRequest(){
 void LWSSH::SSHServer::handleChannelSubsystemRequest(pdiutil::vector<uint8_t>& data){
 
     // Parse the exec request packet
-    if (m_session->current_channel.subsystem_req.subsystem.find("sftp") == 0) {
+    pdiutil::string sftp_str = CHARPTR_WRAP("sftp");
+    if (m_session->current_channel.subsystem_req.subsystem.find(sftp_str) == 0) {
 
         pdiutil::vector<uint8_t> &accum = m_session->current_channel.subsystem_req.sftp.rx_accum;
         accum.insert(accum.end(), data.begin(), data.end());
@@ -956,7 +1025,8 @@ void LWSSH::SSHServer::handleChannelSubsystemRequest(pdiutil::vector<uint8_t>& d
 void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t>& data, bool expectReply){
 
     // Parse the exec request packet
-    if (m_session->current_channel.subsystem_req.subsystem.find("sftp") == 0) {
+    pdiutil::string sftp_str = CHARPTR_WRAP("sftp");
+    if (m_session->current_channel.subsystem_req.subsystem.find(sftp_str) == 0) {
 
         // __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln();
         // __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write_ro(RODT_ATTR("SSH Client channel sftp req : "));

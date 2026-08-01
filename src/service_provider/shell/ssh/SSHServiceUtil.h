@@ -15,6 +15,7 @@ created Date    : 6th Apr 2025
 #include "SSHClientInterface.h"
 #include <service_provider/ServiceProvider.h>
 #include <utility/crypto/symmetric/aes/aes.h>
+#include <utility/crypto/asymmetric/rsa/rsa.h>
 
 namespace LWSSH {
 
@@ -234,6 +235,8 @@ struct LWSSHSession {
     SSHChannel current_channel; // For single-channel servers. currently keeping single channle only.
     ssh_config_t m_ssh_config;  // Per-session auth policy, loaded lazily before userauth.
     bool m_ssh_config_loaded = false;
+    SSHKeyAlgorithm m_negotiated_hostkey_algo = SSH_KEY_ALGO_ED25519; // SSH_KEY_ALGO_MIN => none
+    bool m_client_ext_info = false; // client advertised ext-info-c (RFC 8308)
 };
 
 // Helper functions
@@ -241,10 +244,21 @@ int parse_received_packet(LWSSHSession* session, ssh_packet& packet);
 int parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet);
 bool parse_userauth_request(const pdiutil::vector<uint8_t>& payload, SSHUserAuthRequest& req);
 void load_ssh_config(ssh_config_t& config);
+
+void build_rsa_hostkey_blob(const rsa_key& key, pdiutil::vector<uint8_t>& out);
+bool save_rsa_host_key(const rsa_key& key);
+bool load_rsa_host_key(rsa_key& key);
+void ssh_rng_fill(uint8_t* buf, size_t len);
+bool ed25519_hostkey_exists();
+bool rsa_hostkey_exists();
+void get_supported_hostkey_algos(ssh_name_list& out);
+SSHKeyAlgorithm negotiate_hostkey_algo(const ssh_name_list& client_algos);
+bool client_advertised_ext_info(const ssh_name_list& client_kex_algos);
+void build_ext_info_packet(pdiutil::vector<uint8_t>& payload);
 bool extract_ed25519_blob_field(const pdiutil::vector<uint8_t>& blob, pdiutil::vector<uint8_t>& out, uint32_t expected_size);
-bool is_authorized_pubkey(const pdiutil::vector<uint8_t>& client_rawkey);
+bool is_authorized_pubkey(const pdiutil::vector<uint8_t>& client_pubkey_blob);
 void build_pubkey_auth_signed_data(LWSSHSession* session, const SSHUserAuthRequest& req, pdiutil::vector<uint8_t>& out);
-bool verify_pubkey_signature(LWSSHSession* session, const SSHUserAuthRequest& req, const pdiutil::vector<uint8_t>& rawkey);
+bool verify_pubkey_signature(LWSSHSession* session, const SSHUserAuthRequest& req);
 bool parse_name_list(const pdiutil::vector<uint8_t>& payload, uint32_t& offset, ssh_name_list& name_list);
 bool parse_kex_init_fields(const pdiutil::vector<uint8_t>& payload, SSHKexInitFields& fields);
 bool parse_kex_ecdh_init(const pdiutil::vector<uint8_t>& payload, EcdhInitPacket& packet);
@@ -287,6 +301,12 @@ bool prepare_server_ecdh_reply(LWSSHSession *session,
                                const pdiutil::vector<uint8_t> &server_host_pubkey,
                                const pdiutil::vector<uint8_t> &server_host_privkey,
                                pdiutil::vector<uint8_t> &payload);
+
+bool prepare_server_ecdh_reply_rsa(LWSSHSession *session,
+                                   const pdiutil::vector<uint8_t> &client_pubkey,
+                                   const rsa_key &key,
+                                   SSHKeyAlgorithm algo,
+                                   pdiutil::vector<uint8_t> &payload);
 
 void derive_key(const uint8_t *K, size_t K_len, // shared secret (mpint, usually 32 bytes)
                 const uint8_t *H, size_t H_len, // exchange hash (SHA-256, 32 bytes)

@@ -13,6 +13,7 @@ created Date    : 6th Apr 2025
 #if defined(ENABLE_SSH_SERVICE)
 
 #include "SSHServiceUtil.h"
+#include <utility/SafeAlloc.h>
 #include <helpers/ClientHelper.h>
 #include <helpers/ConfigHelper.h>
 #include <utility/Base64.h>
@@ -420,8 +421,8 @@ void LWSSH::prepare_server_kexinit(pdiutil::vector<uint8_t> &payload){
     }
 
     // 3. Name-lists (choose algorithms you support)
-    ssh_name_list kex_algorithms; kex_algorithms.push_back(CHARPTR_WRAP("curve25519-sha256"));
-    ssh_name_list server_host_key_algorithms; server_host_key_algorithms.push_back(CHARPTR_WRAP("ssh-ed25519"));
+    ssh_name_list kex_algorithms; kex_algorithms.push_back(CHARPTR_WRAP("curve25519-sha256")); kex_algorithms.push_back(SSH_EXT_INFO_S_STR);
+    ssh_name_list server_host_key_algorithms; get_supported_hostkey_algos(server_host_key_algorithms);
     ssh_name_list encryption_algorithms; encryption_algorithms.push_back(CHARPTR_WRAP("aes128-ctr"));
     ssh_name_list mac_algorithms; mac_algorithms.push_back(CHARPTR_WRAP("hmac-sha2-256")); mac_algorithms.push_back(CHARPTR_WRAP("hmac-sha1"));
     ssh_name_list compression_algorithms; compression_algorithms.push_back(CHARPTR_WRAP("none"));
@@ -909,6 +910,96 @@ bool LWSSH::prepare_server_ecdh_reply(LWSSHSession* session,
     return true;
 }
 
+static void ssh_bn_yield() { __i_dvc_ctrl.yield(); }
+
+/**
+ * @brief Prepare the ECDH reply signed with an RSA host key.
+ *        Mirrors prepare_server_ecdh_reply but the host key blob is "ssh-rsa"
+ *        and H is signed with RSASSA-PKCS1-v1_5 (rsa-sha2-256/512).
+ * @param session The SSH session to use.
+ * @param client_pubkey Client's ephemeral Curve25519 public key.
+ * @param key The RSA host key (with private + CRT params).
+ * @param algo Negotiated signature algorithm (RSA_SHA256 or RSA_SHA512).
+ * @param payload Output KEX_ECDH_REPLY payload.
+ */
+bool LWSSH::prepare_server_ecdh_reply_rsa(LWSSHSession* session,
+                            const pdiutil::vector<uint8_t>& client_pubkey,
+                            const rsa_key& key,
+                            SSHKeyAlgorithm algo,
+                            pdiutil::vector<uint8_t>& payload) {
+
+    if (!session || !session->m_client) {
+        return false;
+    }
+
+    // Route bignum yields through the device so the watchdog stays fed during
+    // the long RSA sign. Do NOT disable the WDT: on esp8266 that also stops the
+    // hardware-WDT feed, so a multi-second sign would reset the device.
+    bn_set_yield_hook(ssh_bn_yield);
+
+    // 1. Generate ephemeral Curve25519 key pair (random per session)
+    if (!create_server_ephemeral_keys(session->m_server_ephermeral_pubkey,
+        session->m_server_ephermeral_privkey, nullptr)) {
+        bn_set_yield_hook(nullptr);
+        return false;
+    }
+
+    __i_dvc_ctrl.yield();
+
+    // 2. Compute shared secret
+    crypto_scalarmult(session->m_shared_secret_key, session->m_server_ephermeral_privkey.data(), client_pubkey.data());
+
+    __i_dvc_ctrl.yield();
+
+    // 3. Server host key blob (always "ssh-rsa")
+    pdiutil::vector<uint8_t> hostkey_blob;
+    build_rsa_hostkey_blob(key, hostkey_blob);
+
+    // 4. Build exchange hash H
+    build_exchange_hash(
+        session->m_client_version,
+        session->m_server_version,
+        session->m_client_kexinit.payload,
+        session->m_server_kexinit.payload,
+        hostkey_blob,
+        client_pubkey,
+        session->m_server_ephermeral_pubkey,
+        session->m_shared_secret_key,
+        session->m_exchange_hash_h
+    );
+
+    __i_dvc_ctrl.yield();
+
+    // 5. Sign exchange hash with RSA host key
+    rsa_hash_alg hashalg = (algo == SSH_KEY_ALGO_RSA_SHA512) ? RSA_HASH_SHA512 : RSA_HASH_SHA256;
+    pdiutil::string signame = (algo == SSH_KEY_ALGO_RSA_SHA512) ? SSH_RSA_SIG_ALGO_SHA512_STR : SSH_RSA_SIG_ALGO_SHA256_STR;
+
+    uint8_t sigbuf[RSA_MAX_KEY_BITS / 8];
+    size_t siglen = 0;
+    bool signed_ok = rsa_sign_pkcs1(&key, hashalg, session->m_exchange_hash_h, 32, sigbuf, &siglen);
+
+    bn_set_yield_hook(nullptr);
+    __i_dvc_ctrl.yield();
+
+    if (!signed_ok) {
+        return false;
+    }
+
+    // 6. Build SSH_MSG_KEX_ECDH_REPLY payload
+    payload.push_back(SSH2_MSG_KEXDH_REPLY);
+    append_ssh_string(payload, hostkey_blob);
+    append_ssh_string(payload, session->m_server_ephermeral_pubkey);
+
+    // signature blob: string(sig-algo-name) + string(raw signature)
+    pdiutil::vector<uint8_t> sig_blob;
+    append_ssh_string(sig_blob, signame.c_str(), signame.length());
+    pdiutil::vector<uint8_t> sigvec(sigbuf, sigbuf + siglen);
+    append_ssh_string(sig_blob, sigvec);
+    append_ssh_string(payload, sig_blob);
+
+    return true;
+}
+
 /**
  * @brief Derives a key from the shared secret and exchange hash.
  *        Implements the key derivation function as per RFC 4253 section 7.2.
@@ -962,11 +1053,14 @@ bool LWSSH::parse_userauth_request(const pdiutil::vector<uint8_t>& payload, SSHU
     if (!read_ssh_string(payload, req.service, offset)) return false;
     if (!read_ssh_string(payload, req.method, offset)) return false;
 
-    if (req.method == "password") {
+    pdiutil::string method_password = CHARPTR_WRAP("password");
+    pdiutil::string method_publickey = CHARPTR_WRAP("publickey");
+
+    if (req.method == method_password) {
         if (offset >= payload.size()) return false;
         bool has_old_password = payload[offset++] != 0;
         if (!read_ssh_string(payload, req.password, offset)) return false;
-    } else if (req.method == "publickey") {
+    } else if (req.method == method_publickey) {
         if (offset >= payload.size()) return false;
         req.has_signature = payload[offset++] != 0;
         if (!read_ssh_string(payload, req.pk_algorithm, offset)) return false;
@@ -994,11 +1088,17 @@ void LWSSH::load_ssh_config(ssh_config_t& config) {
         return;
     }
 
+    pdiutil::string val_no = CHARPTR_WRAP("no");
+    pdiutil::string val_No = CHARPTR_WRAP("No");
+    pdiutil::string val_NO = CHARPTR_WRAP("NO");
+    pdiutil::string val_0 = CHARPTR_WRAP("0");
+    pdiutil::string val_false = CHARPTR_WRAP("false");
+
     for (size_t i = 0; i < kvs.size(); i++) {
 
-        bool enabled = !(kvs[i].m_value == "no" || kvs[i].m_value == "No" ||
-                         kvs[i].m_value == "NO" || kvs[i].m_value == "0" ||
-                         kvs[i].m_value == "false");
+        bool enabled = !(kvs[i].m_value == val_no || kvs[i].m_value == val_No ||
+                         kvs[i].m_value == val_NO || kvs[i].m_value == val_0 ||
+                         kvs[i].m_value == val_false);
 
         if (kvs[i].m_key == keyPasswordAuth) {
             config.m_password_auth = enabled;
@@ -1006,6 +1106,186 @@ void LWSSH::load_ssh_config(ssh_config_t& config) {
             config.m_pubkey_auth = enabled;
         }
     }
+}
+
+void LWSSH::ssh_rng_fill(uint8_t* buf, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        buf[i] = (uint8_t)(rand() & 0xFF);
+    }
+}
+
+static void bn_to_vec(const bignum& b, pdiutil::vector<uint8_t>& out) {
+    out.clear();
+    int32_t nb = bn_num_bytes(&b);
+    if (nb <= 0) return;
+    out.resize(nb);
+    bn_to_bytes(&b, out.data(), nb);
+}
+
+static bool vec_to_bn(bignum& b, const pdiutil::vector<uint8_t>& in) {
+    bn_zero(&b);
+    if (in.size() == 0) return true;
+    return bn_from_bytes(&b, in.data(), in.size());
+}
+
+static void append_bn_string(pdiutil::vector<uint8_t>& out, const bignum& b) {
+    pdiutil::vector<uint8_t> tmp;
+    bn_to_vec(b, tmp);
+    append_ssh_string(out, tmp);
+}
+
+// SSH host-key public blob: string("ssh-rsa") mpint(e) mpint(n)
+void LWSSH::build_rsa_hostkey_blob(const rsa_key& key, pdiutil::vector<uint8_t>& out) {
+    out.clear();
+    pdiutil::string keytype = SSH_RSA_KEY_TYPE_STR;
+    append_ssh_string(out, keytype.c_str(), keytype.length());
+    pdiutil::vector<uint8_t> eb, nb;
+    bn_to_vec(key.e, eb);
+    bn_to_vec(key.n, nb);
+    append_mpint(out, eb.data(), (int32_t)eb.size());
+    append_mpint(out, nb.data(), (int32_t)nb.size());
+}
+
+static void rsa_ssh_paths(char* sshdir, size_t dirsz, char* priv, size_t privsz, char* pub, size_t pubsz) {
+    const char* homedir = __i_fs.getHomeDirectory();
+    __snprintf(sshdir, dirsz, "%s/%s", (strlen(homedir) > 1 ? homedir : ""), SSH_DEFAULT_DIR);
+    __snprintf(priv, privsz, "%s/%s", sshdir, SSH_KEY_ALGO_RSA_STR);
+    __snprintf(pub, pubsz, "%s/%s.pub", sshdir, SSH_KEY_ALGO_RSA_STR);
+}
+
+// Private file: ssh-string sequence n,e,d,p,q,dp,dq,qinv. Public file: host-key blob.
+bool LWSSH::save_rsa_host_key(const rsa_key& key) {
+    char sshdir[30]; char priv[45]; char pub[45];
+    memset(sshdir, 0, sizeof(sshdir)); memset(priv, 0, sizeof(priv)); memset(pub, 0, sizeof(pub));
+    rsa_ssh_paths(sshdir, sizeof(sshdir), priv, sizeof(priv), pub, sizeof(pub));
+
+    if (!__i_fs.isDirectory(sshdir)) {
+        if (__i_fs.createDirectory(sshdir) < 0) return false;
+    }
+
+    pdiutil::vector<uint8_t> pb;
+    append_bn_string(pb, key.n);
+    append_bn_string(pb, key.e);
+    append_bn_string(pb, key.d);
+    append_bn_string(pb, key.p);
+    append_bn_string(pb, key.q);
+    append_bn_string(pb, key.dp);
+    append_bn_string(pb, key.dq);
+    append_bn_string(pb, key.qinv);
+    int privst = __i_fs.writeFile(priv, (const char*)pb.data(), pb.size());
+
+    pdiutil::vector<uint8_t> blob;
+    build_rsa_hostkey_blob(key, blob);
+    int pubst = __i_fs.writeFile(pub, (const char*)blob.data(), blob.size());
+
+    return privst >= 0 && pubst >= 0;
+}
+
+bool LWSSH::load_rsa_host_key(rsa_key& key) {
+    rsa_key_init(&key);
+    char sshdir[30]; char priv[45]; char pub[45];
+    memset(sshdir, 0, sizeof(sshdir)); memset(priv, 0, sizeof(priv)); memset(pub, 0, sizeof(pub));
+    rsa_ssh_paths(sshdir, sizeof(sshdir), priv, sizeof(priv), pub, sizeof(pub));
+
+    if (!__i_fs.isFileExist(priv)) return false;
+
+    pdiutil::vector<uint8_t> pb;
+    __i_fs.readFile(priv, 64, [&](char* data, uint32_t size)->bool{
+        pb.insert(pb.end(), data, data + size);
+        return true;
+    });
+    __i_dvc_ctrl.yield();
+
+    int32_t offset = 0;
+    pdiutil::vector<uint8_t> f;
+    bool ok = true;
+    bignum* fields[8] = { &key.n, &key.e, &key.d, &key.p, &key.q, &key.dp, &key.dq, &key.qinv };
+    for (int32_t i = 0; i < 8 && ok; i++) {
+        f.clear();
+        ok = read_ssh_string(pb, f, offset) && vec_to_bn(*fields[i], f);
+    }
+
+    if (ok) { key.has_private = true; key.has_crt = true; }
+    return ok;
+}
+
+bool LWSSH::ed25519_hostkey_exists() {
+    const char* homedir = __i_fs.getHomeDirectory();
+    char sshdir[30]; char priv[45]; char pub[45];
+    memset(sshdir, 0, sizeof(sshdir)); memset(priv, 0, sizeof(priv)); memset(pub, 0, sizeof(pub));
+    __snprintf(sshdir, sizeof(sshdir), "%s/%s", (strlen(homedir) > 1 ? homedir : ""), SSH_DEFAULT_DIR);
+    __snprintf(priv, sizeof(priv), "%s/%s", sshdir, SSH_KEY_ALGO_ED25519_STR);
+    __snprintf(pub, sizeof(pub), "%s/%s.pub", sshdir, SSH_KEY_ALGO_ED25519_STR);
+    return __i_fs.isFileExist(priv) && __i_fs.isFileExist(pub);
+}
+
+bool LWSSH::rsa_hostkey_exists() {
+    const char* homedir = __i_fs.getHomeDirectory();
+    char sshdir[30]; char priv[45];
+    memset(sshdir, 0, sizeof(sshdir)); memset(priv, 0, sizeof(priv));
+    __snprintf(sshdir, sizeof(sshdir), "%s/%s", (strlen(homedir) > 1 ? homedir : ""), SSH_DEFAULT_DIR);
+    __snprintf(priv, sizeof(priv), "%s/%s", sshdir, SSH_KEY_ALGO_RSA_STR);
+    return __i_fs.isFileExist(priv);
+}
+
+// Build the server_host_key_algorithms name-list from what we actually hold.
+// When no key exists at all, still advertise ssh-ed25519 so the downstream
+// "create keys" path surfaces the usual friendly error.
+void LWSSH::get_supported_hostkey_algos(ssh_name_list& out) {
+    out.clear();
+    bool have_ed = ed25519_hostkey_exists();
+    bool have_rsa = rsa_hostkey_exists();
+    if (have_ed || (!have_ed && !have_rsa)) {
+        out.push_back(SSH_ED25519_KEY_TYPE_STR);
+    }
+    if (have_rsa) {
+        out.push_back(SSH_RSA_SIG_ALGO_SHA512_STR);
+        out.push_back(SSH_RSA_SIG_ALGO_SHA256_STR);
+    }
+}
+
+// Pick the first client-listed algorithm we support (RFC 4253 7.1).
+SSHKeyAlgorithm LWSSH::negotiate_hostkey_algo(const ssh_name_list& client_algos) {
+    ssh_name_list supported;
+    get_supported_hostkey_algos(supported);
+
+    pdiutil::string ed = SSH_ED25519_KEY_TYPE_STR;
+    pdiutil::string rsa256 = SSH_RSA_SIG_ALGO_SHA256_STR;
+    pdiutil::string rsa512 = SSH_RSA_SIG_ALGO_SHA512_STR;
+
+    for (size_t i = 0; i < client_algos.size(); i++) {
+        bool ok = false;
+        for (size_t j = 0; j < supported.size() && !ok; j++) {
+            if (client_algos[i] == supported[j]) ok = true;
+        }
+        if (!ok) continue;
+        if (client_algos[i] == ed) return SSH_KEY_ALGO_ED25519;
+        if (client_algos[i] == rsa512) return SSH_KEY_ALGO_RSA_SHA512;
+        if (client_algos[i] == rsa256) return SSH_KEY_ALGO_RSA_SHA256;
+    }
+    return SSH_KEY_ALGO_MIN;
+}
+
+// RFC 8308: did the client advertise ext-info-c in its kex_algorithms list.
+bool LWSSH::client_advertised_ext_info(const ssh_name_list& client_kex_algos) {
+    pdiutil::string ext_c = SSH_EXT_INFO_C_STR;
+    for (size_t i = 0; i < client_kex_algos.size(); i++) {
+        if (client_kex_algos[i] == ext_c) return true;
+    }
+    return false;
+}
+
+// RFC 8308 SSH_MSG_EXT_INFO carrying a single server-sig-algs extension so the
+// client knows we accept rsa-sha2-256/512 signatures for user authentication.
+void LWSSH::build_ext_info_packet(pdiutil::vector<uint8_t>& payload) {
+    payload.clear();
+    payload.push_back(SSH2_MSG_EXT_INFO);
+    payload.push_back(0x00); payload.push_back(0x00);
+    payload.push_back(0x00); payload.push_back(0x01);
+    pdiutil::string name = SSH_EXT_SERVER_SIG_ALGS_STR;
+    pdiutil::string value = SSH_SERVER_SIG_ALGS_VALUE_STR;
+    append_ssh_string(payload, name.c_str(), name.length());
+    append_ssh_string(payload, value.c_str(), value.length());
 }
 
 /**
@@ -1040,22 +1320,24 @@ bool LWSSH::extract_ed25519_blob_field(const pdiutil::vector<uint8_t>& blob, pdi
 }
 
 /**
- * @brief Check whether a client's Ed25519 public key is authorized.
+ * @brief Check whether a client's public key is authorized.
  *
- * Reads <home>/.ssh/authorized_keys and matches the raw 32-byte key against
- * each "ssh-ed25519 <base64 blob> [comment]" entry.
+ * Reads <home>/.ssh/authorized_keys and matches the client's raw public-key
+ * blob against each "<keytype> <base64 blob> [comment]" entry. Key-type
+ * agnostic: works for ssh-ed25519 and ssh-rsa alike.
  *
- * @param client_rawkey The client's raw 32-byte Ed25519 public key.
+ * @param client_pubkey_blob The client's SSH public-key blob.
  * @return True if a matching authorized key is found.
  */
-bool LWSSH::is_authorized_pubkey(const pdiutil::vector<uint8_t>& client_rawkey) {
+bool LWSSH::is_authorized_pubkey(const pdiutil::vector<uint8_t>& client_pubkey_blob) {
 
-    if (client_rawkey.size() != ED25519_PUBKEY_SIZE) {
+    if (client_pubkey_blob.size() == 0) {
         return false;
     }
 
     const char* homedir = __i_fs.getHomeDirectory();
-    pdiutil::string keytype = SSH_ED25519_KEY_TYPE_STR;
+    pdiutil::string ed = SSH_ED25519_KEY_TYPE_STR;
+    pdiutil::string rsa = SSH_RSA_KEY_TYPE_STR;
     pdiutil::string akfile = SSH_AUTHORIZED_KEYS_FILE;
 
     char akpath[64]; memset(akpath, 0, sizeof(akpath));
@@ -1070,7 +1352,7 @@ bool LWSSH::is_authorized_pubkey(const pdiutil::vector<uint8_t>& client_rawkey) 
     bool authorized = false;
     for (size_t i = 0; i < kvs.size() && !authorized; i++) {
 
-        if (kvs[i].m_key != keytype) {
+        if (kvs[i].m_key != ed && kvs[i].m_key != rsa) {
             continue;
         }
 
@@ -1087,12 +1369,8 @@ bool LWSSH::is_authorized_pubkey(const pdiutil::vector<uint8_t>& client_rawkey) 
         }
         blob.resize(declen);
 
-        pdiutil::vector<uint8_t> rawkey;
-        if (!extract_ed25519_blob_field(blob, rawkey, ED25519_PUBKEY_SIZE)) {
-            continue;
-        }
-
-        if (memcmp(rawkey.data(), client_rawkey.data(), ED25519_PUBKEY_SIZE) == 0) {
+        if (blob.size() == client_pubkey_blob.size() &&
+            memcmp(blob.data(), client_pubkey_blob.data(), blob.size()) == 0) {
             authorized = true;
         }
 
@@ -1126,24 +1404,79 @@ void LWSSH::build_pubkey_auth_signed_data(LWSSHSession* session, const SSHUserAu
     append_ssh_string(out, req.pubkey_blob);
 }
 
+// Parse an "ssh-rsa" public-key blob (string("ssh-rsa") mpint(e) mpint(n)) into key.
+static bool extract_rsa_pubkey(const pdiutil::vector<uint8_t>& blob, rsa_key& key) {
+    int32_t offset = 0;
+    pdiutil::string type;
+    if (!read_ssh_string(blob, type, offset)) return false;
+    pdiutil::string expected = SSH_RSA_KEY_TYPE_STR;
+    if (type != expected) return false;
+
+    pdiutil::vector<uint8_t> e, n;
+    if (!read_ssh_string(blob, e, offset)) return false;
+    if (!read_ssh_string(blob, n, offset)) return false;
+
+    rsa_key_init(&key);
+    return bn_from_bytes(&key.e, e.data(), e.size()) &&
+           bn_from_bytes(&key.n, n.data(), n.size());
+}
+
 /**
  * @brief Verify a publickey userauth signature against the client's key.
+ *        Dispatches on the key type in req.pubkey_blob (ssh-ed25519 / ssh-rsa).
  * @param session The SSH session.
  * @param req The parsed publickey userauth request (must carry a signature).
- * @param rawkey The client's raw 32-byte Ed25519 public key.
  * @return True if the signature verifies.
  */
-bool LWSSH::verify_pubkey_signature(LWSSHSession* session, const SSHUserAuthRequest& req, const pdiutil::vector<uint8_t>& rawkey) {
+bool LWSSH::verify_pubkey_signature(LWSSHSession* session, const SSHUserAuthRequest& req) {
 
-    pdiutil::vector<uint8_t> rawsig;
-    if (!extract_ed25519_blob_field(req.signature, rawsig, SSH_ED25519_SIG_SIZE)) {
+    int32_t offset = 0;
+    pdiutil::string type;
+    if (!read_ssh_string(req.pubkey_blob, type, offset)) {
         return false;
     }
 
     pdiutil::vector<uint8_t> signed_data;
     build_pubkey_auth_signed_data(session, req, signed_data);
 
-    return ed25519_verify(rawsig.data(), signed_data.data(), signed_data.size(), rawkey.data()) != 0;
+    pdiutil::string ed = SSH_ED25519_KEY_TYPE_STR;
+    pdiutil::string rsa = SSH_RSA_KEY_TYPE_STR;
+
+    if (type == ed) {
+
+        pdiutil::vector<uint8_t> rawkey, rawsig;
+        if (!extract_ed25519_blob_field(req.pubkey_blob, rawkey, ED25519_PUBKEY_SIZE)) return false;
+        if (!extract_ed25519_blob_field(req.signature, rawsig, SSH_ED25519_SIG_SIZE)) return false;
+        return ed25519_verify(rawsig.data(), signed_data.data(), signed_data.size(), rawkey.data()) != 0;
+
+    } else if (type == rsa) {
+
+        // signature blob: string(sig-algo-name) + string(raw signature)
+        int32_t sigoff = 0;
+        pdiutil::string signame;
+        pdiutil::vector<uint8_t> rawsig;
+        if (!read_ssh_string(req.signature, signame, sigoff)) return false;
+        if (!read_ssh_string(req.signature, rawsig, sigoff)) return false;
+
+        pdiutil::string rsa512 = SSH_RSA_SIG_ALGO_SHA512_STR;
+        rsa_hash_alg alg = (signame == rsa512) ? RSA_HASH_SHA512 : RSA_HASH_SHA256;
+
+        rsa_key* key = pdiutil::safe_new<rsa_key>();
+        if (!key) return false;
+        bool ok = extract_rsa_pubkey(req.pubkey_blob, *key);
+        if (ok) {
+            // Keep the WDT enabled; the yield hook feeds it (disabling it stops
+            // the esp8266 hardware-WDT feed).
+            bn_set_yield_hook(ssh_bn_yield);
+            ok = rsa_verify_pkcs1(key, alg, signed_data.data(), signed_data.size(),
+                                  rawsig.data(), rawsig.size());
+            bn_set_yield_hook(nullptr);
+        }
+        pdiutil::safe_delete(key);
+        return ok;
+    }
+
+    return false;
 }
 
 /**
@@ -1249,10 +1582,16 @@ bool LWSSH::parse_channel_request_pty_req(LWSSHSession *session, const pdiutil::
     if (offset + 4 > data.size()) return false;
     req.width_chars = (data[offset] << 24) | (data[offset+1] << 16) | (data[offset+2] << 8) | data[offset+3];
     offset += 4;
+    if (session->m_sshclient) {
+        session->m_sshclient->set_column_width((uint16_t)req.width_chars);
+    }
     // Parse height_rows
     if (offset + 4 > data.size()) return false;
     req.height_rows = (data[offset] << 24) | (data[offset+1] << 16) | (data[offset+2] << 8) | data[offset+3];
     offset += 4;
+    if (session->m_sshclient) {
+        session->m_sshclient->set_row_count((uint16_t)req.height_rows);
+    }
     // Parse width_pixels
     if (offset + 4 > data.size()) return false;
     req.width_pixels = (data[offset] << 24) | (data[offset+1] << 16) | (data[offset+2] << 8) | data[offset+3];

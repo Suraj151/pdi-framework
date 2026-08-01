@@ -678,6 +678,14 @@ typedef struct CommandBase {
     virtual bool preservesLineBuffer() { return false; }
 
     /**
+     * @brief Whether a waiting command paints the active input line itself.
+     *        When true the input loop stops echoing typed characters, edits and
+     *        cursor moves, and routes every keystroke to the command so it can
+     *        render (e.g. a horizontally scrolling line editor).
+     */
+    virtual bool managesLineRender() { return false; }
+
+    /**
      * @brief Returns a one-line usage description of the command in RO/flash
      *        memory (must be `RODT_ATTR`-wrapped). Read with `write_ro`.
      *        Backs `help` output and the `usage:` line printed on argument

@@ -101,7 +101,7 @@ struct FileReadCommand : public CommandBase {
  * cancel (!c) or delete the current line (!d). Only the active line lives in
  * the session buffer; surrounding lines are read from the working file.
  */
-#define FWRITE_WIN_ROWS   10   // visible line rows in the viewport
+#define FWRITE_MAX_ROWS   24   // max viewport content rows (row-offset array bound)
 #define FWRITE_BACKSCAN   512 // max bytes scanned backward to find a line start
 
 struct FileEditCommand : public CommandBase {
@@ -139,8 +139,14 @@ struct FileEditCommand : public CommandBase {
 	uint32_t m_topLineNo = 0;           // line number (0-based) of top visible line
 	uint32_t m_curLineNo = 0;           // active line number
 	uint32_t m_curOffset = 0;           // byte offset of active line start
-	uint32_t m_rowOffset[FWRITE_WIN_ROWS]; // byte offset of each visible line
+	uint32_t m_rowOffset[FWRITE_MAX_ROWS]; // byte offset of each visible line
 	uint8_t m_rowCount = 0;             // number of visible lines drawn
+	uint8_t m_activeTermRow = 0;        // terminal row of the active line
+	uint32_t m_hscroll = 0;             // horizontal scroll offset of active line
+	uint16_t m_width = 80;              // terminal columns used for wrapping
+	uint16_t m_rows = 24;               // terminal rows
+	uint16_t m_winRows = FWRITE_MAX_ROWS; // active viewport content rows
+	uint16_t m_footerRow = FWRITE_MAX_ROWS + 2; // terminal row of the footer bar
 
 #ifdef ENABLE_AUTH_SERVICE
 	/* override the necesity of required permission */
@@ -149,6 +155,9 @@ struct FileEditCommand : public CommandBase {
 
 	/* keep the preloaded active line in the session buffer while editing */
 	bool preservesLineBuffer() override { return m_editing; }
+
+	/* fedit paints the active line itself (horizontal scroll) while editing */
+	bool managesLineRender() override { return m_editing && !m_escMenu; }
 
 	/* editor drives everything from execute(); keep this a pass-through */
 	cmd_result_t executeTermInputAction(cmd_term_inseq_t terminputaction) override{
@@ -224,7 +233,7 @@ struct FileEditCommand : public CommandBase {
 			case CMD_TERM_INSEQ_ESC:
 			case CMD_TERM_INSEQ_CTRL_C:
 			case CMD_TERM_INSEQ_CTRL_Z:     enterEscMenu(s); break;
-			default: break;
+			default:                        redrawActiveLine(s); break;
 		}
 
 		setWaitingForOption((int8_t)0);
@@ -269,6 +278,7 @@ struct FileEditCommand : public CommandBase {
 		s->m_linebuf = content;
 		s->m_cursor = (cursorcol > (uint32_t)content.size()) ? content.size() : cursorcol;
 		m_activePristine = content;
+		m_hscroll = 0;
 	}
 
 	/* Read one line from the working file starting at byteOffset.
@@ -394,7 +404,7 @@ struct FileEditCommand : public CommandBase {
 		if( !readLineAt(nextOff, next, nc, ne) ) return; // no line below
 
 		m_curLineNo++;
-		if( m_curLineNo - m_topLineNo >= FWRITE_WIN_ROWS ){
+		if( m_curLineNo - m_topLineNo >= m_winRows ){
 			pdiutil::string t; uint32_t tc; bool te;
 			readLineAt(m_topOffset, t, tc, te);
 			m_topOffset += tc;
@@ -446,7 +456,7 @@ struct FileEditCommand : public CommandBase {
 		m_activePristine = left; // left part now on the original line
 
 		m_curLineNo++;
-		if( m_curLineNo - m_topLineNo >= FWRITE_WIN_ROWS ){
+		if( m_curLineNo - m_topLineNo >= m_winRows ){
 			pdiutil::string t; uint32_t tc; bool te;
 			readLineAt(m_topOffset, t, tc, te);
 			m_topOffset += tc;
@@ -484,7 +494,7 @@ struct FileEditCommand : public CommandBase {
 
 	/* Draw a full-width reverse-video bar (nano-style) at the given row */
 	void writeBar(uint8_t row, const pdiutil::string &text){
-		const uint16_t width = 80;
+		const uint16_t width = m_width;
 		pdiutil::string line = text;
 		if( (uint16_t)line.size() < width ) line.resize(width, ' ');
 		else line = line.substr(0, width);
@@ -498,10 +508,10 @@ struct FileEditCommand : public CommandBase {
 	void drawBottomBar(bool menu){
 		pdiutil::string txt = menu ? "  !w save    !c cancel    !d delline    "
 		                           : "  ESC  options    ";
-		writeBar(FWRITE_WIN_ROWS + 4, txt);
+		writeBar(m_footerRow, txt);
 		if( menu ){
 			// leave the cursor after the options so the typed token shows there
-			m_terminal->csi_cursor_move((uint8_t)(txt.size() + 1), FWRITE_WIN_ROWS + 4);
+			m_terminal->csi_cursor_move((uint16_t)(txt.size() + 1), m_footerRow);
 		}
 	}
 
@@ -551,6 +561,8 @@ struct FileEditCommand : public CommandBase {
 	/* Repaint the viewport and place the cursor on the active line */
 	void redraw(session_t *s){
 
+		refreshLayout();
+
 		// Clear once on open so the viewport anchors at the screen top; later
 		// redraws repaint each row in place (erase_in_line) without wiping the
 		// whole terminal, so the cursor never jumps back to the first line.
@@ -567,10 +579,10 @@ struct FileEditCommand : public CommandBase {
 		uint32_t off = m_topOffset;
 		uint32_t lineno = m_topLineNo;
 		m_rowCount = 0;
-		uint8_t activeTermRow = 0;
+		m_activeTermRow = 0;
 		bool atEnd = false;
 
-		for( uint8_t i = 0; i < FWRITE_WIN_ROWS; i++ ){
+		for( uint16_t i = 0; i < m_winRows; i++ ){
 
 			uint8_t termRow = i + 2; // header occupies row 1
 			m_terminal->csi_cursor_move(1, termRow);
@@ -588,9 +600,7 @@ struct FileEditCommand : public CommandBase {
 				// no file line here; render the active line only if it is the
 				// virtual line at EOF (empty file / freshly created)
 				if( lineno == m_curLineNo ){
-					m_terminal->write_ro(RODT_ATTR("> "));
-					m_terminal->write(s->m_linebuf.c_str());
-					activeTermRow = termRow;
+					m_activeTermRow = termRow;
 					m_curOffset = off;
 					m_rowOffset[m_rowCount++] = off;
 				}
@@ -601,29 +611,90 @@ struct FileEditCommand : public CommandBase {
 			m_rowOffset[m_rowCount++] = off;
 
 			if( lineno == m_curLineNo ){
-				m_terminal->write_ro(RODT_ATTR("> "));
-				m_terminal->write(s->m_linebuf.c_str());
-				activeTermRow = termRow;
+				m_activeTermRow = termRow;
 				m_curOffset = off;
 			}else{
 				m_terminal->write_ro(RODT_ATTR("  "));
-				m_terminal->write(linetext.c_str());
+				m_terminal->write(clipLine(linetext).c_str());
 			}
 
 			off += consumed;
 			lineno++;
 		}
 
-		// two blank separator rows, then the bottom hint bar
-		m_terminal->csi_cursor_move(1, FWRITE_WIN_ROWS + 2);
-		m_terminal->csi_erase_in_line(2);
-		m_terminal->csi_cursor_move(1, FWRITE_WIN_ROWS + 3);
-		m_terminal->csi_erase_in_line(2);
+		// clear any rows between the content and the bottom-pinned footer
+		for( uint16_t r = m_winRows + 2; r < m_footerRow; r++ ){
+			m_terminal->csi_cursor_move(1, r);
+			m_terminal->csi_erase_in_line(2);
+		}
 		drawBottomBar(false);
 
-		if( activeTermRow ){
-			m_terminal->csi_cursor_move((uint8_t)(3 + s->m_cursor), activeTermRow);
+		if( m_activeTermRow ){
+			redrawActiveLine(s);
 		}
+	}
+
+	/* Pull the live terminal size and derive the viewport + footer position */
+	void refreshLayout(){
+		if( m_terminal ){
+			m_width = m_terminal->get_column_width();
+			m_rows = m_terminal->get_row_count();
+		}
+		uint16_t fr = (m_rows >= 4) ? m_rows : (FWRITE_MAX_ROWS + 2);
+		m_footerRow = fr;
+		int32_t win = (int32_t)fr - 2; // rows between header (1) and footer
+		if( win < 1 ) win = 1;
+		if( win > FWRITE_MAX_ROWS ) win = FWRITE_MAX_ROWS;
+		m_winRows = (uint16_t)win;
+	}
+
+	/* Clip a non-active line to the viewport width, flagging right overflow */
+	pdiutil::string clipLine(const pdiutil::string &text){
+		int32_t avail = (int32_t)m_width - 3;
+		if( avail < 8 ) avail = 8;
+		if( (int32_t)text.size() <= avail ) return text;
+		pdiutil::string v = text.substr(0, avail);
+		v[avail - 1] = '>';
+		return v;
+	}
+
+	/* Repaint only the active line row, horizontally scrolled to keep the
+	   cursor visible, and place the cursor at its column */
+	void redrawActiveLine(session_t *s){
+
+		if( m_activeTermRow == 0 ){ redraw(s); return; }
+
+		refreshLayout();
+
+		const int32_t prefix = 2;
+		int32_t avail = (int32_t)m_width - prefix - 1;
+		if( avail < 8 ) avail = 8;
+
+		int32_t len = (int32_t)s->m_linebuf.size();
+		int32_t cur = (int32_t)s->m_cursor;
+		if( cur > len ) cur = len;
+
+		if( cur < (int32_t)m_hscroll ) m_hscroll = (uint32_t)cur;
+		if( cur > (int32_t)m_hscroll + avail - 1 ) m_hscroll = (uint32_t)(cur - (avail - 1));
+
+		int32_t vislen = len - (int32_t)m_hscroll;
+		if( vislen < 0 ) vislen = 0;
+		if( vislen > avail ) vislen = avail;
+
+		pdiutil::string vis = s->m_linebuf.substr(m_hscroll, vislen);
+		if( m_hscroll > 0 && vis.size() > 0 ) vis[0] = '<';
+		if( (int32_t)m_hscroll + avail < len ){
+			if( (int32_t)vis.size() < avail ) vis.resize(avail, ' ');
+			vis[avail - 1] = '>';
+		}
+
+		m_terminal->csi_cursor_move(1, m_activeTermRow);
+		m_terminal->csi_erase_in_line(2);
+		m_terminal->write_ro(RODT_ATTR("> "));
+		m_terminal->write(vis.c_str());
+
+		int32_t cursorcol = prefix + 1 + (cur - (int32_t)m_hscroll);
+		m_terminal->csi_cursor_move((uint16_t)cursorcol, m_activeTermRow);
 	}
 };
 

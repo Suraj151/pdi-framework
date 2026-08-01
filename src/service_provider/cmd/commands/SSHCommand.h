@@ -16,6 +16,14 @@ created Date    : 1st June 2019
 #ifdef ENABLE_SSH_SERVICE
 
 #include <utility/crypto/asymmetric/ed25519/ed25519.h>
+#include <utility/crypto/asymmetric/rsa/rsa.h>
+#include <utility/SafeAlloc.h>
+
+// SSH host-key storage helpers (defined in SSHServiceUtil.cpp)
+namespace LWSSH {
+    bool save_rsa_host_key(const rsa_key& key);
+    void ssh_rng_fill(uint8_t* buf, size_t len);
+}
 
 /**
  * SSH command
@@ -50,7 +58,7 @@ struct SSHCommand : public CommandBase {
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("ssh q=<query>,t=<algo>  q=1 (KEYGEN) creates a keypair of given algo");
+		return RODT_ATTR("ssh q=<query>,t=<algo>  q=1 (KEYGEN) t=1 ed25519, t=2 rsa");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -144,6 +152,32 @@ struct SSHCommand : public CommandBase {
 							m_terminal->write_ro(RODT_ATTR("Failed to save SSH keys : "));
 							m_terminal->writeln((int32_t)iStatus);
 						}
+					}
+				}
+				else if(sshk == SSH_KEY_ALGO_RSA_SHA256 || sshk == SSH_KEY_ALGO_RSA_SHA512){
+
+					rsa_key *key = pdiutil::safe_new<rsa_key>();
+					if( nullptr == key ){
+						result = CMD_RESULT_FAILED;
+						m_terminal->putln();
+						m_terminal->writeln_ro(RODT_ATTR("Not enough memory for RSA key."));
+					}else{
+
+						m_terminal->putln();
+						m_terminal->writeln_ro(RODT_ATTR("Generating RSA key, this may take a while..."));
+
+						bn_set_yield_hook([](){ __i_dvc_ctrl.yield(); });
+						bool gen = rsa_generate_keypair(key, SSH_RSA_KEY_BITS, LWSSH::ssh_rng_fill);
+						bn_set_yield_hook(nullptr);
+
+						if( gen && LWSSH::save_rsa_host_key(*key) ){
+							m_terminal->writeln_ro(RODT_ATTR("SSH keys generated successfully."));
+						}else{
+							result = CMD_RESULT_FAILED;
+							m_terminal->writeln_ro(RODT_ATTR("Failed to generate/save RSA keys."));
+						}
+
+						pdiutil::safe_delete(key);
 					}
 				}
 			}
