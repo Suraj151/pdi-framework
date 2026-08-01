@@ -60,7 +60,15 @@ public:
 
 private:
     iServerInterface* m_server;
-    LWSSHSession* m_session;
+    LWSSHSession* m_sessions[SSH_MAX_SESSIONS]; // concurrent session pool
+    LWSSHSession* m_session;                    // session currently being serviced
+    bool m_handling = false;                    // re-entrancy guard for handle()
+
+    // Create SSH_CONFIG_FILE with default policy when it is missing.
+    void createDefaultSshConfig();
+
+    // Run the state machine for the current session (m_session).
+    void serviceSession();
 
     // Private methods for handling SSH session states
     void handleVersionExchange();

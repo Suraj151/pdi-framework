@@ -27,6 +27,19 @@ Created Date    : 1st June 2019
  */
 bool base64Encode(char input_str[], int len_str, char *res_str);
 
+/**
+ * @brief Decodes a Base64-encoded string into raw bytes.
+ *
+ * Whitespace (space, tab, CR, LF) is skipped; decoding stops at the first
+ * padding character. res_buf must hold at least (len_str*3)/4 bytes.
+ *
+ * @param input_str The Base64 input.
+ * @param len_str The length of the input.
+ * @param res_buf The buffer to store the decoded bytes.
+ * @return The number of decoded bytes, or -1 on invalid input.
+ */
+int base64Decode(const char *input_str, int len_str, unsigned char *res_buf);
+
 
 /**
  * @brief Generates a unique key.

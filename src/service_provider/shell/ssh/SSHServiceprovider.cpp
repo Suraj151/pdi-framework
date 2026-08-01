@@ -23,11 +23,15 @@ using namespace LWSSH;
 /**
  * @brief Constructor for SSHServer.
  */
-SSHServer::SSHServer(): 
-    m_server(nullptr), 
+SSHServer::SSHServer():
+    m_server(nullptr),
     m_session(nullptr),
-    ServiceProvider(SERVICE_SSH, RODT_ATTR("SSH")) 
-    {}
+    ServiceProvider(SERVICE_SSH, RODT_ATTR("SSH"))
+    {
+        for (uint8_t i = 0; i < SSH_MAX_SESSIONS; i++) {
+            m_sessions[i] = nullptr;
+        }
+    }
 
 /**
  * @brief Destructor for SSHServer.
@@ -66,6 +70,8 @@ bool SSHServer::start(uint16_t port) {
  */
 bool SSHServer::initService(void *arg) {
 
+    createDefaultSshConfig();
+
     bool started = false;
 
     if (arg) {
@@ -88,10 +94,45 @@ bool SSHServer::initService(void *arg) {
 }
 
 /**
+ * @brief Create SSH_CONFIG_FILE with default policy when it is missing.
+ */
+void SSHServer::createDefaultSshConfig() {
+
+    pdiutil::string cfgfile = SSH_CONFIG_FILE;
+    pdiutil::string cfgdir = SSH_CONFIG_DIR;
+
+    if (__i_fs.isFileExist(cfgfile.c_str())) {
+        return;
+    }
+
+    if (!__i_fs.isDirExist(cfgdir.c_str())) {
+        if (__i_fs.createDirectory(cfgdir.c_str()) < 0) {
+            return;
+        }
+    }
+
+    pdiutil::string defaultcfg = CHARPTR_WRAP(
+        "# PDI SSH server configuration\n"
+        "# PasswordAuthentication yes|no\n"
+        "# PubkeyAuthentication yes|no\n"
+        "PasswordAuthentication yes\n"
+        "PubkeyAuthentication yes\n");
+
+    __i_fs.createFile(cfgfile.c_str(), defaultcfg.c_str());
+}
+
+/**
  * @brief Stop the SSH service.
  */
 void SSHServer::stop() {
-    closeSession();
+    for (uint8_t i = 0; i < SSH_MAX_SESSIONS; i++) {
+        if (m_sessions[i]) {
+            m_session = m_sessions[i];
+            closeSession();
+            m_sessions[i] = nullptr;
+        }
+    }
+    m_session = nullptr;
     if (m_server) {
         m_server->close();
     }
@@ -129,20 +170,56 @@ void SSHServer::handle() {
         return; // Server not initialized
     }
 
-    // Check if there is a new client connection
-    if (!m_session && m_server->hasClient()) {
+    // handle() runs from both the periodic interval and the accept callback;
+    // guard against re-entrancy so the service loop can't corrupt m_session.
+    if (m_handling) {
+        return;
+    }
+    m_handling = true;
 
-        m_session = new LWSSHSession(m_server->accept());
+    // Accept new client connections into any free pool slot. Clients that
+    // arrive while the pool is full stay queued in the transport backlog.
+    while (m_server->hasClient()) {
+
+        int8_t slot = -1;
+        for (uint8_t i = 0; i < SSH_MAX_SESSIONS; i++) {
+            if (m_sessions[i] == nullptr) { slot = i; break; }
+        }
+        if (slot < 0) {
+            break; // pool full
+        }
+
+        m_sessions[slot] = new LWSSHSession(m_server->accept());
 
         #ifdef ENABLE_CMD_SERVICE
-        m_session->m_sshclient->set_terminal_type(TERMINAL_TYPE_SSH);
-        // Inform serial terminal about the new telnet client session
+        m_sessions[slot]->m_sshclient->set_terminal_type(TERMINAL_TYPE_SSH);
+        // Inform serial terminal about the new client session
         if(__i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)){
             __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln();
-            __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln_ro(RODT_ATTR("SSH Client Session started."));
+            __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write_ro(RODT_ATTR("SSH #"));
+            __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write((int32_t)slot);
+            __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln_ro(RODT_ATTR(" Client Session started."));
         }
-        #endif            
+        #endif
     }
+
+    // Service each active session. closeSession() clears m_session, so write
+    // it back to the slot afterwards to reap closed sessions.
+    for (uint8_t i = 0; i < SSH_MAX_SESSIONS; i++) {
+        if (m_sessions[i] == nullptr) continue;
+        m_session = m_sessions[i];
+        serviceSession();
+        m_sessions[i] = m_session;
+    }
+    m_session = nullptr;
+
+    m_handling = false;
+}
+
+/**
+ * @brief Run the SSH state machine for the current session (m_session).
+ */
+void SSHServer::serviceSession() {
 
     // If a client is connected, handle the SSH session
     if (m_session && m_session->m_client && m_session->m_client->connected()) {
@@ -489,6 +566,11 @@ void LWSSH::SSHServer::handleAuthentication(){
                 }
             }else if(msg_type == SSH2_MSG_SERVICE_REQUEST){
 
+                if(!m_session->m_ssh_config_loaded){
+                    load_ssh_config(m_session->m_ssh_config);
+                    m_session->m_ssh_config_loaded = true;
+                }
+
                 pdiutil::string userauth = "ssh-userauth";
                 pdiutil::vector<uint8_t> userauthvec(userauth.begin(), userauth.end());
 
@@ -502,37 +584,63 @@ void LWSSH::SSHServer::handleAuthentication(){
             }else if(msg_type == SSH2_MSG_USERAUTH_REQUEST){
 
                 SSHUserAuthRequest authreq;
-                bool bstatus = parse_userauth_request(m_session->m_sshpacket.payload, authreq);
+                bool parsed = parse_userauth_request(m_session->m_sshpacket.payload, authreq);
 
-                // check if we can check check authentication
-                if( bstatus ){
+                ssh_config_t &cfg = m_session->m_ssh_config;
+                bool authed = false;
+                bool sent_pk_ok = false;
 
-                    bstatus = (authreq.username.size() > 1 && authreq.password.size() > 1);
-                    if( bstatus ){
+                if( parsed && authreq.method == "publickey" && cfg.m_pubkey_auth ){
 
-                        bstatus = __auth_service.isAuthorized(authreq.username.c_str(), authreq.password.c_str());
+                    pdiutil::vector<uint8_t> rawkey;
+                    bool keyok = extract_ed25519_blob_field(authreq.pubkey_blob, rawkey, ED25519_PUBKEY_SIZE) &&
+                                 is_authorized_pubkey(rawkey);
+
+                    if( keyok && !authreq.has_signature ){
+                        // Probe: confirm the offered key is acceptable
+                        pdiutil::vector<uint8_t> reply;
+                        reply.push_back(SSH2_MSG_USERAUTH_PK_OK); // 60
+                        append_ssh_string(reply, authreq.pk_algorithm.c_str(), authreq.pk_algorithm.length());
+                        append_ssh_string(reply, authreq.pubkey_blob);
+                        send_server_ssh_packet(m_session, reply, true);
+                        sent_pk_ok = true;
+                    }else if( keyok && authreq.has_signature ){
+                        authed = verify_pubkey_signature(m_session, authreq, rawkey);
+                        if( authed ){
+                            __auth_service.setVerifiedUsername(authreq.username.c_str());
+                        }
+                    }
+                }else if( parsed && authreq.method == "password" && cfg.m_password_auth ){
+
+                    if( authreq.username.size() > 1 && authreq.password.size() > 1 ){
+                        authed = __auth_service.isAuthorized(authreq.username.c_str(), authreq.password.c_str());
                     }
                 }
 
-                // if false ask for password
-                if(!bstatus){
-                    pdiutil::vector<uint8_t> reply;
-                    reply.push_back(SSH2_MSG_USERAUTH_FAILURE); // 51
-                    pdiutil::string methods = "password";
-                    pdiutil::vector<uint8_t> methodvec(methods.begin(), methods.end());
-                    append_ssh_string(reply, methodvec);
-                    reply.push_back(0); // partial success = FALSE
-
-                    bstatus = send_server_ssh_packet(m_session, reply, true);
-                }else{
+                if( sent_pk_ok ){
+                    // Waiting for the signed request; nothing else to do
+                }else if( authed ){
                     pdiutil::vector<uint8_t> reply;
                     reply.push_back(SSH2_MSG_USERAUTH_SUCCESS); // 52
-                    bstatus = send_server_ssh_packet(m_session, reply, true);
-                    if(bstatus){
+                    if( send_server_ssh_packet(m_session, reply, true) ){
                         SessionManager::attach(m_session->m_sshclient);
                         __auth_service.setAuthorized(true);
                         m_session->m_state = LWSSHSession::SESSION_STATE_CHANNEL_REQUEST;
                     }
+                }else{
+                    pdiutil::vector<uint8_t> reply;
+                    reply.push_back(SSH2_MSG_USERAUTH_FAILURE); // 51
+                    pdiutil::string methods;
+                    if( cfg.m_pubkey_auth ){ methods += "publickey"; }
+                    if( cfg.m_password_auth ){
+                        if( !methods.empty() ){ methods += ","; }
+                        methods += "password";
+                    }
+                    pdiutil::vector<uint8_t> methodvec(methods.begin(), methods.end());
+                    append_ssh_string(reply, methodvec);
+                    reply.push_back(0); // partial success = FALSE
+
+                    send_server_ssh_packet(m_session, reply, true);
                 }
             }else{
                 // __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln();
@@ -1892,8 +2000,8 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
 
 bool LWSSH::SSHServer::handleChannelSftpBolusChunks(pdiutil::vector<uint8_t> &boluschunk){
 
-    static uint8_t sftpheader[28] = {0};
-    static uint64_t sftpheaderoffset = 0;
+    uint8_t *sftpheader = m_session->current_channel.subsystem_req.sftp.fxp_write_header;
+    uint64_t &sftpheaderoffset = m_session->current_channel.subsystem_req.sftp.fxp_write_headeroffset;
     uint32_t &expectedDataLen = m_session->current_channel.subsystem_req.sftp.fxp_write_expectedrecvlen;
     uint32_t &totalreceived = m_session->current_channel.subsystem_req.sftp.fxp_write_totalrecvd;
     bool continueReceiving = true;
@@ -1901,7 +2009,7 @@ bool LWSSH::SSHServer::handleChannelSftpBolusChunks(pdiutil::vector<uint8_t> &bo
     // initial chunk
     if( totalreceived == 0 ){
 
-        memset(sftpheader, 0, sizeof(sftpheader));
+        memset(sftpheader, 0, 28);
 
         // If the first chunk is not SSH_FXP_WRITE, handle it normally and stop further chunk receiving
         if( boluschunk[4] != SSH_FXP_WRITE ){

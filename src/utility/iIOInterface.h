@@ -494,9 +494,9 @@ public:
   void csi_cursor_move(uint8_t x, uint8_t y)
   {
     write_ro(RODT_ATTR(TERMINAL_ESCAPE_SEQ));
-    write(y);
+    write((int32_t)y);
     write((uint8_t)';');
-    write(x);
+    write((int32_t)x);
     write_ro(RODT_ATTR("H"));
   }
 
@@ -579,6 +579,18 @@ public:
   //   write(color);
   //   write_ro(RODT_ATTR("m"));
   // }
+
+  /**
+   * @brief Enables reverse video (swaps foreground/background), giving a
+   *        light-background bar with dark text on a typical dark terminal.
+   * @param None
+   * @return None
+   */
+  void csi_reverse_video()
+  {
+    write_ro(RODT_ATTR(TERMINAL_ESCAPE_SEQ));
+    write_ro(RODT_ATTR("7m"));
+  }
 
   /**
    * @brief Resets the text and background color to default.

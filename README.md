@@ -601,7 +601,7 @@ Each persisted table is wrapped on NVM with a small framing record (table id + c
 | [DeviceIotConfig.h](src/config/DeviceIotConfig.h) | `device_iot_config_table` | Config/OTP URLs, channel keys, sampling/keepalive bounds |
 | [SerialConfig.h](src/config/SerialConfig.h) | — | `SERIAL_MODE`, baud, interface enum |
 | [StorageConfig.h](src/config/StorageConfig.h) | — | Mount point, max path, FS limits |
-| [SshConfig.h](src/config/SshConfig.h) | — | `SSHKeyAlgorithm`, key/file size caps |
+| [SshConfig.h](src/config/SshConfig.h) | — | `SSHKeyAlgorithm`, key/file size caps, `SSH_MAX_SESSIONS`, `ssh_config_t` (auth policy), sshconfig / authorized_keys paths |
 | [NetworkConfig.h](src/config/NetworkConfig.h) | — | Network-wide timeouts |
 | [EventConfig.h](src/config/EventConfig.h) | — | `event_name` enum, channel registry |
 
@@ -1283,7 +1283,7 @@ The working example sketch is walked through in [§11.6 DeviceIotExample](#116-d
 
 #### 6.2.11 Storage (interface init, no provider)
 
-`ENABLE_STORAGE_SERVICE` doesn't have its own `ServiceProvider` subclass — the FS is used directly by SSH/SFTP, `UserStoreService`, the file-oriented CLI commands (`ls`/`cd`/`mv`/`cp`/`rm`/`mkdir`/`touch`/`cat`/`echo`/`fwrite`/`head`/`tail`/`wc`/`df`/`grep`/`hexdump`/`chmod`/`chown`/`umask`/`mount`), and any application code.
+`ENABLE_STORAGE_SERVICE` doesn't have its own `ServiceProvider` subclass — the FS is used directly by SSH/SFTP, `UserStoreService`, the file-oriented CLI commands (`ls`/`cd`/`mv`/`cp`/`rm`/`mkdir`/`touch`/`cat`/`echo`/`fedit`/`head`/`tail`/`wc`/`df`/`grep`/`hexdump`/`chmod`/`chown`/`umask`/`mount`), and any application code.
 
 The global `__i_fs` is a **`VfsDispatcher`** ([src/interface/pdi/impl/modules/storage/VfsDispatcher.{h,cpp}](src/interface/pdi/impl/modules/storage/VfsDispatcher.h)) — an `iFileSystemInterface` implementation that routes every call to a mounted backend selected by **longest-prefix path match**. Per-device `FileSystemInterface` (LittleFS via [external/LittleFSWrapper.{h,cpp}](external/LittleFSWrapper.h) → [FileSystemInterfaceImpl](src/interface/pdi/impl/modules/storage/FileSystemInterfaceImpl.h)) is now `__i_rootfs`, mounted at `/` during `PdiStack::initialize`:
 
@@ -1320,7 +1320,7 @@ Mount table config lives in [config/VfsConfig.h](src/config/VfsConfig.h) — `VF
 | `/sys/class/gpio/<pin>/value` | `0666` | current reading / write value (decimal) |
 | `/sys/class/gpio/<pin>/mode` | `0666` | GPIO mode: `0`=OFF `1`=DIGITAL_WRITE `2`=DIGITAL_READ `3`=DIGITAL_BLINK `4`=ANALOG_WRITE `5`=ANALOG_READ |
 
-Reads return the value the GPIO service maintains (refreshed each operation tick for read-mode pins); writes drive `__gpio_service.m_gpio_config_copy` + persist + re-apply modes. This is the CLI path to GPIO — write mode first, then value: `echo 3 > /sys/class/gpio/4/mode` then `echo 500 > /sys/class/gpio/4/value` blinks GPIO 4 at 500 ms. Directory nodes are `0555`, all nodes root-owned. Write with the `echo` command's `>` redirection ([§7.7](#77-built-in-command-inventory)); the `fwrite` editor's tmp-file flow does not apply to synthetic nodes.
+Reads return the value the GPIO service maintains (refreshed each operation tick for read-mode pins); writes drive `__gpio_service.m_gpio_config_copy` + persist + re-apply modes. This is the CLI path to GPIO — write mode first, then value: `echo 3 > /sys/class/gpio/4/mode` then `echo 500 > /sys/class/gpio/4/value` blinks GPIO 4 at 500 ms. Directory nodes are `0555`, all nodes root-owned. Write with the `echo` command's `>` redirection ([§7.7](#77-built-in-command-inventory)); the `fedit` editor's tmp-file flow does not apply to synthetic nodes.
 
 **devfs** ([src/interface/pdi/impl/modules/storage/DevFs.{h,cpp}](src/interface/pdi/impl/modules/storage/DevFs.h)) — a synthetic filesystem mounted at `/dev` exposing byte-stream device nodes. All nodes are `0666`, root-owned; the `/dev` directory is `0555`.
 
@@ -1383,8 +1383,10 @@ Full breakdown lives in [§8. Web Server](#8-web-server) — it has its own rout
 | Depends on | `iTcpServerInterface`, `iFileSystemInterface`, crypto primitives ([src/utility/crypto/](src/utility/crypto/)), `__auth_service` |
 | Key algorithms | See `SSHKeyAlgorithm` enum in [SshConfig.h](src/config/SshConfig.h) — Ed25519 / Curve25519-based |
 | Transport crypto | `curve25519-sha256` key exchange, `ssh-ed25519` host key, `aes128-ctr` cipher, and a **negotiated MAC**: `hmac-sha2-256` (preferred) or `hmac-sha1`, Encrypt-and-MAC. The server advertises both in `prepare_server_kexinit` and selects the client's first supported choice (client preference, per RFC 4253) in `handleChannelRequest`, storing its length in `session->mac_len` (32 or 20) |
-| File transfer | SFTP subsystem implemented on top of the file system; supports interactive `sftp` (REALPATH, STAT, OPENDIR/READDIR, OPEN/READ/WRITE, MKDIR/RMDIR, REMOVE, RENAME, FSTAT; SETSTAT is no-op; READLINK/SYMLINK report unsupported) and SCP via `scp -s` (see [§7.9 SFTP / SCP file transfer](#79-sftp--scp-file-transfer)) |
-| Cost | **Highest of any service** — keys, hash, symmetric AES, large per-session buffers |
+| Authentication | Two methods, chosen per session. **password** — verified against `/etc/shadow` through `__auth_service`. **publickey** — Ed25519 keys listed in `~/.ssh/authorized_keys` (standard OpenSSH `ssh-ed25519 <base64> comment` lines); the client signature over the session id is checked with `ed25519_verify`. Policy comes from `/etc/ssh/sshconfig` — `PasswordAuthentication` and `PubkeyAuthentication` (`yes`/`no`), both enabled by default; the file is auto-created on first boot if absent. On a failed attempt the server advertises exactly the methods still allowed. See [§7.9.1 SSH authentication](#791-ssh-authentication) |
+| Concurrency | Up to `SSH_MAX_SESSIONS` ([SshConfig.h](src/config/SshConfig.h), default 2) SSH connections are accepted and serviced concurrently. Graphical SFTP clients (FileZilla / WinSCP) keep a directory-browse connection open and open a **second** connection to transfer or edit a file; the pool serves both |
+| File transfer | SFTP subsystem implemented on top of the file system; supports interactive `sftp` (REALPATH, STAT, OPENDIR/READDIR, OPEN/READ/WRITE, MKDIR/RMDIR, REMOVE, RENAME, FSTAT; SETSTAT is no-op; READLINK/SYMLINK report unsupported), remote edit/save from graphical clients, and SCP via `scp -s` (see [§7.9 SFTP / SCP file transfer](#79-sftp--scp-file-transfer)) |
+| Cost | **Highest of any service** — keys, hash, symmetric AES, large per-session buffers (× `SSH_MAX_SESSIONS`) |
 
 #### 6.2.15 `CommandLineServiceProvider` — `__cmd_service`
 
@@ -1395,7 +1397,7 @@ Full breakdown lives in [§8. Web Server](#8-web-server) — it has its own rout
 | Depends on | `__auth_service`, `SessionManager` ([§6.2.18](#6218-sessionmanager)), every command in [cmd/commands/](src/service_provider/cmd/commands/) |
 | Init does | Registers all command handlers; `PdiStack` calls `SessionManager::attach(serialTerminal)` at boot so the serial slot is populated before first input |
 | Terminal binding | `useTerminal(t)` attaches a `session_t` for terminal `t` (idempotent) and draws the login prompt. `processTerminalInput(t)` looks up the session via `SessionManager::findByTerminal(t)`, sets it as current for the tick, then dispatches. Each in-flight command carries `m_owner = session` so cross-session `getCommandWaitingForUserInput` never returns another session's prompt |
-| Built-in commands | Files (`ls`/`cd`/`pwd`/`mkdir`/`touch`/`mv`/`cp`/`rm`/`cat`/`echo`/`fwrite`/`head`/`tail`/`wc`/`df`/`grep`/`hexdump`/`mount`/`chmod`/`chown`/`umask`), auth+users (`login`/`logout`/`whoami`/`id`/`who`/`su`/`passwd`/`useradd`/`userdel`/`groups`), network (`net`/`host`/`ping`/`date`/`tdctl`), device (`srvc`/`ps`/`top`/`kill`/`pkill`/`killall`/`renice`/`ssh`/`tls`/`iot`/`reboot`/`watch`/`uptime`/`cls`/`help`) — full reference in [§7.7](#77-built-in-command-inventory) |
+| Built-in commands | Files (`ls`/`cd`/`pwd`/`mkdir`/`touch`/`mv`/`cp`/`rm`/`cat`/`echo`/`fedit`/`head`/`tail`/`wc`/`df`/`grep`/`hexdump`/`mount`/`chmod`/`chown`/`umask`), auth+users (`login`/`logout`/`whoami`/`id`/`who`/`su`/`passwd`/`useradd`/`userdel`/`groups`), network (`net`/`host`/`ping`/`date`/`tdctl`), device (`srvc`/`ps`/`top`/`kill`/`pkill`/`killall`/`renice`/`ssh`/`tls`/`iot`/`reboot`/`watch`/`uptime`/`cls`/`help`) — full reference in [§7.7](#77-built-in-command-inventory) |
 | Multi-session | Up to `PDI_MAX_SESSIONS` (default 3) sessions run concurrently across serial + telnet + ssh. Each has its own linebuf, cursor, history-walk, cwd, auth, username, and in-flight commands. See [§7.8](#78-multi-terminal-session-lifecycle) |
 
 #### 6.2.16 TLS (no provider; transport hookup + cert provisioning)
@@ -1590,10 +1592,10 @@ The CLI does line editing in-process, so it has to recognise control sequences c
 | `CMD_TERM_INSEQ_HOME` / `_END` | Line start / end |
 | `CMD_TERM_INSEQ_PAGE_UP` / `_PAGE_DOWN` | Scroll long output |
 | `CMD_TERM_INSEQ_TAB` | Autocomplete (cycles registered commands matching the typed prefix) |
-| `CMD_TERM_INSEQ_ESC` | Cancel current line; for `fwrite`, finalize the file |
+| `CMD_TERM_INSEQ_ESC` | Cancel current line; in `fedit`, open the save/cancel/delete menu (`!w`/`!c`/`!d`) |
 | `CMD_TERM_INSEQ_CTRL_C` / `_CTRL_Z` | Abort the running command; the base `executeTermInputAction` returns `CMD_RESULT_ABORTED` |
 
-Long-running commands (`watch`, `fwrite`) opt-in to receive these sequences mid-execution by overriding `executeTermInputAction(cmd_term_inseq_t)`.
+Long-running commands (`watch`, `fedit`) opt-in to receive these sequences mid-execution by overriding `executeTermInputAction(cmd_term_inseq_t)`.
 
 ### 7.4 The `CommandBase` (`cmd_t`) contract
 
@@ -1630,7 +1632,7 @@ int p = atoi(pin->optionval);
 
 #### Multi-iteration commands
 
-For commands that don't finish in a single tick (e.g. `watch`, `fwrite`), `execute` returns `CMD_RESULT_INCOMPLETE`. The service keeps the command active, increments `m_iterations`, and re-enters `execute` on every subsequent input. `Clear()` runs only when `m_result != CMD_RESULT_INCOMPLETE`.
+For commands that don't finish in a single tick (e.g. `watch`, `fedit`), `execute` returns `CMD_RESULT_INCOMPLETE`. The service keeps the command active, increments `m_iterations`, and re-enters `execute` on every subsequent input. `Clear()` runs only when `m_result != CMD_RESULT_INCOMPLETE`.
 
 #### Holding option values
 
@@ -1676,7 +1678,7 @@ Names come from [CommandCommon.h](src/service_provider/cmd/commands/CommandCommo
 | rm \<file_or_dir> | | Remove file or directory. Requires `+w` on the target for non-root. e.g. **rm /home/notes.txt** |
 | cat \<file> | | Print file contents to terminal (renamed from `fread`). Requires `+r` on the file for non-root. e.g. **cat /home/notes.txt**, **cat /proc/uptime** |
 | echo \<text> [> \<file>] | | Print `<text>`; with `>` redirection, write it to `<file>` via a single `writeFile` (no tmp/append dance — works on synthetic nodes). Requires `+w` on the target for non-root. e.g. **echo hello**, **echo 1 > /sys/class/gpio/5/value**, **echo x > /dev/null**. Note: comma is the shell's option separator, so `<text>` should not contain commas. |
-| fwrite \<file> | f=\<file> v=\<value> | Open file in append mode; type content line by line. Press **ESC** to save & exit. Requires `+w` on the file for non-root. e.g. **fwrite /home/notes.txt** or **fwrite f=/home/notes.txt v=hello** |
+| fedit \<file> | | Open `<file>` in the scrolling in-place line editor (creates it empty if missing). A nano-style status bar shows the path; edit the active line with ←/→/Home/End/Backspace/Delete, **↑/↓** move between lines and scroll the viewport through the whole file, **ENTER** splits the active line at the cursor. Press **ESC** for the bottom-bar menu: **!w** save, **!c** cancel, **!d** delete current line. Edits stream to a `<file>.tmp` working copy and are committed over the original on `!w`. Requires `+w` on the file for non-root. e.g. **fedit /home/notes.txt** |
 | head \<file> [N] | | Print first N lines (default 10); constant memory. e.g. **head /home/log.txt 5** |
 | tail \<file> [N] | | Print last N lines (default 10); constant memory. e.g. **tail /home/log.txt 5** |
 | wc \<file> | | Print line / word / byte counts (Linux `wc` order). e.g. **wc /home/log.txt** |
@@ -1722,7 +1724,7 @@ Names come from [CommandCommon.h](src/service_provider/cmd/commands/CommandCommo
 
 Each command's implementation lives in [src/service_provider/cmd/commands/](src/service_provider/cmd/commands/) — one `<Name>Command.h` per verb, with names registered in [CommandCommon.h](src/service_provider/cmd/commands/CommandCommon.h).
 
-**Path arguments** work the POSIX way in every file command (`ls`, `cd`, `cat`, `cp`, `mv`, `rm`, `mkdir`, `touch`, `chmod`, `chown`, `head`, `tail`, `wc`, `grep`, `hexdump`, `fwrite`): a leading `/` is treated as an absolute path, anything else resolves against the session's current directory. `cd` additionally supports `~` (home) and `-` (previous directory).
+**Path arguments** work the POSIX way in every file command (`ls`, `cd`, `cat`, `cp`, `mv`, `rm`, `mkdir`, `touch`, `chmod`, `chown`, `head`, `tail`, `wc`, `grep`, `hexdump`, `fedit`): a leading `/` is treated as an absolute path, anything else resolves against the session's current directory. `cd` additionally supports `~` (home) and `-` (previous directory).
 
 **Positional vs named options.** Commands with ≤2 required args use the **positional** style (`setAcceptArgsOptions(true)` + space separator, args at `m_options[0]`/`[1]`) — matches POSIX and reduces typing: `chmod 0644 /etc/passwd`, `renice -5 10`, `kill 9 12`. Commands with an optional leading arg (`kill [<sig>] <pid>`, `pkill`, `killall`) dispatch on **arg count** — 1 arg = target, 2 args = sig then target — no numeric-vs-name ambiguity. Named options (`x=y`) are retained for commands with many optional slots, sensitive input (`login`/`su`/`passwd`/`useradd`/`userdel`), or optional-in-the-middle patterns (`top i=… n=… u=…`).
 
@@ -1775,6 +1777,35 @@ Constraints:
 
 The SSH service ([§6.2.14](#6-service-providers)) opens an SFTP subsystem on demand. Two clients are supported: `scp -s …` (force SFTP) for single-file copies, and interactive `sftp` for full session browsing. Both ride the same handlers in `handleChannelSubsystemSftpRequest`.
 
+Graphical SFTP clients (FileZilla, WinSCP) work too, including remote **edit/save** — that path needs a second concurrent connection, which the server supports (see the Concurrency row in [§6.2.14](#6214-sshserver--__sshserver_service)).
+
+#### 7.9.1 SSH authentication
+
+The SSH server authenticates each session by **password** or **public key**, governed by `/etc/ssh/sshconfig` (auto-created on first boot):
+
+```
+# /etc/ssh/sshconfig
+PasswordAuthentication yes
+PubkeyAuthentication   yes
+```
+
+- **Password** — checked against the device user store (`/etc/shadow`) via `__auth_service`; the same credentials as the serial / telnet login.
+- **Public key** — Ed25519 only. Add the peer's public key (one per line, standard OpenSSH `ssh-ed25519 <base64> comment` format — copy it from your `~/.ssh/id_ed25519.pub`) to the device's `~/.ssh/authorized_keys`:
+
+```
+fedit ~/.ssh/authorized_keys        # paste the ssh-ed25519 line, then !w to save
+```
+
+Set either key to `no` to disable that method. With `PasswordAuthentication no`, only clients holding an authorized private key can log in:
+
+```
+ssh -i ~/.ssh/id_ed25519 pdiStack@<device-ip>
+```
+
+Notes:
+- `authorized_keys` is a single file under the device home directory (not per-user).
+- The server's own host key is stored as raw bytes in `~/.ssh/ed25519{,.pub,.seed}` (generate with `ssh q=1`) and presented to clients in standard SSH wire format during the handshake.
+
 #### User-facing commands
 
 Upload a file from the desktop to the device (as user `pdiStack`):
@@ -1809,7 +1840,7 @@ The following SFTP operations are implemented (sufficient for OpenSSH `sftp` cli
 | `SETSTAT` / `FSETSTAT` | `chmod`, `chown` | accepted but no-op (FS has no perm/time storage) |
 | `READLINK` / `SYMLINK` | — | reported as unsupported (no symlink layer) |
 
-Idle SFTP sessions are reaped automatically after the configured timeout (default 60 s) so a suspended or dead client never wedges the single-session slot. Interactive SSH shell sessions are NOT idle-reaped — only the SFTP subsystem is.
+Idle SFTP sessions are reaped automatically after the configured timeout (default 60 s) so a suspended or dead client never wedges a pool slot (freeing it for another connection). Interactive SSH shell sessions are NOT idle-reaped — only the SFTP subsystem is.
 
 **Note** the framework handles the SSH chunks in smaller size which can make the file transfer little bit slower. On top if we are overwriting an existing file then it can add the file-edit overhead as well. So speed can be as slow as 0.2 kbps and as fast as 1 kbps.
 
@@ -1874,7 +1905,7 @@ To add `temp` (read a temperature sensor):
 - **Option values are pointers into the input buffer by default.** If your `execute` may live across input arrivals (CTRL+C handler, multi-iteration), `holdOptionValue` first.
 - **`needauth()` is the only gate.** A command returning `true` only fires after a successful `login`; setting it on a "harmless" command still adds friction. Use it for anything mutating state.
 - **`watch` semicolon-separates options because the inner command can use commas.** When chaining your own composite commands, pick a separator that doesn't appear in payloads.
-- **`fwrite` blocks the line until ESC.** Don't run it over telnet/SSH if you also rely on the watchdog firing inside the session — it does, but the terminal is unavailable for `srvc` / `ps` until you exit.
+- **`fedit` takes over the terminal until you exit.** It is a full-screen editor holding that session; the terminal is unavailable for `srvc` / `ps` on that channel until you leave via ESC → `!w` (save) or `!c` (cancel). The watchdog still fires inside the session.
 - **No quoted args.** Values cannot contain `,` (or whichever separator), `=`, or spaces inside an option value. Escape at the producer or accept the constraint.
 
 ### 7.13 Dynamic app loading (esp32)
@@ -2923,7 +2954,7 @@ Three handles for runtime visibility:
 - **`pdiutil::vector::reserve` is a *hint*.** Pushing past the reservation reallocates and copies. Always reserve to the *worst case*, not the *typical case*.
 - **`PAGE_HTML_MAX_SIZE = 1800`** is per-`send` chunk, not per-response. Compose pages in three calls ([§8.7](#8-web-server)) — one big string overflows silently.
 - **`NAPT` table growth is unbounded** by default in lwIP. If your AP carries dozens of clients, the heap will climb. The framework has no per-client throttle.
-- **History file writes happen per-keystroke** during `fwrite` ([§7.9](#7-command-line--terminal)). For long files, the flash wear is real — `fwrite` is for small config edits, not log capture.
+- **`fedit` rewrites its `<file>.tmp` working copy as you edit** ([§7.7](#77-built-in-command-inventory)). A line change that alters length rebuilds the tail of the temp file, so editing large files means real flash writes — `fedit` is for small config edits, not bulk content.
 - **`__task_scheduler` runs *one* inline task per `serve()` tick.** Twenty registered tasks at 100 ms cadence each can starve each other if your serve loop runs less than 10 times per second. Profile with `ps` (or `top` for a live view).
 
 ---
@@ -3713,8 +3744,8 @@ By design — the framework streams SFTP in small bolus chunks (≤256 B) and ha
 **Two telnet clients can't connect simultaneously.**
 The Telnet transport currently holds a single `m_client`, so a second telnet TCP connect is refused until the first disconnects. The session layer itself supports `PDI_MAX_SESSIONS` concurrent slots — serial + telnet + ssh coexist fine, and multi-telnet just needs a client-vector refactor in [TelnetServiceProvider.cpp](src/service_provider/transport/TelnetServiceProvider.cpp) ([§7.8](#78-multi-terminal-session-lifecycle)).
 
-**`fwrite` won't exit.**
-Press **ESC** to finalize (commit + exit). See [§7.7 Built-in command inventory](#77-built-in-command-inventory).
+**`fedit` won't exit.**
+Press **ESC** to open the menu, then **!w** to save (commit + exit) or **!c** to cancel. See [§7.7 Built-in command inventory](#77-built-in-command-inventory).
 
 **TAB autocomplete works but ↑/↓ history doesn't.**
 History is persisted to `/.term_history` — only available when `ENABLE_STORAGE_SERVICE` is on. Autocomplete uses the in-RAM command registry and works regardless. See [§7.6](#7-command-line--terminal).

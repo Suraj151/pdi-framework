@@ -716,6 +716,11 @@ enum vfs_type_t : uint8_t {
     VFS_TYPE_MAX
 };
 
+struct config_kv_t {
+    pdiutil::string m_key;
+    pdiutil::string m_value;
+};
+
 struct vfs_mount_t {
     vfs_mount_t() : m_backend(nullptr), m_type(VFS_TYPE_UNKNOWN), m_prefix_len(0) {
         m_prefix[0] = '\0';

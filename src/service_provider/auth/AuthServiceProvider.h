@@ -37,6 +37,7 @@ public:
 	void setAuthorized(bool auth);
 	bool getAuthorized();
 	const char* getUsername();
+	void setVerifiedUsername(const char *username);
 
   	void printConfigToTerminal(iTerminalInterface *terminal) override;
 private:

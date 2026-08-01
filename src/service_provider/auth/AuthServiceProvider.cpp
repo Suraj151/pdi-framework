@@ -115,6 +115,18 @@ void AuthServiceProvider::setAuthorized(bool auth)
 }
 
 /**
+ * record a verified username for a non-password auth method
+ *
+ * @param const char* username
+ */
+void AuthServiceProvider::setVerifiedUsername(const char *username)
+{
+  if( nullptr != username ){
+    m_lastVerifiedUsername = username;
+  }
+}
+
+/**
  * get authorised status
  *
  * @return bool

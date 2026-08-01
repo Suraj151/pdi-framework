@@ -40,7 +40,9 @@ public:
   iTlsServerInterface* getNewTlsServerInstance() override;
   iTlsClientInterface* getNewTlsClientInstance() override;
   #endif
+  #ifdef ENABLE_STORAGE_SERVICE
   iFileSystemInterface& getFileSystemInstance() override;
+  #endif
 };
 
 #endif

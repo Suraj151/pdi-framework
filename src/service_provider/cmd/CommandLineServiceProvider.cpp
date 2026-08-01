@@ -81,9 +81,9 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   // m_cmdlist.push_back(fileReadcmd);
   FileReadCommand::RegisterCommand();
 
-  // FileWriteCommand *fileWritecmd = new FileWriteCommand();
+  // FileEditCommand *fileWritecmd = new FileEditCommand();
   // m_cmdlist.push_back(fileWritecmd);
-  FileWriteCommand::RegisterCommand();
+  FileEditCommand::RegisterCommand();
 
   HexdumpCommand::RegisterCommand();
   DfFSCommand::RegisterCommand();
@@ -458,8 +458,17 @@ cmd_result_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface
 
     cmd_result_t result = executeCommand(&session->m_linebuf, inseq);
 
+    // A waiting command (e.g. the fedit line editor) can manage the line
+    // buffer itself; don't wipe its preloaded content between inputs.
+    bool preserveLineBuf = false;
+    int16_t activeWaitingIdx = getCommandWaitingForUserInput();
+    if( activeWaitingIdx != -1 && nullptr != m_cmdlist[activeWaitingIdx] &&
+        m_cmdlist[activeWaitingIdx]->preservesLineBuffer() ){
+      preserveLineBuf = true;
+    }
+
     // flush stored string
-    if( result == CMD_RESULT_TERMINAL_HOLD_BUFFER ){
+    if( result == CMD_RESULT_TERMINAL_HOLD_BUFFER || preserveLineBuf ){
 
     }else{
 
@@ -651,6 +660,11 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
 
   if( nullptr != cmd && cmd->size() ){
 
+    // Snapshot the typed command now: `cmd` aliases session->m_linebuf, and an
+    // interactive command (e.g. the fedit editor) may overwrite that buffer
+    // during execute() — history must record what was entered, not that.
+    pdiutil::string originalCmd = *cmd;
+
     // first check whether any last command is incomplete and waiting for user input
     if(is_executing_lastcommand){
 
@@ -683,8 +697,8 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
       __i_instance.getFileSystemInstance().createFile(m_termhistoryfile.c_str(), "", 0);
     }
 
-    if( !is_executing_lastcommand && 
-        cmd->size() < 1024
+    if( !is_executing_lastcommand &&
+        originalCmd.size() < 1024
       ){
 
         // keep only last CMD_TERMINAL_HISTORY_MAX_LINES lines in history
@@ -721,7 +735,7 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
         }
 
         // append command to history file
-        __i_instance.getFileSystemInstance().writeFile(m_termhistoryfile.c_str(), (char*)cmd->c_str(), cmd->size(), true);
+        __i_instance.getFileSystemInstance().writeFile(m_termhistoryfile.c_str(), (char*)originalCmd.c_str(), originalCmd.size(), true);
         __i_instance.getFileSystemInstance().writeFile(m_termhistoryfile.c_str(), (char*)"\r\n", 2, true);
     }
     #endif

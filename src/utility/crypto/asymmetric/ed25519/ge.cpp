@@ -1,5 +1,6 @@
 #include "ge.h"
 #include "precomp_data.h"
+#include <utility/SafeAlloc.h>
 
 
 /*
@@ -65,13 +66,21 @@ B is the Ed25519 base point (x,4/5) with x positive.
 */
 
 void ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a, const ge_p3 *A, const unsigned char *b) {
-    signed char aslide[256];
-    signed char bslide[256];
-    ge_cached Ai[8]; /* A,3A,5A,7A,9A,11A,13A,15A */
+    // Large tables live on the heap to keep this frame off constrained stacks.
+    signed char *aslide = pdiutil::safe_new_array<signed char>(256);
+    signed char *bslide = pdiutil::safe_new_array<signed char>(256);
+    ge_cached *Ai = pdiutil::safe_new_array<ge_cached>(8); /* A,3A,5A,7A,9A,11A,13A,15A */
     ge_p1p1 t;
     ge_p3 u;
     ge_p3 A2;
     int i;
+    if (!aslide || !bslide || !Ai) {
+        ge_p2_0(r);
+        pdiutil::safe_delete_array(aslide);
+        pdiutil::safe_delete_array(bslide);
+        pdiutil::safe_delete_array(Ai);
+        return;
+    }
     slide(aslide, a);
     slide(bslide, b);
     ge_p3_to_cached(&Ai[0], A);
@@ -130,6 +139,10 @@ void ge_double_scalarmult_vartime(ge_p2 *r, const unsigned char *a, const ge_p3 
 
         ge_p1p1_to_p2(r, &t);
     }
+
+    pdiutil::safe_delete_array(aslide);
+    pdiutil::safe_delete_array(bslide);
+    pdiutil::safe_delete_array(Ai);
 }
 
 

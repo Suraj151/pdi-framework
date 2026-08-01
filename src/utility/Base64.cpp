@@ -100,6 +100,69 @@ bool base64Encode(char input_str[], int len_str, char *res_str)
   return true;
 }
 
+static int base64CharValue(char c)
+{
+  if (c >= 'A' && c <= 'Z') return c - 'A';
+  if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+  if (c >= '0' && c <= '9') return c - '0' + 52;
+  if (c == '+') return 62;
+  if (c == '/') return 63;
+  return -1;
+}
+
+/**
+ * @brief Decodes a Base64-encoded string into raw bytes.
+ *
+ * This function processes the input 6 bits at a time, emitting a byte whenever
+ * 8 or more bits have accumulated. Whitespace is skipped and decoding stops at
+ * the first padding character.
+ *
+ * @param input_str The Base64 input.
+ * @param len_str The length of the input.
+ * @param res_buf The buffer to store the decoded bytes.
+ * @return The number of decoded bytes, or -1 on invalid input.
+ */
+int base64Decode(const char *input_str, int len_str, unsigned char *res_buf)
+{
+  if (nullptr == input_str || nullptr == res_buf)
+  {
+    return -1;
+  }
+
+  int val = 0, bits = 0, outlen = 0;
+
+  for (int i = 0; i < len_str; i++)
+  {
+    char c = input_str[i];
+
+    if (c == '=')
+    {
+      break;
+    }
+    if (c == '\n' || c == '\r' || c == ' ' || c == '\t')
+    {
+      continue;
+    }
+
+    int decoded = base64CharValue(c);
+    if (decoded < 0)
+    {
+      return -1;
+    }
+
+    val = (val << 6) | decoded;
+    bits += 6;
+
+    if (bits >= 8)
+    {
+      bits -= 8;
+      res_buf[outlen++] = (unsigned char)((val >> bits) & 0xFF);
+    }
+  }
+
+  return outlen;
+}
+
 /**
  * @brief Generates a unique key of specified length.
  * 

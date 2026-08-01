@@ -69,7 +69,7 @@ created Date    : 1st June 2019
 #define CMD_NAME_MOVE 			    "mv"
 #define CMD_NAME_COPY 			    "cp"
 #define CMD_NAME_FILE_READ 			"cat"
-#define CMD_NAME_FILE_WRITE 		"fwrite"
+#define CMD_NAME_FILE_EDIT 		"fedit"
 #define CMD_NAME_CLS 			    "cls"
 #define CMD_NAME_PS  			    "ps"
 #define CMD_NAME_TOP  			    "top"

@@ -19,7 +19,9 @@ created Date    : 1st Jan 2024
 #include "TlsServerInterface.h"
 #include "TlsClientInterface.h"
 #endif
+#ifdef ENABLE_STORAGE_SERVICE
 #include "FileSystemInterface.h"
+#endif
 
 /**
  * InstanceInterface constructor.
@@ -67,9 +69,11 @@ iTlsClientInterface *InstanceInterface::getNewTlsClientInstance()
 }
 #endif
 
+#ifdef ENABLE_STORAGE_SERVICE
 iFileSystemInterface &InstanceInterface::getFileSystemInstance()
 {
     return __i_fs;
 }
+#endif
 
 InstanceInterface __i_instance;

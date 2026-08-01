@@ -671,6 +671,13 @@ typedef struct CommandBase {
     virtual bool wantsMaskedInput() { return false; }
 
     /**
+     * @brief Whether a waiting command manages the session line buffer itself.
+     *        When true the input loop won't wipe the buffer between inputs, so
+     *        the command can preload it (e.g. an in-place line editor).
+     */
+    virtual bool preservesLineBuffer() { return false; }
+
+    /**
      * @brief Returns a one-line usage description of the command in RO/flash
      *        memory (must be `RODT_ATTR`-wrapped). Read with `write_ro`.
      *        Backs `help` output and the `usage:` line printed on argument

@@ -14,6 +14,8 @@ created Date    : 6th Apr 2025
 
 #include "SSHServiceUtil.h"
 #include <helpers/ClientHelper.h>
+#include <helpers/ConfigHelper.h>
+#include <utility/Base64.h>
 #include <utility/crypto/asymmetric/curve25519/curve25519.h>
 #include <utility/crypto/hash/sha256.h>
 #include <utility/crypto/hmac/hmac_sha1.h>
@@ -964,9 +966,184 @@ bool LWSSH::parse_userauth_request(const pdiutil::vector<uint8_t>& payload, SSHU
         if (offset >= payload.size()) return false;
         bool has_old_password = payload[offset++] != 0;
         if (!read_ssh_string(payload, req.password, offset)) return false;
+    } else if (req.method == "publickey") {
+        if (offset >= payload.size()) return false;
+        req.has_signature = payload[offset++] != 0;
+        if (!read_ssh_string(payload, req.pk_algorithm, offset)) return false;
+        if (!read_ssh_string(payload, req.pubkey_blob, offset)) return false;
+        if (req.has_signature) {
+            if (!read_ssh_string(payload, req.signature, offset)) return false;
+        }
     }
 
     return true;
+}
+
+/**
+ * @brief Load the SSH auth policy from SSH_CONFIG_FILE.
+ * @param config Output config; left at its defaults when the file is absent.
+ */
+void LWSSH::load_ssh_config(ssh_config_t& config) {
+
+    pdiutil::string cfgfile = SSH_CONFIG_FILE;
+    pdiutil::string keyPasswordAuth = SSH_CONFIG_KEY_PASSWORD_AUTH;
+    pdiutil::string keyPubkeyAuth = SSH_CONFIG_KEY_PUBKEY_AUTH;
+
+    pdiutil::vector<config_kv_t> kvs;
+    if (!loadConfigFile(cfgfile.c_str(), kvs)) {
+        return;
+    }
+
+    for (size_t i = 0; i < kvs.size(); i++) {
+
+        bool enabled = !(kvs[i].m_value == "no" || kvs[i].m_value == "No" ||
+                         kvs[i].m_value == "NO" || kvs[i].m_value == "0" ||
+                         kvs[i].m_value == "false");
+
+        if (kvs[i].m_key == keyPasswordAuth) {
+            config.m_password_auth = enabled;
+        } else if (kvs[i].m_key == keyPubkeyAuth) {
+            config.m_pubkey_auth = enabled;
+        }
+    }
+}
+
+/**
+ * @brief Extract the raw field from an "ssh-ed25519" wire blob.
+ *
+ * Parses string("ssh-ed25519") + string(field) and returns the field when it
+ * matches expected_size. Serves both public key blobs (32 bytes) and signature
+ * blobs (64 bytes).
+ *
+ * @param blob The SSH wire blob.
+ * @param out Output field; cleared on failure.
+ * @param expected_size Required field length in bytes.
+ * @return True on a valid blob of the expected size.
+ */
+bool LWSSH::extract_ed25519_blob_field(const pdiutil::vector<uint8_t>& blob, pdiutil::vector<uint8_t>& out, uint32_t expected_size) {
+
+    out.clear();
+
+    int32_t offset = 0;
+    pdiutil::string type;
+    if (!read_ssh_string(blob, type, offset)) return false;
+
+    pdiutil::string expected = SSH_ED25519_KEY_TYPE_STR;
+    if (type != expected) return false;
+
+    pdiutil::vector<uint8_t> field;
+    if (!read_ssh_string(blob, field, offset)) return false;
+    if (field.size() != expected_size) return false;
+
+    out = field;
+    return true;
+}
+
+/**
+ * @brief Check whether a client's Ed25519 public key is authorized.
+ *
+ * Reads <home>/.ssh/authorized_keys and matches the raw 32-byte key against
+ * each "ssh-ed25519 <base64 blob> [comment]" entry.
+ *
+ * @param client_rawkey The client's raw 32-byte Ed25519 public key.
+ * @return True if a matching authorized key is found.
+ */
+bool LWSSH::is_authorized_pubkey(const pdiutil::vector<uint8_t>& client_rawkey) {
+
+    if (client_rawkey.size() != ED25519_PUBKEY_SIZE) {
+        return false;
+    }
+
+    const char* homedir = __i_fs.getHomeDirectory();
+    pdiutil::string keytype = SSH_ED25519_KEY_TYPE_STR;
+    pdiutil::string akfile = SSH_AUTHORIZED_KEYS_FILE;
+
+    char akpath[64]; memset(akpath, 0, sizeof(akpath));
+    __snprintf(akpath, sizeof(akpath), "%s/%s/%s",
+               (strlen(homedir) > 1 ? homedir : ""), SSH_DEFAULT_DIR, akfile.c_str());
+
+    pdiutil::vector<config_kv_t> kvs;
+    if (!loadConfigFile(akpath, kvs)) {
+        return false;
+    }
+
+    bool authorized = false;
+    for (size_t i = 0; i < kvs.size() && !authorized; i++) {
+
+        if (kvs[i].m_key != keytype) {
+            continue;
+        }
+
+        pdiutil::string& val = kvs[i].m_value;
+        size_t sp = 0;
+        while (sp < val.length() && val[sp] != ' ' && val[sp] != '\t') sp++;
+        pdiutil::string b64 = val.substr(0, sp);
+
+        pdiutil::vector<uint8_t> blob;
+        blob.resize((b64.length() * 3) / 4 + 4);
+        int declen = base64Decode(b64.c_str(), b64.length(), blob.data());
+        if (declen <= 0) {
+            continue;
+        }
+        blob.resize(declen);
+
+        pdiutil::vector<uint8_t> rawkey;
+        if (!extract_ed25519_blob_field(blob, rawkey, ED25519_PUBKEY_SIZE)) {
+            continue;
+        }
+
+        if (memcmp(rawkey.data(), client_rawkey.data(), ED25519_PUBKEY_SIZE) == 0) {
+            authorized = true;
+        }
+
+        __i_dvc_ctrl.yield();
+    }
+
+    return authorized;
+}
+
+/**
+ * @brief Build the data a publickey userauth signature is computed over.
+ *
+ * Per RFC 4252 7: string(session_id) followed by the userauth request bytes
+ * through the public key blob, with the signature-present flag forced TRUE.
+ *
+ * @param session The SSH session (provides the session id = exchange hash).
+ * @param req The parsed publickey userauth request.
+ * @param out Output signed data.
+ */
+void LWSSH::build_pubkey_auth_signed_data(LWSSHSession* session, const SSHUserAuthRequest& req, pdiutil::vector<uint8_t>& out) {
+
+    out.clear();
+
+    append_ssh_string(out, (const char*)session->m_exchange_hash_h, sizeof(session->m_exchange_hash_h));
+    out.push_back(SSH2_MSG_USERAUTH_REQUEST);
+    append_ssh_string(out, req.username.c_str(), req.username.length());
+    append_ssh_string(out, req.service.c_str(), req.service.length());
+    append_ssh_string(out, req.method.c_str(), req.method.length());
+    out.push_back(1);
+    append_ssh_string(out, req.pk_algorithm.c_str(), req.pk_algorithm.length());
+    append_ssh_string(out, req.pubkey_blob);
+}
+
+/**
+ * @brief Verify a publickey userauth signature against the client's key.
+ * @param session The SSH session.
+ * @param req The parsed publickey userauth request (must carry a signature).
+ * @param rawkey The client's raw 32-byte Ed25519 public key.
+ * @return True if the signature verifies.
+ */
+bool LWSSH::verify_pubkey_signature(LWSSHSession* session, const SSHUserAuthRequest& req, const pdiutil::vector<uint8_t>& rawkey) {
+
+    pdiutil::vector<uint8_t> rawsig;
+    if (!extract_ed25519_blob_field(req.signature, rawsig, SSH_ED25519_SIG_SIZE)) {
+        return false;
+    }
+
+    pdiutil::vector<uint8_t> signed_data;
+    build_pubkey_auth_signed_data(session, req, signed_data);
+
+    return ed25519_verify(rawsig.data(), signed_data.data(), signed_data.size(), rawkey.data()) != 0;
 }
 
 /**

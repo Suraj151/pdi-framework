@@ -60,6 +60,8 @@ struct SSHSubsystemRequest {
         pdiutil::string handle; // Handle for the sftp, if needed. currently supporting 1 only at a time
         uint32_t fxp_write_totalrecvd = 0; // Total bytes received for current write operation
         uint32_t fxp_write_expectedrecvlen = 0; // Expected total length for current
+        uint8_t fxp_write_header[28] = {0}; // per-session reassembled SSH_FXP_WRITE header
+        uint64_t fxp_write_headeroffset = 0; // per-session base file offset for the write
 
         pdiutil::vector<uint8_t> rx_accum;
 
@@ -121,6 +123,12 @@ struct SSHUserAuthRequest {
     pdiutil::string service;
     pdiutil::string method;
     pdiutil::string password; // Only if method == "password"
+
+    // Only if method == "publickey"
+    bool has_signature = false;
+    pdiutil::string pk_algorithm;
+    pdiutil::vector<uint8_t> pubkey_blob;
+    pdiutil::vector<uint8_t> signature;
 };
 
 // Represents a single SSH session
@@ -224,12 +232,19 @@ struct LWSSHSession {
     uint32_t packets_seq_num_stoc; // Sequence number for server-to-client packets
 
     SSHChannel current_channel; // For single-channel servers. currently keeping single channle only.
+    ssh_config_t m_ssh_config;  // Per-session auth policy, loaded lazily before userauth.
+    bool m_ssh_config_loaded = false;
 };
 
 // Helper functions
 int parse_received_packet(LWSSHSession* session, ssh_packet& packet);
 int parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet);
 bool parse_userauth_request(const pdiutil::vector<uint8_t>& payload, SSHUserAuthRequest& req);
+void load_ssh_config(ssh_config_t& config);
+bool extract_ed25519_blob_field(const pdiutil::vector<uint8_t>& blob, pdiutil::vector<uint8_t>& out, uint32_t expected_size);
+bool is_authorized_pubkey(const pdiutil::vector<uint8_t>& client_rawkey);
+void build_pubkey_auth_signed_data(LWSSHSession* session, const SSHUserAuthRequest& req, pdiutil::vector<uint8_t>& out);
+bool verify_pubkey_signature(LWSSHSession* session, const SSHUserAuthRequest& req, const pdiutil::vector<uint8_t>& rawkey);
 bool parse_name_list(const pdiutil::vector<uint8_t>& payload, uint32_t& offset, ssh_name_list& name_list);
 bool parse_kex_init_fields(const pdiutil::vector<uint8_t>& payload, SSHKexInitFields& fields);
 bool parse_kex_ecdh_init(const pdiutil::vector<uint8_t>& payload, EcdhInitPacket& packet);
