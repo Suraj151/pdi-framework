@@ -19,8 +19,8 @@ namespace {
 
 class ProcFsNullStorage : public iStorageInterface {
 public:
-    int64_t read(uint64_t, void*, uint64_t) override { return -1; }
-    int64_t write(uint64_t, const void*, uint64_t) override { return -1; }
+    int64_t read(uint64_t, void*, uint64_t) override { return PDI_ERR_NOT_SUPPORTED; }
+    int64_t write(uint64_t, const void*, uint64_t) override { return PDI_ERR_NOT_SUPPORTED; }
     bool erase(uint64_t, uint64_t) override { return false; }
     uint64_t size() const override { return 0; }
 };
@@ -85,9 +85,9 @@ pdiutil::string ProcFs::generateContent(const char* path) {
 }
 
 int ProcFs::readFile(const char* path, uint64_t size, pdiutil::function<bool(char*, uint32_t)> readbackfn, uint64_t offset, const char* readUntilMatchStr, bool* didmatchfound) {
-    if (!path || !readbackfn) return -1;
+    if (!path || !readbackfn) return PDI_ERR_INVALID_ARG;
     pdiutil::string content = generateContent(path);
-    if (content.empty()) return -1;
+    if (content.empty()) return PDI_ERR_NOT_FOUND;
     if (offset >= content.length()) return 0;
 
     // `size` is the per-iteration chunk limit, not a total cap — loop the
@@ -106,7 +106,7 @@ int ProcFs::readFile(const char* path, uint64_t size, pdiutil::function<bool(cha
 
 int64_t ProcFs::getFileSize(const char* path) {
     pdiutil::string content = generateContent(path);
-    return content.empty() ? -1 : (int64_t)content.length();
+    return content.empty() ? PDI_ERR_NOT_FOUND : (int64_t)content.length();
 }
 
 bool ProcFs::isFileExist(const char* path) {
@@ -128,7 +128,7 @@ bool ProcFs::isDirectory(const char* path) {
 
 int ProcFs::getDirFileList(const char* path, pdiutil::vector<file_info_t>& items, const char* pattern) {
     const char* norm = normalizePath(path);
-    if (norm[0] != '\0') return -1;
+    if (norm[0] != '\0') return STORAGE_ERROR_NOT_A_DIRECTORY;
 
     for (uint8_t i = 0; i < s_proc_file_count; ++i) {
         file_info_t info;
@@ -152,7 +152,7 @@ int ProcFs::getDirFileList(const char* path, pdiutil::vector<file_info_t>& items
 }
 
 int ProcFs::getFileAttr(const char* path, uint8_t type, void* buffer, uint32_t size) {
-    if (!buffer || size == 0) return -1;
+    if (!buffer || size == 0) return PDI_ERR_INVALID_ARG;
     if (type == FILE_ATTR_PERMS && size >= sizeof(uint16_t)) {
         *(uint16_t*)buffer = 0444;
         return sizeof(uint16_t);
@@ -165,10 +165,10 @@ int ProcFs::getFileAttr(const char* path, uint8_t type, void* buffer, uint32_t s
         *(uint16_t*)buffer = 0;
         return sizeof(uint16_t);
     }
-    return -1;
+    return STORAGE_ERROR_ATTR_NOT_FOUND;
 }
 
-int ProcFs::getFileMeta(const char* path, file_info_t& out) {
+pdi_err_t ProcFs::getFileMeta(const char* path, file_info_t& out) {
     const char* norm = normalizePath(path);
     // Per iFileSystemInterface contract, m_name is left untouched. Do not
     // assign a static/IROM literal or a caller-borrowed pointer here — some
@@ -196,7 +196,7 @@ int ProcFs::getFileMeta(const char* path, file_info_t& out) {
         return 0;
     }
 
-    return -1;
+    return PDI_ERR_NOT_FOUND;
 }
 
 #endif

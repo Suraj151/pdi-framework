@@ -94,7 +94,7 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
             lwip_freeaddrinfo(res);
         } else {
             if (nullptr != res) lwip_freeaddrinfo(res);
-            return -99;
+            return PDI_ERR_STATE;
         }
     }
 
@@ -102,7 +102,7 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
     m_pcb = tcp_new();
     if (!m_pcb) {
         TCP_GUARD_END
-        return -98;
+        return PDI_ERR_NO_MEM;
     }
 
     tcp_arg(m_pcb, this);
@@ -113,7 +113,7 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
     TCP_GUARD_END
     if (err != ERR_OK) {
         close();
-        return err < 0 ? err : -97;
+        return PDI_ERR_FROM_LWIP(err);
     }
     setNoDelay(true);
 
@@ -123,7 +123,7 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
 
     if( !connected() ) {
         close();
-        return -96;  // timeout
+        return PDI_ERR_TIMEOUT;  // timeout
     }    
 
     return 0;
@@ -174,7 +174,7 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
     TCP_GUARD_BEGIN
     if (!m_isConnected || !m_pcb) {
         TCP_GUARD_END
-        return -99;
+        return PDI_ERR_STATE;
     }
 
     uint8_t flags = TCP_WRITE_FLAG_COPY;
@@ -197,7 +197,7 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
         err = tcp_write(m_pcb, c_str + total_sent, chunk, flags);
         if (err != ERR_OK) {
             TCP_GUARD_END
-            return err < 0 ? err : -99;
+            return PDI_ERR_FROM_LWIP(err);
         }
 
         total_sent += chunk;
@@ -209,7 +209,7 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
         err = tcp_output(m_pcb);
         if (err != ERR_OK) {
             TCP_GUARD_END
-            return err < 0 ? err : -99;
+            return PDI_ERR_FROM_LWIP(err);
         }
     }
     TCP_GUARD_END
@@ -234,7 +234,7 @@ int32_t TcpClientInterface::read(uint8_t* buffer, uint32_t size) {
     TCP_GUARD_BEGIN
     if (!m_rxBuffer || m_rxBufferSize == 0) {
         TCP_GUARD_END
-        return -99;
+        return PDI_ERR_STATE;
     }
 
     int32_t bytesToRead = (size < m_rxBufferSize) ? size : m_rxBufferSize;

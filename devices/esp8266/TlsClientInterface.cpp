@@ -466,10 +466,10 @@ void TlsClientInterface::setTimeout(uint32_t timeout) {
 
 
 int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
-    if (m_role != ROLE_CLIENT || !host) return -1;
+    if (m_role != ROLE_CLIENT || !host) return PDI_ERR_INVALID_ARG;
     if (m_verifyPeer && m_caPath.empty()) {
         LogE("TLS connect: verify-peer is on but no CA path set\n");
-        return -2;
+        return PDI_ERR_INVALID_ARG;
     }
 
     close();
@@ -481,7 +481,7 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
     if (!ipaddr_aton(hostname, &serverIp)) {
         if (m_dns.in_flight) {
             // LogE("TLS connect: DNS lookup already in flight\n");
-            return -98;
+            return PDI_ERR_STATE;
         }
 
         m_dns.in_flight = true;
@@ -499,16 +499,16 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
             }
             if (m_dns.in_flight) {
                 LogE("TLS connect: DNS timeout for %s\n", hostname);
-                return -100;
+                return NET_ERROR_DNS_FAILED;
             }
             if (!m_dns.found) {
                 LogE("TLS connect: DNS resolution failed for %s\n", hostname);
-                return -100;
+                return NET_ERROR_DNS_FAILED;
             }
             serverIp = m_dns.addr;
         } else {
             m_dns.in_flight = false;
-            return derr;
+            return PDI_ERR_FROM_LWIP(derr);
         }
     }
 
@@ -517,13 +517,13 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
     m_bear = pdiutil::safe_new<BearSSLState>();
     if (!m_bear) {
         LogE("TLS connect: OOM BearSSLState\n");
-        return -97;
+        return PDI_ERR_NO_MEM;
     }
 
     if (m_verifyPeer && !m_caPath.empty()) {
         if (!TlsCryptoLoader::loadTrustAnchors(m_caPath.c_str(),
                 m_bear->trustAnchors, m_bear->trustAnchorsCount)) {
-            return bearReset(-3);
+            return bearReset(NET_ERROR_TLS_HANDSHAKE_FAILED);
         }
     }
 
@@ -543,7 +543,7 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
         m_bear->noopX509 = pdiutil::safe_new<NoopX509State>();
         if (!m_bear->noopX509) {
             LogE("TLS connect: OOM NoopX509State\n");
-            return bearReset(-97);
+            return bearReset(PDI_ERR_NO_MEM);
         }
         m_bear->noopX509->vtable = &noop_x509_vtable;
         m_bear->noopX509->is_leaf = false;
@@ -552,7 +552,7 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
     }
 
     if (!m_bear->allocIoBuffers(TLS_IBUF_SIZE, TLS_OBUF_SIZE)) {
-        return bearReset(-97);
+        return bearReset(PDI_ERR_NO_MEM);
     }
     br_ssl_engine_set_buffers_bidi(&m_bear->cc.eng,
         m_bear->ibuf, m_bear->ibufLen,
@@ -561,10 +561,10 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
     if (!m_certPath.empty() && !m_keyPath.empty()) {
         if (!TlsCryptoLoader::loadCertChain(m_certPath.c_str(),
                 m_bear->certChain, m_bear->certChainCount, m_bear->certBacking)) {
-            return bearReset(-4);
+            return bearReset(NET_ERROR_TLS_HANDSHAKE_FAILED);
         }
         if (!TlsCryptoLoader::loadPrivateKey(m_keyPath.c_str(), m_bear->skey)) {
-            return bearReset(-4);
+            return bearReset(NET_ERROR_TLS_HANDSHAKE_FAILED);
         }
         int kt = br_skey_decoder_key_type(&m_bear->skey);
         if (kt == BR_KEYTYPE_RSA) {
@@ -580,18 +580,18 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
                 BR_KEYTYPE_EC,
                 br_ec_get_default(), br_ecdsa_i15_sign_asn1);
         } else {
-            return bearReset(-4);
+            return bearReset(NET_ERROR_TLS_HANDSHAKE_FAILED);
         }
     }
 
     const char* sni = m_sniHostname.empty() ? hostname : m_sniHostname.c_str();
     if (!br_ssl_client_reset(&m_bear->cc, sni, 0)) {
-        return bearReset(-5);
+        return bearReset(NET_ERROR_TLS_HANDSHAKE_FAILED);
     }
 
     m_pcb = tcp_new();
     if (!m_pcb) {
-        return bearReset(-98);
+        return bearReset(PDI_ERR_NO_MEM);
     }
     tcp_arg(m_pcb, this);
     tcp_err(m_pcb, &TlsClientInterface::onError);
@@ -601,7 +601,7 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
     if (!startTlsWorker()) {
         close();
-        return -97;
+        return NET_ERROR_TLS_HANDSHAKE_FAILED;
     }
     #endif
 
@@ -614,7 +614,7 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
     #endif
     if (terr != ERR_OK) {
         close();
-        return terr < 0 ? terr : -97;
+        return PDI_ERR_FROM_LWIP(terr);
     }
     setNoDelay(true);
 
@@ -629,7 +629,7 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
         LogE("TLS connect: timeout after %u ms (tcp.connected=%d engState=%u engErr=%d rxQ=%u)\n",
             (unsigned)elapsed, (int)m_isConnected, engState, engErr, (unsigned)m_rxQueueLen);
         close();
-        return -101;
+        return PDI_ERR_TIMEOUT;
     }
 
     // LogI("TLS connect: handshake done in %u ms\n",

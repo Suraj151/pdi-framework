@@ -761,7 +761,7 @@ Every registration entry point (`register_task`, `setInterval`, `setTimeout`, `u
 | Want to… | Call | Returns | Notes |
 |---|---|---|---|
 | Print POSIX-style ps view | `printPsToTerminal(t, filter_owner=0xFF)` | void | Backs the `ps` / `top` CLI commands. Filter by owner sid or `0xFF` for all |
-| Promote a task to a contextual lane | `scheduleUnderExecSched(sched, id, mode, stackdepth)` | int (negative on failure — typically `-1`/`-99` if the port doesn't supply the scheduler or the task couldn't be queued) | Requires `ENABLE_CONTEXTUAL_EXECUTION` |
+| Promote a task to a contextual lane | `scheduleUnderExecSched(sched, id, mode, stackdepth)` | int (negative `pdi_err` code on failure — `PDI_ERR_NOT_IMPLEMENTED` if the port doesn't supply the scheduler, `TASK_ERROR_INVALID_MODE`/`TASK_ERROR_CREATION_FAILED` if the task couldn't be queued) | Requires `ENABLE_CONTEXTUAL_EXECUTION` |
 
 `register_task` returns `-1` if the slot table is full. Callers must check the return value before assuming the task was accepted.
 

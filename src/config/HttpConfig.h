@@ -41,12 +41,6 @@ enum http_resp_code : uint16_t {
 };
 typedef enum http_resp_code http_resp_code_t;
 
-enum http_err_code : int16_t {
-    HTTP_ERROR_CONNECTION_FAILED = -1,
-    HTTP_ERROR_MAX = -999
-};
-typedef enum http_err_code http_err_code_t;
-
 enum http_version : uint8_t {
     HTTP_VERSION_1_0,
     HTTP_VERSION_1_1,

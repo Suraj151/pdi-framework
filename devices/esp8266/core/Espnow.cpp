@@ -59,7 +59,7 @@ int is_device_exist_in_table(esp_now_device_t *_device){
       return i;
     }
   }
-  return -1;
+  return PDI_ERR_FAILURE;
 }
 
 void remove_device_from_table(esp_now_device_t *_device){

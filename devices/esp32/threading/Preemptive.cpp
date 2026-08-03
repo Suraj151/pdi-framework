@@ -47,9 +47,9 @@ PreemptiveScheduler::~PreemptiveScheduler(){
 
 int PreemptiveScheduler::schedule_task(task_t* task, uint32_t stacksize){
 
-    if(task->m_task_mode != TASK_MODE_PREEMPTIVE) return -1;
+    if(task->m_task_mode != TASK_MODE_PREEMPTIVE) return TASK_ERROR_INVALID_MODE;
     Preemptive* f = pdiutil::safe_new<Preemptive>();
-    if (!f) return -2;
+    if (!f) return PDI_ERR_NO_MEM;
     task->m_task_exec = f;
 
     f->stack      = nullptr;
@@ -81,7 +81,7 @@ int PreemptiveScheduler::schedule_task(task_t* task, uint32_t stacksize){
     if (ok != pdPASS) {
         pdiutil::safe_delete(f);
         task->m_task_exec = nullptr;
-        return -3;
+        return TASK_ERROR_CREATION_FAILED;
     }
 
     CRITICAL_SECTION_ENTER

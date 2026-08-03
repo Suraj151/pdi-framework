@@ -43,7 +43,7 @@ static void compute_ssh_mac(uint8_t mac_len, const uint8_t *key, const uint8_t *
 int LWSSH::parse_received_packet(LWSSHSession* session, ssh_packet &packet){
 
     if (!session || !session->m_client) {
-        return -1; // No active session or client
+        return PDI_ERR_NULL_PTR; // No active session or client
     }
     
     if (session->m_client->available() < 5) {
@@ -78,7 +78,7 @@ int LWSSH::parse_received_packet(LWSSHSession* session, ssh_packet &packet){
     
     session->packets_seq_num_ctos++;
 
-    return bStatus ? 0 : -1;
+    return bStatus ? 0 : PDI_ERR_CORRUPT;
 }
 
 /**
@@ -90,7 +90,7 @@ int LWSSH::parse_received_packet(LWSSHSession* session, ssh_packet &packet){
 int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
 
     if (!session || !session->m_client) {
-        return -1; // No active session or client
+        return PDI_ERR_NULL_PTR; // No active session or client
     }
     
     // check whether it has minimum length as per negotiated MAC + payload
@@ -293,7 +293,7 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
 
     if (memcmp(recv_mac.data(), computed_mac, session->mac_len) != 0) {
         // MAC verification failed
-        return -1;
+        return SSH_ERROR_MAC_FAILED;
     }else{
         // MAC verification succeeded.
         session->packets_seq_num_ctos++;
@@ -312,7 +312,7 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
 
     bool bStatus = (packet.payload.size() == payload_length && packet.payload[0] < 101);
     
-    return bStatus ? 0 : -1;
+    return bStatus ? 0 : PDI_ERR_CORRUPT;
 }
 
 /**

@@ -25,7 +25,7 @@ Created Date    : 6th Apr 2025
  * @brief Initializes the file system interface.
  * @return 0 on success, or a negative error code on failure.
  */
-int FileSystemInterfaceImpl::init() { 
+pdi_err_t FileSystemInterfaceImpl::init() { 
 
     // Initialize the file system
     lfs_config lfscfg; 
@@ -37,7 +37,7 @@ int FileSystemInterfaceImpl::init() {
     lfscfg.block_cycles = 100; // Number of erase cycles before wear leveling    
     int status = initLFSConfig(&lfscfg);
 
-    if(status == LFS_ERR_OK) {
+    if(status == PDI_OK) {
         // Create home and temp directories if they do not exist
         // createDirectory(m_home.c_str());
         createDirectory(m_temp.c_str());
@@ -336,9 +336,9 @@ uint16_t FileSystemInterfaceImpl::currentUmask(){
     return (nullptr != s) ? s->m_umask : (uint16_t)FILE_UMASK_DEFAULT;
 }
 
-int FileSystemInterfaceImpl::getFileMeta(const char *path, file_info_t &out){
+pdi_err_t FileSystemInterfaceImpl::getFileMeta(const char *path, file_info_t &out){
     if( !isFileExist(path) && !isDirExist(path) ){
-        return -1;
+        return PDI_ERR_NOT_FOUND;
     }
     bool isDir = isDirectory(path);
     out.m_type = isDir ? FILE_TYPE_DIR : FILE_TYPE_REG;
@@ -360,7 +360,7 @@ int FileSystemInterfaceImpl::setFilePermissions(const char *path, uint16_t perms
     return setFileAttr(path, FILE_ATTR_PERMS, &perms, sizeof(perms));
 }
 
-int FileSystemInterfaceImpl::touch(const char *path){
+pdi_err_t FileSystemInterfaceImpl::touch(const char *path){
     if( !isFileExist(path) ){
         return createFile(path, "");
     }

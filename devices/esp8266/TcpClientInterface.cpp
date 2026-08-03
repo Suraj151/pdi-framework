@@ -84,7 +84,7 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
         // old callback is still parked on &m_dns would let it overwrite
         // the new query's result, so wait for the old one to clear.
         if (m_dns.in_flight) {
-            return -98;
+            return PDI_ERR_STATE;
         }
 
         m_dns.in_flight = true;
@@ -104,24 +104,24 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
             if (m_dns.in_flight) {
                 // Timed out before lwIP fired. Leave in_flight=true so the
                 // next connect() bails until lwIP eventually calls back.
-                return -100;
+                return NET_ERROR_DNS_FAILED;
             }
 
             if (!m_dns.found) {
-                return -100;
+                return NET_ERROR_DNS_FAILED;
             }
             serverIp = m_dns.addr;
         } else {
             // lwIP rejected the request — it will not call the callback
             m_dns.in_flight = false;
-            return -99;
+            return PDI_ERR_FROM_LWIP(err);
         }
     }
 
     // Allocate a new TCP protocol control block
     m_pcb = tcp_new();
     if (!m_pcb) {
-        return -98;
+        return PDI_ERR_NO_MEM;
     }
 
     // Set the connection callback
@@ -139,7 +139,7 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
     #endif
     if (err != ERR_OK) {
         close();
-        return err < 0 ? err : -97; // Return error code if connection fails
+        return PDI_ERR_FROM_LWIP(err); // Return error code if connection fails
     }
     setNoDelay(true);
 
@@ -149,7 +149,7 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
 
     if( !connected() ) {
         close();
-        return -96;  // timeout
+        return PDI_ERR_TIMEOUT;  // timeout
     }
     
     return 0;
@@ -202,7 +202,7 @@ int8_t TcpClientInterface::connected() {
 int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
 
     if (!m_isConnected || !m_pcb) {
-        return -99;
+        return PDI_ERR_STATE;
     }
 
     uint8_t flags = TCP_WRITE_FLAG_COPY;
@@ -231,7 +231,7 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
         m_mutex.critical_unlock();
         #endif
         if (err != ERR_OK) {
-            return err < 0 ? err : -99; // Return error code if write fails
+            return PDI_ERR_FROM_LWIP(err); // Return error code if write fails
         }
 
         total_sent += chunk;
@@ -249,7 +249,7 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
         m_mutex.critical_unlock();
         #endif
         if (err != ERR_OK) {
-            return err < 0 ? err : -99; // Return error code if write fails
+            return PDI_ERR_FROM_LWIP(err); // Return error code if write fails
         }
     }
 
@@ -289,7 +289,7 @@ int32_t TcpClientInterface::write_ro(const char *c_str)
  */
 int32_t TcpClientInterface::read(uint8_t* buffer, uint32_t size) {
     if (!m_rxBuffer || m_rxBufferSize == 0) {
-        return -99;
+        return PDI_ERR_STATE;
     }
 
     int32_t bytesToRead = (size < m_rxBufferSize) ? size : m_rxBufferSize;

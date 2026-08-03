@@ -51,7 +51,7 @@ public:
      * @brief Initializes the file system interface.
      * @return 0 on success, or a negative error code on failure.
      */
-    virtual int init() { return 0; }
+    virtual pdi_err_t init() { return 0; }
 
     /**
      * @brief Creates a file and writes content to it.
@@ -152,14 +152,14 @@ public:
      * @param path The path of the directory to create.
      * @return 0 on success, or a negative error code on failure.
      */
-    virtual int createDirectory(const char* path) = 0;
+    virtual pdi_err_t createDirectory(const char* path) = 0;
 
     /**
      * @brief Deletes a directory.
      * @param path The path of the directory to delete.
      * @return 0 on success, or a negative error code on failure.
      */
-    virtual int deleteDirectory(const char* path) = 0;
+    virtual pdi_err_t deleteDirectory(const char* path) = 0;
 
     /**
      * @brief Renames a file or directory.
@@ -167,7 +167,7 @@ public:
      * @param newPath The new path of the file or directory.
      * @return 0 on success, or a negative error code on failure.
      */
-    virtual int rename(const char* oldPath, const char* newPath) = 0;
+    virtual pdi_err_t rename(const char* oldPath, const char* newPath) = 0;
 
     /**
      * @brief Copies a file to a new path.
@@ -175,7 +175,7 @@ public:
      * @param destPath The path of the destination file.
      * @return 0 on success, or a negative error code on failure.
      */
-    virtual int copyFile(const char* sourcePath, const char* destPath) = 0;
+    virtual pdi_err_t copyFile(const char* sourcePath, const char* destPath) = 0;
 
     /**
      * @brief Moves a file to a new path.
@@ -183,14 +183,14 @@ public:
      * @param newPath The new path of the file.
      * @return 0 on success, or a negative error code on failure.
      */
-    virtual int moveFile(const char* oldPath, const char* newPath) = 0;
+    virtual pdi_err_t moveFile(const char* oldPath, const char* newPath) = 0;
 
     /**
      * @brief Deletes a file.
      * @param path The path of the file to delete.
      * @return 0 on success, or a negative error code on failure.
      */
-    virtual int deleteFile(const char* path) = 0;
+    virtual pdi_err_t deleteFile(const char* path) = 0;
 
     /**
      * @brief Gets the size of a file.
@@ -361,7 +361,7 @@ public:
      * @param type User-defined attribute identifier (0-255).
      * @return 0 on success, or a negative error code on failure.
      */
-    virtual int removeFileAttr(const char *path, uint8_t type) = 0;
+    virtual pdi_err_t removeFileAttr(const char *path, uint8_t type) = 0;
 
     /**
      * @brief Get metadata (type, size, ctime, mtime, perms) for a single path.
@@ -369,7 +369,7 @@ public:
      * @param out file_info_t populated on success; `m_name` is left untouched.
      * @return 0 on success, or a negative error code on failure.
      */
-    virtual int getFileMeta(const char *path, file_info_t &out) = 0;
+    virtual pdi_err_t getFileMeta(const char *path, file_info_t &out) = 0;
 
     /**
      * @brief Set POSIX-style permission bits on a file or directory (advisory).
@@ -394,7 +394,7 @@ public:
      * @param path The path of the file.
      * @return 0 on success, or a negative error code on failure.
      */
-    virtual int touch(const char *path) = 0;
+    virtual pdi_err_t touch(const char *path) = 0;
 protected:
     /**
      * @brief Get current wall-clock time as seconds since Unix epoch, or 0

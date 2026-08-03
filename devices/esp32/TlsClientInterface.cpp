@@ -313,10 +313,10 @@ void TlsClientInterface::setTimeout(uint32_t timeout) {
 
 
 int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
-    if (m_role != ROLE_CLIENT || !host) return -1;
+    if (m_role != ROLE_CLIENT || !host) return PDI_ERR_INVALID_ARG;
     if (m_verifyPeer && m_caPath.empty()) {
         LogE("TLS connect: verify-peer is on but no CA path set\n");
-        return -2;
+        return PDI_ERR_INVALID_ARG;
     }
 
     close();
@@ -335,7 +335,7 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
         if (gerr == 0 && res) {
             if (res->ai_family == AF_INET6) {
                 lwip_freeaddrinfo(res);
-                return -100;
+                return NET_ERROR_DNS_FAILED;
             }
             serverIp.type = IPADDR_TYPE_V4;
             serverIp.u_addr.ip4.addr = ((struct sockaddr_in*)res->ai_addr)->sin_addr.s_addr;
@@ -343,7 +343,7 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
         } else {
             if (res) lwip_freeaddrinfo(res);
             LogE("TLS connect: DNS resolution failed for %s\n", hostname);
-            return -100;
+            return NET_ERROR_DNS_FAILED;
         }
     }
 
@@ -351,19 +351,19 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
     m_tls = pdiutil::safe_new<MbedTLSState>();
     if (!m_tls) {
         LogE("TLS connect: OOM\n");
-        return -97;
+        return PDI_ERR_NO_MEM;
     }
 
     int rc = mbedtls_ctr_drbg_seed(&m_tls->rng, mbedtls_entropy_func, &m_tls->entropy, nullptr, 0);
     if (rc != 0) {
         LogE("TLS connect: ctr_drbg_seed=%d\n", rc);
-        return tlsReset(-97);
+        return tlsReset(NET_ERROR_TLS_HANDSHAKE_FAILED);
     }
 
     if (m_verifyPeer && !m_caPath.empty()) {
         if (!TlsCryptoLoader::loadTrustAnchors(m_caPath.c_str(), &m_tls->caChain)) {
             LogE("TLS connect: loadTrustAnchors failed: %s\n", m_caPath.c_str());
-            return tlsReset(-3);
+            return tlsReset(NET_ERROR_TLS_HANDSHAKE_FAILED);
         }
         m_tls->caLoaded = true;
     }
@@ -374,7 +374,7 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
         MBEDTLS_SSL_PRESET_DEFAULT);
     if (rc != 0) {
         LogE("TLS connect: config_defaults=%d\n", rc);
-        return tlsReset(-5);
+        return tlsReset(NET_ERROR_TLS_HANDSHAKE_FAILED);
     }
 
     mbedtls_ssl_conf_rng(&m_tls->conf, mbedtls_ctr_drbg_random, &m_tls->rng);
@@ -391,32 +391,32 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
     if (!m_certPath.empty() && !m_keyPath.empty()) {
         if (!TlsCryptoLoader::loadCertChain(m_certPath.c_str(), &m_tls->ownCert)) {
             LogE("TLS connect: loadCertChain failed: %s\n", m_certPath.c_str());
-            return tlsReset(-4);
+            return tlsReset(NET_ERROR_TLS_HANDSHAKE_FAILED);
         }
         m_tls->ownCertLoaded = true;
         if (!TlsCryptoLoader::loadPrivateKey(m_keyPath.c_str(), &m_tls->ownKey, &m_tls->rng)) {
             LogE("TLS connect: loadPrivateKey failed: %s\n", m_keyPath.c_str());
-            return tlsReset(-4);
+            return tlsReset(NET_ERROR_TLS_HANDSHAKE_FAILED);
         }
         m_tls->ownKeyLoaded = true;
         rc = mbedtls_ssl_conf_own_cert(&m_tls->conf, &m_tls->ownCert, &m_tls->ownKey);
         if (rc != 0) {
             LogE("TLS connect: conf_own_cert=%d\n", rc);
-            return tlsReset(-4);
+            return tlsReset(NET_ERROR_TLS_HANDSHAKE_FAILED);
         }
     }
 
     rc = mbedtls_ssl_setup(&m_tls->ssl, &m_tls->conf);
     if (rc != 0) {
         LogE("TLS connect: ssl_setup=%d\n", rc);
-        return tlsReset(-5);
+        return tlsReset(NET_ERROR_TLS_HANDSHAKE_FAILED);
     }
 
     const char* sni = m_sniHostname.empty() ? hostname : m_sniHostname.c_str();
     rc = mbedtls_ssl_set_hostname(&m_tls->ssl, sni);
     if (rc != 0) {
         LogE("TLS connect: set_hostname=%d\n", rc);
-        return tlsReset(-5);
+        return tlsReset(NET_ERROR_TLS_HANDSHAKE_FAILED);
     }
 
     mbedtls_ssl_set_bio(&m_tls->ssl, this,
@@ -428,7 +428,7 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
     m_pcb = tcp_new();
     if (!m_pcb) {
         TCP_GUARD_END
-        return tlsReset(-98);
+        return tlsReset(PDI_ERR_NO_MEM);
     }
     tcp_arg(m_pcb, this);
     tcp_err(m_pcb, &TlsClientInterface::onError);
@@ -438,13 +438,13 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
     TCP_GUARD_END
     if (terr != ERR_OK) {
         close();
-        return terr < 0 ? terr : -97;
+        return PDI_ERR_FROM_LWIP(terr);
     }
     setNoDelay(true);
 
     if (!startTlsWorker()) {
         close();
-        return -97;
+        return NET_ERROR_TLS_HANDSHAKE_FAILED;
     }
 
     while (!connected() && (__i_dvc_ctrl.millis_now() - start) < m_timeout) {
@@ -456,7 +456,7 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
         LogE("TLS connect: timeout after %u ms (tcp.connected=%d rxQ=%u)\n",
             (unsigned)elapsed, (int)m_isConnected, (unsigned)m_rxQueueLen);
         close();
-        return -101;
+        return PDI_ERR_TIMEOUT;
     }
 
     return 0;

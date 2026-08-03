@@ -130,6 +130,13 @@ struct TlsCommand : public CommandBase {
                     return result;
                 }
 
+                if (!__i_fs.isDirExist(TLS_DEFAULT_HTTP_DIR)) {
+                    __i_fs.createDirectory(TLS_DEFAULT_HTTP_DIR);
+                }
+                if (!__i_fs.isDirExist(TLS_DEFAULT_SSL_DIR)) {
+                    __i_fs.createDirectory(TLS_DEFAULT_SSL_DIR);
+                }
+
                 bool ok = TlsCertProvisioner::generateCert(
                     TLS_DEFAULT_SERVER_CERT_PATH,
                     TLS_DEFAULT_SERVER_KEY_PATH,

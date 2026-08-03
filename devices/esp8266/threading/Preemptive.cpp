@@ -113,9 +113,9 @@ int PreemptiveScheduler::schedule_task(task_t* task, uint32_t stacksize){
 
     // Init new Preemptive
     // if(task->m_task_exec) { delete task->m_task_exec; }
-    if(task->m_task_mode != TASK_MODE_PREEMPTIVE) return -1;
+    if(task->m_task_mode != TASK_MODE_PREEMPTIVE) return TASK_ERROR_INVALID_MODE;
     Preemptive* f = pdiutil::safe_new<Preemptive>();
-    if (!f) return -2;
+    if (!f) return PDI_ERR_NO_MEM;
     task->m_task_exec = f;
 
     // Allocate with padding to guarantee a 16-byte aligned top-of-stack
@@ -125,7 +125,7 @@ int PreemptiveScheduler::schedule_task(task_t* task, uint32_t stacksize){
     if (!f->stack_raw) {
         pdiutil::safe_delete(f);
         task->m_task_exec = nullptr;
-        return -2;
+        return TASK_ERROR_CREATION_FAILED;
     }
     memset(f->stack_raw, 0, raw_bytes);
 

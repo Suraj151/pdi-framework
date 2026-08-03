@@ -65,9 +65,9 @@ int CooperativeScheduler::schedule_task(task_t* task, uint32_t stacksize){
 
     // Init new Cooperative
     // if(task->m_task_exec) { delete task->m_task_exec; }
-    if(task->m_task_mode != TASK_MODE_COOPERATIVE) return -1;
+    if(task->m_task_mode != TASK_MODE_COOPERATIVE) return TASK_ERROR_INVALID_MODE;
     Cooperative* f = pdiutil::safe_new<Cooperative>();
-    if (!f) return -2;
+    if (!f) return PDI_ERR_NO_MEM;
     task->m_task_exec = f;
 
     // Allocate with padding to guarantee a 16-byte aligned top-of-stack
@@ -77,7 +77,7 @@ int CooperativeScheduler::schedule_task(task_t* task, uint32_t stacksize){
     if (!f->stack_raw) {
         pdiutil::safe_delete(f);
         task->m_task_exec = nullptr;
-        return -2;
+        return TASK_ERROR_CREATION_FAILED;
     }
     memset(f->stack_raw, 0, raw_bytes);
 

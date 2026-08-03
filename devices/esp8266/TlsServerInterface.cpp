@@ -28,22 +28,22 @@ int32_t TlsServerInterface::begin(uint16_t port) {
     close();
 
     if (m_serverCertPath.empty() || m_serverKeyPath.empty()) {
-        return -1;
+        return PDI_ERR_INVALID_ARG;
     }
 
     m_serverPcb = tcp_new();
-    if (!m_serverPcb) return -99;
+    if (!m_serverPcb) return PDI_ERR_NO_MEM;
 
     err_t err = tcp_bind(m_serverPcb, IP_ADDR_ANY, port);
     if (err != ERR_OK) {
         tcp_close(m_serverPcb);
         m_serverPcb = nullptr;
-        return err;
+        return PDI_ERR_FROM_LWIP(err);
     }
 
     // m_serverPcb = tcp_listen(m_serverPcb);
     m_serverPcb = tcp_listen_with_backlog(m_serverPcb, 1);
-    if (!m_serverPcb) return -99;
+    if (!m_serverPcb) return PDI_ERR_NO_MEM;
 
     tcp_arg(m_serverPcb, this);
     tcp_accept(m_serverPcb, &TlsServerInterface::onAccept);

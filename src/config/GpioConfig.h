@@ -198,7 +198,7 @@ struct gpio_configs {
   // return true if gpio has event
   bool gpioHasEvents(uint8_t gpionumber, uint8_t condition = GPIO_EVENT_CONDITION_MAX){
 
-    return -1 != getGpioEventIndex(gpionumber, condition);
+    return getGpioEventIndex(gpionumber, condition) >= 0;
   }
 
   // return event if found
@@ -206,7 +206,7 @@ struct gpio_configs {
 
     int16_t eventidx = getGpioEventIndex(gpioevent.gpioNumber, gpioevent.eventCondition);
 
-    if( eventidx != -1 && eventidx < MAX_GPIO_EVENTS ){
+    if( eventidx >= 0 && eventidx < MAX_GPIO_EVENTS ){
 
       gpioevent.eventChannel = gpio_events[eventidx].eventChannel;
       gpioevent.eventCondition = gpio_events[eventidx].eventCondition;
@@ -223,11 +223,11 @@ struct gpio_configs {
     int16_t eventidx = getGpioEventIndex(gpionumber, condition, addforce);
 
     // if event not found then add
-    if(eventidx == -1){
+    if(eventidx < 0){
       eventidx = getGpioEventIndex(gpionumber, condition, true);
     }
 
-    if( eventidx != -1 && eventidx < MAX_GPIO_EVENTS ){
+    if( eventidx >= 0 && eventidx < MAX_GPIO_EVENTS ){
       
       gpio_events[eventidx].gpioNumber = gpionumber;
       gpio_events[eventidx].eventChannel = channel;
@@ -272,7 +272,7 @@ private:
         return i;
       }
     }
-    return -1;
+    return PDI_ERR_NOT_FOUND;
   }
 
 #endif

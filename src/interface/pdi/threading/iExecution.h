@@ -75,7 +75,7 @@ class iExecutionScheduler {
 public:
     virtual ~iExecutionScheduler() {}
 
-    virtual int schedule_task(task_t* task, uint32_t stacksize) { return -99; }
+    virtual int schedule_task(task_t* task, uint32_t stacksize) { return PDI_ERR_NOT_IMPLEMENTED; }
     virtual void mute() = 0;
     virtual void yield() = 0;
     virtual void sleep(uint32_t ms) = 0;

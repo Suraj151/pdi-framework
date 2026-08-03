@@ -40,7 +40,7 @@ public:
   TmpFs();
   virtual ~TmpFs() {}
 
-  int init() override { return 0; }
+  pdi_err_t init() override { return 0; }
 
   int createFile(const char *path, const char *content, int64_t size = -1) override;
   int editFile(const char *path, uint64_t offset, const char *content, uint32_t size) override;
@@ -51,27 +51,27 @@ public:
                bool *didmatchfound = nullptr) override;
 
   int64_t getOffsetFromLineNumber(const char *path, int linenumber,
-                                  CallBackVoidArgFn yield = nullptr) override { return -1; }
+                                  CallBackVoidArgFn yield = nullptr) override { return PDI_ERR_NOT_SUPPORTED; }
   int64_t getLineNumberFromOffset(const char *path, int64_t offset,
-                                  CallBackVoidArgFn yield = nullptr) override { return -1; }
+                                  CallBackVoidArgFn yield = nullptr) override { return PDI_ERR_NOT_SUPPORTED; }
   int findInFile(const char *path, const char *findStr,
                  pdiutil::vector<uint32_t> *findindices, int maxindices = -1,
                  int everynthindice = 1, int64_t offset = 0,
-                 CallBackVoidArgFn yield = nullptr) override { return -1; }
+                 CallBackVoidArgFn yield = nullptr) override { return PDI_ERR_NOT_SUPPORTED; }
   int getLineNumbersInFile(const char *path,
                            pdiutil::vector<uint32_t> &linenumberindices,
                            int maxlinenumbers = -1, int linenumberoffset = 0,
-                           CallBackVoidArgFn yield = nullptr) override { return -1; }
+                           CallBackVoidArgFn yield = nullptr) override { return PDI_ERR_NOT_SUPPORTED; }
   int readLineInFile(const char *path, int32_t linenumber,
                      pdiutil::string &linedata, const char *pattern = nullptr,
-                     CallBackVoidArgFn yield = nullptr) override { return -1; }
+                     CallBackVoidArgFn yield = nullptr) override { return PDI_ERR_NOT_SUPPORTED; }
 
-  int createDirectory(const char *path) override;
-  int deleteDirectory(const char *path) override;
-  int rename(const char *oldPath, const char *newPath) override;
-  int copyFile(const char *sourcePath, const char *destPath) override;
-  int moveFile(const char *oldPath, const char *newPath) override;
-  int deleteFile(const char *path) override;
+  pdi_err_t createDirectory(const char *path) override;
+  pdi_err_t deleteDirectory(const char *path) override;
+  pdi_err_t rename(const char *oldPath, const char *newPath) override;
+  pdi_err_t copyFile(const char *sourcePath, const char *destPath) override;
+  pdi_err_t moveFile(const char *oldPath, const char *newPath) override;
+  pdi_err_t deleteFile(const char *path) override;
 
   int64_t getFileSize(const char *path) override;
   int getDirFileList(const char *path, pdiutil::vector<file_info_t> &items,
@@ -106,11 +106,11 @@ public:
 
   int setFileAttr(const char *path, uint8_t type, const void *buffer, uint32_t size) override;
   int getFileAttr(const char *path, uint8_t type, void *buffer, uint32_t size) override;
-  int removeFileAttr(const char *path, uint8_t type) override { return -1; }
-  int getFileMeta(const char *path, file_info_t &out) override;
+  pdi_err_t removeFileAttr(const char *path, uint8_t type) override { return PDI_ERR_NOT_SUPPORTED; }
+  pdi_err_t getFileMeta(const char *path, file_info_t &out) override;
   int setFilePermissions(const char *path, uint16_t perms) override;
   int setFileOwner(const char *path, uint16_t uid, uint16_t gid) override;
-  int touch(const char *path) override;
+  pdi_err_t touch(const char *path) override;
 
 protected:
   uint32_t nowEpoch() override;

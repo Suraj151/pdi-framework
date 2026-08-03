@@ -42,7 +42,7 @@ int32_t TcpServerInterface::begin(uint16_t port) {
     m_serverPcb = tcp_new();
     if (!m_serverPcb) {
         TCP_GUARD_END
-        return -99;
+        return PDI_ERR_NO_MEM;
     }
 
     err_t err = tcp_bind(m_serverPcb, IP_ADDR_ANY, port);
@@ -50,13 +50,13 @@ int32_t TcpServerInterface::begin(uint16_t port) {
         tcp_close(m_serverPcb);
         m_serverPcb = nullptr;
         TCP_GUARD_END
-        return err;
+        return PDI_ERR_FROM_LWIP(err);
     }
 
     m_serverPcb = tcp_listen(m_serverPcb);
     if (!m_serverPcb) {
         TCP_GUARD_END
-        return -99;
+        return PDI_ERR_NO_MEM;
     }
 
     tcp_arg(m_serverPcb, this);

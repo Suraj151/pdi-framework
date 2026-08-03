@@ -806,7 +806,7 @@ void TaskScheduler::run()
  */
 int TaskScheduler::scheduleUnderExecSched(iExecutionScheduler* _exec_sched, pdiutil::task_id_t _task_id, task_mode_t _task_mode, uint32_t _stackdepth)
 {
-    int ret = -99;
+    int ret = PDI_ERR_NOT_IMPLEMENTED;
 
     if( _exec_sched ){
 

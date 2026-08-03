@@ -56,14 +56,15 @@ bool UdpInterface::joinMulticastGroup(const ipaddress_t &group) {
 
 int32_t UdpInterface::send(const uint8_t *data, uint16_t len, const ipaddress_t &dst, uint16_t dst_port) {
 
-  if (nullptr == m_pcb || nullptr == data || 0 == len) return -1;
+  if (nullptr == m_pcb || nullptr == data || 0 == len) return PDI_ERR_INVALID_ARG;
 
   struct pbuf *p = pbuf_alloc(PBUF_TRANSPORT, len, PBUF_RAM);
-  if (nullptr == p) return -2;
+  if (nullptr == p) return PDI_ERR_NO_MEM;
 
-  if (ERR_OK != pbuf_take(p, data, len)) {
+  err_t pe = pbuf_take(p, data, len);
+  if (ERR_OK != pe) {
     pbuf_free(p);
-    return -3;
+    return PDI_ERR_FROM_LWIP(pe);
   }
 
   ipaddress_t d = dst;
@@ -73,7 +74,7 @@ int32_t UdpInterface::send(const uint8_t *data, uint16_t len, const ipaddress_t 
   err_t e = udp_sendto(m_pcb, p, &dstaddr, dst_port);
   pbuf_free(p);
 
-  return (ERR_OK == e) ? (int32_t)len : -10;
+  return (ERR_OK == e) ? (int32_t)len : PDI_ERR_FROM_LWIP(e);
 }
 
 void UdpInterface::setOnPacketCallback(CallBackVoidPointerArgFn callbk) {

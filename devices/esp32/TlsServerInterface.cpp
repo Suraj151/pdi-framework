@@ -37,14 +37,14 @@ int32_t TlsServerInterface::begin(uint16_t port) {
     close();
 
     if (m_serverCertPath.empty() || m_serverKeyPath.empty()) {
-        return -1;
+        return PDI_ERR_INVALID_ARG;
     }
 
     TCP_GUARD_BEGIN
     m_serverPcb = tcp_new();
     if (!m_serverPcb) {
         TCP_GUARD_END
-        return -99;
+        return PDI_ERR_NO_MEM;
     }
 
     err_t err = tcp_bind(m_serverPcb, IP_ADDR_ANY, port);
@@ -52,13 +52,13 @@ int32_t TlsServerInterface::begin(uint16_t port) {
         tcp_close(m_serverPcb);
         m_serverPcb = nullptr;
         TCP_GUARD_END
-        return err;
+        return PDI_ERR_FROM_LWIP(err);
     }
 
     m_serverPcb = tcp_listen_with_backlog(m_serverPcb, 1);
     if (!m_serverPcb) {
         TCP_GUARD_END
-        return -99;
+        return PDI_ERR_NO_MEM;
     }
 
     tcp_arg(m_serverPcb, this);

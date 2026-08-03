@@ -27,7 +27,7 @@ int16_t SSHClientInterface::connect(const uint8_t *host, uint16_t port){
     if(m_tcpClient){
         return m_tcpClient->connect(host, port);
     }
-    return -1;
+    return PDI_ERR_NOT_INITIALIZED;
 }
 
 /**
@@ -38,7 +38,7 @@ int16_t SSHClientInterface::disconnect(){
     if(m_tcpClient){
         return m_tcpClient->disconnect();
     }
-    return -1;
+    return PDI_ERR_NOT_INITIALIZED;
 }
 
 /**
@@ -283,7 +283,7 @@ int32_t SSHClientInterface::commit(){
         m_written_data.clear();
         return datasize;
     }
-    return -1;
+    return PDI_ERR_NOT_INITIALIZED;
 }
 
 /** 

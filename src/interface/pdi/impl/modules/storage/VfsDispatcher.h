@@ -34,7 +34,7 @@ public:
     }
     const vfs_mount_t* findMountForPath(const char* path) const;
 
-    int init() override;
+    pdi_err_t init() override;
 
     int createFile(const char* path, const char* content, int64_t size = -1) override;
     int editFile(const char* path, uint64_t offset, const char* content, uint32_t size) override;
@@ -47,12 +47,12 @@ public:
     int getLineNumbersInFile(const char* path, pdiutil::vector<uint32_t>& linenumberindices, int maxlinenumbers = -1, int linenumberoffset = 0, CallBackVoidArgFn yield = nullptr) override;
     int readLineInFile(const char* path, int32_t linenumber, pdiutil::string& linedata, const char* pattern = nullptr, CallBackVoidArgFn yield = nullptr) override;
 
-    int createDirectory(const char* path) override;
-    int deleteDirectory(const char* path) override;
-    int rename(const char* oldPath, const char* newPath) override;
-    int copyFile(const char* sourcePath, const char* destPath) override;
-    int moveFile(const char* oldPath, const char* newPath) override;
-    int deleteFile(const char* path) override;
+    pdi_err_t createDirectory(const char* path) override;
+    pdi_err_t deleteDirectory(const char* path) override;
+    pdi_err_t rename(const char* oldPath, const char* newPath) override;
+    pdi_err_t copyFile(const char* sourcePath, const char* destPath) override;
+    pdi_err_t moveFile(const char* oldPath, const char* newPath) override;
+    pdi_err_t deleteFile(const char* path) override;
 
     int64_t getFileSize(const char* path) override;
     int getDirFileList(const char* path, pdiutil::vector<file_info_t>& items, const char* pattern = nullptr) override;
@@ -83,11 +83,11 @@ public:
 
     int setFileAttr(const char* path, uint8_t type, const void* buffer, uint32_t size) override;
     int getFileAttr(const char* path, uint8_t type, void* buffer, uint32_t size) override;
-    int removeFileAttr(const char* path, uint8_t type) override;
-    int getFileMeta(const char* path, file_info_t& out) override;
+    pdi_err_t removeFileAttr(const char* path, uint8_t type) override;
+    pdi_err_t getFileMeta(const char* path, file_info_t& out) override;
     int setFilePermissions(const char* path, uint16_t perms) override;
     int setFileOwner(const char* path, uint16_t uid, uint16_t gid) override;
-    int touch(const char* path) override;
+    pdi_err_t touch(const char* path) override;
 
     // POSIX-style access-mode bits accepted by checkAccess.
     static constexpr uint8_t VFS_ACCESS_R = 4;

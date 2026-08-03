@@ -166,14 +166,14 @@ public:
      * @param path The path of the directory to create.
      * @return 0 on success, or a negative error code on failure.
      */
-    int createDirectory(const char* path) override;
+    pdi_err_t createDirectory(const char* path) override;
 
     /**
      * @brief Deletes a directory.
      * @param path The path of the directory to delete.
      * @return 0 on success, or a negative error code on failure.
      */
-    int deleteDirectory(const char* path) override;
+    pdi_err_t deleteDirectory(const char* path) override;
 
     /**
      * @brief Renames a file or directory.
@@ -181,7 +181,7 @@ public:
      * @param newPath The new path of the file or directory.
      * @return 0 on success, or a negative error code on failure.
      */
-    int rename(const char* oldPath, const char* newPath) override;
+    pdi_err_t rename(const char* oldPath, const char* newPath) override;
 
     /**
      * @brief Copies a file to a new path.
@@ -189,14 +189,14 @@ public:
      * @param destPath The path of the destination file.
      * @return 0 on success, or a negative error code on failure.
      */
-    int copyFile(const char* sourcePath, const char* destPath) override;
+    pdi_err_t copyFile(const char* sourcePath, const char* destPath) override;
 
     /**
      * @brief Deletes a file.
      * @param path The path of the file to delete.
      * @return 0 on success, or a negative error code on failure.
      */
-    int deleteFile(const char* path) override;
+    pdi_err_t deleteFile(const char* path) override;
 
     /**
      * @brief Moves a file to a new path.
@@ -204,7 +204,7 @@ public:
      * @param newPath The new path of the file.
      * @return 0 on success, or a negative error code on failure.
      */
-    int moveFile(const char* oldPath, const char* newPath) override;
+    pdi_err_t moveFile(const char* oldPath, const char* newPath) override;
 
     /**
      * @brief Gets the size of a file.
@@ -287,7 +287,7 @@ public:
      * @param type User-defined attribute identifier (0-255).
      * @return 0 on success, or a negative error code on failure.
      */
-    int removeFileAttr(const char *path, uint8_t type);
+    pdi_err_t removeFileAttr(const char *path, uint8_t type);
 
     int setFileOwner(const char *path, uint16_t uid, uint16_t gid) override;
 

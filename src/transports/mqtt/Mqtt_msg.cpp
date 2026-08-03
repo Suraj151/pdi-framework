@@ -45,11 +45,11 @@ struct __attribute((__packed__)) mqtt_connect_variable_header{
 static int append_string(mqtt_connection_t* connection, const char* string, int len){
 
   if( nullptr == connection || nullptr == connection->buffer || nullptr == string ){
-    return -1;
+    return PDI_ERR_NULL_PTR;
   }
 
   if(connection->message.length + len + 2 > connection->buffer_length){
-    return -1;
+    return PDI_ERR_OVERFLOW;
   }
 
   connection->buffer[connection->message.length++] = len >> 8;
@@ -84,7 +84,7 @@ static uint16_t append_message_id(mqtt_connection_t* connection, uint16_t messag
 static int init_message(mqtt_connection_t* connection){
 
   if( nullptr == connection ){
-    return -1;
+    return PDI_ERR_NULL_PTR;
   }
 
   connection->message.length = MQTT_MAX_FIXED_HEADER_SIZE;
@@ -144,7 +144,7 @@ void mqtt_msg_init(mqtt_connection_t* connection, uint8_t* buffer, uint16_t buff
 int32_t mqtt_get_total_length(uint8_t* buffer, uint16_t length){
 
   if( nullptr == buffer || length < 1 ){
-    return -1;
+    return PDI_ERR_INVALID_ARG;
   }
 
   int i;

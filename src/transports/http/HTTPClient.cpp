@@ -877,8 +877,8 @@ int16_t Http_Client::handleResponse()
 
 int64_t Http_Client::DownloadStream(const char *url, CallBackBytesArgBoolRetFn writer)
 {
-    if (nullptr == url || !writer) return -1;
-    if (m_stream_writer) return -1;
+    if (nullptr == url || !writer) return PDI_ERR_INVALID_ARG;
+    if (m_stream_writer) return PDI_ERR_BUSY;
 
     m_stream_writer        = writer;
     m_stream_bytes_written = 0;
@@ -889,8 +889,8 @@ int64_t Http_Client::DownloadStream(const char *url, CallBackBytesArgBoolRetFn w
     m_stream_writer = nullptr;
 
     if (HTTP_RESP_OK == status) return m_stream_bytes_written;
-    if (HTTP_RESP_MAX == status) return -1;
-    return -(int64_t)status;
+    if (HTTP_RESP_MAX == status) return HTTP_ERROR_CONNECTION_FAILED;
+    return HTTP_ERROR_UNEXPECTED_STATUS;
 }
 
 bool Http_Client::streamBodyTo(int32_t &max_timeout)
@@ -1014,7 +1014,7 @@ bool Http_Client::streamBodyTo(int32_t &max_timeout)
 
 int64_t Http_Client::DownloadFile(const char *url, const char *dest_path)
 {
-    if (nullptr == url || nullptr == dest_path) return -1;
+    if (nullptr == url || nullptr == dest_path) return PDI_ERR_INVALID_ARG;
 
     pdiutil::string path = dest_path;
 

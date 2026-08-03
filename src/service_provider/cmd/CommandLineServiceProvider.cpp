@@ -958,7 +958,7 @@ int16_t CommandLineServiceProvider::getCommandWaitingForUserInput(){
       return i;
     }
   }
-  return -1;
+  return PDI_ERR_FAILURE;
 }
 
 /**

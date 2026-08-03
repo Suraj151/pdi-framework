@@ -44,7 +44,7 @@ public:
   uint32_t read(uint8_t *buf, uint32_t size) override { return 0; }
 
   // useful api
-  int32_t available() override { return -1; }
+  int32_t available() override { return PDI_ERR_NOT_SUPPORTED; }
   int8_t connected() override { return 0; }
   void setTimeout(uint32_t timeout) override {}
   void flush() override {}

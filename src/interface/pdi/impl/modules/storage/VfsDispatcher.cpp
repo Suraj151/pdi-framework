@@ -22,8 +22,8 @@ namespace {
 
 class VfsNullStorage : public iStorageInterface {
 public:
-    int64_t read(uint64_t, void*, uint64_t) override { return -1; }
-    int64_t write(uint64_t, const void*, uint64_t) override { return -1; }
+    int64_t read(uint64_t, void*, uint64_t) override { return PDI_ERR_NOT_SUPPORTED; }
+    int64_t write(uint64_t, const void*, uint64_t) override { return PDI_ERR_NOT_SUPPORTED; }
     bool erase(uint64_t, uint64_t) override { return false; }
     uint64_t size() const override { return 0; }
 };
@@ -38,16 +38,19 @@ const pdiutil::string s_empty_string;
 VfsDispatcher::VfsDispatcher() : iFileSystemInterface(s_null_storage), m_mount_count(0), m_priv_depth(0) {}
 
 int8_t VfsDispatcher::mount(const char* prefix, iFileSystemInterface* backend, const char* name, vfs_type_t type) {
-    if (!prefix || !backend || m_mount_count >= VFS_MAX_MOUNTS) {
-        return -1;
+    if (!prefix || !backend) {
+        return PDI_ERR_INVALID_ARG;
+    }
+    if (m_mount_count >= VFS_MAX_MOUNTS) {
+        return PDI_ERR_NO_SPACE;
     }
     uint32_t plen = strlen(prefix);
     if (plen == 0 || plen > VFS_MOUNT_PREFIX_MAX) {
-        return -1;
+        return PDI_ERR_INVALID_ARG;
     }
     for (uint8_t i = 0; i < m_mount_count; ++i) {
         if (strcmp(m_mounts[i].m_prefix, prefix) == 0) {
-            return -1;
+            return PDI_ERR_EXISTS;
         }
     }
 
@@ -138,7 +141,7 @@ const vfs_mount_t* VfsDispatcher::findMountForPath(const char* path) const {
     return (best_idx == 0xFF) ? nullptr : &m_mounts[best_idx];
 }
 
-int VfsDispatcher::init() {
+pdi_err_t VfsDispatcher::init() {
     int rc = 0;
     for (uint8_t i = 0; i < m_mount_count; ++i) {
         if (m_mounts[i].m_backend) {
@@ -206,57 +209,57 @@ bool VfsDispatcher::checkOwnerOrRoot(const char* path) {
     } while (0)
 
 int VfsDispatcher::createFile(const char* path, const char* content, int64_t size) {
-    VFS_ROUTE_PATH(createFile, path, -1, content, size);
+    VFS_ROUTE_PATH(createFile, path, STORAGE_ERROR_NOT_MOUNTED, content, size);
 }
 int VfsDispatcher::editFile(const char* path, uint64_t offset, const char* content, uint32_t size) {
-    if (!checkAccess(path, VFS_ACCESS_W)) return -1;
-    VFS_ROUTE_PATH(editFile, path, -1, offset, content, size);
+    if (!checkAccess(path, VFS_ACCESS_W)) return PDI_ERR_PERM;
+    VFS_ROUTE_PATH(editFile, path, STORAGE_ERROR_NOT_MOUNTED, offset, content, size);
 }
 int VfsDispatcher::writeFile(const char* path, const char* content, uint32_t size, bool append) {
-    if (!checkAccess(path, VFS_ACCESS_W)) return -1;
-    VFS_ROUTE_PATH(writeFile, path, -1, content, size, append);
+    if (!checkAccess(path, VFS_ACCESS_W)) return PDI_ERR_PERM;
+    VFS_ROUTE_PATH(writeFile, path, STORAGE_ERROR_NOT_MOUNTED, content, size, append);
 }
 int VfsDispatcher::readFile(const char* path, uint64_t size, pdiutil::function<bool(char*, uint32_t)> readbackfn, uint64_t offset, const char* readUntilMatchStr, bool* didmatchfound) {
-    if (!checkAccess(path, VFS_ACCESS_R)) return -1;
-    VFS_ROUTE_PATH(readFile, path, -1, size, readbackfn, offset, readUntilMatchStr, didmatchfound);
+    if (!checkAccess(path, VFS_ACCESS_R)) return PDI_ERR_PERM;
+    VFS_ROUTE_PATH(readFile, path, STORAGE_ERROR_NOT_MOUNTED, size, readbackfn, offset, readUntilMatchStr, didmatchfound);
 }
 int64_t VfsDispatcher::getOffsetFromLineNumber(const char* path, int linenumber, CallBackVoidArgFn yield) {
-    if (!checkAccess(path, VFS_ACCESS_R)) return -1;
-    VFS_ROUTE_PATH(getOffsetFromLineNumber, path, -1, linenumber, yield);
+    if (!checkAccess(path, VFS_ACCESS_R)) return PDI_ERR_PERM;
+    VFS_ROUTE_PATH(getOffsetFromLineNumber, path, STORAGE_ERROR_NOT_MOUNTED, linenumber, yield);
 }
 int64_t VfsDispatcher::getLineNumberFromOffset(const char* path, int64_t offset, CallBackVoidArgFn yield) {
-    if (!checkAccess(path, VFS_ACCESS_R)) return -1;
-    VFS_ROUTE_PATH(getLineNumberFromOffset, path, -1, offset, yield);
+    if (!checkAccess(path, VFS_ACCESS_R)) return PDI_ERR_PERM;
+    VFS_ROUTE_PATH(getLineNumberFromOffset, path, STORAGE_ERROR_NOT_MOUNTED, offset, yield);
 }
 int VfsDispatcher::findInFile(const char* path, const char* findStr, pdiutil::vector<uint32_t>* findindices, int maxindices, int everynthindice, int64_t offset, CallBackVoidArgFn yield) {
-    if (!checkAccess(path, VFS_ACCESS_R)) return -1;
-    VFS_ROUTE_PATH(findInFile, path, -1, findStr, findindices, maxindices, everynthindice, offset, yield);
+    if (!checkAccess(path, VFS_ACCESS_R)) return PDI_ERR_PERM;
+    VFS_ROUTE_PATH(findInFile, path, STORAGE_ERROR_NOT_MOUNTED, findStr, findindices, maxindices, everynthindice, offset, yield);
 }
 int VfsDispatcher::getLineNumbersInFile(const char* path, pdiutil::vector<uint32_t>& linenumberindices, int maxlinenumbers, int linenumberoffset, CallBackVoidArgFn yield) {
-    if (!checkAccess(path, VFS_ACCESS_R)) return -1;
-    VFS_ROUTE_PATH(getLineNumbersInFile, path, -1, linenumberindices, maxlinenumbers, linenumberoffset, yield);
+    if (!checkAccess(path, VFS_ACCESS_R)) return PDI_ERR_PERM;
+    VFS_ROUTE_PATH(getLineNumbersInFile, path, STORAGE_ERROR_NOT_MOUNTED, linenumberindices, maxlinenumbers, linenumberoffset, yield);
 }
 int VfsDispatcher::readLineInFile(const char* path, int32_t linenumber, pdiutil::string& linedata, const char* pattern, CallBackVoidArgFn yield) {
-    if (!checkAccess(path, VFS_ACCESS_R)) return -1;
-    VFS_ROUTE_PATH(readLineInFile, path, -1, linenumber, linedata, pattern, yield);
+    if (!checkAccess(path, VFS_ACCESS_R)) return PDI_ERR_PERM;
+    VFS_ROUTE_PATH(readLineInFile, path, STORAGE_ERROR_NOT_MOUNTED, linenumber, linedata, pattern, yield);
 }
-int VfsDispatcher::createDirectory(const char* path) {
-    VFS_ROUTE_PATH(createDirectory, path, -1);
+pdi_err_t VfsDispatcher::createDirectory(const char* path) {
+    VFS_ROUTE_PATH(createDirectory, path, STORAGE_ERROR_NOT_MOUNTED);
 }
-int VfsDispatcher::deleteDirectory(const char* path) {
-    if (!checkAccess(path, VFS_ACCESS_W)) return -1;
-    VFS_ROUTE_PATH(deleteDirectory, path, -1);
+pdi_err_t VfsDispatcher::deleteDirectory(const char* path) {
+    if (!checkAccess(path, VFS_ACCESS_W)) return PDI_ERR_PERM;
+    VFS_ROUTE_PATH(deleteDirectory, path, STORAGE_ERROR_NOT_MOUNTED);
 }
-int VfsDispatcher::deleteFile(const char* path) {
-    if (!checkAccess(path, VFS_ACCESS_W)) return -1;
-    VFS_ROUTE_PATH(deleteFile, path, -1);
+pdi_err_t VfsDispatcher::deleteFile(const char* path) {
+    if (!checkAccess(path, VFS_ACCESS_W)) return PDI_ERR_PERM;
+    VFS_ROUTE_PATH(deleteFile, path, STORAGE_ERROR_NOT_MOUNTED);
 }
 int64_t VfsDispatcher::getFileSize(const char* path) {
-    VFS_ROUTE_PATH(getFileSize, path, -1);
+    VFS_ROUTE_PATH(getFileSize, path, STORAGE_ERROR_NOT_MOUNTED);
 }
 int VfsDispatcher::getDirFileList(const char* path, pdiutil::vector<file_info_t>& items, const char* pattern) {
-    if (!checkAccess(path, VFS_ACCESS_R)) return -1;
-    VFS_ROUTE_PATH(getDirFileList, path, -1, items, pattern);
+    if (!checkAccess(path, VFS_ACCESS_R)) return PDI_ERR_PERM;
+    VFS_ROUTE_PATH(getDirFileList, path, STORAGE_ERROR_NOT_MOUNTED, items, pattern);
 }
 bool VfsDispatcher::isFileExist(const char* path) {
     const char* rel = nullptr;
@@ -274,38 +277,38 @@ bool VfsDispatcher::isDirectory(const char* path) {
     return b ? b->isDirectory(rel) : false;
 }
 int VfsDispatcher::setFileAttr(const char* path, uint8_t type, const void* buffer, uint32_t size) {
-    if (!checkOwnerOrRoot(path)) return -1;
-    VFS_ROUTE_PATH(setFileAttr, path, -1, type, buffer, size);
+    if (!checkOwnerOrRoot(path)) return PDI_ERR_PERM;
+    VFS_ROUTE_PATH(setFileAttr, path, STORAGE_ERROR_NOT_MOUNTED, type, buffer, size);
 }
 int VfsDispatcher::getFileAttr(const char* path, uint8_t type, void* buffer, uint32_t size) {
-    VFS_ROUTE_PATH(getFileAttr, path, -1, type, buffer, size);
+    VFS_ROUTE_PATH(getFileAttr, path, STORAGE_ERROR_NOT_MOUNTED, type, buffer, size);
 }
-int VfsDispatcher::removeFileAttr(const char* path, uint8_t type) {
-    if (!checkOwnerOrRoot(path)) return -1;
-    VFS_ROUTE_PATH(removeFileAttr, path, -1, type);
+pdi_err_t VfsDispatcher::removeFileAttr(const char* path, uint8_t type) {
+    if (!checkOwnerOrRoot(path)) return PDI_ERR_PERM;
+    VFS_ROUTE_PATH(removeFileAttr, path, STORAGE_ERROR_NOT_MOUNTED, type);
 }
-int VfsDispatcher::getFileMeta(const char* path, file_info_t& out) {
-    VFS_ROUTE_PATH(getFileMeta, path, -1, out);
+pdi_err_t VfsDispatcher::getFileMeta(const char* path, file_info_t& out) {
+    VFS_ROUTE_PATH(getFileMeta, path, STORAGE_ERROR_NOT_MOUNTED, out);
 }
 int VfsDispatcher::setFilePermissions(const char* path, uint16_t perms) {
-    if (!checkOwnerOrRoot(path)) return -1;
-    VFS_ROUTE_PATH(setFilePermissions, path, -1, perms);
+    if (!checkOwnerOrRoot(path)) return PDI_ERR_PERM;
+    VFS_ROUTE_PATH(setFilePermissions, path, STORAGE_ERROR_NOT_MOUNTED, perms);
 }
 int VfsDispatcher::setFileOwner(const char* path, uint16_t uid, uint16_t gid) {
-    if (!checkRoot()) return -1;
-    VFS_ROUTE_PATH(setFileOwner, path, -1, uid, gid);
+    if (!checkRoot()) return PDI_ERR_PERM;
+    VFS_ROUTE_PATH(setFileOwner, path, STORAGE_ERROR_NOT_MOUNTED, uid, gid);
 }
-int VfsDispatcher::touch(const char* path) {
-    if (!checkAccess(path, VFS_ACCESS_W)) return -1;
-    VFS_ROUTE_PATH(touch, path, -1);
+pdi_err_t VfsDispatcher::touch(const char* path) {
+    if (!checkAccess(path, VFS_ACCESS_W)) return PDI_ERR_PERM;
+    VFS_ROUTE_PATH(touch, path, STORAGE_ERROR_NOT_MOUNTED);
 }
 
 #undef VFS_ROUTE_PATH
 
 int VfsDispatcher::crossCopy(iFileSystemInterface* sb, const char* srel, iFileSystemInterface* db, const char* drel) {
     // Only regular files stream across a mount boundary.
-    if (!sb->isFileExist(srel) || sb->isDirectory(srel)) return -1;
-    if (db->isFileExist(drel) || db->isDirExist(drel)) return -1;
+    if (!sb->isFileExist(srel) || sb->isDirectory(srel)) return STORAGE_ERROR_NOT_A_FILE;
+    if (db->isFileExist(drel) || db->isDirExist(drel)) return PDI_ERR_EXISTS;
 
     // Deliver source content in chunks; the first chunk creates/truncates the
     // destination, the rest append. `size` here is the per-callback chunk cap.
@@ -319,40 +322,42 @@ int VfsDispatcher::crossCopy(iFileSystemInterface* sb, const char* srel, iFileSy
     });
     if (rc < 0 || !ok) {
         db->deleteFile(drel);
-        return -1;
+        return STORAGE_ERROR_BACKEND;
     }
     // Empty source: no chunk was delivered. A zero-byte writeFile does not
     // create the file on every backend (LittleFS opens without O_CREAT for an
     // empty write), so materialise the empty destination with createFile.
-    if (first && db->createFile(drel, "", 0) < 0) return -1;
+    if (first && db->createFile(drel, "", 0) < 0) return STORAGE_ERROR_BACKEND;
     return 0;
 }
 
-int VfsDispatcher::rename(const char* oldPath, const char* newPath) {
+pdi_err_t VfsDispatcher::rename(const char* oldPath, const char* newPath) {
     const char *orel = nullptr, *nrel = nullptr;
     iFileSystemInterface* ob = resolve(oldPath, &orel);
     iFileSystemInterface* nb = resolve(newPath, &nrel);
-    if (!ob || !nb) return -1;
+    if (!ob || !nb) return STORAGE_ERROR_NOT_MOUNTED;
     if (ob == nb) return ob->rename(orel, nrel);
     // Cross-mount rename == copy to the new backend then drop the source.
-    if (crossCopy(ob, orel, nb, nrel) < 0) return -1;
+    int rc = crossCopy(ob, orel, nb, nrel);
+    if (rc < 0) return rc;
     return ob->deleteFile(orel);
 }
-int VfsDispatcher::copyFile(const char* sourcePath, const char* destPath) {
+pdi_err_t VfsDispatcher::copyFile(const char* sourcePath, const char* destPath) {
     const char *srel = nullptr, *drel = nullptr;
     iFileSystemInterface* sb = resolve(sourcePath, &srel);
     iFileSystemInterface* db = resolve(destPath, &drel);
-    if (!sb || !db) return -1;
+    if (!sb || !db) return STORAGE_ERROR_NOT_MOUNTED;
     if (sb == db) return sb->copyFile(srel, drel);
     return crossCopy(sb, srel, db, drel);
 }
-int VfsDispatcher::moveFile(const char* oldPath, const char* newPath) {
+pdi_err_t VfsDispatcher::moveFile(const char* oldPath, const char* newPath) {
     const char *orel = nullptr, *nrel = nullptr;
     iFileSystemInterface* ob = resolve(oldPath, &orel);
     iFileSystemInterface* nb = resolve(newPath, &nrel);
-    if (!ob || !nb) return -1;
+    if (!ob || !nb) return STORAGE_ERROR_NOT_MOUNTED;
     if (ob == nb) return ob->moveFile(orel, nrel);
-    if (crossCopy(ob, orel, nb, nrel) < 0) return -1;
+    int rc = crossCopy(ob, orel, nb, nrel);
+    if (rc < 0) return rc;
     return ob->deleteFile(orel);
 }
 

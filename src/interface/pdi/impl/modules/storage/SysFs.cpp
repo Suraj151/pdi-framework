@@ -26,8 +26,8 @@ namespace {
 
 class SysFsNullStorage : public iStorageInterface {
 public:
-    int64_t read(uint64_t, void*, uint64_t) override { return -1; }
-    int64_t write(uint64_t, const void*, uint64_t) override { return -1; }
+    int64_t read(uint64_t, void*, uint64_t) override { return PDI_ERR_NOT_SUPPORTED; }
+    int64_t write(uint64_t, const void*, uint64_t) override { return PDI_ERR_NOT_SUPPORTED; }
     bool erase(uint64_t, uint64_t) override { return false; }
     uint64_t size() const override { return 0; }
 };
@@ -49,12 +49,12 @@ bool segEquals(const char*& p, const char* lit) {
 }
 
 int16_t parseSeg(const char*& p) {
-    if (*p < '0' || *p > '9') return -1;
+    if (*p < '0' || *p > '9') return PDI_ERR_INVALID_ARG;
     int16_t v = 0;
     while (*p >= '0' && *p <= '9') {
         v = (int16_t)(v * 10 + (*p - '0'));
         p++;
-        if (v > 1000) return -1;
+        if (v > 1000) return PDI_ERR_RANGE;
     }
     return v;
 }
@@ -138,12 +138,13 @@ int SysFs::writeFile(const char* path, const char* content, uint32_t size, bool 
 #ifdef ENABLE_GPIO_SERVICE
     int16_t pin;
     NodeKind k = classify(path, pin);
-    if ((k != SYS_VALUE && k != SYS_MODE) || !content) return -1;
+    if (!content) return PDI_ERR_NULL_PTR;
+    if (k != SYS_VALUE && k != SYS_MODE) return STORAGE_ERROR_READ_ONLY;
 
     uint16_t val = StringToUint16(content, (uint8_t)(size > 255 ? 255 : size));
 
     if (k == SYS_MODE) {
-        if (val >= GPIO_MODE_MAX) return -1;
+        if (val >= GPIO_MODE_MAX) return PDI_ERR_RANGE;
         __gpio_service.m_gpio_config_copy.gpio_mode[pin] = (uint8_t)val;
     } else {
         __gpio_service.m_gpio_config_copy.gpio_readings[pin] = val;
@@ -154,14 +155,14 @@ int SysFs::writeFile(const char* path, const char* content, uint32_t size, bool 
     return (int)size;
 #else
     (void)path; (void)content; (void)size; (void)append;
-    return -1;
+    return PDI_ERR_NOT_SUPPORTED;
 #endif
 }
 
 int SysFs::readFile(const char* path, uint64_t size, pdiutil::function<bool(char*, uint32_t)> readbackfn, uint64_t offset, const char* readUntilMatchStr, bool* didmatchfound) {
-    if (!path || !readbackfn) return -1;
+    if (!path || !readbackfn) return PDI_ERR_INVALID_ARG;
     pdiutil::string content = generateContent(path);
-    if (content.empty()) return -1;
+    if (content.empty()) return PDI_ERR_NOT_FOUND;
     if (offset >= content.length()) return 0;
 
     // `size` is the per-iteration chunk limit, not a total cap — loop the
@@ -180,7 +181,7 @@ int SysFs::readFile(const char* path, uint64_t size, pdiutil::function<bool(char
 
 int64_t SysFs::getFileSize(const char* path) {
     pdiutil::string content = generateContent(path);
-    return content.empty() ? -1 : (int64_t)content.length();
+    return content.empty() ? PDI_ERR_NOT_FOUND : (int64_t)content.length();
 }
 
 bool SysFs::isFileExist(const char* path) {
@@ -237,16 +238,16 @@ int SysFs::getDirFileList(const char* path, pdiutil::vector<file_info_t>& items,
             addEntry(s_sys_leaf_names[i], FILE_TYPE_REG, 0666);
         }
     } else {
-        return -1;
+        return STORAGE_ERROR_NOT_A_DIRECTORY;
     }
     return (int)items.size();
 }
 
 int SysFs::getFileAttr(const char* path, uint8_t type, void* buffer, uint32_t size) {
-    if (!buffer || size == 0) return -1;
+    if (!buffer || size == 0) return PDI_ERR_INVALID_ARG;
     int16_t pin;
     NodeKind k = classify(path, pin);
-    if (k == SYS_INVALID) return -1;
+    if (k == SYS_INVALID) return PDI_ERR_NOT_FOUND;
 
     bool isdir = (k == SYS_ROOT || k == SYS_CLASS || k == SYS_GPIODIR || k == SYS_PIN);
 
@@ -262,10 +263,10 @@ int SysFs::getFileAttr(const char* path, uint8_t type, void* buffer, uint32_t si
         *(uint16_t*)buffer = 0;
         return sizeof(uint16_t);
     }
-    return -1;
+    return STORAGE_ERROR_ATTR_NOT_FOUND;
 }
 
-int SysFs::getFileMeta(const char* path, file_info_t& out) {
+pdi_err_t SysFs::getFileMeta(const char* path, file_info_t& out) {
     int16_t pin;
     NodeKind k = classify(path, pin);
     // Per iFileSystemInterface contract, m_name is left untouched — some callers
@@ -293,7 +294,7 @@ int SysFs::getFileMeta(const char* path, file_info_t& out) {
         return 0;
     }
 
-    return -1;
+    return PDI_ERR_NOT_FOUND;
 }
 
 #endif

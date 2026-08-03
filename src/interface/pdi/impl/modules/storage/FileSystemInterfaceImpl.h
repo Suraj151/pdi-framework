@@ -51,7 +51,7 @@ public:
      * @brief Initializes the file system interface.
      * @return 0 on success, or a negative error code on failure.
      */
-    virtual int init() override;
+    virtual pdi_err_t init() override;
 
     /**
      * @brief Get file mime type based on file extension.
@@ -147,7 +147,7 @@ public:
      * @param out file_info_t populated on success; `m_name` is left untouched.
      * @return 0 on success, or a negative error code on failure.
      */
-    virtual int getFileMeta(const char *path, file_info_t &out) override;
+    virtual pdi_err_t getFileMeta(const char *path, file_info_t &out) override;
 
     /**
      * @brief Set POSIX-style permission bits on a file or directory (advisory).
@@ -163,7 +163,7 @@ public:
      * @param path The path of the file.
      * @return 0 on success, or a negative error code on failure.
      */
-    int touch(const char *path) override;
+    pdi_err_t touch(const char *path) override;
 
 protected:
 

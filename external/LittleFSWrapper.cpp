@@ -13,6 +13,15 @@ created Date    : 6th Apr 2025
 
 #include "LittleFSWrapper.h"
 
+// Map a LittleFS return (LFS_ERR_* negative, or a non-negative count/size) onto
+// the framework error space. Non-negative values (count/size) pass through
+// unchanged. A negative LFS_ERR_* is preserved exactly via the FS_LITTLEFS
+// passthrough band rather than collapsed to a generic code, so both the origin
+// (LittleFS) and the exact error stay traceable: lfs_err = code - PDI_ERRBASE_FS_LITTLEFS.
+static int lfsToPdiErr(int rc) {
+    return rc >= 0 ? rc : PDI_ERR_FROM_LFS(rc);
+}
+
 /**
  * @brief Constructor to initialize the LittleFSWrapper.
  * @param storage Reference to an iStorageInterface implementation.
@@ -79,7 +88,7 @@ int LittleFSWrapper::initLFSConfig(lfs_config *lfscnfg)
         ret = lfs_mount(&m_lfs, &m_lfscfg);
     }
 
-    return ret; // Success
+    return lfsToPdiErr(ret); // Success
 }
 
 /**
@@ -93,14 +102,14 @@ int LittleFSWrapper::createFile(const char* path, const char* content, int64_t s
     lfs_file_t file;
     int fileOpenOrErr = lfs_file_open(&m_lfs, &file, path, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC | LFS_O_EXCL);
     if (fileOpenOrErr < 0) {
-        return fileOpenOrErr; // Failed to create file
+        return lfsToPdiErr(fileOpenOrErr); // Failed to create file
     }
     int bytesWrittenOrErr = lfs_file_write(&m_lfs, &file, content, (size == -1) ? strlen(content) : size);
     lfs_file_close(&m_lfs, &file);
     if( bytesWrittenOrErr >= 0 ){
         stampCreate(path, false);
     }
-    return bytesWrittenOrErr;
+    return lfsToPdiErr(bytesWrittenOrErr);
 }
 
 /**
@@ -120,7 +129,7 @@ int LittleFSWrapper::editFile(const char* path, uint64_t offset, const char* con
     lfs_file_t file;
     int fileOpenOrErr = lfs_file_open(&m_lfs, &file, path, LFS_O_WRONLY);
     if (fileOpenOrErr < 0) {
-        return fileOpenOrErr; // Failed to open file
+        return lfsToPdiErr(fileOpenOrErr); // Failed to open file
     }
 
     int64_t filesize = lfs_file_size(&m_lfs, &file);
@@ -138,7 +147,7 @@ int LittleFSWrapper::editFile(const char* path, uint64_t offset, const char* con
             int written = lfs_file_write(&m_lfs, &file, pad_buf, chunk);
             if (written <= 0) { // error or no progress
                 lfs_file_close(&m_lfs, &file);
-                return (written == 0) ? -3 : written;
+                return (written == 0) ? PDI_ERR_IO : lfsToPdiErr(written);
             }
             gap -= written;
         }
@@ -147,21 +156,21 @@ int LittleFSWrapper::editFile(const char* path, uint64_t offset, const char* con
     // Move to the specified offset
     if (lfs_file_seek(&m_lfs, &file, offset, LFS_SEEK_SET) < 0) {
         lfs_file_close(&m_lfs, &file);
-        return -1; // Failed to seek to offset
+        return STORAGE_ERROR_BACKEND; // Failed to seek to offset
     }
 
     int bytesWrittenOrErr = lfs_file_write(&m_lfs, &file, content, size);
     lfs_file_close(&m_lfs, &file);
 
     if (bytesWrittenOrErr > 0 && (uint32_t)bytesWrittenOrErr != size) {
-        return -2; // Partial write
+        return PDI_ERR_IO; // Partial write
     }
 
     if( bytesWrittenOrErr >= 0 ){
         stampModify(path);
     }
 
-    return bytesWrittenOrErr;
+    return lfsToPdiErr(bytesWrittenOrErr);
 }
 
 /**
@@ -182,7 +191,7 @@ int LittleFSWrapper::writeFile(const char *path, const char *content, uint32_t s
     lfs_file_t file;
     int fileOpenOrErr = lfs_file_open(&m_lfs, &file, path, LFS_O_WRONLY | LFS_O_CREAT | (append ? LFS_O_APPEND : LFS_O_TRUNC) );
     if (fileOpenOrErr < 0) {
-        return fileOpenOrErr; // Failed to create file
+        return lfsToPdiErr(fileOpenOrErr); // Failed to create file
     }
     int bytesWrittenOrErr = lfs_file_write(&m_lfs, &file, content, size);
     lfs_file_close(&m_lfs, &file);
@@ -193,7 +202,7 @@ int LittleFSWrapper::writeFile(const char *path, const char *content, uint32_t s
             stampCreate(path, false);
         }
     }
-    return bytesWrittenOrErr;
+    return lfsToPdiErr(bytesWrittenOrErr);
 }
 
 /**
@@ -210,7 +219,7 @@ int LittleFSWrapper::readFile(const char* path, uint64_t size, pdiutil::function
     lfs_file_t file;
     int32_t okOrErr = lfs_file_open(&m_lfs, &file, path, LFS_O_RDONLY);
     if (okOrErr < 0) {
-        return okOrErr; // Failed to open file
+        return lfsToPdiErr(okOrErr); // Failed to open file
     }
 
     char *matchstrtempbuffer = nullptr;
@@ -302,7 +311,7 @@ int LittleFSWrapper::readFile(const char* path, uint64_t size, pdiutil::function
     }
 
     lfs_file_close(&m_lfs, &file);
-    return bytesReadOrErr;
+    return lfsToPdiErr(bytesReadOrErr);
 }
 
 /**
@@ -314,7 +323,7 @@ int LittleFSWrapper::readFile(const char* path, uint64_t size, pdiutil::function
  * @return 0 on success, or a negative error code on failure.
  */
 int LittleFSWrapper::setFileAttr(const char *path, uint8_t type, const void *buffer, uint32_t size){
-    return lfs_setattr(&m_lfs, path, type, buffer, (lfs_size_t)size);
+    return lfsToPdiErr(lfs_setattr(&m_lfs, path, type, buffer, (lfs_size_t)size));
 }
 
 /**
@@ -326,7 +335,7 @@ int LittleFSWrapper::setFileAttr(const char *path, uint8_t type, const void *buf
  * @return The size of the attribute on success, or a negative error code on failure.
  */
 int LittleFSWrapper::getFileAttr(const char *path, uint8_t type, void *buffer, uint32_t size){
-    return lfs_getattr(&m_lfs, path, type, buffer, (lfs_size_t)size);
+    return lfsToPdiErr(lfs_getattr(&m_lfs, path, type, buffer, (lfs_size_t)size));
 }
 
 /**
@@ -335,8 +344,8 @@ int LittleFSWrapper::getFileAttr(const char *path, uint8_t type, void *buffer, u
  * @param type User-defined attribute identifier (0-255).
  * @return 0 on success, or a negative error code on failure.
  */
-int LittleFSWrapper::removeFileAttr(const char *path, uint8_t type){
-    return lfs_removeattr(&m_lfs, path, type);
+pdi_err_t LittleFSWrapper::removeFileAttr(const char *path, uint8_t type){
+    return lfsToPdiErr(lfs_removeattr(&m_lfs, path, type));
 }
 
 int LittleFSWrapper::setFileOwner(const char *path, uint16_t uid, uint16_t gid){
@@ -418,7 +427,7 @@ int LittleFSWrapper::findInFile(const char* path, const char* findStr, pdiutil::
             }, offsetindex, findStr, &didmatchfound);
 
             if( bytesReadOrErr < 0 ){
-                return bytesReadOrErr; // error
+                return lfsToPdiErr(bytesReadOrErr); // error
             }
 
             offsetindex += bytesReadOrErr + 1; // move to next char to continue search
@@ -452,7 +461,7 @@ int LittleFSWrapper::findInFile(const char* path, const char* findStr, pdiutil::
             }
         }while( offsetindex < filesize && ( maxindices == -1 || offset < 0 || (findindices ? findindices->size() : foundcount) < maxindices  ) );
     }else{
-        return -99;
+        return PDI_ERR_NULL_PTR;
     }
 
     return foundcount;
@@ -493,7 +502,7 @@ int64_t LittleFSWrapper::getOffsetFromLineNumber(const char* path, int linenumbe
         }
 
         linenumber = totalnumberoflines + linenumber;
-        if( linenumber < 0 ) return -1;
+        if( linenumber < 0 ) return PDI_ERR_RANGE;
     }
 
     // Find the file content offset from line number offset
@@ -543,7 +552,7 @@ int64_t LittleFSWrapper::getOffsetFromLineNumber(const char* path, int linenumbe
         //     }, offset, "\n", &didmatchfound);
 
         //     if(bytesReadOrErr < 0){
-        //         return bytesReadOrErr;
+        //         return lfsToPdiErr(bytesReadOrErr);
         //     }
 
         //     offset += bytesReadOrErr + 1;
@@ -617,7 +626,7 @@ int64_t LittleFSWrapper::getLineNumberFromOffset(const char* path, int64_t offse
         //     }, offsetcount, "\n", &didmatchfound);
 
         //     if(bytesReadOrErr < 0){
-        //         return bytesReadOrErr;
+        //         return lfsToPdiErr(bytesReadOrErr);
         //     }
 
         //     offsetcount += bytesReadOrErr + 1;
@@ -702,7 +711,7 @@ int LittleFSWrapper::readLineInFile(const char* path, int32_t linenumber, pdiuti
 
         lineoffset = getOffsetFromLineNumber(path, linenumber, yield);
         if(lineoffset < 0) return (int)lineoffset;
-        if(lineoffset >= filesize) return -99;
+        if(lineoffset >= filesize) return PDI_ERR_NOT_FOUND;
 
     }else{
 
@@ -711,11 +720,11 @@ int LittleFSWrapper::readLineInFile(const char* path, int32_t linenumber, pdiuti
         pdiutil::vector<uint32_t> patternindices;
         int rc = findInFile(path, pattern, &patternindices, CAP, CAP,
                             (linenumber < 0) ? -filesize : 0, yield);
-        if(rc < 0) return rc;
-        if(patternindices.size() == 0) return -99;
+        if(rc < 0) return lfsToPdiErr(rc);
+        if(patternindices.size() == 0) return PDI_ERR_NOT_FOUND;
 
         int64_t anchorLine = getLineNumberFromOffset(path, patternindices[0], yield);
-        if(anchorLine < 0) return -99;
+        if(anchorLine < 0) return (int)anchorLine;
 
         const int WINDOW = 50;
         int windowStartLine = (int)anchorLine - WINDOW;
@@ -723,12 +732,12 @@ int LittleFSWrapper::readLineInFile(const char* path, int32_t linenumber, pdiuti
 
         pdiutil::vector<uint32_t> linenumbersvec;
         rc = getLineNumbersInFile(path, linenumbersvec, 2 * WINDOW + 1, windowStartLine, yield);
-        if(rc < 0) return rc;
-        if(linenumbersvec.size() == 0) return -99;
+        if(rc < 0) return lfsToPdiErr(rc);
+        if(linenumbersvec.size() == 0) return PDI_ERR_NOT_FOUND;
 
         pdiutil::vector<uint32_t> winpatternindices;
         rc = findInFile(path, pattern, &winpatternindices, -1, 1, (int64_t)linenumbersvec[0], yield);
-        if(rc < 0) return rc;
+        if(rc < 0) return lfsToPdiErr(rc);
 
         pdiutil::vector<uint32_t> filtered;
         for(size_t i = 0; i < linenumbersvec.size(); i++){
@@ -742,13 +751,13 @@ int LittleFSWrapper::readLineInFile(const char* path, int32_t linenumber, pdiuti
             }
         }
 
-        if(filtered.size() == 0) return -99;
+        if(filtered.size() == 0) return PDI_ERR_NOT_FOUND;
 
         int32_t idx = (linenumber < 0) ? ((int32_t)filtered.size() + linenumber) : linenumber;
-        if(idx < 0 || (size_t)idx >= filtered.size()) return -99;
+        if(idx < 0 || (size_t)idx >= filtered.size()) return PDI_ERR_NOT_FOUND;
 
         lineoffset = (int64_t)filtered[idx];
-        if(lineoffset >= filesize) return -99;
+        if(lineoffset >= filesize) return PDI_ERR_NOT_FOUND;
     }
 
     int bytesReadedOrError = readFile(path, 250, [&](char *data, uint32_t size) -> bool {
@@ -761,7 +770,7 @@ int LittleFSWrapper::readLineInFile(const char* path, int32_t linenumber, pdiuti
         bytesReadedOrError--;
     }
 
-    return bytesReadedOrError;
+    return lfsToPdiErr(bytesReadedOrError);
 }
 
 
@@ -770,12 +779,12 @@ int LittleFSWrapper::readLineInFile(const char* path, int32_t linenumber, pdiuti
  * @param path The path of the directory to create.
  * @return 0 on success, or a negative error code on failure.
  */
-int LittleFSWrapper::createDirectory(const char* path) {
-    if (!path || path[0] == '\0') return LFS_ERR_INVAL;
+pdi_err_t LittleFSWrapper::createDirectory(const char* path) {
+    if (!path || path[0] == '\0') return PDI_ERR_INVALID_ARG;
 
     char temp[LFS_NAME_MAX*2]; // Adjust size as needed
     size_t len = strlen(path);
-    if (len >= sizeof(temp)) return LFS_ERR_NAMETOOLONG;
+    if (len >= sizeof(temp)) return STORAGE_ERROR_NAME_TOO_LONG;
 
     int res = 0;
     size_t i = 0;
@@ -790,7 +799,7 @@ int LittleFSWrapper::createDirectory(const char* path) {
                 memcpy(temp, path, i);
                 temp[i] = '\0';
                 res = lfs_mkdir(&m_lfs, temp);
-                if (res != 0 && res != LFS_ERR_EXIST) return res;
+                if (res != 0 && res != LFS_ERR_EXIST) return lfsToPdiErr(res);
                 if (res == 0) {
                     stampCreate(temp, true);
                 }
@@ -807,13 +816,13 @@ int LittleFSWrapper::createDirectory(const char* path) {
  * @param path The path of the directory to delete.
  * @return 0 on success, or a negative error code on failure.
  */
-int LittleFSWrapper::deleteDirectory(const char* path) {
+pdi_err_t LittleFSWrapper::deleteDirectory(const char* path) {
     lfs_dir_t dir;
     lfs_info info;
 
     int dirOpenOrErr = lfs_dir_open(&m_lfs, &dir, path);
     if (dirOpenOrErr < 0) {
-        return dirOpenOrErr; // Failed to open directory
+        return lfsToPdiErr(dirOpenOrErr); // Failed to open directory
     }
 
     while (lfs_dir_read(&m_lfs, &dir, &info) > 0) {
@@ -836,14 +845,14 @@ int LittleFSWrapper::deleteDirectory(const char* path) {
             int res = lfs_remove(&m_lfs, childPath);
             if (res < 0) {
                 lfs_dir_close(&m_lfs, &dir);
-                return res;
+                return lfsToPdiErr(res);
             }
         }
     }
     lfs_dir_close(&m_lfs, &dir);
 
     // Now delete the (now empty) directory itself
-    return lfs_remove(&m_lfs, path);
+    return lfsToPdiErr(lfs_remove(&m_lfs, path));
 }
 
 /**
@@ -852,8 +861,8 @@ int LittleFSWrapper::deleteDirectory(const char* path) {
  * @param newPath The new path of the file or directory.
  * @return 0 on success, or a negative error code on failure.
  */
-int LittleFSWrapper::rename(const char* oldPath, const char* newPath) {
-    return lfs_rename(&m_lfs, oldPath, newPath);
+pdi_err_t LittleFSWrapper::rename(const char* oldPath, const char* newPath) {
+    return lfsToPdiErr(lfs_rename(&m_lfs, oldPath, newPath));
 }
 
 /**
@@ -862,7 +871,7 @@ int LittleFSWrapper::rename(const char* oldPath, const char* newPath) {
  * @param destPath The path of the destination file.
  * @return 0 on success, or a negative error code on failure.
  */
-int LittleFSWrapper::copyFile(const char* sourcePath, const char* destPath) {
+pdi_err_t LittleFSWrapper::copyFile(const char* sourcePath, const char* destPath) {
     // Buffer to store file content
     char buffer[m_lfscfg.read_size];
     memset(buffer, 0, sizeof(buffer));
@@ -870,13 +879,13 @@ int LittleFSWrapper::copyFile(const char* sourcePath, const char* destPath) {
     lfs_file_t sourceFile;
     int fileOpenOrErr = lfs_file_open(&m_lfs, &sourceFile, sourcePath, LFS_O_RDONLY);
     if (fileOpenOrErr < 0) {
-        return fileOpenOrErr; // Failed to open source file
+        return lfsToPdiErr(fileOpenOrErr); // Failed to open source file
     }
 
     lfs_file_t destFile;
     fileOpenOrErr = lfs_file_open(&m_lfs, &destFile, destPath, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC);
     if (fileOpenOrErr < 0) {
-        return fileOpenOrErr; // Failed to open/create file
+        return lfsToPdiErr(fileOpenOrErr); // Failed to open/create file
     }
 
     // Copy the content from source file to destination file
@@ -898,7 +907,7 @@ int LittleFSWrapper::copyFile(const char* sourcePath, const char* destPath) {
         lfs_setattr(&m_lfs, destPath, FILE_ATTR_PERMS, &srcPerms, sizeof(srcPerms));
     }
 
-    return LFS_ERR_OK; // Success
+    return PDI_OK; // Success
 }
 
 /**
@@ -906,8 +915,8 @@ int LittleFSWrapper::copyFile(const char* sourcePath, const char* destPath) {
  * @param path The path of the file to delete.
  * @return 0 on success, or a negative error code on failure.
  */
-int LittleFSWrapper::deleteFile(const char *path){
-    return lfs_remove(&m_lfs, path);
+pdi_err_t LittleFSWrapper::deleteFile(const char *path){
+    return lfsToPdiErr(lfs_remove(&m_lfs, path));
 }
 
 /**
@@ -916,8 +925,8 @@ int LittleFSWrapper::deleteFile(const char *path){
  * @param newPath The new path of the file.
  * @return 0 on success, or a negative error code on failure.
  */
-int LittleFSWrapper::moveFile(const char *oldPath, const char *newPath){
-    return lfs_rename(&m_lfs, oldPath, newPath);
+pdi_err_t LittleFSWrapper::moveFile(const char *oldPath, const char *newPath){
+    return lfsToPdiErr(lfs_rename(&m_lfs, oldPath, newPath));
 }
 
 /**
@@ -929,11 +938,11 @@ int64_t LittleFSWrapper::getFileSize(const char *path) {
     lfs_file_t file;
     int fileOpenOrErr = lfs_file_open(&m_lfs, &file, path, LFS_O_RDONLY);
     if (fileOpenOrErr < 0) {
-        return fileOpenOrErr; // Failed to open file
+        return lfsToPdiErr(fileOpenOrErr); // Failed to open file
     }    
     int64_t size = lfs_file_size(&m_lfs, &file);
     lfs_file_close(&m_lfs, &file);
-    return size;
+    return size < 0 ? lfsToPdiErr((int)size) : size;
 }
 
 /**
@@ -951,7 +960,7 @@ int LittleFSWrapper::getDirFileList(const char *path, pdiutil::vector<file_info_
     
     int dirOpenOrErr = lfs_dir_open(&m_lfs, &dir, path);
     if (dirOpenOrErr < 0) {
-        return dirOpenOrErr; // Failed to open directory
+        return lfsToPdiErr(dirOpenOrErr); // Failed to open directory
     }    
 
     size_t basepathlen = strlen(path);
@@ -1003,7 +1012,7 @@ int LittleFSWrapper::getDirFileList(const char *path, pdiutil::vector<file_info_
     }
 
     lfs_dir_close(&m_lfs, &dir);
-    return LFS_ERR_OK;
+    return PDI_OK;
 }
 
 /**

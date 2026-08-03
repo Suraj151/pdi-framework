@@ -19,8 +19,8 @@ namespace {
 
 class DevFsNullStorage : public iStorageInterface {
 public:
-    int64_t read(uint64_t, void*, uint64_t) override { return -1; }
-    int64_t write(uint64_t, const void*, uint64_t) override { return -1; }
+    int64_t read(uint64_t, void*, uint64_t) override { return PDI_ERR_NOT_SUPPORTED; }
+    int64_t write(uint64_t, const void*, uint64_t) override { return PDI_ERR_NOT_SUPPORTED; }
     bool erase(uint64_t, uint64_t) override { return false; }
     uint64_t size() const override { return 0; }
 };
@@ -100,26 +100,27 @@ int DevFs::streamFill(bool random, uint64_t size, pdiutil::function<bool(char*, 
 }
 
 int DevFs::readFile(const char* path, uint64_t size, pdiutil::function<bool(char*, uint32_t)> readbackfn, uint64_t offset, const char* readUntilMatchStr, bool* didmatchfound) {
-    if (!path || !readbackfn) return -1;
+    if (!path || !readbackfn) return PDI_ERR_INVALID_ARG;
     switch (classify(path)) {
         case DEV_NULL:    return 0; // EOF, deliver nothing
         case DEV_ZERO:    return streamFill(false, size, readbackfn, offset);
         case DEV_RANDOM:
         case DEV_URANDOM: return streamFill(true, size, readbackfn, offset);
-        default:          return -1;
+        default:          return PDI_ERR_NOT_FOUND;
     }
 }
 
 int DevFs::writeFile(const char* path, const char* content, uint32_t size, bool append) {
     // Every writable dev node discards its input; report success.
     NodeKind k = classify(path);
-    if (k == DEV_ROOT || k == DEV_INVALID) return -1;
+    if (k == DEV_ROOT) return STORAGE_ERROR_NOT_A_FILE;
+    if (k == DEV_INVALID) return PDI_ERR_NOT_FOUND;
     return (int)size;
 }
 
 int64_t DevFs::getFileSize(const char* path) {
     NodeKind k = classify(path);
-    return (k == DEV_ROOT || k == DEV_INVALID) ? -1 : 0;
+    return (k == DEV_ROOT || k == DEV_INVALID) ? STORAGE_ERROR_NOT_A_FILE : 0;
 }
 
 bool DevFs::isFileExist(const char* path) {
@@ -136,7 +137,7 @@ bool DevFs::isDirectory(const char* path) {
 }
 
 int DevFs::getDirFileList(const char* path, pdiutil::vector<file_info_t>& items, const char* pattern) {
-    if (classify(path) != DEV_ROOT) return -1;
+    if (classify(path) != DEV_ROOT) return STORAGE_ERROR_NOT_A_DIRECTORY;
 
     for (uint8_t i = 0; i < s_dev_file_count; ++i) {
         file_info_t info;
@@ -159,9 +160,9 @@ int DevFs::getDirFileList(const char* path, pdiutil::vector<file_info_t>& items,
 }
 
 int DevFs::getFileAttr(const char* path, uint8_t type, void* buffer, uint32_t size) {
-    if (!buffer || size == 0) return -1;
+    if (!buffer || size == 0) return PDI_ERR_INVALID_ARG;
     NodeKind k = classify(path);
-    if (k == DEV_INVALID) return -1;
+    if (k == DEV_INVALID) return PDI_ERR_NOT_FOUND;
 
     if (type == FILE_ATTR_PERMS && size >= sizeof(uint16_t)) {
         *(uint16_t*)buffer = (k == DEV_ROOT) ? 0555 : 0666;
@@ -175,10 +176,10 @@ int DevFs::getFileAttr(const char* path, uint8_t type, void* buffer, uint32_t si
         *(uint16_t*)buffer = 0;
         return sizeof(uint16_t);
     }
-    return -1;
+    return STORAGE_ERROR_ATTR_NOT_FOUND;
 }
 
-int DevFs::getFileMeta(const char* path, file_info_t& out) {
+pdi_err_t DevFs::getFileMeta(const char* path, file_info_t& out) {
     NodeKind k = classify(path);
     // Per iFileSystemInterface contract, m_name is left untouched.
 
@@ -204,7 +205,7 @@ int DevFs::getFileMeta(const char* path, file_info_t& out) {
         return 0;
     }
 
-    return -1;
+    return PDI_ERR_NOT_FOUND;
 }
 
 #endif
