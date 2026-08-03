@@ -75,12 +75,14 @@ bool http_req_t::init(const char *url)
         if (bStatus)
         {
             // check for correct protocol (http or https)
-            if (-1 != __strstr(_url, "https"))
+            pdiutil::string proto_https = CHARPTR_WRAP("https");
+            pdiutil::string proto_http = CHARPTR_WRAP("http");
+            if (-1 != __strstr(_url, proto_https.c_str()))
             {
                 port = 443;
                 isHttps = true;
             }
-            else if (-1 != __strstr(_url, "http"))
+            else if (-1 != __strstr(_url, proto_http.c_str()))
             {
                 port = 80;
             }
@@ -277,8 +279,11 @@ void Http_Client::SetClient(iClientInterface *client)
  */
 void Http_Client::SetKeepAlive(bool keep_alive)
 {
+    pdiutil::string connection_key = CHARPTR_WRAP(HTTP_HEADER_KEY_CONNECTION);
+    pdiutil::string conn_keepalive = CHARPTR_WRAP("keep-alive");
+    pdiutil::string conn_close = CHARPTR_WRAP("close");
     m_request.reuse = keep_alive;
-    AddReqHeader(HTTP_HEADER_KEY_CONNECTION, keep_alive ? "keep-alive" : "close", true);
+    AddReqHeader(connection_key.c_str(), keep_alive ? conn_keepalive.c_str() : conn_close.c_str(), true);
 }
 
 /**
@@ -339,8 +344,10 @@ void Http_Client::SetDefaultHeaders(bool set_default)
 {
     if( set_default )
     {
-        AddReqHeader(HTTP_HEADER_KEY_USER_AGENT, RODT_ATTR("ew_client"));
-        AddReqHeader(HTTP_HEADER_KEY_ACCEPT_ENCODING, RODT_ATTR("identity;q=1,chunked;q=0.1,*;q=0"));
+        pdiutil::string user_agent_key = CHARPTR_WRAP(HTTP_HEADER_KEY_USER_AGENT);
+        pdiutil::string accept_encoding_key = CHARPTR_WRAP(HTTP_HEADER_KEY_ACCEPT_ENCODING);
+        AddReqHeader(user_agent_key.c_str(), RODT_ATTR("ew_client"));
+        AddReqHeader(accept_encoding_key.c_str(), RODT_ATTR("identity;q=1,chunked;q=0.1,*;q=0"));
     }
     else
     {
@@ -353,7 +360,8 @@ void Http_Client::SetDefaultHeaders(bool set_default)
  */
 bool Http_Client::SetUserAgent(const char *agent)
 {
-    return AddReqHeader(HTTP_HEADER_KEY_USER_AGENT, agent);
+    pdiutil::string user_agent_key = CHARPTR_WRAP(HTTP_HEADER_KEY_USER_AGENT);
+    return AddReqHeader(user_agent_key.c_str(), agent);
 }
 
 bool Http_Client::SetBasicAuthorization(const char *user, const char *pass)
@@ -366,7 +374,8 @@ bool Http_Client::SetBasicAuthorization(const char *user, const char *pass)
         if(nullptr != base64_encoded_auth)
         {
             Http_Client::BuildBasicAuthorization(user, pass, base64_encoded_auth, 300);
-            bStatus = AddReqHeader(HTTP_HEADER_KEY_AUTHORIZATION, base64_encoded_auth);
+            pdiutil::string authorization_key = CHARPTR_WRAP(HTTP_HEADER_KEY_AUTHORIZATION);
+            bStatus = AddReqHeader(authorization_key.c_str(), base64_encoded_auth);
             delete []base64_encoded_auth;
         }
     }
@@ -442,7 +451,8 @@ bool Http_Client::GetRespHeader(const char *name, char *&value)
  */
 int16_t Http_Client::Get(const char *url)
 {
-    return SendRequest("GET", url);
+    pdiutil::string method_get = CHARPTR_WRAP("GET");
+    return SendRequest(method_get.c_str(), url);
 }
 
 /**
@@ -450,14 +460,17 @@ int16_t Http_Client::Get(const char *url)
  */
 int16_t Http_Client::Post(const char *url, const char *payload)
 {
+    pdiutil::string content_type_key = CHARPTR_WRAP(HTTP_HEADER_KEY_CONTENT_TYPE);
+    pdiutil::string content_length_key = CHARPTR_WRAP(HTTP_HEADER_KEY_CONTENT_LENGTH);
     char *value;
-    if( !GetHeader(HTTP_HEADER_KEY_CONTENT_TYPE, value) )
+    if( !GetHeader(content_type_key.c_str(), value) )
     {
-        AddHeader(HTTP_HEADER_KEY_CONTENT_TYPE, RODT_ATTR("text/plain"));
+        AddHeader(content_type_key.c_str(), RODT_ATTR("text/plain"));
     }
-    AddReqHeader(HTTP_HEADER_KEY_CONTENT_LENGTH, pdiutil::to_string(strlen(payload)).c_str());
-    
-    return SendRequest("POST", url, payload, strlen(payload));
+    AddReqHeader(content_length_key.c_str(), pdiutil::to_string(strlen(payload)).c_str());
+
+    pdiutil::string method_post = CHARPTR_WRAP("POST");
+    return SendRequest(method_post.c_str(), url, payload, strlen(payload));
 }
 
 /**
@@ -545,7 +558,8 @@ int16_t Http_Client::SendRequest(const char *type, const char *url, const char *
                 if (m_response.follow_redirects && redirect_count < m_response.redirect_limit)
                 {
                     char *redirect_location = nullptr;
-                    bStatus = GetRespHeader(HTTP_HEADER_KEY_LOCATION, redirect_location);
+                    pdiutil::string location_key = CHARPTR_WRAP(HTTP_HEADER_KEY_LOCATION);
+                    bStatus = GetRespHeader(location_key.c_str(), redirect_location);
                     uint16_t req_was_https = m_request.isHttps;
                     bool can_keep_alive = m_request.reuse;
 
@@ -556,7 +570,8 @@ int16_t Http_Client::SendRequest(const char *type, const char *url, const char *
                         m_request.clear(true); // clear request object but keep the last headers
                         redirect_count++;
                         // if port are different in prev and redirect location then cant keep alive same connection
-                        can_keep_alive = (req_was_https == (-1 != __strstr(redirect_location, "https")));
+                        pdiutil::string proto_https = CHARPTR_WRAP("https");
+                        can_keep_alive = (req_was_https == (-1 != __strstr(redirect_location, proto_https.c_str())));
                     }
                     else
                     {
@@ -565,10 +580,12 @@ int16_t Http_Client::SendRequest(const char *type, const char *url, const char *
 
                     // check whether we can reuse the connection
                     char *connection = nullptr;
-                    GetRespHeader(HTTP_HEADER_KEY_CONNECTION, connection);
+                    pdiutil::string connection_key = CHARPTR_WRAP(HTTP_HEADER_KEY_CONNECTION);
+                    GetRespHeader(connection_key.c_str(), connection);
                     if (nullptr != connection && can_keep_alive)
                     {
-                        m_request.reuse = (-1 != __strstr(connection, "aliv"));
+                        pdiutil::string conn_alive = CHARPTR_WRAP("aliv");
+                        m_request.reuse = (-1 != __strstr(connection, conn_alive.c_str()));
                     }
                 }
                 else
@@ -814,9 +831,11 @@ int16_t Http_Client::handleResponse()
                 }
 
                 char *transferencoding = nullptr;
-                if(GetHeader(HTTP_HEADER_KEY_TRANSFER_ENCODING, transferencoding, false)){
+                pdiutil::string transfer_encoding_key = CHARPTR_WRAP(HTTP_HEADER_KEY_TRANSFER_ENCODING);
+                if(GetHeader(transfer_encoding_key.c_str(), transferencoding, false)){
 
-                    if( __are_arrays_equal(transferencoding,"chunked", strlen(transferencoding)) ){
+                    pdiutil::string encoding_chunked = CHARPTR_WRAP("chunked");
+                    if( __are_arrays_equal(transferencoding,encoding_chunked.c_str(), strlen(transferencoding)) ){
 
                         pdiutil::string body; 
                         
@@ -864,7 +883,8 @@ int64_t Http_Client::DownloadStream(const char *url, CallBackBytesArgBoolRetFn w
     m_stream_writer        = writer;
     m_stream_bytes_written = 0;
 
-    int16_t status = SendRequest("GET", url);
+    pdiutil::string method_get = CHARPTR_WRAP("GET");
+    int16_t status = SendRequest(method_get.c_str(), url);
 
     m_stream_writer = nullptr;
 
@@ -881,14 +901,17 @@ bool Http_Client::streamBodyTo(int32_t &max_timeout)
 
     char *content_length_hdr = nullptr;
     int64_t content_length = -1;
-    if (GetHeader(HTTP_HEADER_KEY_CONTENT_LENGTH, content_length_hdr, false) && nullptr != content_length_hdr) {
+    pdiutil::string content_length_key = CHARPTR_WRAP(HTTP_HEADER_KEY_CONTENT_LENGTH);
+    if (GetHeader(content_length_key.c_str(), content_length_hdr, false) && nullptr != content_length_hdr) {
         content_length = (int64_t)StringToUint64(content_length_hdr);
     }
 
     char *transferencoding = nullptr;
     bool is_chunked = false;
-    if (GetHeader(HTTP_HEADER_KEY_TRANSFER_ENCODING, transferencoding, false) && nullptr != transferencoding) {
-        is_chunked = __are_arrays_equal(transferencoding, "chunked", strlen(transferencoding));
+    pdiutil::string transfer_encoding_key = CHARPTR_WRAP(HTTP_HEADER_KEY_TRANSFER_ENCODING);
+    if (GetHeader(transfer_encoding_key.c_str(), transferencoding, false) && nullptr != transferencoding) {
+        pdiutil::string encoding_chunked = CHARPTR_WRAP("chunked");
+        is_chunked = __are_arrays_equal(transferencoding, encoding_chunked.c_str(), strlen(transferencoding));
     }
 
     uint32_t size_hint = (content_length > 0) ? (uint32_t)content_length : 0;

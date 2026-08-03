@@ -95,9 +95,9 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isEventPost ){
   pdiutil::string posturl = this->m_gpio_config_copy.gpio_host;
 
   if( isEventPost ){
-    posturl += GPIO_EVENT_POST_HTTP_URL;
+    posturl += CHARPTR_WRAP(GPIO_EVENT_POST_HTTP_URL);
   }else{
-    posturl += GPIO_DATA_POST_HTTP_URL;
+    posturl += CHARPTR_WRAP(GPIO_DATA_POST_HTTP_URL);
   }
 
   LogI("Handling GPIO Http Request\n");
@@ -107,14 +107,16 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isEventPost ){
     nullptr != this->m_http_client
   ){
 
-    pdiutil::string::size_type mac_index = posturl.find("[mac]");
+    pdiutil::string mac_placeholder = CHARPTR_WRAP("[mac]");
+    pdiutil::string::size_type mac_index = posturl.find(mac_placeholder.c_str());
     if( pdiutil::string::npos != mac_index )
     {
       posturl.replace( mac_index, 5, __i_dvc_ctrl.getDeviceMac().c_str() );
     }
 
 #ifdef ENABLE_DEVICE_IOT
-    pdiutil::string::size_type duid_index = posturl.find("[duid]");
+    pdiutil::string duid_placeholder = CHARPTR_WRAP("[duid]");
+    pdiutil::string::size_type duid_index = posturl.find(duid_placeholder.c_str());
     if( pdiutil::string::npos != duid_index )
     {
       posturl.replace( duid_index, 6, __device_iot_service.getDeviceId() );
@@ -127,17 +129,24 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isEventPost ){
 
       this->appendGpioJsonPayload( *_payload, isEventPost );
 
+      pdiutil::string user_agent = CHARPTR_WRAP("pdistack");
+      pdiutil::string content_type_json = CHARPTR_WRAP("application/json");
+
       this->m_http_client->Begin();
 
       #ifdef ENABLE_DEVICE_IOT
-      this->m_http_client->SetUserAgent("pdistack");
-      this->m_http_client->SetBasicAuthorization("mac", __i_dvc_ctrl.getDeviceMac().c_str());
+      pdiutil::string auth_user = CHARPTR_WRAP("mac");
+      this->m_http_client->SetUserAgent(user_agent.c_str());
+      this->m_http_client->SetBasicAuthorization(auth_user.c_str(), __i_dvc_ctrl.getDeviceMac().c_str());
       #else
-      this->m_http_client->SetUserAgent("pdistack");
-      this->m_http_client->SetBasicAuthorization("user", "password");
+      pdiutil::string auth_user = CHARPTR_WRAP("user");
+      pdiutil::string auth_pass = CHARPTR_WRAP("password");
+      this->m_http_client->SetUserAgent(user_agent.c_str());
+      this->m_http_client->SetBasicAuthorization(auth_user.c_str(), auth_pass.c_str());
       #endif
 
-      this->m_http_client->AddReqHeader(HTTP_HEADER_KEY_CONTENT_TYPE, "application/json");
+      pdiutil::string content_type_key = CHARPTR_WRAP(HTTP_HEADER_KEY_CONTENT_TYPE);
+      this->m_http_client->AddReqHeader(content_type_key.c_str(), content_type_json.c_str());
       this->m_http_client->SetTimeout(2*MILLISECOND_DURATION_1000);
 
       LogI("posting data : %s\n", _payload->c_str());
@@ -167,7 +176,7 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
   if( __i_dvc_ctrl.getDeviceMac().size() ){
 
     _payload += "\"";
-    _payload += GPIO_PAYLOAD_MAC_KEY;
+    _payload += CHARPTR_WRAP(GPIO_PAYLOAD_MAC_KEY);
     _payload += CHARPTR_WRAP("\":\"");
     _payload += __i_dvc_ctrl.getDeviceMac().c_str();
     _payload += CHARPTR_WRAP("\",");
@@ -179,7 +188,7 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
   if( _duid && _duid[0] != '\0' ){
 
     _payload += "\"";
-    _payload += GPIO_PAYLOAD_DUID_KEY;
+    _payload += CHARPTR_WRAP(GPIO_PAYLOAD_DUID_KEY);
     _payload += CHARPTR_WRAP("\":\"");
     _payload += _duid;
     _payload += CHARPTR_WRAP("\",");
@@ -190,7 +199,7 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
   if( isEventPost ){
 
     _payload += "\"";
-    _payload += GPIO_EVENT_PIN_KEY;
+    _payload += CHARPTR_WRAP(GPIO_EVENT_PIN_KEY);
     _payload += CHARPTR_WRAP("\":\"");
 
     if( __gpio_event_track.event_gpio_pin < MAX_DIGITAL_GPIO_PINS ){
@@ -206,7 +215,7 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
 #endif
 
   _payload += "\"";
-  _payload += GPIO_PAYLOAD_DATA_KEY;
+  _payload += CHARPTR_WRAP(GPIO_PAYLOAD_DATA_KEY);
   _payload += CHARPTR_WRAP("\":{");
 
   bool _remove_comma = false;
@@ -217,11 +226,11 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
       _payload += "\"D";
       _payload += pdiutil::to_string(_pin);
       _payload += CHARPTR_WRAP("\":{\"");
-      _payload += GPIO_PAYLOAD_MODE_KEY;
+      _payload += CHARPTR_WRAP(GPIO_PAYLOAD_MODE_KEY);
       _payload += CHARPTR_WRAP("\":");
       _payload += pdiutil::to_string(this->m_gpio_config_copy.gpio_mode[_pin]);
       _payload += CHARPTR_WRAP(",\"");
-      _payload += GPIO_PAYLOAD_VALUE_KEY;
+      _payload += CHARPTR_WRAP(GPIO_PAYLOAD_VALUE_KEY);
       _payload += CHARPTR_WRAP("\":");
       _payload += pdiutil::to_string(this->m_gpio_config_copy.gpio_readings[_pin]);
       _payload += CHARPTR_WRAP("},");
@@ -237,11 +246,11 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
       _payload += "\"A";
       _payload += pdiutil::to_string(_pin);
       _payload += CHARPTR_WRAP("\":{\"");
-      _payload += GPIO_PAYLOAD_MODE_KEY;
+      _payload += CHARPTR_WRAP(GPIO_PAYLOAD_MODE_KEY);
       _payload += CHARPTR_WRAP("\":");
       _payload += pdiutil::to_string(this->m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS+_pin]);
       _payload += CHARPTR_WRAP(",\"");
-      _payload += GPIO_PAYLOAD_VALUE_KEY;
+      _payload += CHARPTR_WRAP(GPIO_PAYLOAD_VALUE_KEY);
       _payload += CHARPTR_WRAP("\":");
       _payload += pdiutil::to_string(this->m_gpio_config_copy.gpio_readings[MAX_DIGITAL_GPIO_PINS+_pin]);
       _payload += CHARPTR_WRAP("},");
@@ -266,10 +275,14 @@ void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payloa
 
   LogI("Applying GPIO from Json Payload : %s\n", _payload);
 
+  pdiutil::string data_key = CHARPTR_WRAP(GPIO_PAYLOAD_DATA_KEY);
+  pdiutil::string mode_key = CHARPTR_WRAP(GPIO_PAYLOAD_MODE_KEY);
+  pdiutil::string value_key = CHARPTR_WRAP(GPIO_PAYLOAD_VALUE_KEY);
+
   if(
-    0 <= __strstr( _payload, (char*)GPIO_PAYLOAD_DATA_KEY, _payload_length - strlen(GPIO_PAYLOAD_DATA_KEY) ) &&
-    0 <= __strstr( _payload, (char*)GPIO_PAYLOAD_MODE_KEY, _payload_length - strlen(GPIO_PAYLOAD_MODE_KEY) ) &&
-    0 <= __strstr( _payload, (char*)GPIO_PAYLOAD_VALUE_KEY, _payload_length - strlen(GPIO_PAYLOAD_VALUE_KEY) )
+    0 <= __strstr( _payload, (char*)data_key.c_str(), _payload_length - strlen(data_key.c_str()) ) &&
+    0 <= __strstr( _payload, (char*)mode_key.c_str(), _payload_length - strlen(mode_key.c_str()) ) &&
+    0 <= __strstr( _payload, (char*)value_key.c_str(), _payload_length - strlen(value_key.c_str()) )
   ){
 
     int _pin_data_max_len = 30, _pin_values_max_len = 6;
@@ -319,9 +332,9 @@ void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payloa
           }
         }
 
-        if( __get_from_json( _pin_data, GPIO_PAYLOAD_MODE_KEY, _pin_mode, _pin_values_max_len ) ){
+        if( __get_from_json( _pin_data, mode_key.c_str(), _pin_mode, _pin_values_max_len ) ){
 
-          if( __get_from_json( _pin_data, GPIO_PAYLOAD_VALUE_KEY, _pin_value, _pin_values_max_len ) ){
+          if( __get_from_json( _pin_data, value_key.c_str(), _pin_value, _pin_values_max_len ) ){
 
             LogI("Applying to : %s, mode : %s, value : %s\n", _pin_label_uppercase, _pin_mode, _pin_value);
 
@@ -366,9 +379,13 @@ void GpioServiceProvider::applyGpioEventJsonPayload( char* _payload, uint16_t _p
 
   LogI("Applying GPIO Events from Json Payload : %s\n", _payload);
 
+  pdiutil::string comparator_key = CHARPTR_WRAP(GPIO_EVENT_COMPARATOR_KEY);
+  pdiutil::string value_key = CHARPTR_WRAP(GPIO_PAYLOAD_VALUE_KEY);
+  pdiutil::string data_key = CHARPTR_WRAP(GPIO_PAYLOAD_DATA_KEY);
+
   if(
-    0 <= __strstr( _payload, (char*)GPIO_EVENT_COMPARATOR_KEY, _payload_length - strlen(GPIO_PAYLOAD_DATA_KEY) ) &&
-    0 <= __strstr( _payload, (char*)GPIO_PAYLOAD_VALUE_KEY, _payload_length - strlen(GPIO_PAYLOAD_VALUE_KEY) )
+    0 <= __strstr( _payload, (char*)comparator_key.c_str(), _payload_length - strlen(data_key.c_str()) ) &&
+    0 <= __strstr( _payload, (char*)value_key.c_str(), _payload_length - strlen(value_key.c_str()) )
   ){
 
     int _iface_data_max_len = 150, _iface_keys_max_len = 6;
@@ -442,9 +459,9 @@ void GpioServiceProvider::applyGpioEventJsonPayload( char* _payload, uint16_t _p
               }
             }
 
-            if( __get_from_json( _iface_data + _iface_data_index, GPIO_EVENT_COMPARATOR_KEY, _iface_comparator, _iface_keys_max_len ) ){
+            if( __get_from_json( _iface_data + _iface_data_index, comparator_key.c_str(), _iface_comparator, _iface_keys_max_len ) ){
 
-              if( __get_from_json( _iface_data + _iface_data_index, GPIO_PAYLOAD_VALUE_KEY, _iface_value, _iface_keys_max_len ) ){
+              if( __get_from_json( _iface_data + _iface_data_index, value_key.c_str(), _iface_value, _iface_keys_max_len ) ){
 
                 LogI("Applying to : %s, cmp : %s, value : %s\n", _iface_label_uppercase, _iface_comparator, _iface_value);
 

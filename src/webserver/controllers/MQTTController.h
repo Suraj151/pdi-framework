@@ -208,7 +208,8 @@ public:
       strncpy(_mqtt_general_configs->username, _username.c_str(), _username.size());
       strncpy(_mqtt_general_configs->password, _password.c_str(), _password.size());
       _mqtt_general_configs->keepalive = StringToUint16(_keep_alive.c_str());
-      _mqtt_general_configs->clean_session = (int)(_clean_session == "clean");
+      pdiutil::string clean_flag = CHARPTR_WRAP("clean");
+      _mqtt_general_configs->clean_session = (int)(_clean_session == clean_flag);
 
       this->m_web_resource->m_db_conn->set_mqtt_general_config_table(_mqtt_general_configs);
       delete _mqtt_general_configs;
@@ -322,7 +323,8 @@ public:
       strncpy(_mqtt_lwt_configs->will_topic, _will_topic.c_str(), _will_topic.size());
       strncpy(_mqtt_lwt_configs->will_message, _will_message.c_str(), _will_message.size());
       _mqtt_lwt_configs->will_qos = StringToUint16(_will_qos.c_str());
-      _mqtt_lwt_configs->will_retain = (int)(_will_retain == "retain");
+      pdiutil::string retain_flag = CHARPTR_WRAP("retain");
+      _mqtt_lwt_configs->will_retain = (int)(_will_retain == retain_flag);
 
       this->m_web_resource->m_db_conn->set_mqtt_lwt_config_table(_mqtt_lwt_configs);
       delete _mqtt_lwt_configs;
@@ -498,6 +500,8 @@ public:
       memset(_retain_name, 0, 10);
       strcpy(_retain_name, "prtn0");
 
+      pdiutil::string retain_flag = CHARPTR_WRAP("retain");
+
       for (uint8_t i = 0; i < MQTT_MAX_PUBLISH_TOPIC; i++)
       {
 
@@ -511,7 +515,7 @@ public:
 
         strncpy(_mqtt_pubsub_configs->publish_topics[i].topic, _topic.c_str(), _topic.size());
         _mqtt_pubsub_configs->publish_topics[i].qos = StringToUint8(_qos.c_str());
-        _mqtt_pubsub_configs->publish_topics[i].retain = (int)(_retain == "retain");
+        _mqtt_pubsub_configs->publish_topics[i].retain = (int)(_retain == retain_flag);
 
         LogI("%d : Topic(%s), Qos(%s), Retain(%s)\n", i, _topic.c_str(),_qos.c_str(),_retain.c_str());
       }

@@ -99,8 +99,8 @@ bool SSHServer::initService(void *arg) {
  */
 void SSHServer::createDefaultSshConfig() {
 
-    pdiutil::string cfgfile = SSH_CONFIG_FILE;
-    pdiutil::string cfgdir = SSH_CONFIG_DIR;
+    pdiutil::string cfgfile = CHARPTR_WRAP(SSH_CONFIG_FILE);
+    pdiutil::string cfgdir = CHARPTR_WRAP(SSH_CONFIG_DIR);
 
     if (__i_fs.isFileExist(cfgfile.c_str())) {
         return;
@@ -311,9 +311,11 @@ bool SSHServer::getSSHKeyPairs(SSHKeyAlgorithm type, pdiutil::vector<uint8_t> &p
         privkey.clear();
         int bytesRead = 0;
 
-        __snprintf(sshdir, sizeof(sshdir), "%s/%s", (strlen(homedir) > 1 ? homedir : ""), SSH_DEFAULT_DIR);
-        __snprintf(privkeyOrseed_path, sizeof(privkeyOrseed_path), (privkeyInSeedPlusPubkeyformat ? "%s/%s.seed" : "%s/%s"), sshdir, SSH_KEY_ALGO_ED25519_STR);
-        __snprintf(pubkey_path, sizeof(pubkey_path), "%s/%s.pub", sshdir, SSH_KEY_ALGO_ED25519_STR);
+        pdiutil::string ssh_dir = CHARPTR_WRAP(SSH_DEFAULT_DIR);
+        pdiutil::string ed_algo = CHARPTR_WRAP(SSH_KEY_ALGO_ED25519_STR);
+        __snprintf(sshdir, sizeof(sshdir), "%s/%s", (strlen(homedir) > 1 ? homedir : ""), ssh_dir.c_str());
+        __snprintf(privkeyOrseed_path, sizeof(privkeyOrseed_path), (privkeyInSeedPlusPubkeyformat ? "%s/%s.seed" : "%s/%s"), sshdir, ed_algo.c_str());
+        __snprintf(pubkey_path, sizeof(pubkey_path), "%s/%s.pub", sshdir, ed_algo.c_str());
 
         if (!__i_fs.isFileExist(privkeyOrseed_path) || !__i_fs.isFileExist(pubkey_path)) {
             return bStatus; // No SSH keys found, cannot proceed

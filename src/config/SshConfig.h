@@ -23,28 +23,28 @@ created Date    : 1st June 2025
 #define SSH_KEY_ALGO_ED25519_STR "ed25519"
 #define SSH_KEY_ALGO_RSA_STR "rsa"
 
-#define SSH_AUTHORIZED_KEYS_FILE CHARPTR_WRAP("authorized_keys")
-#define SSH_ED25519_KEY_TYPE_STR CHARPTR_WRAP("ssh-ed25519")
+#define SSH_AUTHORIZED_KEYS_FILE "authorized_keys"
+#define SSH_ED25519_KEY_TYPE_STR "ssh-ed25519"
 #define SSH_ED25519_SIG_SIZE 64
 
-#define SSH_RSA_KEY_TYPE_STR CHARPTR_WRAP("ssh-rsa")
-#define SSH_RSA_SIG_ALGO_SHA256_STR CHARPTR_WRAP("rsa-sha2-256")
-#define SSH_RSA_SIG_ALGO_SHA512_STR CHARPTR_WRAP("rsa-sha2-512")
+#define SSH_RSA_KEY_TYPE_STR "ssh-rsa"
+#define SSH_RSA_SIG_ALGO_SHA256_STR "rsa-sha2-256"
+#define SSH_RSA_SIG_ALGO_SHA512_STR "rsa-sha2-512"
 
-#define SSH_EXT_INFO_C_STR CHARPTR_WRAP("ext-info-c")
-#define SSH_EXT_INFO_S_STR CHARPTR_WRAP("ext-info-s")
-#define SSH_EXT_SERVER_SIG_ALGS_STR CHARPTR_WRAP("server-sig-algs")
-#define SSH_SERVER_SIG_ALGS_VALUE_STR CHARPTR_WRAP("rsa-sha2-512,rsa-sha2-256,ssh-ed25519")
+#define SSH_EXT_INFO_C_STR "ext-info-c"
+#define SSH_EXT_INFO_S_STR "ext-info-s"
+#define SSH_EXT_SERVER_SIG_ALGS_STR "server-sig-algs"
+#define SSH_SERVER_SIG_ALGS_VALUE_STR "rsa-sha2-512,rsa-sha2-256,ssh-ed25519"
 
 #ifndef SSH_RSA_KEY_BITS
 #define SSH_RSA_KEY_BITS 2048
 #endif
 
 /* SSH server configuration file and its option keys */
-#define SSH_CONFIG_DIR CHARPTR_WRAP("/etc/ssh")
-#define SSH_CONFIG_FILE CHARPTR_WRAP("/etc/ssh/sshconfig")
-#define SSH_CONFIG_KEY_PASSWORD_AUTH CHARPTR_WRAP("PasswordAuthentication")
-#define SSH_CONFIG_KEY_PUBKEY_AUTH CHARPTR_WRAP("PubkeyAuthentication")
+#define SSH_CONFIG_DIR "/etc/ssh"
+#define SSH_CONFIG_FILE "/etc/ssh/sshconfig"
+#define SSH_CONFIG_KEY_PASSWORD_AUTH "PasswordAuthentication"
+#define SSH_CONFIG_KEY_PUBKEY_AUTH "PubkeyAuthentication"
 
 /* SSH Key algorithm options */
 enum SSHKeyAlgorithm{

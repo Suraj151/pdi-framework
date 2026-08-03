@@ -55,7 +55,8 @@ bool AuthServiceProvider::isAuthorized(const char *username, const char *passwor
   bool ok = false;
 
 #ifdef ENABLE_STORAGE_SERVICE
-  if( __i_fs.isFileExist(USER_STORE_SHADOW_PATH) ){
+  pdiutil::string shadow_path = CHARPTR_WRAP(USER_STORE_SHADOW_PATH);
+  if( __i_fs.isFileExist(shadow_path.c_str()) ){
     ok = __user_store_service.verifyPassword(username, password);
   }else
 #endif

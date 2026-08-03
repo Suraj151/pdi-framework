@@ -102,7 +102,7 @@ struct UseraddCommand : public CommandBase {
 		newRec.m_gid = nextUid;
 		newRec.m_username = uname;
 		newRec.m_home = FILE_SEPARATOR;
-		newRec.m_shell = USER_STORE_DEFAULT_SHELL;
+		newRec.m_shell = CHARPTR_WRAP(USER_STORE_DEFAULT_SHELL);
 
 		if( __user_store_service.addUser(newRec, pw) ){
 			if( nullptr != m_terminal ){

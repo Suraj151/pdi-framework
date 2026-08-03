@@ -131,7 +131,7 @@ public:
 
 			this->_last_monitor_point.x = x2;
 			this->_last_monitor_point.y = y2;
-			this->m_web_resource->m_server->addHeader("Cache-Control", "no-cache");
+			this->m_web_resource->m_server->addHeader(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_CACHE_CONTROL), CHARPTR_WRAP_RO(HTTP_HEADER_VALUE_NO_CACHE));
 			this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _response->c_str());
 
 			delete _response;

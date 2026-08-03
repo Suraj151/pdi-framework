@@ -102,16 +102,18 @@ http_ota_status OtaServiceProvider::handle()
     {
       firmware_url.pop_back();
     }
-    firmware_url += OTA_VERSION_CHECK_URL;
+    firmware_url += CHARPTR_WRAP(OTA_VERSION_CHECK_URL);
 
-    size_t mac_index = firmware_url.find("[mac]");
+    pdiutil::string mac_placeholder = CHARPTR_WRAP("[mac]");
+    size_t mac_index = firmware_url.find(mac_placeholder.c_str());
     if (pdiutil::string::npos != mac_index)
     {
       firmware_url.replace(mac_index, 5, __i_dvc_ctrl.getDeviceMac().c_str());
     }
 
 #ifdef ENABLE_DEVICE_IOT
-    pdiutil::string::size_type duid_index = firmware_url.find("[duid]");
+    pdiutil::string duid_placeholder = CHARPTR_WRAP("[duid]");
+    pdiutil::string::size_type duid_index = firmware_url.find(duid_placeholder.c_str());
     if( pdiutil::string::npos != duid_index )
     {
       firmware_url.replace( duid_index, 6, __device_iot_service.getDeviceId() );
@@ -121,9 +123,11 @@ http_ota_status OtaServiceProvider::handle()
 
   if (nullptr != this->m_http_client && firmware_url.size() > 0 && _ota_configs.ota_port > 0)
   {
+    pdiutil::string user_agent = CHARPTR_WRAP("pdistack");
+    pdiutil::string auth_user = CHARPTR_WRAP("ota");
     this->m_http_client->Begin();
-    this->m_http_client->SetUserAgent("pdistack");
-    this->m_http_client->SetBasicAuthorization("ota", __i_dvc_ctrl.getDeviceMac().c_str());
+    this->m_http_client->SetUserAgent(user_agent.c_str());
+    this->m_http_client->SetBasicAuthorization(auth_user.c_str(), __i_dvc_ctrl.getDeviceMac().c_str());
     this->m_http_client->SetTimeout(2 * MILLISECOND_DURATION_1000);
 
     int _httpCode = this->m_http_client->Get(firmware_url.c_str());
@@ -142,7 +146,8 @@ http_ota_status OtaServiceProvider::handle()
       {
         memset(_version_buf, 0, OTA_VERSION_LENGTH);
 
-        if (__get_from_json(http_resp, OTA_VERSION_KEY, _version_buf, OTA_VERSION_LENGTH))
+        pdiutil::string version_key = CHARPTR_WRAP(OTA_VERSION_KEY);
+        if (__get_from_json(http_resp, version_key.c_str(), _version_buf, OTA_VERSION_LENGTH))
         {
           _firm_version = StringToUint32(_version_buf);
 
@@ -169,16 +174,18 @@ http_ota_status OtaServiceProvider::handle()
           {
             firmware_url.pop_back();
           }
-          firmware_url += OTA_BINARY_DOWNLOAD_URL;
+          firmware_url += CHARPTR_WRAP(OTA_BINARY_DOWNLOAD_URL);
 
-          size_t mac_index = firmware_url.find("[mac]");
+          pdiutil::string mac_placeholder = CHARPTR_WRAP("[mac]");
+          size_t mac_index = firmware_url.find(mac_placeholder.c_str());
           if (pdiutil::string::npos != mac_index)
           {
             firmware_url.replace(mac_index, 5, __i_dvc_ctrl.getDeviceMac().c_str());
           }
 
 #ifdef ENABLE_DEVICE_IOT
-          pdiutil::string::size_type duid_index = firmware_url.find("[duid]");
+          pdiutil::string duid_placeholder = CHARPTR_WRAP("[duid]");
+          pdiutil::string::size_type duid_index = firmware_url.find(duid_placeholder.c_str());
           if (pdiutil::string::npos != duid_index)
           {
             firmware_url.replace(duid_index, 6, __device_iot_service.getDeviceId());
@@ -189,9 +196,11 @@ http_ota_status OtaServiceProvider::handle()
 
         LogI("Starting OTA...\n");
 
+        pdiutil::string user_agent = CHARPTR_WRAP("pdistack");
+        pdiutil::string auth_user = CHARPTR_WRAP("ota");
         this->m_http_client->Begin();
-        this->m_http_client->SetUserAgent("pdistack");
-        this->m_http_client->SetBasicAuthorization("ota", __i_dvc_ctrl.getDeviceMac().c_str());
+        this->m_http_client->SetUserAgent(user_agent.c_str());
+        this->m_http_client->SetBasicAuthorization(auth_user.c_str(), __i_dvc_ctrl.getDeviceMac().c_str());
         this->m_http_client->SetTimeout(120 * MILLISECOND_DURATION_1000);
         upgrade_status_t upgrd_status = __i_dvc_ctrl.Upgrade(
             firmware_url.c_str(),

@@ -78,9 +78,11 @@ void MqttServiceProvider::handleMqttPublish(bool sync){
   mqtt_pubsub_config_table _mqtt_pubsub_configs;
   __database_service.get_mqtt_pubsub_config_table(&_mqtt_pubsub_configs);
 
+  pdiutil::string mac_placeholder = CHARPTR_WRAP("[mac]");
+
   for (uint8_t i = 0; i < MQTT_MAX_PUBLISH_TOPIC; i++) {
 
-    __find_and_replace( _mqtt_pubsub_configs.publish_topics[i].topic, "[mac]", __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
+    __find_and_replace( _mqtt_pubsub_configs.publish_topics[i].topic, mac_placeholder.c_str(), __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
     if( nullptr != this->m_mqtt_payload && strlen(_mqtt_pubsub_configs.publish_topics[i].topic) > 0 ){
 
       LogI("MQTT: publishing on topic : %s\n", _mqtt_pubsub_configs.publish_topics[i].topic);
@@ -114,7 +116,7 @@ void MqttServiceProvider::handleMqttPublish(bool sync){
       if( nullptr != this->m_mqtt_publish_data_cb ){
         this->m_mqtt_publish_data_cb( this->m_mqtt_payload, MQTT_PAYLOAD_BUF_SIZE );
       }
-      __find_and_replace( this->m_mqtt_payload, "[mac]", __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
+      __find_and_replace( this->m_mqtt_payload, mac_placeholder.c_str(), __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
 
       bool ret = this->m_mqtt_client.Publish(
         _mqtt_pubsub_configs.publish_topics[i].topic,
@@ -143,9 +145,11 @@ void MqttServiceProvider::handleMqttSubScribe(){
   mqtt_pubsub_config_table _mqtt_pubsub_configs;
   __database_service.get_mqtt_pubsub_config_table(&_mqtt_pubsub_configs);
 
+  pdiutil::string mac_placeholder = CHARPTR_WRAP("[mac]");
+
   for (uint8_t i = 0; i < MQTT_MAX_SUBSCRIBE_TOPIC; i++) {
 
-    __find_and_replace( _mqtt_pubsub_configs.subscribe_topics[i].topic, "[mac]", __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
+    __find_and_replace( _mqtt_pubsub_configs.subscribe_topics[i].topic, mac_placeholder.c_str(), __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
 
     if( strlen(_mqtt_pubsub_configs.subscribe_topics[i].topic) > 0 && !this->m_mqtt_client.is_topic_subscribed(_mqtt_pubsub_configs.subscribe_topics[i].topic) ){
 
@@ -193,9 +197,10 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
       __database_service.get_mqtt_general_config_table(&_mqtt_general_configs);
       __database_service.get_mqtt_lwt_config_table(&_mqtt_lwt_configs);
 
-      __find_and_replace( _mqtt_general_configs.username, "[mac]", __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
-      __find_and_replace( _mqtt_general_configs.client_id, "[mac]", __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
-      __find_and_replace( _mqtt_lwt_configs.will_message, "[mac]", __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
+      pdiutil::string mac_placeholder = CHARPTR_WRAP("[mac]");
+      __find_and_replace( _mqtt_general_configs.username, mac_placeholder.c_str(), __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
+      __find_and_replace( _mqtt_general_configs.client_id, mac_placeholder.c_str(), __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
+      __find_and_replace( _mqtt_lwt_configs.will_message, mac_placeholder.c_str(), __i_dvc_ctrl.getDeviceMac().c_str(), 2 );
 
       if( this->m_mqtt_client.begin( m_client, &_mqtt_general_configs, &_mqtt_lwt_configs ) ){
         this->m_mqtt_timer_cb_id = this->serviceUpdateInterval(

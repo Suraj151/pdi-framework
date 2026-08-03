@@ -225,9 +225,9 @@ class LoginController : public Controller {
         char _session_cookie[EW_COOKIE_BUFF_MAX_SIZE];
         this->m_route_handler->build_session_cookie( _session_cookie, true, EW_COOKIE_BUFF_MAX_SIZE, true, this->login_credentials.cookie_max_age );
 
-        this->m_web_resource->m_server->addHeader("Location", WEB_SERVER_HOME_ROUTE);
-        this->m_web_resource->m_server->addHeader("Cache-Control", "no-cache");
-        this->m_web_resource->m_server->addHeader("Set-Cookie", _session_cookie);
+        this->m_web_resource->m_server->addHeader(CHARPTR_WRAP(HTTP_HEADER_KEY_LOCATION), WEB_SERVER_HOME_ROUTE);
+        this->m_web_resource->m_server->addHeader(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_CACHE_CONTROL), CHARPTR_WRAP_RO(HTTP_HEADER_VALUE_NO_CACHE));
+        this->m_web_resource->m_server->addHeader(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_SET_COOKIE), _session_cookie);
         this->m_web_resource->m_server->send(HTTP_RESP_MOVED_PERMANENTLY);
 
         LogS("Log in Successful\n");

@@ -22,6 +22,11 @@ created Date    : 1st June 2019
  */
 static const char HTTP_SERVER_DEFAULT_STATIC_PATH   []PROG_RODT_ATTR = "/var/www/static/";
 
+static const char HTTP_HEADER_KEY_CACHE_CONTROL     []PROG_RODT_ATTR = "Cache-Control";
+static const char HTTP_HEADER_VALUE_NO_CACHE        []PROG_RODT_ATTR = "no-cache";
+static const char HTTP_HEADER_KEY_SET_COOKIE        []PROG_RODT_ATTR = "Set-Cookie";
+static const char HTTP_HEADER_KEY_COOKIE            []PROG_RODT_ATTR = "Cookie";
+
 
 /* HTTP support functions */
 

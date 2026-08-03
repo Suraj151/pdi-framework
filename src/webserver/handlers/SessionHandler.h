@@ -63,8 +63,8 @@ public:
 
     if (nullptr != __web_resource.m_server)
     {
-      __web_resource.m_server->addHeader("Cache-Control", "no-cache");
-      __web_resource.m_server->addHeader("Set-Cookie", _session_cookie);
+      __web_resource.m_server->addHeader(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_CACHE_CONTROL), CHARPTR_WRAP_RO(HTTP_HEADER_VALUE_NO_CACHE));
+      __web_resource.m_server->addHeader(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_SET_COOKIE), _session_cookie);
     }
   }
 
@@ -116,9 +116,9 @@ public:
       return false;
     }
 
-    if (__web_resource.m_server->hasHeader("Cookie"))
+    if (__web_resource.m_server->hasHeader(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_COOKIE)))
     {
-      pdiutil::string cookie = __web_resource.m_server->header("Cookie");
+      pdiutil::string cookie = __web_resource.m_server->header(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_COOKIE));
       char _session_cookie[EW_COOKIE_BUFF_MAX_SIZE];
       this->build_session_cookie(_session_cookie, true, EW_COOKIE_BUFF_MAX_SIZE);
 
@@ -152,9 +152,9 @@ public:
       return false;
     }
 
-    if (__web_resource.m_server->hasHeader("Cookie"))
+    if (__web_resource.m_server->hasHeader(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_COOKIE)))
     {
-      pdiutil::string cookie = __web_resource.m_server->header("Cookie");
+      pdiutil::string cookie = __web_resource.m_server->header(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_COOKIE));
       char _session_cookie[EW_COOKIE_BUFF_MAX_SIZE];
       this->build_session_cookie(_session_cookie, false, EW_COOKIE_BUFF_MAX_SIZE);
 

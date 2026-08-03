@@ -12,10 +12,12 @@ created Date    : 30th July 2026
 #define _ESP32_ELF_LOADER_CONFIG_H_
 
 /**
- * Plain ESP32 (Xtensa, no PSRAM): load ELF sections into internal RAM and run
- * .text through the D/IRAM bus mirror. PSRAM and MMU remap paths stay off.
+ * Xtensa cores load ELF sections into internal RAM and run .text through the
+ * D/IRAM bus mirror. RISC-V cores have a unified bus and use the segment path.
  */
+#if defined(__XTENSA__)
 #define CONFIG_ELF_LOADER_BUS_ADDRESS_MIRROR 1
+#endif
 #define CONFIG_ELF_FILE_SYSTEM_BASE_PATH     "/storage"
 #define CONFIG_ELF_LOADER_NUMBER_SYMBOLS     8
 

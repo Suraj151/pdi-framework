@@ -302,7 +302,7 @@ public:
 			}
 		}
 
-        this->m_web_resource->m_server->addHeader(HTTP_HEADER_KEY_LOCATION, loc);
+        this->m_web_resource->m_server->addHeader(CHARPTR_WRAP(HTTP_HEADER_KEY_LOCATION), loc);
         this->m_web_resource->m_server->send(HTTP_RESP_MOVED_PERMANENTLY);
 	}
 
@@ -466,7 +466,7 @@ public:
 			}
 		}
 
-        this->m_web_resource->m_server->addHeader(HTTP_HEADER_KEY_LOCATION, loc);
+        this->m_web_resource->m_server->addHeader(CHARPTR_WRAP(HTTP_HEADER_KEY_LOCATION), loc);
         this->m_web_resource->m_server->send(HTTP_RESP_MOVED_PERMANENTLY);
 	}
 

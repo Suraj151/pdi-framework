@@ -248,11 +248,16 @@ void HttpServerInterfaceImpl::collectHeaders(const char *headerKeys[], const siz
     m_clientRequest.headers.clear();
 
     // Add default headers to collect list
-    m_clientRequest.headers.push_back({HTTP_HEADER_KEY_HOST, nullptr});
-    m_clientRequest.headers.push_back({HTTP_HEADER_KEY_AUTHORIZATION, nullptr});
-    m_clientRequest.headers.push_back({HTTP_HEADER_KEY_CONNECTION, nullptr});
-    m_clientRequest.headers.push_back({HTTP_HEADER_KEY_CONTENT_TYPE, nullptr});
-    m_clientRequest.headers.push_back({HTTP_HEADER_KEY_CONTENT_LENGTH, nullptr});
+    pdiutil::string host_key = CHARPTR_WRAP(HTTP_HEADER_KEY_HOST);
+    pdiutil::string authorization_key = CHARPTR_WRAP(HTTP_HEADER_KEY_AUTHORIZATION);
+    pdiutil::string connection_key = CHARPTR_WRAP(HTTP_HEADER_KEY_CONNECTION);
+    pdiutil::string content_type_key = CHARPTR_WRAP(HTTP_HEADER_KEY_CONTENT_TYPE);
+    pdiutil::string content_length_key = CHARPTR_WRAP(HTTP_HEADER_KEY_CONTENT_LENGTH);
+    m_clientRequest.headers.push_back({host_key.c_str(), nullptr});
+    m_clientRequest.headers.push_back({authorization_key.c_str(), nullptr});
+    m_clientRequest.headers.push_back({connection_key.c_str(), nullptr});
+    m_clientRequest.headers.push_back({content_type_key.c_str(), nullptr});
+    m_clientRequest.headers.push_back({content_length_key.c_str(), nullptr});
 
     // Collect headers from the provided header keys
     for (size_t i = 0; i < headerKeysCount; ++i) {
@@ -403,6 +408,8 @@ void HttpServerInterfaceImpl::parseRequest(){
     bool isEncoded = false; // Indicates encoded data
     pdiutil::string boundaryStr; // Boundary for multipart/form-data
     uint32_t contentLength = 0; // Content length
+    pdiutil::string content_type_key = CHARPTR_WRAP(HTTP_HEADER_KEY_CONTENT_TYPE);
+    pdiutil::string content_length_key = CHARPTR_WRAP(HTTP_HEADER_KEY_CONTENT_LENGTH);
 
     while (1) {
 
@@ -422,7 +429,7 @@ void HttpServerInterfaceImpl::parseRequest(){
                 m_clientRequest.headers[i].setvalue(key.c_str(), value.c_str());
             }
 
-            if( key == HTTP_HEADER_KEY_CONTENT_TYPE ){
+            if( key == content_type_key ){
 
                 if( value.find(getMimeTypeString(MIME_TYPE_APPLICATION_X_WWW_FORM_URLENCODED)) != pdiutil::string::npos ){
                     isForm = false;
@@ -432,7 +439,7 @@ void HttpServerInterfaceImpl::parseRequest(){
                     boundaryStr = value.substr(value.find('=') + 1);
                     boundaryStr.replace("\"","");
                 }
-            }else if( key == HTTP_HEADER_KEY_CONTENT_LENGTH ){
+            }else if( key == content_length_key ){
                 contentLength = StringToUint32(value.c_str());
             }
         }
@@ -602,6 +609,7 @@ void HttpServerInterfaceImpl::parseRequest(){
                         part.clear();
                         argvalue.clear();
                         pdiutil::string lastread;
+                        pdiutil::string held;
                         uint32_t maxreadinonecall = 256;
                         while (1) {
 
@@ -636,17 +644,20 @@ void HttpServerInterfaceImpl::parseRequest(){
                                 }
                             }
 
-                            if (found_boundary || found_end) {
-                                if( lastread.length() >= 2 && lastread[lastread.length() - 2] == '\r' && lastread[lastread.length() - 1] == '\n'){
-                                    lastread.pop_back(); lastread.pop_back();
-                                }
-                            }
-
                             #ifdef ENABLE_STORAGE_SERVICE
-                            // Write the file content to a temporary file
                             if(++filewritecounter == 2){
-                                // If we have read two parts, write the last part to the file
-                                __i_instance.getFileSystemInstance().writeFile(tempFilePath.c_str(), lastread.c_str(), lastread.length(), true);
+                                if( !held.empty() ){
+                                    __i_instance.getFileSystemInstance().writeFile(tempFilePath.c_str(), held.c_str(), held.length(), true);
+                                    held.clear();
+                                }
+                                uint32_t llen = lastread.length();
+                                if( llen >= 2 ){
+                                    held += lastread[llen - 2];
+                                    held += lastread[llen - 1];
+                                    __i_instance.getFileSystemInstance().writeFile(tempFilePath.c_str(), lastread.c_str(), llen - 2, true);
+                                }else{
+                                    held += lastread;
+                                }
                                 filewritecounter = 0;
                             }
                             #else
@@ -697,32 +708,34 @@ void HttpServerInterfaceImpl::prepareResponseHeader(pdiutil::string& _header, in
     _header += getHttpStatusString(code);
     _header += "\r\n";
 
-    addHeader(HTTP_HEADER_KEY_CONTENT_TYPE, content_type);
+    addHeader(CHARPTR_WRAP(HTTP_HEADER_KEY_CONTENT_TYPE), content_type);
 
     if(chunk_encoding)
-        addHeader(HTTP_HEADER_KEY_TRANSFER_ENCODING, CHARPTR_WRAP("chunked"));
+        addHeader(CHARPTR_WRAP(HTTP_HEADER_KEY_TRANSFER_ENCODING), CHARPTR_WRAP("chunked"));
     else
-        addHeader(HTTP_HEADER_KEY_CONTENT_LENGTH, pdiutil::to_string(content_length));
+        addHeader(CHARPTR_WRAP(HTTP_HEADER_KEY_CONTENT_LENGTH), pdiutil::to_string(content_length));
 
-    pdiutil::string keepalive = header(HTTP_HEADER_KEY_CONNECTION);
-    if (keepalive.empty() || keepalive == "close") {
-        addHeader(HTTP_HEADER_KEY_CONNECTION, CHARPTR_WRAP("close"));
+    pdiutil::string connection_key = CHARPTR_WRAP(HTTP_HEADER_KEY_CONNECTION);
+    pdiutil::string conn_close = CHARPTR_WRAP("close");
+    pdiutil::string keepalive = header(connection_key);
+    if (keepalive.empty() || keepalive == conn_close) {
+        addHeader(connection_key, CHARPTR_WRAP("close"));
     } else {
-        addHeader(HTTP_HEADER_KEY_CONNECTION, CHARPTR_WRAP("keep-alive"));
+        addHeader(connection_key, CHARPTR_WRAP("keep-alive"));
 
         keepalive = CHARPTR_WRAP("timeout=");
         keepalive += pdiutil::to_string((int)(HTTP_DEFAULT_KEEP_ALIVE_MS));
-        addHeader(HTTP_HEADER_KEY_KEEP_ALIVE, keepalive);
+        addHeader(CHARPTR_WRAP(HTTP_HEADER_KEY_KEEP_ALIVE), keepalive);
         // (static_cast<iTcpClientInterface*>(m_client))->setKeepAlive((HTTP_DEFAULT_KEEP_ALIVE_MS/1000), 10, 3); // Enable keep-alive for the client
     }
 
-    addHeader(HTTP_HEADER_KEY_ACCESS_CONTROL_ALLOW_ORIGIN, "*"); // Allow CORS
+    addHeader(CHARPTR_WRAP(HTTP_HEADER_KEY_ACCESS_CONTROL_ALLOW_ORIGIN), "*"); // Allow CORS
 
     #ifdef ENABLE_TLS_SERVICE
     if(m_secure && HTTPS_HSTS_MAX_AGE_SECONDS > 0){
         pdiutil::string hsts = CHARPTR_WRAP("max-age=");
         hsts += pdiutil::to_string((int)(HTTPS_HSTS_MAX_AGE_SECONDS));
-        addHeader(HTTP_HEADER_KEY_STRICT_TRANSPORT_SECURITY, hsts);
+        addHeader(CHARPTR_WRAP(HTTP_HEADER_KEY_STRICT_TRANSPORT_SECURITY), hsts);
     }
     #endif
 
@@ -768,7 +781,9 @@ bool HttpServerInterfaceImpl::handleStaticFileRequest(){
 
     #ifdef ENABLE_STORAGE_SERVICE
 
-    if (m_clientRequest.method == "GET" || m_clientRequest.method == "HEAD") {
+    pdiutil::string method_get = CHARPTR_WRAP("GET");
+    pdiutil::string method_head = CHARPTR_WRAP("HEAD");
+    if (m_clientRequest.method == method_get || m_clientRequest.method == method_head) {
 
         pdiutil::string filePath = m_storagePath + (m_clientRequest.uri[0] == '/' ? m_clientRequest.uri.substr(1) : m_clientRequest.uri);
         mimetype_t filetype = __i_instance.getFileSystemInstance().getFileMimeType(filePath.c_str());
@@ -784,7 +799,7 @@ bool HttpServerInterfaceImpl::handleStaticFileRequest(){
             // Add Content-Disposition header to force download
             m_responseHeaders.clear();
             pdiutil::string content_disposition_value = CHARPTR_WRAP("attachment; filename=\"") + __i_instance.getFileSystemInstance().basename(filePath.c_str()) + "\"";
-            addHeader(HTTP_HEADER_KEY_CONTENT_DISPOSITION, content_disposition_value);
+            addHeader(CHARPTR_WRAP(HTTP_HEADER_KEY_CONTENT_DISPOSITION), content_disposition_value);
 
             pdiutil::string response;
             prepareResponseHeader(response, HTTP_RESP_OK, getMimeTypeString(filetype), __i_instance.getFileSystemInstance().getFileSize(filePath.c_str()));

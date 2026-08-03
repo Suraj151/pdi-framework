@@ -421,7 +421,7 @@ void LWSSH::prepare_server_kexinit(pdiutil::vector<uint8_t> &payload){
     }
 
     // 3. Name-lists (choose algorithms you support)
-    ssh_name_list kex_algorithms; kex_algorithms.push_back(CHARPTR_WRAP("curve25519-sha256")); kex_algorithms.push_back(SSH_EXT_INFO_S_STR);
+    ssh_name_list kex_algorithms; kex_algorithms.push_back(CHARPTR_WRAP("curve25519-sha256")); kex_algorithms.push_back(CHARPTR_WRAP(SSH_EXT_INFO_S_STR));
     ssh_name_list server_host_key_algorithms; get_supported_hostkey_algos(server_host_key_algorithms);
     ssh_name_list encryption_algorithms; encryption_algorithms.push_back(CHARPTR_WRAP("aes128-ctr"));
     ssh_name_list mac_algorithms; mac_algorithms.push_back(CHARPTR_WRAP("hmac-sha2-256")); mac_algorithms.push_back(CHARPTR_WRAP("hmac-sha1"));
@@ -972,7 +972,7 @@ bool LWSSH::prepare_server_ecdh_reply_rsa(LWSSHSession* session,
 
     // 5. Sign exchange hash with RSA host key
     rsa_hash_alg hashalg = (algo == SSH_KEY_ALGO_RSA_SHA512) ? RSA_HASH_SHA512 : RSA_HASH_SHA256;
-    pdiutil::string signame = (algo == SSH_KEY_ALGO_RSA_SHA512) ? SSH_RSA_SIG_ALGO_SHA512_STR : SSH_RSA_SIG_ALGO_SHA256_STR;
+    pdiutil::string signame = (algo == SSH_KEY_ALGO_RSA_SHA512) ? CHARPTR_WRAP(SSH_RSA_SIG_ALGO_SHA512_STR) : CHARPTR_WRAP(SSH_RSA_SIG_ALGO_SHA256_STR);
 
     uint8_t sigbuf[RSA_MAX_KEY_BITS / 8];
     size_t siglen = 0;
@@ -1079,9 +1079,9 @@ bool LWSSH::parse_userauth_request(const pdiutil::vector<uint8_t>& payload, SSHU
  */
 void LWSSH::load_ssh_config(ssh_config_t& config) {
 
-    pdiutil::string cfgfile = SSH_CONFIG_FILE;
-    pdiutil::string keyPasswordAuth = SSH_CONFIG_KEY_PASSWORD_AUTH;
-    pdiutil::string keyPubkeyAuth = SSH_CONFIG_KEY_PUBKEY_AUTH;
+    pdiutil::string cfgfile = CHARPTR_WRAP(SSH_CONFIG_FILE);
+    pdiutil::string keyPasswordAuth = CHARPTR_WRAP(SSH_CONFIG_KEY_PASSWORD_AUTH);
+    pdiutil::string keyPubkeyAuth = CHARPTR_WRAP(SSH_CONFIG_KEY_PUBKEY_AUTH);
 
     pdiutil::vector<config_kv_t> kvs;
     if (!loadConfigFile(cfgfile.c_str(), kvs)) {
@@ -1137,7 +1137,7 @@ static void append_bn_string(pdiutil::vector<uint8_t>& out, const bignum& b) {
 // SSH host-key public blob: string("ssh-rsa") mpint(e) mpint(n)
 void LWSSH::build_rsa_hostkey_blob(const rsa_key& key, pdiutil::vector<uint8_t>& out) {
     out.clear();
-    pdiutil::string keytype = SSH_RSA_KEY_TYPE_STR;
+    pdiutil::string keytype = CHARPTR_WRAP(SSH_RSA_KEY_TYPE_STR);
     append_ssh_string(out, keytype.c_str(), keytype.length());
     pdiutil::vector<uint8_t> eb, nb;
     bn_to_vec(key.e, eb);
@@ -1148,9 +1148,11 @@ void LWSSH::build_rsa_hostkey_blob(const rsa_key& key, pdiutil::vector<uint8_t>&
 
 static void rsa_ssh_paths(char* sshdir, size_t dirsz, char* priv, size_t privsz, char* pub, size_t pubsz) {
     const char* homedir = __i_fs.getHomeDirectory();
-    __snprintf(sshdir, dirsz, "%s/%s", (strlen(homedir) > 1 ? homedir : ""), SSH_DEFAULT_DIR);
-    __snprintf(priv, privsz, "%s/%s", sshdir, SSH_KEY_ALGO_RSA_STR);
-    __snprintf(pub, pubsz, "%s/%s.pub", sshdir, SSH_KEY_ALGO_RSA_STR);
+    pdiutil::string ssh_dir = CHARPTR_WRAP(SSH_DEFAULT_DIR);
+    pdiutil::string rsa_algo = CHARPTR_WRAP(SSH_KEY_ALGO_RSA_STR);
+    __snprintf(sshdir, dirsz, "%s/%s", (strlen(homedir) > 1 ? homedir : ""), ssh_dir.c_str());
+    __snprintf(priv, privsz, "%s/%s", sshdir, rsa_algo.c_str());
+    __snprintf(pub, pubsz, "%s/%s.pub", sshdir, rsa_algo.c_str());
 }
 
 // Private file: ssh-string sequence n,e,d,p,q,dp,dq,qinv. Public file: host-key blob.
@@ -1213,9 +1215,11 @@ bool LWSSH::ed25519_hostkey_exists() {
     const char* homedir = __i_fs.getHomeDirectory();
     char sshdir[30]; char priv[45]; char pub[45];
     memset(sshdir, 0, sizeof(sshdir)); memset(priv, 0, sizeof(priv)); memset(pub, 0, sizeof(pub));
-    __snprintf(sshdir, sizeof(sshdir), "%s/%s", (strlen(homedir) > 1 ? homedir : ""), SSH_DEFAULT_DIR);
-    __snprintf(priv, sizeof(priv), "%s/%s", sshdir, SSH_KEY_ALGO_ED25519_STR);
-    __snprintf(pub, sizeof(pub), "%s/%s.pub", sshdir, SSH_KEY_ALGO_ED25519_STR);
+    pdiutil::string ssh_dir = CHARPTR_WRAP(SSH_DEFAULT_DIR);
+    pdiutil::string ed_algo = CHARPTR_WRAP(SSH_KEY_ALGO_ED25519_STR);
+    __snprintf(sshdir, sizeof(sshdir), "%s/%s", (strlen(homedir) > 1 ? homedir : ""), ssh_dir.c_str());
+    __snprintf(priv, sizeof(priv), "%s/%s", sshdir, ed_algo.c_str());
+    __snprintf(pub, sizeof(pub), "%s/%s.pub", sshdir, ed_algo.c_str());
     return __i_fs.isFileExist(priv) && __i_fs.isFileExist(pub);
 }
 
@@ -1223,8 +1227,10 @@ bool LWSSH::rsa_hostkey_exists() {
     const char* homedir = __i_fs.getHomeDirectory();
     char sshdir[30]; char priv[45];
     memset(sshdir, 0, sizeof(sshdir)); memset(priv, 0, sizeof(priv));
-    __snprintf(sshdir, sizeof(sshdir), "%s/%s", (strlen(homedir) > 1 ? homedir : ""), SSH_DEFAULT_DIR);
-    __snprintf(priv, sizeof(priv), "%s/%s", sshdir, SSH_KEY_ALGO_RSA_STR);
+    pdiutil::string ssh_dir = CHARPTR_WRAP(SSH_DEFAULT_DIR);
+    pdiutil::string rsa_algo = CHARPTR_WRAP(SSH_KEY_ALGO_RSA_STR);
+    __snprintf(sshdir, sizeof(sshdir), "%s/%s", (strlen(homedir) > 1 ? homedir : ""), ssh_dir.c_str());
+    __snprintf(priv, sizeof(priv), "%s/%s", sshdir, rsa_algo.c_str());
     return __i_fs.isFileExist(priv);
 }
 
@@ -1236,11 +1242,11 @@ void LWSSH::get_supported_hostkey_algos(ssh_name_list& out) {
     bool have_ed = ed25519_hostkey_exists();
     bool have_rsa = rsa_hostkey_exists();
     if (have_ed || (!have_ed && !have_rsa)) {
-        out.push_back(SSH_ED25519_KEY_TYPE_STR);
+        out.push_back(CHARPTR_WRAP(SSH_ED25519_KEY_TYPE_STR));
     }
     if (have_rsa) {
-        out.push_back(SSH_RSA_SIG_ALGO_SHA512_STR);
-        out.push_back(SSH_RSA_SIG_ALGO_SHA256_STR);
+        out.push_back(CHARPTR_WRAP(SSH_RSA_SIG_ALGO_SHA512_STR));
+        out.push_back(CHARPTR_WRAP(SSH_RSA_SIG_ALGO_SHA256_STR));
     }
 }
 
@@ -1249,9 +1255,9 @@ SSHKeyAlgorithm LWSSH::negotiate_hostkey_algo(const ssh_name_list& client_algos)
     ssh_name_list supported;
     get_supported_hostkey_algos(supported);
 
-    pdiutil::string ed = SSH_ED25519_KEY_TYPE_STR;
-    pdiutil::string rsa256 = SSH_RSA_SIG_ALGO_SHA256_STR;
-    pdiutil::string rsa512 = SSH_RSA_SIG_ALGO_SHA512_STR;
+    pdiutil::string ed = CHARPTR_WRAP(SSH_ED25519_KEY_TYPE_STR);
+    pdiutil::string rsa256 = CHARPTR_WRAP(SSH_RSA_SIG_ALGO_SHA256_STR);
+    pdiutil::string rsa512 = CHARPTR_WRAP(SSH_RSA_SIG_ALGO_SHA512_STR);
 
     for (size_t i = 0; i < client_algos.size(); i++) {
         bool ok = false;
@@ -1268,7 +1274,7 @@ SSHKeyAlgorithm LWSSH::negotiate_hostkey_algo(const ssh_name_list& client_algos)
 
 // RFC 8308: did the client advertise ext-info-c in its kex_algorithms list.
 bool LWSSH::client_advertised_ext_info(const ssh_name_list& client_kex_algos) {
-    pdiutil::string ext_c = SSH_EXT_INFO_C_STR;
+    pdiutil::string ext_c = CHARPTR_WRAP(SSH_EXT_INFO_C_STR);
     for (size_t i = 0; i < client_kex_algos.size(); i++) {
         if (client_kex_algos[i] == ext_c) return true;
     }
@@ -1282,8 +1288,8 @@ void LWSSH::build_ext_info_packet(pdiutil::vector<uint8_t>& payload) {
     payload.push_back(SSH2_MSG_EXT_INFO);
     payload.push_back(0x00); payload.push_back(0x00);
     payload.push_back(0x00); payload.push_back(0x01);
-    pdiutil::string name = SSH_EXT_SERVER_SIG_ALGS_STR;
-    pdiutil::string value = SSH_SERVER_SIG_ALGS_VALUE_STR;
+    pdiutil::string name = CHARPTR_WRAP(SSH_EXT_SERVER_SIG_ALGS_STR);
+    pdiutil::string value = CHARPTR_WRAP(SSH_SERVER_SIG_ALGS_VALUE_STR);
     append_ssh_string(payload, name.c_str(), name.length());
     append_ssh_string(payload, value.c_str(), value.length());
 }
@@ -1308,7 +1314,7 @@ bool LWSSH::extract_ed25519_blob_field(const pdiutil::vector<uint8_t>& blob, pdi
     pdiutil::string type;
     if (!read_ssh_string(blob, type, offset)) return false;
 
-    pdiutil::string expected = SSH_ED25519_KEY_TYPE_STR;
+    pdiutil::string expected = CHARPTR_WRAP(SSH_ED25519_KEY_TYPE_STR);
     if (type != expected) return false;
 
     pdiutil::vector<uint8_t> field;
@@ -1336,13 +1342,14 @@ bool LWSSH::is_authorized_pubkey(const pdiutil::vector<uint8_t>& client_pubkey_b
     }
 
     const char* homedir = __i_fs.getHomeDirectory();
-    pdiutil::string ed = SSH_ED25519_KEY_TYPE_STR;
-    pdiutil::string rsa = SSH_RSA_KEY_TYPE_STR;
-    pdiutil::string akfile = SSH_AUTHORIZED_KEYS_FILE;
+    pdiutil::string ed = CHARPTR_WRAP(SSH_ED25519_KEY_TYPE_STR);
+    pdiutil::string rsa = CHARPTR_WRAP(SSH_RSA_KEY_TYPE_STR);
+    pdiutil::string akfile = CHARPTR_WRAP(SSH_AUTHORIZED_KEYS_FILE);
+    pdiutil::string ssh_dir = CHARPTR_WRAP(SSH_DEFAULT_DIR);
 
     char akpath[64]; memset(akpath, 0, sizeof(akpath));
     __snprintf(akpath, sizeof(akpath), "%s/%s/%s",
-               (strlen(homedir) > 1 ? homedir : ""), SSH_DEFAULT_DIR, akfile.c_str());
+               (strlen(homedir) > 1 ? homedir : ""), ssh_dir.c_str(), akfile.c_str());
 
     pdiutil::vector<config_kv_t> kvs;
     if (!loadConfigFile(akpath, kvs)) {
@@ -1409,7 +1416,7 @@ static bool extract_rsa_pubkey(const pdiutil::vector<uint8_t>& blob, rsa_key& ke
     int32_t offset = 0;
     pdiutil::string type;
     if (!read_ssh_string(blob, type, offset)) return false;
-    pdiutil::string expected = SSH_RSA_KEY_TYPE_STR;
+    pdiutil::string expected = CHARPTR_WRAP(SSH_RSA_KEY_TYPE_STR);
     if (type != expected) return false;
 
     pdiutil::vector<uint8_t> e, n;
@@ -1439,8 +1446,8 @@ bool LWSSH::verify_pubkey_signature(LWSSHSession* session, const SSHUserAuthRequ
     pdiutil::vector<uint8_t> signed_data;
     build_pubkey_auth_signed_data(session, req, signed_data);
 
-    pdiutil::string ed = SSH_ED25519_KEY_TYPE_STR;
-    pdiutil::string rsa = SSH_RSA_KEY_TYPE_STR;
+    pdiutil::string ed = CHARPTR_WRAP(SSH_ED25519_KEY_TYPE_STR);
+    pdiutil::string rsa = CHARPTR_WRAP(SSH_RSA_KEY_TYPE_STR);
 
     if (type == ed) {
 
@@ -1458,7 +1465,7 @@ bool LWSSH::verify_pubkey_signature(LWSSHSession* session, const SSHUserAuthRequ
         if (!read_ssh_string(req.signature, signame, sigoff)) return false;
         if (!read_ssh_string(req.signature, rawsig, sigoff)) return false;
 
-        pdiutil::string rsa512 = SSH_RSA_SIG_ALGO_SHA512_STR;
+        pdiutil::string rsa512 = CHARPTR_WRAP(SSH_RSA_SIG_ALGO_SHA512_STR);
         rsa_hash_alg alg = (signame == rsa512) ? RSA_HASH_SHA512 : RSA_HASH_SHA256;
 
         rsa_key* key = pdiutil::safe_new<rsa_key>();

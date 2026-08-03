@@ -185,7 +185,8 @@ public:
 				strncpy(this->email_configs.mail_to, _mail_to.c_str(), _mail_to.size());
 				strncpy(this->email_configs.mail_subject, _mail_subject.c_str(), _mail_subject.size());
 				// this->email_configs.mail_frequency = (uint16_t)_mail_frequency.toInt();
-				_is_test_mail = (bool)(_test_mail == "test");
+				pdiutil::string test_flag = CHARPTR_WRAP("test");
+				_is_test_mail = (bool)(_test_mail == test_flag);
 				__i_dvc_ctrl.yield();
 
 				this->m_web_resource->m_db_conn->set_email_config_table(&this->email_configs);

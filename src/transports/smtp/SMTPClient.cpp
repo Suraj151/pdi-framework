@@ -269,8 +269,9 @@ bool SMTPClient::sendHello( char *domain ){
 
   if( nullptr != cmd ){
 
+    pdiutil::string ehlo_cmd = CHARPTR_WRAP(SMTP_COMMAND_EHLO);
     memset( cmd, 0, 100 );
-    strcpy( cmd, SMTP_COMMAND_EHLO );
+    strcpy( cmd, ehlo_cmd.c_str() );
     strcat( cmd, " " );
     strcat( cmd, domain );
     respcode = this->sendCommandAndGetCode( cmd );
@@ -293,7 +294,8 @@ bool SMTPClient::sendAuthLogin( char *username, char *password ){
     base64Encode( username, strlen(username), _username );
     base64Encode( password, strlen(password), _password );
 
-    respcode = this->sendCommandAndGetCode( SMTP_COMMAND_AUTH );
+    pdiutil::string auth_cmd = CHARPTR_WRAP(SMTP_COMMAND_AUTH);
+    respcode = this->sendCommandAndGetCode( auth_cmd.c_str() );
 
     if( respcode < SMTP_STATUS_SERVICE_UNAVAILABLE ){
       respcode = this->sendCommandAndGetCode( _username );
@@ -317,8 +319,9 @@ bool SMTPClient::sendFrom( char *sender ){
 
   if( nullptr != cmd ){
 
+    pdiutil::string from_cmd = CHARPTR_WRAP(SMTP_COMMAND_FROM);
     memset( cmd, 0, 128 );
-    strcpy( cmd, SMTP_COMMAND_FROM );
+    strcpy( cmd, from_cmd.c_str() );
     strcat( cmd, SMTP_COMMAND_SEPARATOR );
     strcat( cmd, SMTP_COMMAND_OPENING_ANG_BRACKET );
     strcat( cmd, sender );
@@ -337,8 +340,9 @@ bool SMTPClient::sendTo( char *recipient ){
 
   if( nullptr != cmd ){
 
+    pdiutil::string to_cmd = CHARPTR_WRAP(SMTP_COMMAND_TO);
     memset( cmd, 0, 128 );
-    strcpy( cmd, SMTP_COMMAND_TO );
+    strcpy( cmd, to_cmd.c_str() );
     strcat( cmd, SMTP_COMMAND_SEPARATOR );
     strcat( cmd, SMTP_COMMAND_OPENING_ANG_BRACKET );
     strcat( cmd, recipient );
@@ -352,22 +356,26 @@ bool SMTPClient::sendTo( char *recipient ){
 
 bool SMTPClient::sendDataCommand(){
 
-  int respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA );
+  pdiutil::string data_cmd = CHARPTR_WRAP(SMTP_COMMAND_DATA);
+  int respcode = this->sendCommandAndGetCode( data_cmd.c_str() );
   return ( SMTP_STATUS_START_MAIL_INPUT == respcode );
 }
 
 void SMTPClient::sendDataHeader( char *sender, char *recipient, char *subject ){
 
   if( nullptr != this->m_client ){
-    this->m_client->write((const uint8_t*)SMTP_COMMAND_DATA_HEADER_TO);
+    pdiutil::string header_to = CHARPTR_WRAP(SMTP_COMMAND_DATA_HEADER_TO);
+    pdiutil::string header_from = CHARPTR_WRAP(SMTP_COMMAND_DATA_HEADER_FROM);
+    pdiutil::string header_subject = CHARPTR_WRAP(SMTP_COMMAND_DATA_HEADER_SUBJECT);
+    this->m_client->write((const uint8_t*)header_to.c_str());
     this->m_client->write((const uint8_t*)recipient);
     this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
 
-    this->m_client->write((const uint8_t*)SMTP_COMMAND_DATA_HEADER_FROM);
+    this->m_client->write((const uint8_t*)header_from.c_str());
     this->m_client->write((const uint8_t*)sender);
     this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
 
-    this->m_client->write((const uint8_t*)SMTP_COMMAND_DATA_HEADER_SUBJECT);
+    this->m_client->write((const uint8_t*)header_subject.c_str());
     this->m_client->write((const uint8_t*)subject);
     this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
     this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
@@ -418,7 +426,8 @@ bool SMTPClient::sendDataBody( const char * body ){
 
 bool SMTPClient::sendQuit(){
 
-  int respcode = this->sendCommandAndGetCode( SMTP_COMMAND_QUIT );
+  pdiutil::string quit_cmd = CHARPTR_WRAP(SMTP_COMMAND_QUIT);
+  int respcode = this->sendCommandAndGetCode( quit_cmd.c_str() );
   return ( SMTP_STATUS_SERVER_ENDING_CON == respcode );
 }
 

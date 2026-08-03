@@ -15,8 +15,10 @@ created Date    : 23rd July 2026
 void NameResolver::ensureHostsFile()
 {
 #ifdef ENABLE_STORAGE_SERVICE
-  if (__i_fs.isFileExist(HOSTS_FILE_PATH)) return;
-  __i_fs.createFile(HOSTS_FILE_PATH, HOSTS_FILE_SEED);
+  pdiutil::string hosts_path = CHARPTR_WRAP(HOSTS_FILE_PATH);
+  pdiutil::string hosts_seed = CHARPTR_WRAP(HOSTS_FILE_SEED);
+  if (__i_fs.isFileExist(hosts_path.c_str())) return;
+  __i_fs.createFile(hosts_path.c_str(), hosts_seed.c_str());
 #endif
 }
 
@@ -28,8 +30,9 @@ bool NameResolver::parseIpLiteral(const char *str, ipaddress_t &out)
     if ((*p < '0' || *p > '9') && *p != '.') return false;
   }
 
+  pdiutil::string zero_ip = CHARPTR_WRAP("0.0.0.0");
   ipaddress_t ip(str);
-  if (ip.isSet() || 0 == strcmp(str, "0.0.0.0")) {
+  if (ip.isSet() || 0 == strcmp(str, zero_ip.c_str())) {
     out = ip;
     return true;
   }
@@ -39,8 +42,9 @@ bool NameResolver::parseIpLiteral(const char *str, ipaddress_t &out)
 bool NameResolver::lookupHostsFile(const char *hostname, ipaddress_t &out)
 {
 #ifdef ENABLE_STORAGE_SERVICE
-  if (nullptr == hostname || !__i_fs.isFileExist(HOSTS_FILE_PATH)) return false;
-  int64_t fs = __i_fs.getFileSize(HOSTS_FILE_PATH);
+  pdiutil::string hosts_path = CHARPTR_WRAP(HOSTS_FILE_PATH);
+  if (nullptr == hostname || !__i_fs.isFileExist(hosts_path.c_str())) return false;
+  int64_t fs = __i_fs.getFileSize(hosts_path.c_str());
   if (fs <= 0) return false;
 
   size_t hlen = strlen(hostname);
@@ -49,7 +53,7 @@ bool NameResolver::lookupHostsFile(const char *hostname, ipaddress_t &out)
 
   while (offset < (uint64_t)fs && !found) {
     pdiutil::string linedata;
-    int bytes = __i_fs.readFile(HOSTS_FILE_PATH, 128, [&](char *data, uint32_t size) -> bool {
+    int bytes = __i_fs.readFile(hosts_path.c_str(), 128, [&](char *data, uint32_t size) -> bool {
       linedata += pdiutil::string(data, size);
       return true;
     }, offset, "\n");

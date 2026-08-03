@@ -41,14 +41,18 @@ bool UserStoreService::initService(void *arg)
 #ifdef ENABLE_STORAGE_SERVICE
 void UserStoreService::bootstrapFromLoginTable()
 {
-  if (__i_fs.isFileExist(USER_STORE_SHADOW_PATH)) {
-    __i_fs.setFilePermissions(USER_STORE_SHADOW_PATH, 0600);
+  pdiutil::string shadow_path = CHARPTR_WRAP(USER_STORE_SHADOW_PATH);
+  pdiutil::string passwd_path = CHARPTR_WRAP(USER_STORE_PASSWD_PATH);
+  pdiutil::string etc_dir = CHARPTR_WRAP(USER_STORE_ETC_DIR);
+
+  if (__i_fs.isFileExist(shadow_path.c_str())) {
+    __i_fs.setFilePermissions(shadow_path.c_str(), 0600);
   }
 
-  if (__i_fs.isFileExist(USER_STORE_PASSWD_PATH)) return;
+  if (__i_fs.isFileExist(passwd_path.c_str())) return;
 
-  if (!__i_fs.isDirectory(USER_STORE_ETC_DIR)) {
-    if (__i_fs.createDirectory(USER_STORE_ETC_DIR) < 0) return;
+  if (!__i_fs.isDirectory(etc_dir.c_str())) {
+    if (__i_fs.createDirectory(etc_dir.c_str()) < 0) return;
   }
 
   login_credential_table creds;
@@ -60,7 +64,7 @@ void UserStoreService::bootstrapFromLoginTable()
   root.m_gid = USER_STORE_ROOT_GID;
   root.m_username = creds.username;
   root.m_home = __i_fs.getHomeDirectory();
-  root.m_shell = USER_STORE_DEFAULT_SHELL;
+  root.m_shell = CHARPTR_WRAP(USER_STORE_DEFAULT_SHELL);
 
   addUser(root, creds.password);
 }
@@ -84,20 +88,21 @@ bool UserStoreService::addUser(const user_record_t &record, const char *password
   user_record_t existing;
   if (findUserByName(record.m_username.c_str(), existing)) return false;
 
+  pdiutil::string passwd_path = CHARPTR_WRAP(USER_STORE_PASSWD_PATH);
   pdiutil::string line;
   serializePasswdLine(record, line);
   line += '\n';
 
-  if (!__i_fs.isFileExist(USER_STORE_PASSWD_PATH)) {
-    if (__i_fs.createFile(USER_STORE_PASSWD_PATH, "") < 0) return false;
+  if (!__i_fs.isFileExist(passwd_path.c_str())) {
+    if (__i_fs.createFile(passwd_path.c_str(), "") < 0) return false;
   }
 
-  int iStatus = __i_fs.writeFile(USER_STORE_PASSWD_PATH, (char*)line.c_str(), line.size(), true);
+  int iStatus = __i_fs.writeFile(passwd_path.c_str(), (char*)line.c_str(), line.size(), true);
   if (iStatus < 0) return false;
 
   if (nullptr != password && 0 != password[0]) {
     if (!setPassword(record.m_username.c_str(), password)) {
-      removeLineByUsername(USER_STORE_PASSWD_PATH, record.m_username.c_str());
+      removeLineByUsername(passwd_path.c_str(), record.m_username.c_str());
       return false;
     }
   }
@@ -107,8 +112,10 @@ bool UserStoreService::addUser(const user_record_t &record, const char *password
 bool UserStoreService::removeUser(const char *username)
 {
   if (nullptr == username || 0 == username[0]) return false;
-  bool passwdRemoved = removeLineByUsername(USER_STORE_PASSWD_PATH, username);
-  removeLineByUsername(USER_STORE_SHADOW_PATH, username);
+  pdiutil::string passwd_path = CHARPTR_WRAP(USER_STORE_PASSWD_PATH);
+  pdiutil::string shadow_path = CHARPTR_WRAP(USER_STORE_SHADOW_PATH);
+  bool passwdRemoved = removeLineByUsername(passwd_path.c_str(), username);
+  removeLineByUsername(shadow_path.c_str(), username);
   return passwdRemoved;
 }
 
@@ -157,8 +164,9 @@ void UserStoreService::serializePasswdLine(const user_record_t &record, pdiutil:
 
 bool UserStoreService::scanPasswdFile(bool matchByUid, uint16_t uid, const char *username, user_record_t &out)
 {
-  if (!__i_fs.isFileExist(USER_STORE_PASSWD_PATH)) return false;
-  int64_t fs = __i_fs.getFileSize(USER_STORE_PASSWD_PATH);
+  pdiutil::string passwd_path = CHARPTR_WRAP(USER_STORE_PASSWD_PATH);
+  if (!__i_fs.isFileExist(passwd_path.c_str())) return false;
+  int64_t fs = __i_fs.getFileSize(passwd_path.c_str());
   if (fs <= 0) return false;
 
   uint64_t offset = 0;
@@ -167,7 +175,7 @@ bool UserStoreService::scanPasswdFile(bool matchByUid, uint16_t uid, const char 
 
   while (offset < (uint64_t)fs && !found) {
     linedata.clear();
-    int bytes = __i_fs.readFile(USER_STORE_PASSWD_PATH, 128, [&](char *data, uint32_t size) -> bool {
+    int bytes = __i_fs.readFile(passwd_path.c_str(), 128, [&](char *data, uint32_t size) -> bool {
       linedata += pdiutil::string(data, size);
       return true;
     }, offset, "\n");
@@ -293,18 +301,19 @@ bool UserStoreService::setPassword(const char *username, const char *password)
   line += hexsalt;
   line += '\n';
 
+  pdiutil::string shadow_path = CHARPTR_WRAP(USER_STORE_SHADOW_PATH);
   __i_fs.beginPrivileged();
-  removeLineByUsername(USER_STORE_SHADOW_PATH, username);
+  removeLineByUsername(shadow_path.c_str(), username);
 
-  if (!__i_fs.isFileExist(USER_STORE_SHADOW_PATH)) {
-    if (__i_fs.createFile(USER_STORE_SHADOW_PATH, "") < 0) {
+  if (!__i_fs.isFileExist(shadow_path.c_str())) {
+    if (__i_fs.createFile(shadow_path.c_str(), "") < 0) {
       __i_fs.endPrivileged();
       return false;
     }
-    __i_fs.setFilePermissions(USER_STORE_SHADOW_PATH, 0600);
+    __i_fs.setFilePermissions(shadow_path.c_str(), 0600);
   }
 
-  int iStatus = __i_fs.writeFile(USER_STORE_SHADOW_PATH, (char*)line.c_str(), line.size(), true);
+  int iStatus = __i_fs.writeFile(shadow_path.c_str(), (char*)line.c_str(), line.size(), true);
   __i_fs.endPrivileged();
   return (iStatus >= 0);
 }
@@ -312,9 +321,10 @@ bool UserStoreService::setPassword(const char *username, const char *password)
 bool UserStoreService::readShadowRecord(const char *username, uint8_t hashOut[32], uint8_t *saltOut)
 {
   if (nullptr == username || nullptr == hashOut || nullptr == saltOut) return false;
-  if (!__i_fs.isFileExist(USER_STORE_SHADOW_PATH)) return false;
+  pdiutil::string shadow_path = CHARPTR_WRAP(USER_STORE_SHADOW_PATH);
+  if (!__i_fs.isFileExist(shadow_path.c_str())) return false;
 
-  int64_t fs = __i_fs.getFileSize(USER_STORE_SHADOW_PATH);
+  int64_t fs = __i_fs.getFileSize(shadow_path.c_str());
   if (fs <= 0) return false;
 
   size_t unlen = strlen(username);
@@ -324,7 +334,7 @@ bool UserStoreService::readShadowRecord(const char *username, uint8_t hashOut[32
 
   while (offset < (uint64_t)fs && !found) {
     linedata.clear();
-    int bytes = __i_fs.readFile(USER_STORE_SHADOW_PATH, 128, [&](char *data, uint32_t size) -> bool {
+    int bytes = __i_fs.readFile(shadow_path.c_str(), 128, [&](char *data, uint32_t size) -> bool {
       linedata += pdiutil::string(data, size);
       return true;
     }, offset, "\n");

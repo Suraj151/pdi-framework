@@ -350,8 +350,8 @@ public:
     while (available() > 0) {
       // Read a byte from the input
       c = read();
-      if (_delimiter!=0 && (c == _delimiter || c == 0)) {
-        if(_keepdelimiterinstr && c != 0)
+      if (_delimiter != 0 && c == _delimiter) {
+        if(_keepdelimiterinstr)
           _outstr += c;
         break;
       }
@@ -372,7 +372,6 @@ public:
    * @param _yield Optional callback function to yield control during reading.
    * This function reads bytes from the input until it encounters a newline character ('\n').
    * It accumulates the read characters into the provided string.
-   * If a null byte (0) is encountered, it stops reading.
    */
   virtual void readLine(pdiutil::string &_outstr, CallBackVoidArgFn _yield = nullptr, uint32_t _maxlen = 0){
     _outstr.clear();

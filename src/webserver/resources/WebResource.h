@@ -24,6 +24,7 @@ Created Date    : 1st June 2019
 #include <webserver/pages/Footer.h>
 #include <webserver/pages/NotFound.h>
 #include <webserver/helpers/DynamicPageBuildHelper.h>
+#include <helpers/HttpHelper.h>
 
 
 /**
