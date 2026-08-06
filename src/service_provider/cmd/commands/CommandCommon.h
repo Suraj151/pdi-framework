@@ -77,7 +77,7 @@ created Date    : 1st June 2019
 #define CMD_NAME_PKILL 			    "pkill"
 #define CMD_NAME_KILLALL 		    "killall"
 #define CMD_NAME_RENICE 		    "renice"
-#define CMD_NAME_SSH 				"ssh"
+#define CMD_NAME_SSHKEYGEN 			"sshkgen"
 #define CMD_NAME_TLS 				"tls"
 #define CMD_NAME_REBOOT				"reboot"
 #define CMD_NAME_NETWORK			"net"

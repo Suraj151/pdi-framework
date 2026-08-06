@@ -1,42 +1,43 @@
 # PDI Framework — Portable Device Interface Stack
 
-PDI is a modular C++ stack for embedded devices. Application code is written once against clean interfaces (`i*Interface`) and runs on ESP32, ESP8266, Arduino UNO — or any board that has a device port. Batteries included: WiFi, HTTP/HTTPS server, MQTT, OTA, SSH, Telnet, SFTP, SMTP, GPIO, terminal CLI, and a configurable task scheduler.
+One C++ codebase that runs on an ESP32, an ESP8266 or an Arduino UNO. Application and service code is written against interfaces — `iWiFiInterface`, `iFileSystemInterface`, `iTcpServerInterface` and friends — and each board ships an adapter that implements them. Nothing above the adapter layer knows which chip it is sitting on.
+
+What comes out of the box is closer to a small system than to a sketch template: a WiFi captive portal and web UI, an HTTP/HTTPS server, MQTT, OTA, an SSH server with SFTP and scp, Telnet, SMTP, a virtual filesystem with users and permissions, a task scheduler with three execution models, and a Linux-flavoured shell sitting on top of all of it.
 
 <p align="center">
   <img width="500" src="https://github.com/Suraj151/pdi-framework/blob/master/doc/pdi-framework.jpg">
 </p>
 
-## Capabilities
+## What it can do
 
-- **Portable architecture.** Services depend on abstract interfaces, not vendor SDKs. Adding a new board means writing an adapter — the application and service layers stay unchanged.
-- **Bundled services.** WiFi captive portal, HTTP/HTTPS web portal, MQTT client, OTA updates, SSH server, Telnet server, SFTP subsystem, SMTP client, GPIO control (local + MQTT/HTTP), NVM database, TLS (BearSSL / mbedTLS), ESPNOW mesh, Auth, Device-IoT.
-- **Compile-time feature gating.** Each capability is wrapped in an `ENABLE_*` flag; disabled features contribute zero flash.
-- **Configurable task scheduler.** Inline, cooperative, and preemptive modes; priority-and-policy scheduling; POSIX nice; per-task signals (KILL/TERM/STOP/CONT) with `ps`/`top`/`kill`/`pkill`/`killall`/`renice`.
-- **Dynamic program execution (esp32).** `elfload <path>` loads an external relocatable ELF app from the filesystem and launches it as a **background** preemptive task — returns immediately with a pid, managed via `ps` / `kill`. `dlopen`-style, no reflash. See [§7.13](#713-dynamic-app-loading-esp32).
-- **Service supervisor (systemd-lite).** `srvc list / status / start / stop / restart` — every service tracks its scheduler tasks and can be paused or resumed at runtime.
-- **Virtual filesystem (VFS).** Multiple backends mounted under one tree with longest-prefix routing; POSIX-style permissions, ownership, and per-session umask enforced at the VFS layer; multi-user aware (`/etc/passwd` + `/etc/shadow`), with networking config files (`/etc/hosts` for name overrides, `/etc/hostname` written with the device's mDNS name). Includes a read-only `/proc` with live system nodes, a read/write `/sys` exposing GPIO as files (`echo 1 > /sys/class/gpio/5/value`), a `/dev` with byte-stream nodes (`/dev/null`, `/dev/zero`, `/dev/random`), and a RAM-backed `/tmp` scratch filesystem.
-- **Linux-style CLI on serial / Telnet / SSH.** `ls`, `cat`, `echo`, `grep`, `head`, `tail`, `wc`, `hexdump`, `df`, `mount`, `chmod`, `chown`, `umask`, `uptime`, `mv`, `cp`, `mkdir`, `touch`, `rm`, `watch`, `srvc`, `ps`, `top`, `kill`, `pkill`, `killall`, `renice`, `net`, `host`, `ping`, `date`, `tdctl`, `iot`, `ssh`, `tls`, `reboot`, and more. (GPIO is driven as files via `/sys` — see below.)
-- **On-device file transfer.** `scp` (single file) and interactive `sftp` over the SSH tunnel.
-- **Zero-dependency mDNS + DNS-SD.** Advertises `pdi-<mac>.local` and its listening services (`_http`/`_https`, `_ssh`, `_sftp-ssh`, `_telnet._tcp`) on the LAN — a from-scratch responder built directly on lwIP UDP (no Arduino mDNS library). Reach the device by name (`ping pdi-<mac>.local`) or browse it with `avahi-browse -a`. Name resolution goes through IP-literal → `/etc/hosts` → DNS (`host <name>`).
-- **Web portal for configuration.** Session-based login, per-service settings pages, GPIO control, storage browser, MQTT tester, Email tester.
-- **Persistent config store.** Address-based table engine with JSON-driven codegen for schema tables.
-- **Cross-platform build.** Arduino Library Manager install or manual clone; single Python script switches the active device port.
-- **Extensible.** New services, commands, web pages, and device ports plug in through documented base classes.
+**Portability is the whole point.** Services depend on abstract interfaces, not on vendor SDKs. Supporting a new board means writing an adapter for the interfaces that board can actually offer; the services, the portal and the shell come along unchanged. Anything a board can't do is switched off at compile time rather than stubbed at runtime.
+
+**Services.** WiFi with captive portal, HTTP/HTTPS web portal, MQTT client, OTA updates, SSH server, Telnet server, SFTP subsystem, SMTP client, GPIO control (locally and over MQTT/HTTP), an NVM-backed configuration database, TLS via BearSSL or mbedTLS, ESPNOW mesh, authentication, and a device-IoT hook for your own cloud. Each one is a `ServiceProvider` with the same lifecycle, and `srvc list / status / start / stop / restart` drives them at runtime the way systemd drives units.
+
+**A real shell.** The same forty-plus commands are reachable over serial, Telnet and SSH: `ls`, `cat`, `grep`, `head`, `tail`, `wc`, `hexdump`, `df`, `mount`, `chmod`, `chown`, `umask`, `ps`, `top`, `kill`, `renice`, `net`, `host`, `ping`, `date`, `useradd`, `passwd`, `watch` and the rest. Login, history, tab completion, in-place file editing and Ctrl+C all behave the way muscle memory expects.
+
+**A filesystem with users.** Several backends mount into one tree and are routed by longest prefix: LittleFS at the root, a read-only `/proc` of live system nodes, a writable `/sys` where GPIO pins are files (`echo 1 > /sys/class/gpio/5/value`), a `/dev` with `null`/`zero`/`random`, and a RAM-backed `/tmp`. Permissions, ownership and per-session umask are enforced in the VFS layer, so `/etc/passwd` and `/etc/shadow` mean what they say and two logged-in users genuinely see different access.
+
+**Scheduling that scales down and up.** Tasks run inline, cooperatively, or preemptively on a hardware tick, with priorities, POSIX nice values and per-task signals. On ESP32 an external relocatable ELF can be loaded from the filesystem and launched as a background process — `elfload <path>` returns a pid you can `ps` and `kill`, no reflash involved.
+
+**Found on the network without help.** A from-scratch mDNS/DNS-SD responder built straight on lwIP UDP advertises `pdi-<mac>.local` and the services it is listening on, so the device answers to a name and shows up in `avahi-browse -a`. Name lookups walk IP literal, then `/etc/hosts`, then DNS.
+
+**Configured from a browser.** Session-based login, one settings page per service, GPIO control, a storage browser, and MQTT and email testers — all served from flash-resident page fragments.
 
 ## Quick Start
 
 1. **Install** from the **Arduino Library Manager** (search "pdi-framework"). Builds for ESP32 by default.
    For ESP8266 / Arduino UNO, run: `python3 scripts/DeviceSetup.py -d <board>`.
 2. Open **File → Examples → pdi-framework → PdiStack**, then compile and upload.
-3. On your phone / laptop, look for the WiFi network **`pdiStack`** — password **`pdiStack@123`**.
+3. On your phone or laptop, look for the WiFi network **`pdiStack`** — password **`pdiStack@123`**.
 4. Browse to **http://192.168.0.1** and log in as **`pdiStack` / `pdiStack@123`**.
 
-That's it — the device is now running a web portal, remote shell, and file transfer.
+That's it — the device is now running a web portal, a remote shell and file transfer.
 
-Prefer a remote shell? `ssh pdiStack@<device-ip>` or `telnet <device-ip>` (default port 22 / 23).
-Copy files? `scp -s file pdiStack@<device-ip>:/path` or `sftp -P 22 pdiStack@<device-ip>`.
+Prefer a remote shell? `ssh pdiStack@<device-ip>` or `telnet <device-ip>` (default ports 22 and 23).
+Copying files? `scp -s file pdiStack@<device-ip>:/path` or `sftp -P 22 pdiStack@<device-ip>`.
 
-Full install / build details (manual clone paths, autogen script, board-package versions, git-ignored files) are in [§2 Build & Toolchain](#2-build--toolchain).
+Manual clone paths, the autogen script, board-package versions and git-ignored files are covered in [§2 Build & Toolchain](#2-build--toolchain).
 
 ### Supported Boards
 
@@ -46,23 +47,22 @@ Full install / build details (manual clone paths, autogen script, board-package 
 | esp8266 | 3.1.2 |
 | arduinouno | 1.8.6 |
 
-**Note:** not every board exposes every capability — for example Arduino UNO has no WiFi, so the web server / MQTT / OTA services are disabled at compile time on that port.
+Not every board exposes every capability. An Arduino UNO has no WiFi, so the web server, MQTT and OTA services are compiled out on that port.
 
 ## What's Inside
 
 **Services** — WiFi · HTTP/S server · MQTT · OTA · SSH · Telnet · SFTP · SMTP · GPIO · Serial · Terminal · Database · TLS · ESPNOW · Auth · Device-IoT.
 Per-service reference in [§6 Service Providers](#6-service-providers).
 
-**Utilities** — Task Scheduler (inline / cooperative / preemptive), Event bus, Queues, String helpers, Data converters, Crypto, PdiSTL, Reset Factory.
+**Utilities** — task scheduler, event bus, queues, string helpers, data converters, crypto, PdiSTL, factory reset.
 Full inventory in [§15 Utility Library](#15-utility-library).
 
-**Storage** — VFS with mountable backends (LittleFS root + `/proc` + `/sys` + `/dev` synthetics + RAM-backed `/tmp`), POSIX permissions/ownership with per-session umask, multi-user file access control.
+**Storage** — one VFS tree over LittleFS, `/proc`, `/sys`, `/dev` and `/tmp`, with POSIX permissions and multi-user access control.
 Details in [§6.2.11 Storage](#6211-storage-interface-init-no-provider).
 
-**CLI** — 40+ built-in commands including `ls mkdir touch mv cp cat echo head tail wc hexdump grep df mount chmod chown umask srvc ps top kill pkill killall renice net host ping date tdctl watch iot ssh tls reboot uptime groups useradd userdel passwd ...`.
-Full command reference in [§7.7 Built-in command inventory](#77-built-in-command-inventory).
+**CLI** — 40+ built-in commands, listed in [§7.7 Built-in command inventory](#77-built-in-command-inventory).
 
-**Extras** — Captive portal, GPIO events over MQTT/HTTP/Email, NAT (ESP8266 lwIP — see [§2.4.1](#241-nat-and-mesh)), Mesh via ESPNOW.
+**Extras** — captive portal, GPIO events over MQTT/HTTP/email, NAT on the ESP8266 lwIP port ([§2.4.1](#241-nat-and-mesh)), mesh over ESPNOW.
 
 ## A Peek at the Terminal and Web UI
 
@@ -91,97 +91,88 @@ Full command reference in [§7.7 Built-in command inventory](#77-built-in-comman
 
 ## Want to Dig Deeper?
 
-The **[Detailed Documentation](#detailed-documentation)** below is an in-tree reference for contributors and porters. Jump straight to what interests you:
+The **[Detailed Documentation](#detailed-documentation)** below is the in-tree reference for contributors and porters. Jump to whatever you're working on:
 
-- **[1. Architecture Overview](#1-architecture-overview)** — layered model, ports & adapters, runtime lifecycle.
+- **[1. Architecture Overview](#1-architecture-overview)** — layered model, ports and adapters, runtime lifecycle.
 - **[2. Build & Toolchain](#2-build--toolchain)** — install, switch board, autogen scripts, vendored externals.
-- **[3. Configuration System](#3-configuration-system)** — every `ENABLE_*` flag and its dependencies.
-- **[4. Task Scheduler](#4-task-scheduler)** — three modes, four policies, decision tree.
+- **[3. Configuration System](#3-configuration-system)** — every `ENABLE_*` flag and what depends on it.
+- **[4. Task Scheduler](#4-task-scheduler)** — three modes, four policies, and how to choose.
 - **[5. Database Layer](#5-database-layer)** — schema model, address-based store, JSON codegen.
-- **[6. Service Providers](#6-service-providers)** — per-service init flow, CLI / web surface, events.
-- **[7. Command Line / Terminal](#7-command-line--terminal)** — full CLI reference & how to add a command.
-- **[8. Web Server](#8-web-server)** — request lifecycle, routes, views, "how to add a page".
+- **[6. Service Providers](#6-service-providers)** — per-service init flow, CLI and web surface, events.
+- **[7. Command Line / Terminal](#7-command-line--terminal)** — full CLI reference and how to add a command.
+- **[8. Web Server](#8-web-server)** — request lifecycle, routes, views, adding a page.
 - **[9. Logger](#9-logger)** — levels, macros, and the zero-cost-when-disabled pattern.
-- **[10. Transports](#10-transports)** — HTTP, MQTT, SMTP client internals.
-- **[11. Examples Walkthrough](#11-examples-walkthrough)** — bundled sketches, line by line.
-- **[12. Memory & Performance Notes](#12-memory--performance-notes)** — flash/RAM cost per feature.
-- **[13. Portable Interfaces](#13-portable-interfaces)** — the "ports" every device adapter implements.
+- **[10. Transports](#10-transports)** — HTTP, MQTT and SMTP client internals.
+- **[11. Examples Walkthrough](#11-examples-walkthrough)** — what each bundled sketch demonstrates.
+- **[12. Memory & Performance Notes](#12-memory--performance-notes)** — flash and RAM cost per feature.
+- **[13. Portable Interfaces](#13-portable-interfaces)** — the ports every device adapter implements.
 - **[14. Device Layer & Porting Guide](#14-device-layer--porting-guide)** — how to add a new board.
-- **[15. Utility Library](#15-utility-library)** — scheduler, event bus, string ops, embedded STL, crypto.
+- **[15. Utility Library](#15-utility-library)** — event bus, string ops, embedded STL, crypto.
 - **[16. Extending the Framework](#16-extending-the-framework)** — adding services, commands, pages.
 - **[17. Troubleshooting & FAQ](#17-troubleshooting--faq)** — common issues and fixes.
 
 # Detailed Documentation
 
-Each section below is self-contained but cross-links to source paths so you can jump straight to the code.
+Each section stands on its own, and points at the file worth opening when you want the code.
 
 ---
-
 ## 1. Architecture Overview
 
-PDI Framework is structured as a layered, ports-and-adapters stack. The lower layers describe **what** a device must be able to do (abstract interfaces); the upper layers describe **what the application offers** (services, transports, web server, CLI). The two are bridged at compile time by a single device-selection macro and a set of `ENABLE_*` feature flags.
+The stack is layered, and the layering is enforced by what each layer is allowed to include. The bottom half describes what a device must be able to *do* — pure abstract interfaces. The top half describes what the product *offers* — services, transports, the web server, the shell. A single device-selection macro and a set of `ENABLE_*` flags bolt the two halves together at compile time.
 
 ### 1.1 Layered model
 
 ```
                        ┌────────────────────────────────────────┐
-   Application sketch  │  examples/PdiStack/*.ino               │
+   Application sketch  │  your .ino — initialize() + serve()    │
                        └───────────────────┬────────────────────┘
                                            │ uses
                        ┌───────────────────▼────────────────────┐
-   Orchestrator        │  PDIStack  (src/PdiStack.{h,cpp})      │
+   Orchestrator        │  PDIStack — one global, wires it all   │
                        └───────────────────┬────────────────────┘
                                            │ wires up
    ┌───────────────────────────────────────┼───────────────────────────────────────┐
-   │                                       │                                       │
    ▼                                       ▼                                       ▼
 ┌──────────────────┐         ┌──────────────────────────┐          ┌───────────────────────┐
-│  Service Layer   │         │  Web Server / CLI / SSH  │          │  Transports           │
-│  service_provider│◄────────┤  webserver/, cmd/, shell │◄─────────┤  transports/http,     │
-│  /*ServiceProv.  │         │                          │          │  mqtt, smtp           │
+│  Services        │         │  Web server / CLI / SSH  │          │  Transports           │
+│  one per feature │◄────────┤                          │◄─────────┤  HTTP · MQTT · SMTP   │
 └────────┬─────────┘         └──────────────┬───────────┘          └──────────┬────────────┘
          │                                  │                                 │
-         │ all consume only                 │                                 │
+         │            all of them consume only what is below                  │
          ▼                                  ▼                                 ▼
                        ┌──────────────────────────────────────────────────┐
-   Utilities           │  src/utility/  (Scheduler, EventUtil, Database,  │
-                       │  StringOps, CommandBase, crypto, pdistl, queue,  │
-                       │  fiber, Base64, DataTypeConversions, ...)        │
+   Utilities           │  scheduler · event bus · database engine ·       │
+                       │  string ops · crypto · embedded STL · queues     │
                        └────────────────────────┬─────────────────────────┘
                                                 │ + abstract contracts
                                                 ▼
                        ┌──────────────────────────────────────────────────┐
-   Interface Layer     │  src/interface/pdi/   (iDeviceControlInterface,  │
-   (the "ports")       │  iClientInterface, iServerInterface, iWifi*,     │
-                       │  iStorage*, iFileSystem*, iSerial*, iGpio*,      │
-                       │  iLogger*, iDatabase*, iNtp*, iPing*, iWdt*,     │
-                       │  threading: iExecution, iMutex, iCondvar, ...)   │
+   Interfaces          │  iDeviceControl · iClient · iServer · iWiFi ·    │
+   (the "ports")       │  iFileSystem · iSerial · iGpio · iDatabase ·     │
+                       │  iNtp · iPing · iWdt · threading primitives      │
                        └────────────────────────┬─────────────────────────┘
                                                 │ implemented by
                                                 ▼
                        ┌──────────────────────────────────────────────────┐
-   Device Layer        │  devices/esp32/, esp8266/, arduinouno/,          │
-   (the "adapters")    │  mockdevice/   — concrete *Interface.cpp +       │
-                       │  <name>_pdi.h aggregator                         │
+   Devices             │  esp32 · esp8266 · arduinouno · mockdevice       │
+   (the "adapters")    │  concrete implementations + one aggregator each  │
                        └──────────────────────────────────────────────────┘
 ```
 
-**Direction of dependency is strictly downward.** A service never includes a device header directly; it talks to an `i*Interface` pointer. The only place device-specific code is reached from above is the aggregator [src/interface/pdi.h](src/interface/pdi.h), which chooses *one* `<device>_pdi.h` based on the `DEVICE_*` macro emitted by `scripts/DeviceSetup.py` into [devices/DeviceSetup.h](devices/DeviceSetup.h).
+Dependencies only ever point downward. A service never includes a device header; it holds an `i*Interface` pointer and calls through it. The one place device code is reached from above is [src/interface/pdi.h](src/interface/pdi.h), which picks exactly one board aggregator based on the `DEVICE_*` macro that `scripts/DeviceSetup.py` writes into `devices/DeviceSetup.h`.
 
-### 1.2 The five layers
+| Layer | Role | Sees |
+|---|---|---|
+| Application | your sketch: `initialize()` once, `serve()` in the loop | orchestrator |
+| Orchestrator | the `PdiStack` global that conditionally starts every enabled service | services, interfaces |
+| Services | one `ServiceProvider` subclass per feature, self-registering in a global table | utilities, interfaces |
+| Utilities | device-agnostic primitives — scheduler, event bus, database engine, crypto, STL subset | interfaces only |
+| Interfaces | pure abstract ports, grouped by role into drivers, middlewares, modules and threading | nothing |
+| Devices | the concrete per-MCU adapters | vendor SDK / Arduino core |
 
-| Layer | Path | Role | Depends on |
-|---|---|---|---|
-| Application | `examples/` | The user's sketch — calls `PdiStack.initialize()` then `PdiStack.serve()` in `loop()` | Orchestrator |
-| Orchestrator | [src/PdiStack.cpp](src/PdiStack.cpp), [src/PdiStack.h](src/PdiStack.h) | Single global `PDIStack PdiStack` that conditionally wires every enabled service | Services + Interfaces |
-| Service Layer | [src/service_provider/](src/service_provider/) | One subclass of `ServiceProvider` per feature (WiFi, MQTT, OTA, GPIO, Auth, Cmd, …); registers itself in a global table | Utilities + Interfaces |
-| Utilities | [src/utility/](src/utility/) | Reusable primitives with no device knowledge (scheduler, event bus, database engine, crypto, STL subset, fiber) | Interfaces only |
-| Interface Layer | [src/interface/pdi/](src/interface/pdi/) | Pure abstract C++ ports (`i*Interface`) grouped into `drivers/`, `middlewares/`, `modules/`, `threading/` | — |
-| Device Layer | [devices/](devices/) | Concrete adapters per MCU; each provides a `<name>_pdi.h` aggregator (e.g. [devices/esp32/esp32_pdi.h](devices/esp32/esp32_pdi.h)) that pulls in the relevant `*Interface.h` files for that board | Vendor SDK / Arduino core |
+### 1.2 The `ServiceProvider` contract
 
-### 1.3 The `ServiceProvider` contract
-
-Every feature service derives from [ServiceProvider](src/service_provider/ServiceProvider.h) and self-registers into a global table indexed by a `service_t` enum:
+Every feature service derives from `ServiceProvider` and puts itself into a global table indexed by a `service_t` enum:
 
 ```cpp
 ServiceProvider(service_t st, const char *_svc_name)
@@ -190,25 +181,27 @@ ServiceProvider(service_t st, const char *_svc_name)
 }
 ```
 
-The base class defines a uniform lifecycle — `initService` (required override, called once by `PDIStack::initialize`), `stopService` (optional teardown), `printConfigToTerminal` / `printStatusToTerminal` (optional; back the `srvc` CLI command), plus a static `getService(st)` lookup so services can find each other without `#include` cycles. Because every provider conforms to this shape, the `srvc` terminal command can enumerate, configure and inspect any service generically.
+The base class fixes the lifecycle. `initService` is the required override and runs once from `PDIStack::initialize`. `stopService` tears down. `printConfigToTerminal` and `printStatusToTerminal` are what the `srvc` command prints. A static `getService(st)` lets one service find another without include cycles. Because the shape is uniform, `srvc` can enumerate, start, stop and inspect anything without knowing what it is.
 
-### 1.4 The interface contract (the "ports")
+Start reading at [src/service_provider/ServiceProvider.h](src/service_provider/ServiceProvider.h).
 
-Interfaces are grouped by *role* rather than by feature:
+### 1.3 The ports
 
-| Group | Examples | Who implements | Who consumes |
+Interfaces are grouped by role, not by feature:
+
+| Group | Examples | Implemented by | Used by |
 |---|---|---|---|
-| `drivers/` | `iGpioInterface`, `iWdtInterface` | Device adapter | GPIO service, framework core |
-| `middlewares/` | `iClientInterface`, `iServerInterface`, `iNtpInterface`, `iPingInterface`, `iDeviceControlInterface`, `iUpgradeInterface` | Device adapter | OTA, MQTT, Email, HTTP, IoT services |
-| `modules/serial`, `modules/storage`, `modules/wifi` | `iSerialInterface`, `iStorageInterface`, `iFileSystemInterface`, `iWiFiInterface`, `iHttpServerInterface` | Device adapter | Serial, Storage, WiFi services |
-| `threading/` | `iExecution`, `iMutex`, `iCondvar`, `iContext` + `cooperative/`, `preemptive/` | Device adapter (if supported) | Task scheduler in contextual mode |
-| Top-level | `iDatabaseInterface`, `iDeviceIotInterface` | Device adapter (DB) / framework (IoT) | Database service, IoT service |
+| drivers | `iGpioInterface`, `iWdtInterface` | device adapter | GPIO service, core |
+| middlewares | `iClientInterface`, `iServerInterface`, `iNtpInterface`, `iPingInterface`, `iDeviceControlInterface`, `iUpgradeInterface` | device adapter | OTA, MQTT, email, HTTP, IoT |
+| modules | `iSerialInterface`, `iStorageInterface`, `iFileSystemInterface`, `iWiFiInterface`, `iHttpServerInterface` | device adapter | serial, storage, WiFi |
+| threading | `iExecution`, `iMutex`, `iCondvar`, `iContext` | device adapter, where the board can | scheduler in contextual mode |
+| top level | `iDatabaseInterface`, `iDeviceIotInterface` | device adapter / framework | database, IoT |
 
-A device port is considered "complete" when it provides at least: `iDeviceControlInterface`, `iDatabaseInterface`, `iSerialInterface` (if `ENABLE_SERIAL_SERVICE`), and any group required by the feature flags it intends to support. See [devices/esp32/esp32_pdi.h](devices/esp32/esp32_pdi.h) for the canonical aggregator pattern — note how each include is itself wrapped in the matching `ENABLE_*` guard so an unused interface costs zero code size.
+A port is usable once it provides `iDeviceControlInterface`, `iDatabaseInterface`, `iSerialInterface` (when the serial service is on), plus whichever groups the feature flags it claims to support actually need.
 
-### 1.5 Compile-time composition (feature gating)
+### 1.4 Compile-time composition
 
-There is **no runtime plugin system**. Every optional capability is selected at compile time through `ENABLE_*` macros declared in [devices/DeviceConfig.h](devices/DeviceConfig.h). Macros cascade: enabling `ENABLE_NETWORK_SERVICE` is what makes `ENABLE_MQTT_SERVICE`, `ENABLE_HTTP_SERVER`, `ENABLE_OTA_SERVICE`, etc. meaningful for that device. Dependencies are encoded as nested `#if` blocks; e.g. SSH is only enabled if storage is available:
+There is no runtime plugin system. Every optional capability is chosen by an `ENABLE_*` macro in `devices/DeviceConfig.h`, and the macros cascade — turning on networking is what makes MQTT, the HTTP server and OTA meaningful for that board, and SSH only appears when storage is also present:
 
 ```c
 #ifdef ENABLE_NETWORK_SERVICE
@@ -217,95 +210,90 @@ There is **no runtime plugin system**. Every optional capability is selected at 
   #if defined(ENABLE_STORAGE_SERVICE)
     #define ENABLE_SSH_SERVICE
   #endif
-  ...
 #endif
 ```
 
-The same flag drives **three** independent things, in lockstep:
+One flag then drives three things in lockstep:
 
-1. Whether the **device aggregator** includes the corresponding `*Interface.h` (see [devices/esp32/esp32_pdi.h](devices/esp32/esp32_pdi.h)).
-2. Whether the **orchestrator** includes the corresponding `*ServiceProvider.h` (see [src/PdiStack.h](src/PdiStack.h)).
-3. Whether `PDIStack::initialize()` calls the service's `initService(...)` (see [src/PdiStack.cpp](src/PdiStack.cpp)).
+```
+   ENABLE_SSH_SERVICE
+        │
+        ├──▶ device aggregator includes the interfaces SSH needs
+        ├──▶ orchestrator includes SSHServiceProvider
+        └──▶ initialize() calls its initService()
+```
 
-That triple-guard is intentional — it lets a feature be removed entirely from a build (zero flash, zero RAM, zero static-init cost) just by commenting one `#define`.
+The triple guard is deliberate. Comment out one `#define` and the feature leaves the binary completely — no flash, no RAM, no static-init cost, no dangling stub.
 
-### 1.6 Runtime lifecycle
+### 1.5 Runtime lifecycle
 
 ```
 boot
  │
- ├─ static init of PDIStack PdiStack       (src/PdiStack.cpp)
- │     ├─ __utl_event.begin(&__i_dvc_ctrl)
- │     ├─ __task_scheduler.setUtilityInterface(...)
- │     └─ (if WiFi) m_client = __i_instance.getNewT(cp|ls)ClientInstance()
- │                  (TLS picked at compile time via ENABLE_TLS_SERVICE)
+ ├─ static init of the PdiStack global
+ │     ├─ event bus starts
+ │     ├─ scheduler gets its utility interface
+ │     └─ (WiFi builds) a TCP or TLS client instance is created
  │
 setup()
  │
- ├─ PdiStack.initialize()                  (src/PdiStack.cpp)
- │     ├─ __i_dvc_ctrl.initDeviceSpecificFeatures()
- │     ├─ acquire terminal, attach to ServiceProvider base
- │     ├─ __database_service.initService()                (always)
- │     └─ each enabled service .initService(args)         (conditional)
+ ├─ PdiStack.initialize()
+ │     ├─ device brings up its own features
+ │     ├─ terminal acquired and handed to the ServiceProvider base
+ │     ├─ database service starts            (always)
+ │     └─ every enabled service starts       (conditional)
  │
 loop()
  │
- └─ PdiStack.serve()                        (src/PdiStack.cpp)
-       ├─ __web_server.handle_clients()                    (if enabled)
-       ├─ __task_scheduler.run()                           (inline tasks)
-       ├─ __i_dvc_ctrl.yield()
-       ├─ __i_dvc_ctrl.handleEvents()
-       ├─ __i_cooperative_scheduler.tick_from_loop()       (if contextual)
-       └─ __i_preemptive_scheduler.yield()                 (if contextual)
+ └─ PdiStack.serve()
+       ├─ web server handles pending clients
+       ├─ scheduler runs inline tasks
+       ├─ device yield + event dispatch
+       └─ contextual lanes get a slice       (cooperative, then preemptive)
 ```
 
-Two scheduling lanes coexist here:
+Two scheduling lanes live side by side. Inline tasks advance on every `serve()` tick and suit short periodic work. Contextual tasks run on their own stacks and the loop merely yields to them; they exist on boards whose port supplies `iExecution` and a matching scheduler. [§4](#4-task-scheduler) covers picking between them.
 
-- **Inline tasks** advance every `serve()` tick — best for periodic, short, non-blocking work.
-- **Contextual tasks** (cooperative / preemptive) advance on their own stacks; the loop only *yields* to them. These exist only on devices whose port provides `iExecution` + a matching scheduler under [src/interface/pdi/threading/](src/interface/pdi/threading/).
+### 1.6 Global instances and naming
 
-Section [5. Task Scheduler] will cover the choice between modes in depth.
+A small set of well-known globals, all prefixed `__`, so any of them can be found with one grep:
 
-### 1.7 Global instances and naming
-
-The framework exposes a small set of well-known global symbols, all prefixed with `__`. The naming is uniform so a contributor can grep for any one of them:
-
-| Symbol | Provided by | Purpose |
+| Symbol | From | What it is |
 |---|---|---|
-| `__i_dvc_ctrl` | Device layer | The single `iDeviceControlInterface` for this build |
-| `__i_db`, `__i_fs`, `__i_wifi`, `__i_http_server`, `__i_ntp`, `__i_ping`, `__i_serial` | Device layer | Interface singletons, only defined when the matching flag is on |
-| `__task_scheduler`, `__utl_event` | Utility layer | Cross-service scheduler and event bus |
-| `__database_service`, `__wifi_service`, `__mqtt_service`, `__ota_service`, ... | Service layer | One per `ServiceProvider` subclass |
-| `__i_cooperative_scheduler`, `__i_preemptive_scheduler` | Threading port | Contextual execution lanes |
-| `PdiStack` | Orchestrator | The single application-facing facade |
+| `__i_dvc_ctrl` | device | the one `iDeviceControlInterface` for this build |
+| `__i_db`, `__i_fs`, `__i_wifi`, `__i_http_server`, `__i_ntp`, `__i_ping`, `__i_serial` | device | interface singletons, present only when the matching flag is on |
+| `__task_scheduler`, `__utl_event` | utilities | scheduler and event bus |
+| `__database_service`, `__wifi_service`, `__mqtt_service`, `__ota_service`, … | services | one per `ServiceProvider` subclass |
+| `__i_cooperative_scheduler`, `__i_preemptive_scheduler` | threading port | the contextual lanes |
+| `PdiStack` | orchestrator | the single application-facing facade |
 
-Services find each other by global symbol when the dependency is fixed (e.g. `__mqtt_service` reads from `__database_service`), and via `ServiceProvider::getService(st)` when a generic lookup is required (e.g. the `srvc` CLI command).
+Services reach each other by global symbol when the dependency is fixed, and through `ServiceProvider::getService(st)` when the lookup has to stay generic — which is exactly what `srvc` does.
 
 ---
-
 ## 2. Build & Toolchain
 
-PDI Framework targets the **Arduino IDE / arduino-cli** build system. This section is the integrator's reference: install, board versions, what the scripts do, and the Arduino Library Manager flow. The framework compiles clean against `-std=c++14` (or newer) with GCC variadic-macro extensions — there are no hidden compiler-flag dependencies beyond that, so PlatformIO or a raw `make` build works if you reproduce the standard Arduino-core defines.
+The build target is the Arduino IDE / arduino-cli toolchain. The code compiles clean against `-std=c++14` or newer with GCC's variadic-macro extension, and nothing else is assumed — PlatformIO or a hand-rolled `make` works as long as you reproduce the usual Arduino-core defines.
 
-### 2.1 Supported boards
+### 2.1 Board packages
 
-| Board | Arduino IDE board package version |
+| Board | Arduino board package version |
 |---|---|
 | Arduino UNO | 1.8.6 |
 | ESP8266 | 3.1.2 |
 | ESP32 | 3.3.3 |
 
-These are the versions the current `devices/<board>/` adapters are written against — vendor SDK headers and Arduino-core APIs move, so newer board packages may break a port until the adapter is updated.
+These are the versions the adapters in `devices/` are written against. Vendor headers move between core releases, so a newer board package can need adapter changes.
 
-### 2.2 Installation flow
+### 2.2 Installing
 
-Two paths — Library Manager (recommended) or manual git clone.
+Two routes: the Library Manager, or a git clone if you intend to work on the framework itself.
 
-**Library Manager (default target: ESP32):**
+**Library Manager — builds for ESP32 with no extra steps.**
 
-1. **Install the device's Arduino board package** at the version above through the Boards Manager.
-2. **Install pdi-framework** from Tools → Manage Libraries → search for `pdi-framework`.
-3. **Open the bundled example** in the IDE: File → Examples → pdi-framework → PdiStack. Select an **ESP32** board, compile, flash.
+1. Install the board package at the version above through the Boards Manager.
+2. Tools → Manage Libraries → search `pdi-framework` → install.
+3. File → Examples → pdi-framework → PdiStack, pick an ESP32 board, compile, flash.
+
    <table>
      <tr>
        <td width="50%"><img src="https://github.com/Suraj151/pdi-framework/blob/master/doc/library-install-arduino.png" width="100%"></td>
@@ -313,30 +301,28 @@ Two paths — Library Manager (recommended) or manual git clone.
      </tr>
    </table>
 
-That's it for ESP32. The library ships with placeholder DB-table headers and a [`__has_include("DeviceSetup.h")`](devices/DeviceConfig.h) guard in `devices/DeviceConfig.h` that falls back to ESP32 when no `DeviceSetup.h` is present, so a fresh Library Manager install builds out of the box for ESP32 with no extra steps.
+A fresh install already carries ESP32-shaped placeholder database headers, and `devices/DeviceConfig.h` falls back to `DEVICE_ESP32` when no generated setup header is present — hence the zero-step ESP32 build.
 
-**To build for ESP8266 or Arduino UNO** (or any other supported device), generate the per-device setup files first:
+**For ESP8266 or Arduino UNO,** generate the per-device files first:
 
 ```
 cd <your-Arduino-libraries-path>/pdi-framework/scripts
 python3 DeviceSetup.py -d esp8266        # or arduinouno
 ```
 
-This writes [devices/DeviceSetup.h](devices/DeviceSetup.h) with `#define DEVICE_<NAME>` and regenerates [src/database/tables/](src/database/tables/) for the target. Switching boards later is the same one-liner against the new device name.
+That writes `devices/DeviceSetup.h` with the right `DEVICE_<NAME>` and regenerates the database table headers for the target. Changing boards later is the same one-liner with a different name.
 
-**Manual git clone (development / contributor install):**
+**Git clone, for contributors.**
 
-1. Install the board package (as above).
+1. Install the board package as above.
 2. Clone into your Arduino `libraries/` directory:
    ```
    cd ~/Arduino/libraries
    git clone https://github.com/Suraj151/pdi-framework.git
    cd pdi-framework
    ```
-   Linux/macOS: `~/Arduino/libraries/`. 
-
-   Windows: `%USERPROFILE%\AppData\Local\Arduino15\packages\<vendor>\hardware\<arch>\<ver>\libraries\` (cross-arch install) **or** `Documents\Arduino\libraries\` (per-user). 
-3. (Optional) `python3 scripts/DeviceSetup.py -d <board>` if you need a non-ESP32 target. open terminal to the sketchbook location as shown in below image.
+   Linux and macOS use `~/Arduino/libraries/`. On Windows it is either `Documents\Arduino\libraries\` for a per-user install, or `%USERPROFILE%\AppData\Local\Arduino15\packages\<vendor>\hardware\<arch>\<ver>\libraries\` for a cross-arch one.
+3. Run `python3 scripts/DeviceSetup.py -d <board>` if you are not targeting ESP32. Open a terminal at the sketchbook location, as in the images below.
 
    <table>
      <tr>
@@ -345,7 +331,7 @@ This writes [devices/DeviceSetup.h](devices/DeviceSetup.h) with `#define DEVICE_
      </tr>
    </table>
 
-4. Open the bundled example, select your board, compile, flash.
+4. Open the example, select the board, compile, flash.
 
    <table>
      <tr>
@@ -354,713 +340,624 @@ This writes [devices/DeviceSetup.h](devices/DeviceSetup.h) with `#define DEVICE_
      </tr>
    </table>
 
-LittleFS is now vendored in-tree under [external/littlefs/](external/littlefs/) — no submodules to pull.
+There are no git submodules to initialise — LittleFS is vendored in-tree.
 
 ### 2.3 What the scripts do
 
-| Script | Purpose | When to re-run |
-|---|---|---|
-| [`scripts/DeviceSetup.py`](scripts/DeviceSetup.py) | Writes `devices/DeviceSetup.h` with `#define DEVICE_<NAME>` ([§14.4](#144-device-selection-flow)) and then calls `CreateDBSourceFromJson.py` | When switching target device |
-| [`scripts/CreateDBSourceFromJson.py`](scripts/CreateDBSourceFromJson.py) | Wipes [src/database/tables/](src/database/tables/) and regenerates it from the per-device `DBTableSchema.json` by calling `JsonToCpp.py` ([§5.5](#5-database-layer)) | When changing the schema for the active device |
-| [`scripts/JsonToCpp.py`](scripts/JsonToCpp.py) | Generic JSON-to-C++ codegen used by the table generator | Always indirectly |
-| [`scripts/Util.py`](scripts/Util.py) | Shared helpers: template substitution, kebab-to-PascalCase, `clang-format` invocation, device-folder path resolution | Library — not invoked directly |
-| [`scripts/GenTlsCerts.py`](scripts/GenTlsCerts.py) | OpenSSL-backed off-device TLS cert generator: EC/RSA keypair, multi-DNS/multi-IP SANs, optional CA mode, CSR signing. Output to `certs/`; upload via SFTP to the `TLS_DEFAULT_*_PATH` defaults. On-device equivalent for esp32 is the `tls` CLI command. | When provisioning HTTPS on esp8266 (no on-device gen), or seeding an esp32 cert signed by a stable dev CA |
+```
+  DeviceSetup.py -d <board>
+        │
+        ├──▶ devices/DeviceSetup.h        #define DEVICE_<NAME>
+        │
+        └──▶ CreateDBSourceFromJson.py
+                   │  reads the board's DBTableSchema.json
+                   └──▶ JsonToCpp.py ──▶ src/database/tables/*.h
+```
 
-Generated output goes through `clang-format --style=Microsoft -i` if `clang-format` is on `PATH`, so generated headers look hand-written. If the formatter is missing, files are written un-formatted and still compile fine.
+| Script | Run it when |
+|---|---|
+| `DeviceSetup.py` | switching target device — it chains the database codegen for you |
+| `CreateDBSourceFromJson.py` | changing the schema of the active device |
+| `JsonToCpp.py` | never directly; it is the codegen engine |
+| `Util.py` | never directly; shared template and path helpers |
+| `GenTlsCerts.py` | provisioning HTTPS certificates off-device, or signing an ESP32 cert with a stable dev CA |
+
+Generated headers are passed through `clang-format --style=Microsoft` when the formatter is on `PATH`, so they read like hand-written code. Without it they are written unformatted and compile the same.
 
 ### 2.4 Vendored externals
 
-The framework no longer carries any git submodules. Two external bodies of code are vendored directly in the repo:
+Two bodies of external code live directly in the repo. [external/littlefs/](external/littlefs/) is the filesystem used by the storage interface on ESP8266 and ESP32, and by everything downstream of it — SFTP, shell history, the file commands. AVR builds have no storage and never reach it. [lwip/](lwip/) is a customised lwIP 1.4 used by the legacy NAPT path described below.
 
-- [external/littlefs/](external/littlefs/) — the LittleFS filesystem (vendored, not a submodule). Used by the storage interface on esp8266/esp32 for `ENABLE_STORAGE_SERVICE` and everything downstream of it (SSH/SFTP, CLI history, file commands). AVR builds skip storage so they don't reach this code.
-- [lwip/](lwip/) — a vendored copy of customised lwIP 1.4 for the legacy NAPT path (see [§2.4.1 NAT and Mesh](#241-nat-and-mesh) below). The modern path uses the lwIP shipped with the ESP8266 core; this folder is opt-in by manually replacing the board-package's lwIP.
+#### 2.4.1 NAT and mesh
 
-#### 2.4.1 NAT and Mesh
+Both are radio-level capabilities layered onto WiFi rather than regular services.
 
-Two board-level networking features rely on the vendored externals and the ESP SDKs. They are **not** exposed as regular `ServiceProvider` classes — they're compile-time / runtime capabilities layered onto WiFi.
+**NAT on ESP8266** rewrites IP-header fields on packets in transit so that clients joining the device's access point reach the upstream network the station link is connected to. From ESP8266 core 2.6.x onward this runs on lwIP v2 (IPv4), selected in the IDE's Tools menu, and is the path in normal use. The older NAPT implementation uses the vendored lwIP 1.4: rename the core's `tools/sdk/lwip` aside, drop this repo's `lwip/` in its place, and pick the "lwIP 1.4 compile from source" variant. Which one is active is a compile-time choice. On the service side, `ENABLE_NAPT` makes the WiFi service schedule a one-shot NAPT enable once the station link is up.
 
-**NAT (ESP8266).** Network Address Translation remaps one IP address space into another by rewriting IP-header fields on packets in transit. With NAT active the ESP8266 can extend an upstream (station) network — devices joining the ESP's AP reach the same internet as the STA link.
+**Mesh over ESPNOW** wraps Espressif's peer-to-peer link-layer protocol into a small API so applications can build broadcasts and hop-distance topologies without touching the driver. It shares the radio with station mode and is configured from the application. Paired with `ENABLE_DYNAMIC_SUBNETTING` and `ENABLE_INTERNET_BASED_CONNECTIONS` on the WiFi service, it gives each node a notion of how many hops it sits from the hub.
 
-- From ESP8266 Arduino core **v2.6.x** onwards, an initial NAT example is provided using **lwIP v2** (IPv4 only). This is the modern path and is on by default when a lwIP v2 variant is selected in the Arduino IDE Tools menu.
-- The older **NAPT** (network address & port translation) path uses the customised **lwIP 1.4** vendored at [lwip/](lwip/). To test it, rename `…esp8266/tools/sdk/lwip` to `…esp8266/tools/sdk/lwip.org`, copy this repo's `lwip/` folder in its place, and select the "lwIP 1.4 compile from source" variant in the Arduino Tools menu.
-- Which path is active is decided at compile time by which lwIP variant the IDE builds against; there is no runtime switch.
-- Related runtime knob: `ENABLE_NAPT` in `WiFiServiceProvider` (§6.2.4) — the WiFi service schedules a one-shot NAPT-enable after the STA link comes up.
+#### 2.4.2 mDNS and DNS-SD
 
-**Mesh (ESPNOW).** ESP-NOW is the Espressif peer-to-peer link-layer protocol available on esp8266/esp32. The framework wraps it into a small API surface so applications can build **mesh networks, broadcasts, and hop-distance topologies** without touching the raw ESPNOW driver.
+The responder is written from scratch on raw lwIP UDP — `udp_*` plus `igmp_joingroup` on ESP8266, the same wrapped in `LOCK_TCPIP_CORE` on ESP32 — and runs as an ordinary service. No Arduino mDNS library is involved.
 
-- Configuration is done at compile time / from the application; there is no web-portal page for ESPNOW.
-- Works well as a companion to WiFi station mode — the same radio serves both.
-- Related runtime knobs on the WiFi service: `ENABLE_DYNAMIC_SUBNETTING`, `ENABLE_INTERNET_BASED_CONNECTIONS` (§6.2.4) — used with ESPNOW to build a subnetting hierarchy where each device knows its hop distance from the main hub.
+```
+  EVENT_WIFI_STA_GOT_IP
+        │
+        ├─ hostname pdi-<last-3-mac-bytes> written to /etc/hostname
+        ├─ join 224.0.0.251:5353
+        └─ answer queries as they arrive        (callback-driven, nothing to pump)
+                │
+                ├─ A                    →  hostname → address
+                ├─ PTR _services…       →  which service types exist
+                ├─ PTR <type>           →  instances of a type
+                └─ SRV / TXT            →  port + metadata, bundled with A
+```
 
-#### 2.4.2 mDNS + DNS-SD (`ENABLE_MDNS_SERVICE`)
+It advertises what the build is actually listening on: `_http._tcp` or `_https._tcp`, `_ssh._tcp`, `_sftp-ssh._tcp`, `_telnet._tcp`. Outbound clients such as MQTT and OTA listen for nothing, so nothing is advertised for them. `cat /etc/hostname` shows the name, `ping pdi-<xxxxxx>.local` proves it resolves, and `srvc status MDNS` lists the address and the advertised set. Service types, TTLs and the multicast group live in [src/config/MdnsConfig.h](src/config/MdnsConfig.h).
 
-The device is reachable by name and discoverable on the LAN via a **from-scratch multicast-DNS responder — no Arduino `ESP8266mDNS`/`ESPmDNS` dependency**. It's built on a new `iUdpInterface` (raw lwIP UDP: `udp_*` + `igmp_joingroup` on esp8266; the same wrapped in `LOCK_TCPIP_CORE` on esp32's multi-threaded stack), and runs as a normal `ServiceProvider` (`MdnsServiceProvider` / `SERVICE_MDNS`).
+### 2.5 How the ESP32 default works
 
-- **Hostname.** Derived from the MAC as `pdi-<last-3-bytes>` and written to `/etc/hostname` (Linux-style, no `.local`). `cat /etc/hostname` shows it; then `ping pdi-<xxxxxx>.local` from any host on the segment.
-- **Lifecycle.** Starts on the `EVENT_WIFI_STA_GOT_IP` event (re-announces on every reconnect); joins `224.0.0.251:5353`. Receive is callback-driven, so there is **no periodic `update()`** to pump.
-- **DNS-SD service ads.** Advertises the build's listening servers so they appear in `avahi-browse -a` / Bonjour: `_http._tcp` (or `_https._tcp` when `ENABLE_HTTPS_SERVER`), `_ssh._tcp`, `_sftp-ssh._tcp`, `_telnet._tcp`. It answers A, service-enumeration PTR (`_services._dns-sd._udp.local`), per-type PTR, and instance SRV/TXT queries, and returns PTR+SRV+TXT+A as one bundle. Config (types/ttls/multicast group/service cap) lives in [config/MdnsConfig.h](src/config/MdnsConfig.h).
-- **Status.** `srvc status MDNS` shows the hostname, address, and advertised services.
+Three things line up so that a first build needs no scripts:
 
-Clients only listen (MQTT/OTA/email/IoT), so nothing there is advertised.
+```
+  devices/DeviceConfig.h
+        │
+        ├─ #if __has_include("DeviceSetup.h")  →  use the generated macro
+        └─ #else                               →  #define DEVICE_ESP32
+                │
+                ├─ per-port config cascade ends in esp32_device_config.h
+                └─ checked-in placeholder table headers are ESP32-shaped
+```
 
-### 2.5 Library Manager: how the ESP32 default works
+Running `DeviceSetup.py` for another board overrides all three: the generated `DeviceSetup.h` wins over the fallback and fresh table headers replace the placeholders. To come back to ESP32, either re-run the script with `-d esp32` or delete `devices/DeviceSetup.h` and let the fallback take over again.
 
-The library installs cleanly through Arduino Library Manager because three things hold true at first build:
-
-1. **`devices/DeviceSetup.h` is optional.** [`devices/DeviceConfig.h`](devices/DeviceConfig.h) starts with:
-   ```c
-   #if __has_include("DeviceSetup.h")
-   #include "DeviceSetup.h"
-   #else
-   #define DEVICE_ESP32
-   #endif
-   ```
-   so a fresh install (no setup script run) builds as if `DEVICE_ESP32` were set.
-2. **The per-port platform header falls back to ESP32.** The cascade right after the `DEVICE_*` selector ends with `#else #include "esp32/esp32_device_config.h"`, so any unrecognised `DEVICE_*` (or no `DEVICE_*` at all) lands on ESP32's `RODT_ATTR` / `strcat_ro` / `CRITICAL_SECTION_*` definitions.
-3. **DB table headers ship as ESP32 placeholders.** [`src/database/tables/`](src/database/tables/) is no longer wiped at install time — the checked-in `*.h` placeholders are ESP32-shaped and let `DatabaseServiceProvider` link without running the codegen.
-
-To build for a non-default board (ESP8266 / Arduino UNO / any future port), run the setup script — the regenerated `DeviceSetup.h` overrides the fallback, and the regenerated table headers replace the placeholders. Switching back to ESP32 later either means re-running `DeviceSetup.py -d esp32` or deleting `devices/DeviceSetup.h` (the `__has_include` fallback then takes over again).
+Because the fallback is silent, a build flashed onto an ESP8266 or an UNO without running the script compiles happily with ESP32 table addresses and feature flags. Run the script whenever you leave the ESP32 default, and again whenever you come back — `git checkout src/database/tables/` restores the placeholders if the generated ones are still lying around.
 
 #### 2.5.1 Per-port capability flags
 
-The new `DEVICE_SUPPORTS_*` gates in the per-port `<board>_device_config.h` files keep the device-selection logic in `DeviceConfig.h` board-agnostic:
+Board-specific answers live in `<board>_device_config.h`, not in the central config, which keeps the selection logic board-agnostic:
 
-| Macro | Defined by | Effect |
+| Macro | Set by | Effect |
 |---|---|---|
-| `DEVICE_SUPPORTS_TLS` | esp8266 / esp32 device-config | Allows `ENABLE_TLS_SERVICE` to actually take effect — DeviceConfig auto-`#undef`s it on ports without this flag |
-| `DEVICE_SUPPORTS_CONTEXTUAL_EXECUTION` | esp8266 / esp32 device-config | Same shape as TLS — auto-undef when the port can't host cooperative/preemptive lanes |
-| `DEVICE_SUPPORTS_TLS_CERT_GENERATION` | esp32 device-config only | Gates `ENABLE_TLS_CERT_GENERATION` instead of the older `DEVICE_ESP32` hard-coding |
-| `MAX_DIGITAL_GPIO_PINS`, `MAX_ANALOG_GPIO_PINS`, `MAX_DB_TABLES` | each per-port device-config | Per-board limits, previously inlined in `DeviceConfig.h`'s `DEVICE_*` cascade |
-| `ENABLE_NETWORK_SERVICE`, `ENABLE_AUTH_SERVICE`, `ENABLE_STORAGE_SERVICE`, `ENABLE_GPIO_BASIC_ONLY` | each per-port device-config | Per-board defaults (e.g. AVR omits network/auth/storage; esp* enable them) |
+| `DEVICE_SUPPORTS_TLS` | esp8266, esp32 | lets `ENABLE_TLS_SERVICE` take effect; ports without it get the flag undefined automatically |
+| `DEVICE_SUPPORTS_CONTEXTUAL_EXECUTION` | esp8266, esp32 | same shape, for the cooperative and preemptive lanes |
+| `DEVICE_SUPPORTS_TLS_CERT_GENERATION` | esp32 | gates on-device certificate generation |
+| `MAX_DIGITAL_GPIO_PINS`, `MAX_ANALOG_GPIO_PINS`, `MAX_DB_TABLES` | every port | per-board limits |
+| `ENABLE_NETWORK_SERVICE`, `ENABLE_AUTH_SERVICE`, `ENABLE_STORAGE_SERVICE`, `ENABLE_GPIO_BASIC_ONLY` | every port | per-board defaults — AVR omits network, auth and storage; the ESP ports enable them |
 
-The contract: anything that's *truly* per-board lives in the per-port `<board>_device_config.h`; the central [DeviceConfig.h](devices/DeviceConfig.h) only carries cross-board feature flags and the `DEVICE_SUPPORTS_*` auto-undef chains. A new port just needs to set the right `DEVICE_SUPPORTS_*` macros and the framework's optional services fall in line.
-
-### 2.6 Gotchas
-
-- **The default install is ESP32-only.** Without running the setup script, `devices/DeviceConfig.h`'s `__has_include` fallback selects `DEVICE_ESP32` and the ESP32 placeholder DB tables. If you flash an ESP8266 or AVR build without first running `DeviceSetup.py -d <board>`, the binary still compiles but contains ESP32-shaped table addresses and feature flags — and will misbehave at runtime against the actual hardware. Always run the script when switching off the ESP32 default.
-- **Switching boards without re-running setup.** `devices/DeviceSetup.h` keeps the *previous* device macro. Either re-run `DeviceSetup.py -d <new-board>`, or delete `devices/DeviceSetup.h` to fall back to the ESP32 default.
-- **Stale generated table headers after a board switch.** `CreateDBSourceFromJson.py` wipes and rewrites `src/database/tables/` for the active target. If you switch from a custom port back to ESP32 and forget to re-run the script, the previously generated headers stay in place — they're git-ignored at that point and won't be restored by `git pull`. Re-run the script (or `git checkout src/database/tables/` to restore the ESP32 placeholders).
+The contract is simple: genuinely per-board facts go in the per-port header, and the central `DeviceConfig.h` carries only cross-board feature flags and the auto-undef chains. A new port sets its `DEVICE_SUPPORTS_*` macros and the optional services fall in line by themselves.
 
 ---
-
 ## 3. Configuration System
 
-Configuration in PDI Framework is **layered, compile-time, and additive**. There is no `.ini`, no runtime config parser, and no over-the-air feature toggling. Every choice — which services exist, how large each table is, what the defaults are, which interfaces a port supplies — is fixed when you build.
+Configuration is layered, compile-time and additive. There is no `.ini` file, no runtime parser and no over-the-air feature toggle. Which services exist, how big each table is, what the defaults are and which interfaces a port supplies are all decided when you build.
 
-This section is the canonical reference for: every `ENABLE_*` flag and what it pulls in, the per-service `*Config.h` files and the structs they declare for the database, and the dependency relationships you must respect when turning features on or off.
+### 3.1 Three tiers
 
-### 3.1 Three tiers of configuration
-
-The configuration system has three distinct tiers, each addressing a different concern:
-
-| Tier | Lives in | Owns | Audience |
+| Tier | Lives in | Owns | Written by |
 |---|---|---|---|
-| **Device tier** | [devices/DeviceSetup.h](devices/DeviceSetup.h) (autogen) + [devices/DeviceConfig.h](devices/DeviceConfig.h) + each port's `devices/<board>/<board>_device_config.h` | `DEVICE_*` selector, `ENABLE_*` feature flags + per-board limits, and per-port platform macros (`RODT_ATTR`, `PROG_RODT_ATTR`, `strcat_ro` family, `CRITICAL_SECTION_ENTER/EXIT`) | Integrator: "what board, what features"; porter: "how the board names flash / interrupts" |
-| **Common tier** | [src/config/Common.h](src/config/Common.h), [src/config/GlobalConfig.h](src/config/GlobalConfig.h) | Cross-cutting constants (`MAX_SCHEDULABLE_TASKS`, default user/pass, base time durations), the always-present `global_config` table | Framework author + integrator |
-| **Service tier** | One `*Config.h` per service under [src/config/](src/config/) | Per-service tuning knobs **and** the runtime config struct(s) persisted to NVM | Service author + advanced integrator |
+| Device | `devices/DeviceSetup.h` (generated), `devices/DeviceConfig.h`, and each port's `<board>_device_config.h` | the `DEVICE_*` selector, the `ENABLE_*` flags, per-board limits, and platform macros such as `RODT_ATTR` and `CRITICAL_SECTION_ENTER/EXIT` | integrator picking board and features; porter describing the board |
+| Common | `src/config/Common.h`, `src/config/GlobalConfig.h` | cross-cutting constants and the always-present `global_config` table | framework author, integrator |
+| Service | one `*Config.h` per service under `src/config/` | per-service knobs plus the struct that gets persisted to NVM | service author |
 
-The tiers are pulled in via the single entry point [src/config/Config.h](src/config/Config.h), which conditionally includes each service-tier header based on the `ENABLE_*` flags decided by the device tier. Every translation unit in the framework reaches the configuration system through this one header.
+Everything funnels through [src/config/Config.h](src/config/Config.h), which conditionally includes the service-tier headers according to the flags the device tier settled on. Every translation unit in the framework reaches configuration through that one header.
 
-### 3.2 Inclusion graph
+### 3.2 How the pieces include each other
 
 ```
-devices/DeviceSetup.h              (autogenerated: #define DEVICE_<NAME>)
+  DeviceSetup.h            generated:  #define DEVICE_<NAME>
         │
         ▼
-devices/DeviceConfig.h             (cascades DEVICE_* into ENABLE_* flags;
-        │                           also pulls in devices/<board>/<board>_device_config.h
-        │                           for per-port platform macros — RODT_ATTR,
-        │                           PROG_RODT_ATTR, strcat_ro family,
-        │                           CRITICAL_SECTION_ENTER/EXIT)
+  DeviceConfig.h           DEVICE_* ──▶ ENABLE_* cascade
+        │                  + pulls in <board>_device_config.h for platform macros
         ▼
-src/config/Common.h                (defaults that other configs reference)
+  Common.h                 shared defaults other configs reference
         │
         ▼
-src/config/GlobalConfig.h          (the always-loaded `global_config` table)
+  GlobalConfig.h           the always-loaded global_config table
         │
         ▼
-src/config/Config.h                ── conditional includes ──┐
-                                                              │
-   ┌────────────────────┬───────────────────┬─────────────────┼─────────────────┐
-   ▼                    ▼                   ▼                 ▼                 ▼
-WifiConfig.h     ServerConfig.h     HttpConfig.h        StorageConfig.h    OtaConfig.h
-                                          ⋮                  ⋮                 ⋮
-                              (one per ENABLE_*-gated service)
+  Config.h ──── conditional includes ────┐
+                                          │
+   WifiConfig · ServerConfig · HttpConfig · StorageConfig · OtaConfig · …
+                     one per ENABLE_*-gated service
 ```
 
-Two implications:
+Two consequences worth internalising. A config header for a disabled service is never included, so its struct does not exist in the build and the NVM address it would have taken is reclaimed. And a config header may include `Common.h` for shared defaults but never another service config — coupling two services through configuration is exactly the thing the layout prevents.
 
-1. A `*Config.h` for a disabled service is **never** included — so the struct it declares does not exist in the build, and the table address it would occupy is reclaimed.
-2. Every config file may freely include `Common.h` for shared defaults, but **must not** include other service configs — that would couple two services through configuration. The orchestrator owns ordering.
+### 3.3 Device-tier flags
 
-### 3.3 Device-tier flags — full reference
-
-Every `ENABLE_*` (and `ALLOW_*` / `IGNORE_*` / `AUTO_*`) flag lives in [devices/DeviceConfig.h](devices/DeviceConfig.h) and acts as a triple gate: it controls (1) which interface a device exposes, (2) which service the orchestrator includes, and (3) which `*Config.h` is pulled into `Config.h`.
+Every flag acts as a triple gate: which interface the device exposes, which service the orchestrator includes, and which config header `Config.h` pulls in.
 
 #### 3.3.1 Service flags
 
-| Flag | Default on | Brings in | Requires | Memory cost (approx) |
+| Flag | On by default | Brings in | Needs | Cost |
 |---|---|---|---|---|
-| `ENABLE_SERIAL_SERVICE` | yes (all boards) | SerialServiceProvider + `SerialConfig.h` | `iSerialInterface` | low |
-| `ENABLE_STORAGE_SERVICE` | yes (default; auto-disabled on UNO) | `StorageConfig.h` + filesystem | `iStorageInterface` + `iFileSystemInterface` | medium (FS overhead) |
-| `ENABLE_GPIO_SERVICE` | yes | GpioServiceProvider + `GpioConfig.h` | `iGpioInterface` (via `iDeviceControlInterface`) | low; `ENABLE_GPIO_BASIC_ONLY` trims it further for uno |
-| `ENABLE_CMD_SERVICE` | yes | CommandLineServiceProvider | A terminal source (serial / telnet / ssh) | low |
-| `ENABLE_AUTH_SERVICE` | non-uno | AuthServiceProvider + `ServerConfig.h` (`login_credential` table) | Storage | low |
-| `ENABLE_NETWORK_SERVICE` | non-uno | Umbrella — gates everything below | `iTcpClient/Server`, `iNtp`, `iPing`, `iWiFi` | — |
-| `ENABLE_WIFI_SERVICE` | with network | WiFiServiceProvider + `WifiConfig.h` | `iWiFiInterface` | medium |
-| `ENABLE_HTTP_SERVER` | with network | WebServer + `ServerConfig.h` + `HttpConfig.h` | `iHttpServerInterface` (or `HttpServerInterfaceImpl`) | medium |
-| `ENABLE_HTTPS_SERVER` | off; with `TLS_SERVICE` | Switches `WebServer::initService` to `begin(HTTPS_DEFAULT_PORT=443, secure=true)` with cert/key paths from `TlsConfig.h` | `ENABLE_TLS_SERVICE` (+ optional `ENABLE_HTTPS_SERVER_MTLS` for client-cert auth) | high (TLS handshake + per-session buffers) |
-| `ENABLE_HTTP_CLIENT` | with network | HttpHelper + `HttpConfig.h` | `iTcpClientInterface` | low |
-| `ENABLE_MQTT_SERVICE` | with network | MqttServiceProvider + `MqttConfig.h` | TCP client | medium |
-| `ENABLE_OTA_SERVICE` | with network | OtaServiceProvider + `OtaConfig.h` | TCP client + `iUpgradeInterface` | low |
-| `ENABLE_EMAIL_SERVICE` | with network | EmailServiceProvider + `EmailConfig.h` | TCP client | low |
-| `ENABLE_TELNET_SERVICE` | with network | TelnetServiceProvider | TCP server | low |
-| `ENABLE_SSH_SERVICE` | with network **and** storage | SSHServiceProvider | TCP server + FS | **high** (keys, crypto, SFTP) |
-| `ENABLE_DEVICE_IOT` | with network | DeviceIotServiceProvider + `DeviceIotConfig.h` | TCP client | low (app supplies hooks) |
-| `ENABLE_TLS_SERVICE` | off | TLS-capable client/server (`iTlsClientInterface` / `iTlsServerInterface`) + `TlsConfig.h`; forces `ENABLE_CONTEXTUAL_EXECUTION` on as TLS runs on a dedicated cooperative task | esp8266 (BearSSL) or esp32 (mbedTLS) backend in the port | **high** — see [§12.4](#124-the-expensive-features-called-out) |
-| `ENABLE_TLS_CERT_GENERATION` | off (esp32 only) | `tls` CLI command + `TlsCertProvisioner` (mbedTLS issuer) | `ENABLE_TLS_SERVICE` + esp32 | medium (mbedTLS keygen frames) |
-| `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` | off | Listener on `EVENT_WIFI_STA_GOT_IP` that auto-mints a self-signed cert for the device's IP if `/etc/http/server.crt` is missing | `ENABLE_TLS_CERT_GENERATION` | low at idle, one-shot keygen cost on first boot |
-| `ENABLE_CONTEXTUAL_EXECUTION` | off (esp8266 + esp32) | Cooperative + preemptive scheduler lanes | `iExecution`, `iMutex`, `iCondvar`, `iContext` + scheduler globals | high (per-task stacks) |
-| `ENABLE_TIMER_TASK_SCHEDULER` | off (removed from default header) | Timer-backed task scheduler variant | Device timer | depends |
+| `ENABLE_SERIAL_SERVICE` | all boards | serial service + `SerialConfig.h` | `iSerialInterface` | low |
+| `ENABLE_STORAGE_SERVICE` | yes, except UNO | filesystem + `StorageConfig.h` | `iStorageInterface`, `iFileSystemInterface` | medium |
+| `ENABLE_GPIO_SERVICE` | yes | GPIO service + `GpioConfig.h` | `iGpioInterface` | low; `ENABLE_GPIO_BASIC_ONLY` trims it further |
+| `ENABLE_CMD_SERVICE` | yes | the CLI | a terminal source | low |
+| `ENABLE_AUTH_SERVICE` | non-UNO | auth service + the credential table | storage | low |
+| `ENABLE_NETWORK_SERVICE` | non-UNO | umbrella for everything below | TCP client/server, NTP, ping, WiFi | — |
+| `ENABLE_WIFI_SERVICE` | with network | WiFi service + `WifiConfig.h` | `iWiFiInterface` | medium |
+| `ENABLE_HTTP_SERVER` | with network | web portal + `ServerConfig.h`, `HttpConfig.h` | `iHttpServerInterface` | medium |
+| `ENABLE_HTTPS_SERVER` | off | serves the portal on 443 with certs from the filesystem | `ENABLE_TLS_SERVICE` | high |
+| `ENABLE_HTTP_CLIENT` | with network | outbound HTTP | TCP client | low |
+| `ENABLE_MQTT_SERVICE` | with network | MQTT service + `MqttConfig.h` | TCP client | medium |
+| `ENABLE_OTA_SERVICE` | with network | OTA service + `OtaConfig.h` | TCP client, `iUpgradeInterface` | low |
+| `ENABLE_EMAIL_SERVICE` | with network | email service + `EmailConfig.h` | TCP client | low |
+| `ENABLE_TELNET_SERVICE` | with network | telnet server | TCP server | low |
+| `ENABLE_SSH_SERVICE` | with network and storage | SSH server, SFTP, scp | TCP server, filesystem | high |
+| `ENABLE_DEVICE_IOT` | with network | IoT service + `DeviceIotConfig.h` | TCP client | low |
+| `ENABLE_TLS_SERVICE` | off | TLS client and server + `TlsConfig.h`; turns on contextual execution, since TLS runs on its own cooperative task | BearSSL on esp8266, mbedTLS on esp32 | high — see [§12.3](#123-the-expensive-features) |
+| `ENABLE_TLS_CERT_GENERATION` | off, esp32 | the `tls` command and the on-device issuer | TLS service, esp32 | medium |
+| `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` | off | mints a self-signed cert on first boot once the station gets an IP | cert generation | one-shot |
+| `ENABLE_CONTEXTUAL_EXECUTION` | off | cooperative and preemptive lanes | the threading interfaces | high (per-task stacks) |
+| `ENABLE_TIMER_TASK_SCHEDULER` | off | timer-backed scheduler variant | a device timer | depends |
 
 #### 3.3.2 Behaviour flags
 
 | Flag | Effect |
 |---|---|
-| `ENABLE_GPIO_BASIC_ONLY` | Reduces GPIO service to digital-only (used on uno) |
-| `ENABLE_DYNAMIC_SUBNETTING` | AP subnet/gateway picked at runtime instead of static |
-| `ENABLE_NAPT` | Network address & port translation; lets AP clients reach the STA's network. Increases heap |
-| `IGNORE_FREE_RELAY_CONNECTIONS` | Skip already-connected SSIDs during scan to avoid loops in mesh |
-| `ALLOW_WIFI_CONFIG_MODIFICATION`, `ALLOW_WIFI_SSID_PASSKEY_CONFIG_MODIFICATION_ONLY` | Restrict the WiFi config web form |
-| `ALLOW_MQTT_CONFIG_MODIFICATION`, `ALLOW_OTA_CONFIG_MODIFICATION` | Same for MQTT / OTA forms |
-| `AUTO_FACTORY_RESET_ON_INVALID_CONFIGS` | If DB checksum invalid at boot, reset to defaults instead of halting |
-| `CONFIG_CLEAR_TO_DEFAULT_ON_FACTORY_RESET` | Factory reset writes default structs back instead of zeroing |
-| `ENABLE_CONSOLE_LOG_ALL` / `_INFO` / `_WARNING` / `_ERROR` / `_SUCCESS` | Per-level console (serial) log gates; if none are set, every `Log*` call compiles to nothing |
-| `ENABLE_SYSLOG_SERVICE` | Persist log lines to `/var/log/syslog.<type>` files (the `SysLog*` macros); storage-gated |
+| `ENABLE_GPIO_BASIC_ONLY` | digital-only GPIO, used on UNO |
+| `ENABLE_DYNAMIC_SUBNETTING` | AP subnet and gateway chosen at runtime instead of statically |
+| `ENABLE_NAPT` | AP clients reach the station's network; costs heap |
+| `IGNORE_FREE_RELAY_CONNECTIONS` | skip already-connected SSIDs during scan, avoiding mesh loops |
+| `ALLOW_WIFI_CONFIG_MODIFICATION`, `ALLOW_WIFI_SSID_PASSKEY_CONFIG_MODIFICATION_ONLY` | how much of the WiFi form is editable |
+| `ALLOW_MQTT_CONFIG_MODIFICATION`, `ALLOW_OTA_CONFIG_MODIFICATION` | same for the MQTT and OTA forms |
+| `AUTO_FACTORY_RESET_ON_INVALID_CONFIGS` | bad checksum at boot resets to defaults instead of halting |
+| `CONFIG_CLEAR_TO_DEFAULT_ON_FACTORY_RESET` | factory reset writes the default structs back rather than zeroing |
+| `ENABLE_CONSOLE_LOG_ALL` / `_INFO` / `_WARNING` / `_ERROR` / `_SUCCESS` | per-level console gates; with none set, every log call compiles away |
+| `ENABLE_SYSLOG_SERVICE` | also persist log lines under `/var/log`; needs storage |
 
 #### 3.3.3 Per-device limits
 
 | Macro | Purpose | Typical values |
 |---|---|---|
-| `MAX_DIGITAL_GPIO_PINS` | Size of GPIO config table | 14 (uno), 12 (esp32 WROOM/S2/S3/C6), 8 (esp32 C3/H2), 9 (esp8266) |
-| `MAX_ANALOG_GPIO_PINS` | Same, analog side | 5 (uno), 4 (esp32 all variants), 1 (esp8266) |
-| `MAX_DB_TABLES` | Upper bound on registered tables | 5 (uno), 15 (esp*) |
-| `MAX_SCHEDULABLE_TASKS` | Inline scheduler slot count | 25 (in `Common.h`) |
-| `MAX_FACTORY_RESET_CALLBACKS` | Reset-hook count | `MAX_SCHEDULABLE_TASKS` |
-| `WIFI_STATION_CONNECT_ATTEMPT_TIMEOUT` | STA connect retry budget (s) | 1 |
-| `WIFI_CONNECTIVITY_CHECK_DURATION` | Inter-check interval (ms) | 5000 |
-| `INTERNET_CONNECTIVITY_CHECK_DURATION` | Internet recheck cadence | same as above |
+| `MAX_DIGITAL_GPIO_PINS` | size of the GPIO config table | 14 UNO · 12 esp32 WROOM/S2/S3/C6 · 8 esp32 C3/H2 · 9 esp8266 |
+| `MAX_ANALOG_GPIO_PINS` | same, analog side | 5 UNO · 4 esp32 · 1 esp8266 |
+| `MAX_DB_TABLES` | upper bound on registered tables | 5 UNO · 15 esp |
+| `MAX_SCHEDULABLE_TASKS` | inline scheduler slots | 25 |
+| `MAX_FACTORY_RESET_CALLBACKS` | reset hooks | same as the task count |
+| `WIFI_STATION_CONNECT_ATTEMPT_TIMEOUT` | station connect budget, seconds | 1 |
+| `WIFI_CONNECTIVITY_CHECK_DURATION` | link recheck interval, ms | 5000 |
+| `INTERNET_CONNECTIVITY_CHECK_DURATION` | internet recheck cadence | same |
 
-### 3.4 The service-tier `*Config.h` pattern
+### 3.4 The shape of a service config
 
-Every per-service config file follows the same shape so the framework can treat them uniformly. Using [WifiConfig.h](src/config/WifiConfig.h) as the canonical example:
+Every per-service config follows the same six-part shape, which is what lets the database layer and the web forms treat them uniformly. WiFi is the canonical example:
 
 ```cpp
 #define WIFI_CONFIGS_BUF_SIZE 30
 #define DEFAULT_SSID         USER          // 1. defaults
 #define DEFAULT_PASSPHRASE   PASSPHRASE
 const uint8_t DEFAULT_AP_LOCAL_IP[] = {192, 168, 0, 1};
-...
 
-#define ALLOW_WIFI_CONFIG_MODIFICATION    // 2. policy switches (optional)
+#define ALLOW_WIFI_CONFIG_MODIFICATION    // 2. policy switches
 
-typedef struct { ... } __status_wifi_t;   // 3. runtime-only status (not persisted)
+typedef struct { ... } __status_wifi_t;   // 3. runtime status, never persisted
 extern __status_wifi_t __status_wifi;
 
 struct wifi_configs {                     // 4. the persisted struct
-  wifi_configs() { clear(); }             //    - default-constructible
-  void clear() { ... }                    //    - zero/default initialisable
-  char sta_ssid[WIFI_CONFIGS_BUF_SIZE];   //    - fixed-size members only (no pointers)
-  ...
+  wifi_configs() { clear(); }             //    default-constructible
+  void clear() { ... }                    //    resettable
+  char sta_ssid[WIFI_CONFIGS_BUF_SIZE];   //    fixed-size members only
 };
 
-const int wifi_config_size = sizeof(wifi_configs) + 5;  // 5. on-NVM size (+5 = framing)
-using wifi_config_table = wifi_configs;                 // 6. canonical table alias
+const int wifi_config_size = sizeof(wifi_configs) + 5;  // 5. size on NVM
+using wifi_config_table = wifi_configs;                 // 6. canonical alias
 ```
 
-The six numbered conventions are part of the contract — the database layer ([§5](#5-database-layer)) and the web forms rely on every config struct providing them.
+The `+ 5` is the per-table framing on NVM — table id and checksum. Boot sums those sizes across every registered table and checks the total against what the database interface reports as available.
 
-#### 3.4.1 Why `+5` in `*_config_size`
+### 3.5 What each config file carries
 
-Each persisted table is wrapped on NVM with a small framing record (table id + checksum). The `+ 5` byte allowance is the framework's fixed overhead per table, summed at boot to compute total NVM usage and validated against `iDatabaseInterface::getMaxDBSize()`.
-
-### 3.5 Per-service config files — what's in each
-
-| File | Always-on table(s) | Headline knobs |
+| File | Persisted table | Headline knobs |
 |---|---|---|
-| [Common.h](src/config/Common.h) | — | `USER`, `PASSPHRASE`, `MAX_SCHEDULABLE_TASKS`, time durations, HTTP request budget |
-| [GlobalConfig.h](src/config/GlobalConfig.h) | `global_config_table` (version, year, firmware) | `CONFIG_START`, `CONFIG_VERSION`, `FIRMWARE_VERSION`, `RELEASE`, `LAUNCH_UNIX_TIME` |
-| [WifiConfig.h](src/config/WifiConfig.h) | `wifi_config_table` (STA+AP creds, IPs) | `WIFI_CONFIGS_BUF_SIZE`, default IPs, modification policies |
-| [ServerConfig.h](src/config/ServerConfig.h) | `login_credential_table` (web/CLI user) | `SERVER_SESSION_NAME`, `SERVER_COOKIE_MAX_AGE` (300 s) |
-| [HttpConfig.h](src/config/HttpConfig.h) | — (transient `http_param_t`) | `HTTP_CLIENT_BUF_SIZE`, request size limits, `HTTPS_DEFAULT_PORT`, `HTTPS_HSTS_MAX_AGE_SECONDS` |
-| [TlsConfig.h](src/config/TlsConfig.h) | — | `TLS_IBUF_SIZE` / `TLS_OBUF_SIZE` (per-session record buffers, 2 KB / 1 KB), `TLS_TASK_STACK_SIZE` (6500 B on esp8266 cooperative TLS task), `TLS_TASK_POLL_MS`; default FS paths `TLS_DEFAULT_SERVER_CERT_PATH`, `TLS_DEFAULT_SERVER_KEY_PATH`, `TLS_DEFAULT_CLIENT_CA_PATH`, `TLS_DEFAULT_OUTBOUND_CA_BUNDLE_PATH` |
-| [OtaConfig.h](src/config/OtaConfig.h) | `ota_config_table` (host, port, version, freq) | OTA check cadence |
-| [MqttConfig.h](src/config/MqttConfig.h) | `mqtt_general_config_table`, `mqtt_lwt_config_table`, `mqtt_pubsub_config_table` | Broker, LWT, publish/subscribe slots, `MQTT_CONFIG_TYPE` selector |
-| [GpioConfig.h](src/config/GpioConfig.h) | `gpio_config_table` | Pin map, `GPIO_MODE` enum, event conditions/channels, graph dimensions |
-| [EmailConfig.h](src/config/EmailConfig.h) | `email_config_table` | SMTP host/port/auth, default subject |
-| [DeviceIotConfig.h](src/config/DeviceIotConfig.h) | `device_iot_config_table` | Config/OTP URLs, channel keys, sampling/keepalive bounds |
-| [SerialConfig.h](src/config/SerialConfig.h) | — | `SERIAL_MODE`, baud, interface enum |
-| [StorageConfig.h](src/config/StorageConfig.h) | — | Mount point, max path, FS limits |
-| [SshConfig.h](src/config/SshConfig.h) | — | `SSHKeyAlgorithm` (Ed25519 / RSA), `SSH_RSA_KEY_BITS` (2048), key/file size caps, `SSH_MAX_SESSIONS`, `ssh_config_t` (auth policy), sshconfig / authorized_keys paths |
-| [NetworkConfig.h](src/config/NetworkConfig.h) | — | Network-wide timeouts |
-| [EventConfig.h](src/config/EventConfig.h) | — | `event_name` enum, channel registry |
+| Common | — | `USER`, `PASSPHRASE`, task count, time durations, HTTP request budget |
+| GlobalConfig | `global_config_table` | config version, firmware version, release, launch time |
+| WifiConfig | `wifi_config_table` | buffer sizes, default IPs, modification policy |
+| ServerConfig | `login_credential_table` | session name, cookie max age |
+| HttpConfig | — | client buffer size, request limits, HTTPS port, HSTS age |
+| TlsConfig | — | per-session record buffers, TLS task stack and poll interval, default cert/key paths |
+| OtaConfig | `ota_config_table` | host, port, version, check cadence |
+| MqttConfig | general / LWT / pub-sub tables | broker, last will, publish and subscribe slots |
+| GpioConfig | `gpio_config_table` | pin map, modes, event conditions and channels |
+| EmailConfig | `email_config_table` | SMTP host, port, auth, default subject |
+| DeviceIotConfig | `device_iot_config_table` | config and OTP URLs, channel keys, sampling bounds |
+| SerialConfig | — | mode, baud, interface selection |
+| StorageConfig | — | mount point, path limits |
+| SshConfig | — | key algorithms, RSA key bits, session count, auth policy, host-key and config paths |
+| NetworkConfig | — | network-wide timeouts |
+| EventConfig | — | the event enum and channel registry |
 
-> **Pattern note:** the always-on tables (`global_config_table`, `login_credential_table` when auth is on, `wifi_config_table` when wifi is on) form the framework's minimum NVM footprint. Everything else is opt-in via the matching `ENABLE_*`.
+The always-on tables — global config, plus credentials and WiFi when those services are on — are the minimum NVM footprint. Everything else arrives with its flag.
 
-### 3.6 Dependency rules (read before flipping a flag)
+### 3.6 What depends on what
 
-The most common foot-gun is enabling a service whose dependency is off. The rules:
+```
+  NETWORK ─┬─ WIFI ─── HTTP_SERVER ─┬─ HTTPS_SERVER ── TLS_SERVICE ── CONTEXTUAL_EXECUTION
+           │                        └─ (needs STORAGE for certs)
+           ├─ MQTT · OTA · EMAIL · DEVICE_IOT        (TCP client)
+           ├─ TELNET                                 (TCP server, pairs with CMD)
+           └─ SSH ─── STORAGE                        (host keys, SFTP)
 
-- `ENABLE_HTTP_SERVER` ⇒ `ENABLE_WIFI_SERVICE` (web server must run somewhere) ⇒ `ENABLE_NETWORK_SERVICE`.
-- `ENABLE_MQTT_SERVICE` / `ENABLE_OTA_SERVICE` / `ENABLE_EMAIL_SERVICE` / `ENABLE_DEVICE_IOT` ⇒ `ENABLE_NETWORK_SERVICE` (need TCP client) and *usually* `ENABLE_WIFI_SERVICE` (need a network).
-- `ENABLE_SSH_SERVICE` ⇒ `ENABLE_NETWORK_SERVICE` **and** `ENABLE_STORAGE_SERVICE` (key persistence, SFTP).
-- `ENABLE_TELNET_SERVICE` ⇒ `ENABLE_NETWORK_SERVICE` and benefits from `ENABLE_CMD_SERVICE` (no CLI = no terminal value).
-- `ENABLE_AUTH_SERVICE` ⇒ `ENABLE_STORAGE_SERVICE` (credentials need to survive reboot) — though framed via the always-present DB.
-- `ENABLE_DEVICE_IOT` ⇒ the **application** must implement `iDeviceIotInterface` (see [§13.3.5](#13-portable-interfaces)) and pass its instance to `__device_iot_service.initService(...)`.
-- `ENABLE_CONTEXTUAL_EXECUTION` ⇒ the port supplies the full threading interface family ([§13.3.6](#13-portable-interfaces)) — both esp8266 and esp32 ship this today.
-- `ENABLE_TLS_SERVICE` ⇒ implicitly turns on `ENABLE_CONTEXTUAL_EXECUTION` (TLS runs on its own cooperative task — see [TlsConfig.h](src/config/TlsConfig.h)). Cannot coexist with `ENABLE_NAPT` on esp8266 (both want too much heap). Auto-`#undef`ed on UNO along with storage and contextual execution.
-- `ENABLE_HTTPS_SERVER` ⇒ `ENABLE_TLS_SERVICE` **and** `ENABLE_HTTP_SERVER` **and** `ENABLE_STORAGE_SERVICE` (cert/key are loaded from FS at `/etc/http/server.{crt,key}`). Optional `ENABLE_HTTPS_SERVER_MTLS` adds `/etc/http/client-ca.crt` mTLS verification.
-- `ENABLE_TLS_CERT_GENERATION` ⇒ `ENABLE_TLS_SERVICE` **and** `DEVICE_ESP32` (mbedTLS issuer API). The `tls` CLI command is gated on this flag.
-- `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` ⇒ `ENABLE_TLS_CERT_GENERATION`. Registers a listener on `EVENT_WIFI_STA_GOT_IP` that mints a self-signed cert for the device IP the first time it boots without one.
-- `ENABLE_SYSLOG_SERVICE` ⇒ `ENABLE_STORAGE_SERVICE` (the file sink needs a mounted filesystem). It is auto-defined inside that guard in [DeviceConfig.h](devices/DeviceConfig.h) and absent on storage-less ports such as uno. `ENABLE_SYSLOG_FORWARD` (remote forwarding) additionally ⇒ `ENABLE_NETWORK_SERVICE`, and is auto-defined when both are on.
+  STORAGE ─┬─ AUTH                                   (credentials survive reboot)
+           └─ SYSLOG ─── (+NETWORK) ─── SYSLOG_FORWARD
 
-The header guards in [devices/DeviceConfig.h](devices/DeviceConfig.h) enforce most of these by structurally wrapping the dependent flags inside `#ifdef ENABLE_NETWORK_SERVICE`. The rest you are responsible for.
+  TLS_CERT_GENERATION ── TLS_SERVICE + esp32
+  DEVICE_IOT ── the application implements iDeviceIotInterface and passes it to initService
+```
+
+Most of these are enforced structurally — the dependent flags are physically nested inside `#ifdef ENABLE_NETWORK_SERVICE` and friends in `DeviceConfig.h`. Two pairings are worth remembering because nothing stops them at compile time: TLS and NAPT both want more heap than an ESP8266 has, and enabling TLS implies contextual execution because the TLS engine runs on its own cooperative task.
 
 ### 3.7 Common build shapes
 
-A few preset configurations contributors typically reach for:
-
-| Goal | Flags to keep | Flags to drop |
+| Goal | Keep | Drop |
 |---|---|---|
-| **Smallest possible** (uno-class) | `SERIAL`, `CMD`, `GPIO_BASIC_ONLY` | Everything else |
-| **Offline gateway** | Add `STORAGE`, `AUTH` | Everything network |
-| **Headless networked node** | Add `NETWORK`, `WIFI`, `MQTT`, `OTA`, `NTP` | `HTTP_SERVER`, `SSH`, `EMAIL` |
-| **Full portal** | Default `DeviceConfig.h` (everything on) | — |
-| **Diagnostics build** | Default + `ENABLE_CONSOLE_LOG_ALL` (optionally `ENABLE_SYSLOG_SERVICE`) | — |
-| **Concurrent demo** (esp8266 or esp32) | Default + `ENABLE_CONTEXTUAL_EXECUTION` | — |
-| **HTTPS portal** | Default + `ENABLE_TLS_SERVICE` + `ENABLE_HTTPS_SERVER` (esp32 also: `ENABLE_TLS_CERT_GENERATION`) | `ENABLE_NAPT` on esp8266 |
-| **HTTPS + mTLS** | Above + `ENABLE_HTTPS_SERVER_MTLS` | — |
+| Smallest possible (UNO class) | serial, CLI, basic GPIO | everything else |
+| Offline gateway | add storage and auth | everything network |
+| Headless networked node | add network, WiFi, MQTT, OTA, NTP | web server, SSH, email |
+| Full portal | the stock `DeviceConfig.h` | — |
+| Diagnostics build | stock plus console logging, optionally syslog | — |
+| Concurrency demo | stock plus contextual execution | — |
+| HTTPS portal | stock plus TLS and HTTPS (esp32: also cert generation) | NAPT on esp8266 |
+| HTTPS with client certs | as above plus mTLS | — |
 
-### 3.8 Changing defaults vs persisted values
+### 3.8 Defaults are not current values
 
-A frequent point of confusion: editing `DEFAULT_SSID` in `WifiConfig.h` does **not** change the SSID a running device uses. The defaults are only consulted on:
+Editing `DEFAULT_SSID` does not change the SSID a running device uses. Defaults are consulted exactly twice: on first boot, when NVM is empty or the checksum fails, and on factory reset when the framework is configured to write defaults back rather than zeroing.
 
-1. First boot (NVM empty / checksum invalid).
-2. Factory reset (if `CONFIG_CLEAR_TO_DEFAULT_ON_FACTORY_RESET` is set).
+To change a live value, go through the portal, the CLI (`net connsta`, `iot sethost`, and so on), or the database service directly and persist the table. Defaults govern the fallback state; the database holds the current one.
 
-To change a live value, edit it through the web portal, the CLI (`net connsta`, `iot sethost`, etc.), or directly via `DatabaseServiceProvider::set(...)` and persist the table. The defaults govern the **fallback** state, not the **current** state.
+### 3.9 Conventions worth keeping
 
-### 3.9 Anti-patterns
-
-Avoid:
-
-- Adding runtime branches on `ENABLE_*` macros — they are compile-time. Use `#ifdef` instead, since the unreached branch otherwise pulls symbols the link will fail on.
-- Putting a `std::string` / `pdiutil::string` or any pointer in a `*_config_table` struct — NVM serialisation requires fixed-size, POD layout.
-- Cross-including `*Config.h` files. If a value is shared, hoist it to `Common.h`.
-- Hard-coding feature checks in services against device macros (`#if defined(DEVICE_ESP32)`) — gate on the *capability* flag (`ENABLE_WIFI_SERVICE`), not the *board*. The board may change; the capability is what the code actually needs.
+Branch on `ENABLE_*` with `#ifdef`, never with a runtime `if` — the unreached branch still needs symbols the link cannot provide. Keep config structs POD and fixed-size; a pointer or a `pdiutil::string` inside one cannot be serialised to NVM. Never include one service config from another; if two need the same value, it belongs in `Common.h`. And gate code on the capability (`ENABLE_WIFI_SERVICE`) rather than on the board (`DEVICE_ESP32`) — the board changes, the capability is what the code actually depends on.
 
 ---
-
 ## 4. Task Scheduler
 
-The scheduler is the framework's pacemaker. Every periodic background activity — NTP refresh, MQTT reconnect, OTA poll, GPIO blink, web session expiry, watch-dog feed, log heartbeat — runs through it. There is one inline scheduler that every device gets for free, plus two optional contextual lanes (cooperative and preemptive) that a port may add by implementing the threading interfaces from [§13.3.6](#13-portable-interfaces).
+The scheduler is the pacemaker. NTP refresh, MQTT reconnect, OTA polling, GPIO blinking, session expiry, watchdog feeding, log heartbeats — all of it is a task. Every board gets the inline scheduler for free; a port that implements the threading interfaces adds two more lanes on top.
 
-Implementation: [src/utility/TaskScheduler.h](src/utility/TaskScheduler.h), [src/utility/TaskScheduler.cpp](src/utility/TaskScheduler.cpp). Global instance: `__task_scheduler`.
+Implementation is [src/utility/TaskScheduler.h](src/utility/TaskScheduler.h), and the global is `__task_scheduler`.
 
-### 4.1 Three task modes
+### 4.1 Three modes
 
-| Mode | Enum value | Where the work runs | Stack used | Needs port support? | Use when |
-|---|---|---|---|---|---|
-| `TASK_MODE_INLINE` | `0` (default) | Inside `__task_scheduler.run()` on the main loop's stack | Main `loop()` stack | No | The task is short and non-blocking — periodic polls, timeouts, blink ticks. **This is the default for nearly everything.** |
-| `TASK_MODE_COOPERATIVE` | `1` | On a dedicated stack via `__i_cooperative_scheduler.run()`, advancing only when the task explicitly `yield()`s or `sleep()`s | Per-task stack you size | Yes — port must provide `iCooperativeScheduler` | The task wants to *appear* sequential (`while(1) { do; sleep(500); }`) but you accept that one misbehaving task can starve others. |
-| `TASK_MODE_PREEMPTIVE` | `2` | On a dedicated stack interrupted by a timer ISR via `__i_preemptive_scheduler.yield()` | Per-task stack you size | Yes — port must provide `iPreemptiveScheduler`, `iContext`, tick ISR | The task may block or run long and you cannot trust it to yield. Higher overhead per switch. |
-| `TASK_MODE_MAX` | `3` | — | — | — | Sentinel; do not use |
+| Mode | Runs on | Stack | Needs port support | Right when |
+|---|---|---|---|---|
+| inline | the main loop's stack, inside `run()` | the loop's own | no | the task is short and never blocks — this covers nearly everything |
+| cooperative | its own stack, advancing only when it yields or sleeps | one you size | yes | you want to write it as `while(1){ step(); sleep(N); }` and you trust it to yield |
+| preemptive | its own stack, interrupted by a timer ISR | one you size | yes | the task may block or run long, and you can't trust it to yield |
 
-All three modes coexist in the same process. `PDIStack::serve()` ticks each lane in order ([src/PdiStack.cpp](src/PdiStack.cpp)):
+All three coexist. Each pass of `serve()` ticks the lanes in order:
 
-```cpp
-__task_scheduler.run();                 // inline lane
-__i_dvc_ctrl.yield();
-__i_dvc_ctrl.handleEvents();
-#ifdef ENABLE_CONTEXTUAL_EXECUTION
-__i_cooperative_scheduler.tick_from_loop();  // cooperative lane (yields one slice per serve())
-__i_preemptive_scheduler.yield();       // preemptive lane (only yields; ISR-driven)
-#endif
+```
+  serve()
+    ├─ __task_scheduler.run()                     inline: at most one task, then out
+    ├─ device yield + event dispatch
+    ├─ cooperative_scheduler.tick_from_loop()     one slice
+    └─ preemptive_scheduler.yield()               ISR already drives it; this is courtesy
 ```
 
-> `tick_from_loop()` exists on every `iExecutionScheduler` since the TLS work landed — for cooperative schedulers it forwards to `run()` (one slice from the main loop), and preemptive schedulers leave it as a no-op because they're driven by a hardware timer. The orchestrator now calls `tick_from_loop()` instead of `run()` so any port that needs a different main-loop entry point (timer-only, deferred-tick, etc.) can override just that hook.
+`tick_from_loop()` is the main-loop entry point for a lane. Cooperative schedulers forward it to `run()`; preemptive ones ignore it because a hardware timer is already driving them. A port that needs a different main-loop hook overrides only that one call.
 
-### 4.2 Task policies (scheduling discipline within a mode)
+### 4.2 Policies
 
-Independent of mode, each task carries a `task_policy_t` that influences which **inline** task runs first when several are due at the same tick:
+Independently of mode, each task carries a policy that decides who goes first when several inline tasks come due on the same tick:
 
-| Policy | Enum | Selection rule |
+| Policy | Selection rule |
+|---|---|
+| FIFO (default) | priority, biased by a logarithmic lateness boost |
+| round robin | equal slices, favouring whoever ran least recently |
+| deadline | earliest deadline first, with double the lateness weight |
+| fair share | favours whoever has consumed the least cumulative CPU |
+
+All four share the same skeleton: a base term of `effective_priority × 100`, plus `policy_boost × min(floor(log2(ms_late + 1)), cap)`. The logarithmic aging term is what guarantees a ceiling — no low-priority task waits more than about five seconds before its accumulated score overtakes a high-priority one. Policies apply to the inline lane; contextual lanes schedule themselves.
+
+### 4.3 What a task record holds
+
+A task is a POD stored by value in a vector reserved to `MAX_SCHEDULABLE_TASKS`, so steady-state scheduling causes no heap churn.
+
+| Group | Fields | Why |
 |---|---|---|
-| `TASK_POLICY_FIFO` | `0` (default) | Priority biased with logarithmic lateness aging boost (base `policy_boost = 320`, `policy_cap = 50`). |
-| `TASK_POLICY_ROUNDROBIN` | `1` | Equal time slices — favours tasks that ran least recently (log-scaled with `320` multiplier). |
-| `TASK_POLICY_DEADLINE` | `2` | Earliest deadline first — boost = `2.0 × 320`. |
-| `TASK_POLICY_FAIRSHARE` | `3` | Favours tasks that have consumed the **least** cumulative CPU time so far. Boost = `1.5 × 320`. |
+| identity | id, name, owner | pid, a read-only name pointer (often in flash), and the owning session — 0 means kernel |
+| callback | the function | what actually runs |
+| schedule | duration, last run, remaining attempts, priority, nice, policy, mode | everything scoring needs |
+| lifecycle | state, pending signal | ready / running / sleeping / stopped / zombie, plus a queued signal |
+| observability | created-at, run count, last and total exec time in µs | what `ps` and `top` render, including %CPU |
+| contextual | the lane executive | present only in contextual builds |
 
-The scoring formula is in [TaskScheduler::computeScore](src/utility/TaskScheduler.cpp). All four share the base term `effective_priority × 100`, then add a scaled logarithmic policy boost (`policy_boost × min(floor(log2(ms + 1)), policy_cap)` where `policy_boost = 320`). This guarantees that no low-priority task waits longer than **5 seconds** before its accumulated policy score overcomes high-priority priority offsets and grants an execution turn.
+Exec time is sampled in microseconds around each callback, so a task that finishes in well under a millisecond still registers a non-zero cost rather than rounding to zero.
 
-> Policies apply to the inline lane. Contextual lanes have their own per-implementation scheduling.
+### 4.4 The API, by what you want to do
 
-### 4.3 The `task_t` record
+Every registration call takes a trailing name and owner. Fill them in — that is what makes a task visible in `ps` and reachable by `pkill NAME`. Services normally don't call these directly; they go through the `ServiceProvider` wrappers, which supply the service name automatically.
 
-Defined in [src/utility/DataTypeDef.h](src/utility/DataTypeDef.h). A POD carrying everything the scheduler needs to make scoring, signalling, and observability decisions. Stored by value in `pdiutil::vector<task_t>` reserved to `MAX_SCHEDULABLE_TASKS` slots — no heap churn during steady-state.
+**Registering and cancelling**
 
-Every member uses the `m_` prefix. Grouped for readability:
-
-| Group | Fields | Purpose |
+| Want to | Call | Note |
 |---|---|---|
-| identity | `m_task_id`, `m_name`, `m_owner` | PID (unique per slot), human-readable name (RO ptr — may be PROGMEM), owning session id (0 = kernel) |
-| callback | `m_task` | The `CallBackVoidArgFn` to invoke |
-| schedule | `m_duration`, `m_last_millis`, `m_max_attempts`, `m_task_priority`, `m_nice`, `m_task_policy`, `m_task_mode` | Interval / last run / remaining attempts / base priority / POSIX nice (-20..19) / policy (FIFO/RR/DEADLINE/FAIRSHARE) / mode (INLINE/COOP/PREEMPT) |
-| lifecycle state | `m_state`, `m_pending_sig` | READY / RUNNING / SLEEPING / STOPPED / ZOMBIE; queued signal (SIG_NONE / HUP / KILL / TERM / CONT / STOP) consumed at the top of `handle_tasks` |
-| observability | `m_created_ms`, `m_run_count`, `m_task_exec_us`, `m_total_exec_us` | Registration timestamp (ms), how many times the callback has fired, last exec time in µs, cumulative exec time in µs — powers `ps` / `top` %CPU |
-| contextual | `m_task_exec` (ifdef `ENABLE_CONTEXTUAL_EXECUTION`) | Pointer to the per-lane executive |
+| run once after N ms | `setTimeout(fn, dur, now, prio, name, owner)` | auto-removed after it fires |
+| run every N ms | `setInterval(fn, dur, now, prio, name, owner)` | runs until cancelled |
+| reschedule a one-shot | `updateTimeout(id, fn, dur, now)` | replaces callback and duration in place |
+| reschedule a periodic | `updateInterval(id, …)` | falls back to registering fresh if the id is gone |
+| spell everything out | `register_task(fn, dur, prio, last, maxAtt, name, owner)` | the lowest-level entry point |
+| cancel either kind | `clearTimeout(id)` / `clearInterval(id)` | marks for removal on the next sweep |
+| look one up | `get_task(id)` | to change policy or mode after the fact |
+| force a re-sort now | `rebaseAndRestartPrioTasks()` | the current sweep breaks after one task |
 
-Exec-time bookkeeping is µs-granular via [`iUtilityInterface::micros_now()`](src/utility/iUtilityInterface.h) — see §14 for port hooks. Callbacks finishing under 1 ms are counted correctly (they don't just round to zero).
+`register_task` returns `-1` when the slot table is full — check it before assuming the task exists.
 
-### 4.4 Public API by use case
+**Metadata, signals, rendering**
 
-Every registration entry point (`register_task`, `setInterval`, `setTimeout`, `updateInterval`) takes trailing `const char* name = nullptr`, `uint8_t owner = 0` — populate them to make the task visible in `ps` / `top` and reachable by `pkill NAME`. Service subclasses normally don't call these directly; they use the `ServiceProvider` wrappers (see §6.1) which auto-supply the service's name and owner=0.
+| Want to | Call |
+|---|---|
+| name a task after the fact | `setTaskName(id, name)` — the pointer must outlive the task |
+| attach an owning session | `setTaskOwner(id, sid)` |
+| change nice, -20..19 | `setTaskNice(id, nice)`, then rebase for an immediate re-sort |
+| queue a signal on one task | `sendSignal(id, sig)` |
+| signal every task with a name | `sendSignalByName(name, sig, requester, is_root)` — this is what `pkill` and `srvc stop` use |
+| print the `ps` view | `printPsToTerminal(terminal, filter_owner)` |
+| promote a task to a lane | `scheduleUnderExecSched(sched, id, mode, stack)` |
 
-**Registration & scheduling**
-
-| Want to… | Call | Returns | Notes |
-|---|---|---|---|
-| Run something once after N ms | `setTimeout(fn, dur, now, prio, name, owner)` | task id | Sets `m_max_attempts = 1`; task is auto-removed after firing |
-| Run something every N ms | `setInterval(fn, dur, now, prio, name, owner)` | task id | `m_max_attempts = -1` |
-| Reschedule an existing timeout | `updateTimeout(id, fn, dur, now)` | id | Replaces the callback/duration in place |
-| Reschedule an existing interval | `updateInterval(id, fn, dur, prio, last, maxAtt, name, owner)` | id | Falls back to `register_task` if id not found |
-| Register a task with everything spelled out | `register_task(fn, dur, prio, last, maxAtt, name, owner)` | id | The lowest-level entry point |
-| Cancel a one-shot | `clearTimeout(id)` | bool | Marks the task for removal next sweep (see §4.7) |
-| Cancel a periodic | `clearInterval(id)` | bool | Same |
-| Look up a task | `get_task(id)` | `task_t*` or `nullptr` | Useful to mutate `m_task_policy` / `m_task_mode` after registration |
-| Force a re-sort mid-sweep | `rebaseAndRestartPrioTasks()` | void | Breaks out of the current `handle_tasks` loop on the next iteration |
-
-**Metadata mutation (used by `ps` / `renice` / `srvc`)**
-
-| Want to… | Call | Returns | Notes |
-|---|---|---|---|
-| Attach / change a task's name after registration | `setTaskName(id, name)` | bool | Name pointer must outlive the task (RO literal / PROGMEM). Backs `pkill` name lookup |
-| Attach an owning session id | `setTaskOwner(id, sid)` | bool | Used by kill's owner check; 0 = kernel |
-| Change POSIX nice (-20..19) | `setTaskNice(id, nice)` | bool | Clamped in range. Follow with `rebaseAndRestartPrioTasks` for immediate re-sort |
-| Read the owning session id | `getTaskOwner(id)` | `uint8_t` | Returns 0 if not found |
-
-**Signals (§4.5 details how they're consumed)**
-
-| Want to… | Call | Returns | Notes |
-|---|---|---|---|
-| Queue a signal on a specific task | `sendSignal(id, sig)` | bool | Consumed on the next `handle_tasks` iteration |
-| Broadcast a signal to every task with a given name | `sendSignalByName(name, sig, requester_sid, is_root)` | uint16_t hits | Applies owner check per task unless `is_root`. Used by `pkill` / `killall` / `srvc stop` |
-
-**Rendering**
-
-| Want to… | Call | Returns | Notes |
-|---|---|---|---|
-| Print POSIX-style ps view | `printPsToTerminal(t, filter_owner=0xFF)` | void | Backs the `ps` / `top` CLI commands. Filter by owner sid or `0xFF` for all |
-| Promote a task to a contextual lane | `scheduleUnderExecSched(sched, id, mode, stackdepth)` | int (negative `pdi_err` code on failure — `PDI_ERR_NOT_IMPLEMENTED` if the port doesn't supply the scheduler, `TASK_ERROR_INVALID_MODE`/`TASK_ERROR_CREATION_FAILED` if the task couldn't be queued) | Requires `ENABLE_CONTEXTUAL_EXECUTION` |
-
-`register_task` returns `-1` if the slot table is full. Callers must check the return value before assuming the task was accepted.
-
-### 4.5 How a tick is processed
-
-`__task_scheduler.run()` calls `handle_tasks()`, which on every tick:
-
-1. Reads `now = m_util->millis_now()`.
-2. Builds an array of indices and sorts it via `getSortedTaskList` using `computeScore` plus a 3 ms tolerance window on due-times. `computeScore` folds `m_nice` in as `effective_priority = m_task_priority - m_nice` before weighting by policy. **The vector itself is not reordered** — only an indirection table — so task ids stay stable.
-3. Iterates the sorted indices. A task on a contextual lane (`m_task_mode != TASK_MODE_INLINE`) is not dispatched inline — instead its `m_pending_sig` is delivered to the lane executive (`SIG_STOP` → suspend, `SIG_CONT` → resume, `SIG_KILL` / `SIG_TERM` → terminate) and a finished task is reaped (its finalizer, if any, then runs), after which iteration `continue`s. So `kill` / STOP / CONT reach cooperative and preemptive tasks too, not just inline ones. The remaining signal/dispatch steps apply to inline tasks.
-4. **Consumes `m_pending_sig` before scheduling.** Under one critical section: the sig is cleared, then dispatched as
-   - `SIG_KILL` / `SIG_TERM` → task marked ZOMBIE, callback nulled, `m_max_attempts = 0`; iteration `continue`s.
-   - `SIG_STOP` → `m_state = TASK_STATE_STOPPED`.
-   - `SIG_CONT` → if currently STOPPED, `m_state = TASK_STATE_SLEEPING`.
-   - `SIG_HUP` → accepted but currently no-op (reserved for a future user handler hook).
-5. If `m_state == TASK_STATE_STOPPED` after signal consumption, skip this task's execution — it stays in the slot but the scheduler ignores it until a `SIG_CONT` arrives.
-6. For each due task (`now - m_last_millis ≥ m_duration`), samples `m_util->micros_now()` immediately **before and after** the callback, invokes it, updates
-   - `m_task_exec_us = end - start` (µs delta — sub-ms callbacks now register non-zero),
-   - `m_total_exec_us +=` that delta (lifetime accumulator; feeds `%CPU`),
-   - `m_run_count++`,
-   - `m_state` flipping `SLEEPING → RUNNING → SLEEPING` around the callback (or `→ ZOMBIE` if this was the last attempt).
-7. Advances `m_last_millis` by whole multiples of `m_duration` (catch-up, capped at 3 rounds to avoid runaway after a long stall) and decrements `m_max_attempts` if finite.
-8. Calls `m_util->yield()` after each task so the platform can service WiFi / interrupts.
-9. If `m_rebase_start_priotask` was set (either by another task calling `rebaseAndRestartPrioTasks` or implicitly at the top of `handle_tasks`), breaks out of the loop after running **one** task — the next tick will re-sort. This guarantees a newly-registered high-priority task is picked up on the very next tick.
-10. Calls `remove_expired_tasks` to drop everything with `m_max_attempts == 0`.
-
-The "run-one-then-break" pattern (point 9) is the key reason the scheduler keeps low jitter without preemption: each `serve()` iteration runs at most one inline task before yielding back to the platform, the web server, and the contextual lanes.
-
-### 4.6 Choosing a mode — decision tree
+### 4.5 What happens on a tick
 
 ```
-Does your task do real work for more than a few ms,
-OR call a blocking SDK API (TLS handshake, large flash write)?
-│
-├─ No  → TASK_MODE_INLINE  (the default; no port effort)
-│
-└─ Yes → Is the work sequential / stateful enough that you'd write
-         it as `while(1){ step(); sleep(N); }` if you could?
-         │
-         ├─ Yes → TASK_MODE_COOPERATIVE
-         │        (you control yields; cheap context switches;
-         │         starvation possible — peer tasks rely on you)
-         │
-         └─ No, it might block unpredictably → TASK_MODE_PREEMPTIVE
-                  (timer ISR forces switches; safe against badly
-                   behaved code; higher per-switch overhead;
-                   needs `iContext` + tick ISR from the port)
+  run() ──▶ handle_tasks()
+             │
+             1. now = millis
+             2. score every task, sort an index table (the vector never moves,
+                so task ids stay stable), 3 ms tolerance on due-times
+             3. for each task in score order:
+                  │
+                  ├─ contextual task?  deliver its pending signal to the lane
+                  │                    (STOP suspends, CONT resumes, KILL ends),
+                  │                    reap it if finished, then move on
+                  │
+                  ├─ consume the pending signal under one critical section
+                  │     KILL / TERM ─▶ zombie, callback dropped
+                  │     STOP        ─▶ stopped, skipped until CONT
+                  │     CONT        ─▶ back to sleeping
+                  │
+                  ├─ due?  sample µs, run the callback, sample µs again,
+                  │        update exec time, total time, run count, state
+                  │
+                  ├─ advance last-run by whole intervals (catch-up capped at 3)
+                  └─ yield to the platform
+             4. after one task, if a rebase was requested, break out —
+                the next tick re-sorts from scratch
+             5. drop everything whose attempts hit zero
 ```
 
-If your port does not provide the contextual interfaces, **the only honest choice is INLINE plus splitting the work into a state machine**. Calling `scheduleUnderExecSched` with a missing scheduler is a no-op.
+Point 4 is why the scheduler keeps jitter low without preemption: each pass of `serve()` runs at most one inline task before handing control back to the platform, the web server and the contextual lanes. It also means a freshly registered high-priority task is picked up on the very next tick.
 
-### 4.7 Threading and lifecycle gotchas
+### 4.6 Picking a mode
 
-A few sharp edges worth knowing before you use the API in anger:
+```
+  Does the task work for more than a few ms,
+  or call a blocking SDK API?
+   │
+   ├─ No ──▶ inline. No port work, no stack to size. Default answer.
+   │
+   └─ Yes ─▶ Would you naturally write it as while(1){ step(); sleep(N); } ?
+              │
+              ├─ Yes ──▶ cooperative. Cheap switches, you control the yields,
+              │          and peers depend on you actually yielding.
+              │
+              └─ No, it may block unpredictably ──▶ preemptive. A timer ISR
+                         forces the switch. Costlier, and it needs the port to
+                         supply context switching and a tick ISR.
+```
 
-- **`remove_task` does not erase immediately.** It marks the task by zeroing `m_task`, dropping priority, setting `m_max_attempts = 0`, and flipping `m_state = TASK_STATE_ZOMBIE`; the actual `vector::erase` happens in `remove_expired_tasks` at the *end* of `handle_tasks`. This is intentional — erasing during iteration was a bug source ([TaskScheduler.cpp](src/utility/TaskScheduler.cpp)). Don't dereference an id immediately after `clearInterval`.
-- **Tasks are stored by value.** Lambdas that capture a `this` pointer or large state work fine, but be mindful that captures live until the task is removed *and* the next sweep runs.
-- **The scheduler is not re-entrant.** Don't call `__task_scheduler.run()` from inside a task. Use the contextual lanes if you need nested execution.
-- **`m_last_millis = 0` means "first run".** On the first dispatch the scheduler stamps `m_last_millis = now` instead of doing catch-up, so a freshly registered interval will fire after one full `m_duration` from the moment it is first considered.
-- **Catch-up is capped at 3 rounds.** A scheduler that has been frozen for >3× the task duration will resume fresh rather than firing all the back-runs. Long blocks (OTA, deep sleep) should re-register their tasks if they need exact-count semantics.
-- **`MAX_SCHEDULABLE_TASKS` defaults to 25** ([src/config/Common.h](src/config/Common.h)). `PDIStack::PDIStack()` configures the scheduler with that limit. If you raise it, every service's worst-case footprint grows along with `MAX_FACTORY_RESET_CALLBACKS`.
-- **No clock skew tolerance beyond 3 ms.** If your `iUtilityInterface::millis_now()` jitters more than that, you will see tasks reshuffle order between runs. The 3 ms window in `getSortedTaskList` is per-comparison, not per-tick.
+On a port without the contextual interfaces, inline plus a hand-written state machine is the answer; promoting a task to a lane that isn't there does nothing.
 
-### 4.8 Contextual scheduling — extra API
+### 4.7 Behaviour worth knowing before you lean on it
 
-When `ENABLE_CONTEXTUAL_EXECUTION` is on, the inline scheduler **registers** the task (you get an id) and then a second call **promotes** it to a contextual lane:
+Cancelling a task marks it rather than erasing it — the vector entry is dropped in the sweep at the end of `handle_tasks`, not the moment you call `clearInterval`. Don't dereference an id in between.
+
+Tasks are stored by value, so a lambda capturing `this` or a chunk of state is fine, but those captures live until the removal sweep runs.
+
+The scheduler is not re-entrant. Never call `run()` from inside a task; that is what the contextual lanes are for.
+
+A freshly registered interval stamps its last-run time on first consideration, so it fires one full interval later rather than immediately. Catch-up after a stall is capped at three rounds, so a scheduler frozen through an OTA or a deep sleep resumes fresh instead of firing a burst of back-runs — re-register if you need exact counts.
+
+The slot table is `MAX_SCHEDULABLE_TASKS`, 25 by default. Raising it raises every service's worst-case footprint and the factory-reset hook count along with it.
+
+Sorting tolerates 3 ms of clock jitter per comparison. A `millis_now()` that wanders further will visibly reshuffle task order between runs.
+
+### 4.8 Promoting a task to a lane
+
+With contextual execution on, registration and promotion are two steps — you register normally, get an id, then hand that id to a lane:
 
 ```cpp
 int tid = __task_scheduler.register_task([&](){
     uint32_t i = 0;
     while (1) {
-        // long-running body, allowed to sleep
         __i_dvc_ctrl.getTerminal()->writeln((uint32_t)i++);
-        __i_cooperative_scheduler.sleep(500);  // yield to peers
+        __i_cooperative_scheduler.sleep(500);  // yields to peers
     }
 });
 __task_scheduler.scheduleUnderExecSched(
     &__i_cooperative_scheduler,
     tid,
     TASK_MODE_COOPERATIVE,
-    1 * 1024                  // per-task stack bytes
+    1 * 1024                  // per-task stack, in bytes
 );
 ```
 
-Stack sizing is your responsibility — there is no automatic measurement unless the port supports `iUtilityInterface::can_measure_stack()`. A safe starting point on esp8266 is 1 KiB cooperative / 2 KiB preemptive; bump it if your task uses `pdiutil::string`, JSON parsing, or TLS.
+Stack sizing is on you unless the port can measure it. A KiB for cooperative and two for preemptive is a reasonable starting point on ESP8266; raise it if the task touches `pdiutil::string`, parses JSON, or goes through TLS.
 
-Cross-lane primitives:
+Across lanes: `sleep(ms)` and `yield()` are called from inside a cooperative task (the inline lane's `sleep` is deliberately a no-op), a preemptive task can yield voluntarily even though the ISR will preempt it anyway, and any data shared between lanes needs `iMutex` or `iConditionVar`. The inline lane needs neither.
 
-- `iCooperativeScheduler::sleep(ms)` / `::yield()` — must be called from inside the cooperative task; the inline lane's `sleep()` is a no-op by design ([TaskScheduler.cpp](src/utility/TaskScheduler.cpp)).
-- `iPreemptiveScheduler::yield()` — voluntary yield from a preemptive task; the tick ISR will preempt it anyway.
-- `iMutex` / `iConditionVar` — required whenever data crosses lanes. The inline lane does not need them.
+### 4.9 Watching and steering it from the shell
 
-### 4.9 Inspecting and tuning at runtime
+`ps` prints every registered task — pid, owner, state (`R` running, `S` sleeping, `T` stopped, `Z` zombie), priority, nice, policy, rolling %CPU, run count, interval and name — and `ps <sid>` filters by owner. `top` re-renders the same view on a scheduler tick and stops on Ctrl+C. `watch` wraps any other command on an interval.
 
-Every runtime tool below is available at the shell — no debugger, no recompile.
+Signals mirror POSIX: `HUP=1`, `KILL=9`, `TERM=15`, `CONT=18`, `STOP=19`. They are queued on the task and consumed at the top of the next scheduler pass.
 
-**Observability**
+```
+  kill    [sig] <pid>     one task, by pid          default TERM
+  pkill   [sig] <name>    every task with a name    default TERM
+  killall [sig] <name>    same, but default KILL
+  renice  <nice> <pid>    -20..19, re-sorts on the next tick
+```
 
-- **`ps`** — POSIX-style view of every registered task: PID, owner session, state (`R` running / `S` sleeping / `T` stopped / `Z` zombie), priority, nice, policy (`F`/`R`/`D`/`S`), rolling `%CPU`, run count, interval, name. Filter by owner with `ps <sid>`. Source: [printPsToTerminal](src/utility/TaskScheduler.cpp).
-- **`top`** — same view re-rendered on a scheduler tick (`top i=<ms>; n=<iters>; u=<sid>`), clearing the screen each pass. Stops with Ctrl+C. Source: [TopCommand](src/service_provider/cmd/commands/TopCommand.h).
-- **`watch`** — general periodic wrapper (`watch c=<cmd>; i=<ms>; n=<iters>`); use for anything not already tied to a scheduler view.
+Root may signal any task; anyone else only tasks owned by their own session. All of it compiles out when auth is off.
 
-**Signals & lifecycle**
+Services are driven the same way, one level up:
 
-Task-scheduler analogues of POSIX signals: `SIG_HUP=1`, `SIG_KILL=9`, `SIG_TERM=15`, `SIG_CONT=18`, `SIG_STOP=19` (see `enum Signal` in [DataTypeDef.h](src/utility/DataTypeDef.h)). Delivery is queued on `m_pending_sig` and consumed at the top of the next `handle_tasks` iteration under one critical section.
+```
+  srvc list             every service: state and task count
+  srvc status <name>    that service's state and the pids it owns
+  srvc start <name>     CONT every task the service owns
+  srvc stop <name>      STOP every task the service owns   (a freeze, not a teardown)
+  srvc restart <name>   stop, then start
+```
 
-- **`kill [<sig>] <PID>`** — send by PID. Default sig is `SIG_TERM` (15). 1 arg = pid, 2 args = sig then pid. SIG_HUP is accepted but currently no-op.
-- **`pkill [<sig>] <NAME>`** — send by task name. Default TERM. Prints `signaled N task(s)`.
-- **`killall [<sig>] <NAME>`** — same as `pkill` but default is SIG_KILL (impolite).
-- **`renice <nice> <PID>`** — change POSIX nice (-20..19) on a live task; auto-triggers `rebaseAndRestartPrioTasks` so the new sort order takes effect on the next tick.
-
-Permission model on all four: root (uid=0) can touch any task; other users only tasks whose `m_owner` matches the current session id. Compiled out entirely when `ENABLE_AUTH_SERVICE` is off.
-
-**Services (systemd-lite)**
-
-- **`srvc list`** — every registered service with state (`inactive` / `active` / `stopped` / `dead`) and task counts.
-- **`srvc status <name>`** — per-service detail: state, tracked PID list.
-- **`srvc start <name>`** — SIG_CONT every task owned by the service.
-- **`srvc stop <name>`** — SIG_STOP every task owned. Task-level freeze, not resource release.
-- **`srvc restart <name>`** — STOP then CONT.
-
-`start` / `stop` / `restart` require root. Service ownership of tasks lives in `ServiceProvider::m_service_task_ids[]` (see §6.1), so name matching is by _service_, not by task name — renaming a task in the future won't break lifecycle.
+Start, stop and restart need root. Ownership is tracked per service rather than per task name, so renaming a task never breaks service control.
 
 ---
-
 ## 5. Database Layer
 
-The database layer persists framework configuration to non-volatile memory. It is **not** a general-purpose KV store, a relational DB, or a filesystem; it is a fixed-address, fixed-size, type-safe table store, sized to fit in a few KB of EEPROM-emulated flash. Every persisted struct from [§3](#3-configuration-system) reaches NVM through it.
+This is where framework configuration goes to survive a reboot. It is not a key-value store, not relational, and not a filesystem — it is a fixed-address, fixed-size, type-safe table store sized for the few kilobytes of EEPROM-emulated flash a small MCU can spare. Every persisted struct from [§3](#3-configuration-system) reaches NVM through it.
 
-It is split across the same three-tier shape the rest of the framework uses:
+It follows the same three tiers as everything else:
 
-| Tier | Component | Path | Role |
-|---|---|---|---|
-| Port | `iDatabaseInterface` + concrete `DatabaseInterface` | [src/interface/pdi/iDatabaseInterface.h](src/interface/pdi/iDatabaseInterface.h), `devices/<board>/DatabaseInterface.*` | Raw NVM read/write/checksum for one block at an address |
-| Engine | `Database` + `DatabaseTable<addr, T>` | [src/utility/Database.{h,cpp}](src/utility/Database.h), [src/database/core/DatabaseTable.h](src/database/core/DatabaseTable.h) | Table registry, address-overlap checks, typed `get/set/clear` |
-| Service | `DatabaseServiceProvider` | [src/service_provider/database/DatabaseServiceProvider.h](src/service_provider/database/DatabaseServiceProvider.h) | Public `get_*_table` / `set_*_table` APIs, factory-reset wiring |
+```
+  service   DatabaseServiceProvider     get_*_table / set_*_table, factory-reset wiring
+      │                                 ← the only surface other services touch
+  engine    Database + DatabaseTable    registry, address checks, typed get/set/clear
+      │                                 ← owns no bytes, just knows who lives where
+  port      iDatabaseInterface          raw read, write and checksum at an address
+```
 
-The per-table classes themselves are **autogenerated** from a JSON schema by [scripts/CreateDBSourceFromJson.py](scripts/CreateDBSourceFromJson.py) — they live in [src/database/tables/](src/database/tables/) and should never be hand-edited.
+The per-table classes are generated from a JSON schema and live in `src/database/tables/`. Nothing there is hand-edited.
 
 ### 5.1 Mental model
 
-NVM is treated as a flat byte address space owned by the port:
+NVM is one flat byte space owned by the port:
 
 ```
-NVM (size = __i_db.getMaxDBSize())
 0          5                                                                  end
 ├──────────┼──────────┬──────────┬──────────┬──────────┬──────────┬──── ... ──┤
 │ reserved │ Global   │ Login    │ WiFi     │ OTA      │ Gpio     │           │
 │  prefix  │  @5      │  @50     │  @150    │  @300    │  @500    │  unused   │
 └──────────┴──────────┴──────────┴──────────┴──────────┴──────────┴──── ... ──┘
-                ↑                                                            ↑
-        CONFIG_START                                          getMaxDBSize() - footer
 ```
 
-Each table occupies `[address, address + sizeof(T) + 5)` — `+5` is the per-table framing the port writes (table id byte + 4-byte CRC/checksum). Addresses are **hard-coded** per table in the autogenerated header; the engine's only address-time check is "does this table overlap or run past the limit". There is no allocator, no relocation, no defragmentation.
+A table occupies `[address, address + sizeof(T) + 5)`, where the five bytes are the framing the port writes — a table id and a checksum. Addresses are fixed in the generated header. The engine's only check at registration time is whether a table overlaps its neighbour or runs past the end of the region. There is no allocator, no relocation, no defragmentation, and that is the whole point.
 
-### 5.2 The port — `iDatabaseInterface`
+### 5.2 The port
 
-[iDatabaseInterface.h](src/interface/pdi/iDatabaseInterface.h). The device-side contract: open/erase/validate the NVM region, report its size, plus three implementation-required template methods (`saveConfig<T>` / `loadConfig<T>` / `clearConfig<T>`) that each port defines inline in `DatabaseInterface.h` — templates can't be virtual, so the base declares them only as commented contracts and every port must supply them. Singleton: `extern DatabaseInterface __i_db;`.
+The device side opens, erases and validates the NVM region and reports its size. It also supplies the three template methods that actually move typed bytes — `saveConfig<T>`, `loadConfig<T>`, `clearConfig<T>`. Templates cannot be virtual, so the base interface documents them as a contract and every port defines them inline in its own header. The singleton is `__i_db`.
 
-### 5.3 The engine — `Database` and `DatabaseTable<addr, T>`
+### 5.3 The engine
 
-The engine is purely an in-RAM registry of `struct_tables { addr, size, instance* }` records — it owns no bytes itself.
-
-#### `DatabaseTableAbstractLayer`
-Every table inherits this. Its constructor self-registers the table into a static array, bounded by `MAX_TABLES = MAX_DB_TABLES` ([Database.h](src/utility/Database.h)) — so tables are visible to the engine *before* `main()` runs. No dynamic dispatch needed for registration.
-
-#### `DatabaseTable<uint16_t addr, class Table>`
-The CRTP-style template each generated class inherits from:
+Tables register themselves before `main()` runs. Each generated table inherits an abstract layer whose constructor pushes the instance into a static array, so by the time the database service starts, it already knows every table that exists in this build.
 
 ```cpp
 class WiFiTable : public DatabaseTable<WIFI_CONFIG_TABLE_ADDRESS, wifi_config_table> {};
 extern WiFiTable __wifi_table;
 ```
 
-This gives every table `boot()` (self-registration into `__database.m_database_tables`, called once by `Database::init_database`) plus `get(T*)` / `set(T*)` / `clear()` — thin typed wrappers that dispatch to `__i_db.{loadConfig,saveConfig,clearConfig}<T>(addr, ...)`.
+The template supplies `boot()` — which registers the address and size with the engine — plus typed `get`, `set` and `clear` that forward to the port.
 
-#### `Database` (singleton `__database`)
-Holds the registry vector and enforces three rules during `register_table`:
+The engine itself, the `__database` singleton, keeps the registry and enforces three rules when a table registers: the address must sit past the previous table's tail with a two-byte gap, the new tail must fit inside the region, and the table count must stay within `MAX_DB_TABLES`. A table that fails any of them is skipped, which shows up as a table quietly returning defaults. If that happens after a schema edit, the address map is where to look.
 
-1. The new table's `address` must be **greater than** `last_table.address + last_table.size + 2` (no overlap, with a 2-byte gap).
-2. The new table's tail (`address + size + 2`) must be **less than** `m_max_db_size`.
-3. Total registered tables must be `≤ MAX_DB_TABLES`.
+### 5.4 The service
 
-Violation: `register_table` returns `false` and the table is silently skipped. Callers must verify, but the typical flow (auto-registration at boot) just leaves the table unavailable — a hint to bump `MAX_DB_TABLES` in `DeviceConfig.h` or compact the address map.
+`DatabaseServiceProvider` is what the rest of the framework calls. It defines the table globals, each behind the matching `ENABLE_*` flag; it owns the boot sequence; and it exposes one typed `get_*_table` / `set_*_table` pair per persisted struct.
 
-`clear_all()` iterates every registered table and calls its `clear()` — used by the factory-reset path.
+```cpp
+__i_db.beginConfigs(__i_db.getMaxDBSize());       // port mounts NVM
+__database.init_database(__i_db.getMaxDBSize());  // every table boots and registers
 
-### 5.4 The service — `DatabaseServiceProvider`
+if (AUTO_FACTORY_RESET_ON_INVALID_CONFIGS) {
+    __task_scheduler.setInterval([&]{
+        if (!__i_db.isValidConfigs()) { clear_default_tables(); __factory_reset.factory_reset(); }
+    }, 5000, now);
+}
+if (CONFIG_CLEAR_TO_DEFAULT_ON_FACTORY_RESET) {
+    __utl_event.add_event_listener(EVENT_FACTORY_RESET, [&]{ clear_default_tables(); });
+}
+```
 
-`DatabaseServiceProvider` ([source](src/service_provider/database/DatabaseServiceProvider.h)) is what the rest of the framework actually calls. It does three things:
+Services go through those accessors rather than touching `__i_db` or a table global directly. That keeps the dependency one-way: a service depends on the database service, never on the port or on the generated layout.
 
-1. **Defines the global table singletons.** `GlobalTable __global_table;`, `WiFiTable __wifi_table;`, … each guarded by the matching `ENABLE_*` flag so disabled features cost zero ([DatabaseServiceProvider.cpp](src/service_provider/database/DatabaseServiceProvider.cpp)).
-2. **Owns the boot sequence** in `initService` ([](src/service_provider/database/DatabaseServiceProvider.cpp)):
-   ```cpp
-   __i_db.beginConfigs(__i_db.getMaxDBSize());     // open NVM
-   __database.init_database(__i_db.getMaxDBSize());// reserves vector, calls boot() on every table
-   if (AUTO_FACTORY_RESET_ON_INVALID_CONFIGS) {
-       __task_scheduler.setInterval([&]{
-           if (!__i_db.isValidConfigs()) {
-               clear_default_tables();
-               __factory_reset.factory_reset();
-           }
-       }, 5000, now);
-   }
-   if (CONFIG_CLEAR_TO_DEFAULT_ON_FACTORY_RESET) {
-       __utl_event.add_event_listener(EVENT_FACTORY_RESET, [&]{ clear_default_tables(); });
-   }
-   ```
-3. **Exposes typed `get_*_table` / `set_*_table` pairs**, one per persisted struct. These are thin pass-throughs to `__<name>_table.get/set` and are the **only** public surface other services should touch.
-
-> Services should never call `__i_db` directly or hold a raw `__<name>_table` pointer. Going through `__database_service` keeps the persistence boundary one-way: services depend on the service, not on the port or codegen layout.
-
-### 5.5 The autogen pipeline
-
-Per-board tables come from a per-device schema, not the framework root:
+### 5.5 Where the tables come from
 
 ```
-devices/<board>/config/DBTableSchema.json     ← edit this to add/move a table
+  devices/<board>/config/DBTableSchema.json      ← you edit this
         │
-        │  scripts/DeviceSetup.py -d <board>
-        │      → invokes scripts/CreateDBSourceFromJson.py
-        │           → invokes scripts/JsonToCpp.py
+        │   DeviceSetup.py -d <board>
+        │     └─ CreateDBSourceFromJson.py
+        │          └─ JsonToCpp.py
         ▼
-src/database/tables/<TableName>.h             ← generated; do not edit
+  src/database/tables/<TableName>.h              ← generated, never edited
 ```
 
-The schema's `defItems` list each table — each entry names the C++ class, the backing struct alias, the address macro + numeric offset, and the `extern` global the framework will link against. The full schema template (class shape, parent `DatabaseTable<addr, type>`, header includes, post-declaration `extern`) lives at the top of [devices/esp32/config/DBTableSchema.json](devices/esp32/config/DBTableSchema.json); copy an existing `defItems` entry when adding a table. A generated table is always a `final-shape, no-member` subclass of `DatabaseTable<…>` — all logic lives in the template.
+Each `defItems` entry names the C++ class, the backing struct alias, the address macro and its value, and the global the framework links against. A generated table is a body-less subclass of the template — all the behaviour lives in the template, so copying an existing entry is genuinely all it takes.
 
-#### 5.5.1 Default address map (esp* schema)
+The default map on the ESP ports:
 
-| Table | Address | Backing struct | Service flag |
+| Table | Address | Backing struct | Present when |
 |---|---|---|---|
-| Global | `CONFIG_START` (5) | `global_config_table` | always |
-| Login | 50 | `login_credential_table` | `AUTH` ∥ `HTTP_SERVER` |
-| WiFi | 150 | `wifi_config_table` | `WIFI` |
-| OTA | 300 | `ota_config_table` | `OTA` |
-| GPIO | 500 | `gpio_config_table` | `GPIO` |
-| MQTT General | 700 | `mqtt_general_config_table` | `MQTT` |
-| MQTT LWT | 1500 | `mqtt_lwt_config_table` | `MQTT` |
-| MQTT PubSub | 1700 | `mqtt_pubsub_config_table` | `MQTT` |
-| Email | 2000 | `email_config_table` | `EMAIL` |
-| Device IoT | 2600 | `device_iot_config_table` | `DEVICE_IOT` |
+| Global | 5 | `global_config_table` | always |
+| Login | 50 | `login_credential_table` | auth or web server |
+| WiFi | 150 | `wifi_config_table` | WiFi |
+| OTA | 300 | `ota_config_table` | OTA |
+| GPIO | 500 | `gpio_config_table` | GPIO |
+| MQTT general | 700 | `mqtt_general_config_table` | MQTT |
+| MQTT LWT | 1500 | `mqtt_lwt_config_table` | MQTT |
+| MQTT pub/sub | 1700 | `mqtt_pubsub_config_table` | MQTT |
+| Email | 2000 | `email_config_table` | email |
+| Device IoT | 2600 | `device_iot_config_table` | IoT |
 
-The gaps between addresses are deliberate growth headroom for the backing struct — if you add a field to `wifi_configs`, the WiFi table can grow up to `300 - 150 - 5 = 145` bytes before colliding with OTA. Going beyond requires moving OTA (and migrating).
+The gaps are growth room. Adding a field to the WiFi struct is free until it reaches `300 - 150 - 5 = 145` bytes; past that, OTA has to move and existing devices need to be reset.
 
-### 5.6 Boot sequence (end-to-end)
+### 5.6 Boot, end to end
 
 ```
-static-init time
-    each `<Table>Table __<name>_table;` global is constructed
-        DatabaseTableAbstractLayer ctor pushes `this` into m_instances[]
+  static init        every table global is constructed
+                     └─ pushes itself into the pre-registration array
 
-setup() → PdiStack.initialize() → __database_service.initService()
-    __i_db.beginConfigs(maxSize)              // port mounts NVM
-    __database.init_database(maxSize)
-        m_database_tables.reserve(MAX_TABLES)
-        for each pre-registered instance:
-            instance->boot()
-                register_table({addr, sizeof(T), this})
-                    if (no overlap && fits in maxSize) push_back
-    if AUTO_FACTORY_RESET_ON_INVALID_CONFIGS:
-        every 5s → if !__i_db.isValidConfigs() → clear_all + __factory_reset
-    if CONFIG_CLEAR_TO_DEFAULT_ON_FACTORY_RESET:
-        listen for EVENT_FACTORY_RESET → clear_all
+  initialize()       __database_service.initService()
+                       ├─ port mounts NVM
+                       ├─ engine reserves its registry
+                       ├─ every pre-registered table boot()s
+                       │     └─ address checked, then accepted
+                       ├─ optional 5 s validity watchdog → reset on corruption
+                       └─ optional listener: factory reset → clear to defaults
 ```
 
-After this, any service can call `__database_service.get_wifi_config_table(&cfg)` and trust the contents.
+After that, any service can ask for a table and trust what comes back.
 
-### 5.7 Read / write semantics
+### 5.7 Read and write semantics
 
-- **Reads are full-struct.** There is no per-field read. Always allocate the full `T` on the stack, read into it, mutate, write back.
-- **Writes are immediate.** `set_*_table` returns after the port's `saveConfig` returns — there is no journal, no commit phase. On flash-backed ports this is a flash write per call; **batch your `set` calls** if you are mutating several fields in a row.
-- **Endianness and packing.** Structs are written raw via `memcpy`. The framework assumes the same toolchain reads the same bytes back, so a port that targets a different ABI cannot share an NVM image with another port. This is a tradeoff for zero serialisation overhead.
-- **Concurrency.** None. The engine is single-threaded; if you use contextual execution, guard `get`/`set` calls with an `iMutex` if more than one lane touches the same table.
+Reads are whole-struct — put a `T` on the stack, read into it, change what you need, write it back. Writes land immediately; there is no journal and no commit phase, so on a flash-backed port every `set` is a flash write. Batch your changes rather than writing per field.
+
+Structs are `memcpy`'d raw, which is what makes serialisation free and also means an NVM image belongs to the toolchain that wrote it. Nothing about the layout is portable across ABIs.
+
+The engine is single-threaded. If contextual execution is on and two lanes touch the same table, guard it with a mutex.
 
 ### 5.8 Factory reset
 
-Two configurable behaviours:
+Two switches shape the behaviour. `AUTO_FACTORY_RESET_ON_INVALID_CONFIGS` runs a five-second validity check and, on a bad checksum, clears the tables and fires the reset — which is how a device recovers from corrupted flash instead of sitting there bricked. `CONFIG_CLEAR_TO_DEFAULT_ON_FACTORY_RESET` makes the reset event write default structs back rather than leaving zeros.
 
-| Macro | Effect |
-|---|---|
-| `AUTO_FACTORY_RESET_ON_INVALID_CONFIGS` | Every 5 s, check `__i_db.isValidConfigs()`. If false, `clear_all` + invoke `__factory_reset`. Recovers from corrupted flash without bricking the device |
-| `CONFIG_CLEAR_TO_DEFAULT_ON_FACTORY_RESET` | On `EVENT_FACTORY_RESET` (fired by `FactoryResetServiceProvider` after a 6-7s flash-button hold), clear all tables to default. Without this, `factory_reset` only triggers a reboot |
+The reset event is public, so any service can hook it to drop its own caches.
 
-Other services can hook the same event ([EventConfig.h](src/config/EventConfig.h)) to perform their own cleanup (delete IoT cache, clear MQTT retained, etc.).
+### 5.9 Adding a table
 
-### 5.9 Adding a new table
+Say you want a metrics service to persist a host and a port.
 
-To persist a new struct (say `metrics_config` for a new metrics service):
-
-1. **Define the persisted struct** in a new or existing `src/config/<service>Config.h`, following the [§3.4](#3-configuration-system) contract — POD layout, default ctor calls `clear()`, fixed-size members only:
+1. Define the struct in `src/config/MetricsConfig.h` following the [§3.4](#34-the-shape-of-a-service-config) shape — POD, fixed-size members, a `clear()` the constructor calls:
    ```cpp
-   struct metrics_configs { ... char host[40]; uint16_t port; ... };
+   struct metrics_configs { char host[40]; uint16_t port; };
    const int metrics_config_size = sizeof(metrics_configs) + 5;
    using metrics_config_table = metrics_configs;
    ```
-2. **Pick a free address** in the per-device schema. Use the gap calculator: `prev_addr + prev_size + 5 < your_addr < next_addr`. For esp* the schema currently runs to 2600 + `sizeof(device_iot_configs) + 5`, so anything beyond that is fair game.
-3. **Add a `defItems` entry** to every `devices/<board>/config/DBTableSchema.json` that should carry the table:
+2. Pick an address past the last table's tail: `prev_addr + prev_size + 5 < yours`.
+3. Add a `defItems` entry to every board schema that should carry it:
    ```json
    {
      "defItemName": "MetricsTable",
@@ -1071,717 +968,586 @@ To persist a new struct (say `metrics_config` for a new metrics service):
      "defItemExtVar": "__metrics_table"
    }
    ```
-4. **Regenerate**: `python3 scripts/DeviceSetup.py -d <board>` — this rewrites `src/database/tables/MetricsTable.h`.
-5. **Add the include + global + accessors** in `DatabaseServiceProvider.{h,cpp}` under the matching `ENABLE_METRICS_SERVICE` guard, mirroring `WiFiTable` / `OtaTable` / etc.
-6. **If you exceeded `MAX_DB_TABLES`**, raise it in `devices/DeviceConfig.h` (currently 15 for esp*, 5 for uno).
+4. Regenerate with `python3 scripts/DeviceSetup.py -d <board>`.
+5. Add the include, the global and the accessor pair to the database service, guarded by your feature flag, mirroring any existing table.
+6. Raise `MAX_DB_TABLES` if you have run out of slots.
 
-### 5.10 Gotchas
+Keep schema addresses strictly ascending. The overlap check compares against the most recently registered table, so a table declared out of order slips past it.
 
-- **Adding a field to a struct rewrites the on-flash layout.** Existing devices will see `isValidConfigs() == false` on next boot and (if `AUTO_FACTORY_RESET_ON_INVALID_CONFIGS` is on) get reset to defaults. There is no schema migration. Bump `CONFIG_VERSION` to make this intentional.
-- **Address collisions are not flagged loudly.** `Database::register_table` returns `false` and the table is silently absent. If `get_wifi_config_table` is returning defaults after a schema edit, check whether your address overlaps with a neighbour.
-- **`get_last_table` walks linearly.** Registration is O(n²) in table count — fine for 15, painful if you push past 50.
-- **`Database::register_table` only compares against the *last* table.** Inserting a table out of address order (i.e. with an address lower than an already-registered one) bypasses the overlap check. Always keep `defItemAddressValue` strictly increasing in schema order, or define them in ascending order in `DatabaseServiceProvider.cpp`.
-- **The port's templates must be visible at every call site.** Define `saveConfig`/`loadConfig`/`clearConfig` inline in `DatabaseInterface.h`, not in `.cpp`, or the link will fail for unused types.
-- **The codegen blows away the output directory.** `CreateDBSourceFromJson.py` does `cleanpath(outpath)` before writing — anything else in `src/database/tables/` is deleted. Don't park unrelated files there.
+Changing a struct changes the on-flash layout, which invalidates the checksum on every device already in the field — they come up and reset to defaults. Bump `CONFIG_VERSION` when you do that, so it reads as a decision rather than an accident.
 
 ---
-
 ## 6. Service Providers
 
-A *service provider* is the framework's unit of feature. Each one lives under [src/service_provider/](src/service_provider/), derives from [`ServiceProvider`](src/service_provider/ServiceProvider.h) ([§1.3](#1-architecture-overview)), and is gated by exactly one `ENABLE_*` flag ([§3.3](#3-configuration-system)). This section is the per-service reference: what it does, what it depends on, what its public API looks like, and how it surfaces in the CLI and web portal.
+A service provider is the framework's unit of feature. Each one lives under [src/service_provider/](src/service_provider/), derives from `ServiceProvider`, and is gated by exactly one `ENABLE_*` flag. This section is the per-service reference.
 
-### 6.1 Common shape
-
-Every provider follows the same skeleton:
+### 6.1 The common shape
 
 ```cpp
 class XServiceProvider : public ServiceProvider {
 public:
     XServiceProvider() : ServiceProvider(SERVICE_X, RODT_ATTR("X")) {}
-    bool initService(void* arg = nullptr) override;     // wired from PDIStack::initialize
-    bool stopService()                  override;       // optional; base impl reaps every tracked task
-    void printConfigToTerminal(iTerminalInterface*) override;   // free-form status hook
-    void printStatusToTerminal(iTerminalInterface*) override;   // free-form status hook
+    bool initService(void* arg = nullptr) override;   // called once by the orchestrator
+    bool stopService()                    override;   // optional; base reaps tracked tasks
+    void printConfigToTerminal(iTerminalInterface*) override;
+    void printStatusToTerminal(iTerminalInterface*) override;
 };
 extern XServiceProvider __x_service;
 ```
 
-Conventions that hold across all providers:
+The global is `__<name>_service`. The constructor hands the base a `service_t` value and a flash-resident name, and the base registers it so `srvc` can find it without knowing what it is.
 
-- The global instance is `__<name>_service` (matches [§1.7](#1-architecture-overview) naming).
-- The constructor passes a `service_t` enum value and a `RODT_ATTR` flash-string name; the base class self-registers it into `m_services[]` so the `srvc` CLI can enumerate it generically.
-- Long-running work is driven by `__task_scheduler`, but **never called directly**. Use the base wrappers so every task is auto-named (from `m_service_name`), owner-tagged (0 = kernel), and tracked for `srvc stop/start/restart` (§4.9):
-  - `serviceSetInterval(fn, dur, now_millis, prio=DEFAULT)` — periodic.
-  - `serviceSetTimeout(fn, dur, now_millis, prio=DEFAULT)` — one-shot.
-  - `serviceUpdateInterval(id, fn, dur, prio, last_millis, max_attempts)` — reschedule in-place.
-  Each mirrors the underlying [`TaskScheduler`](src/utility/TaskScheduler.h) call 1:1 — only the trailing `name`/`owner` args are auto-supplied. All other timing knobs stay explicit.
-- The returned id joins a fixed-size list `m_service_task_ids[MAX_SERVICE_TASKS]` (default 6; raise in [ServiceProvider.h](src/service_provider/ServiceProvider.h) if a service needs more). Overflow is silently dropped for that slot. Backward-compat: the base still exposes `m_service_routine_task_id`, kept in sync with the first tracked id.
-- `stopService()` in the base now reaps **every** tracked task (used to be primary-only — old leak). Override it if you also need to close sockets or release buffers, and call the base at the end.
-- Cross-service triggers flow through `__utl_event` events ([EventConfig.h](src/config/EventConfig.h)), not direct calls — this keeps the dependency graph one-way through the orchestrator.
-- Persisted config lives in NVM through `__database_service.get_<name>_config_table` / `set_<name>_config_table` ([§5.4](#5-database-layer)); services never touch `__i_db` directly.
+Background work goes through the base's scheduling wrappers rather than the scheduler directly:
 
-**Lifecycle helpers on the base (all called by `srvc`):**
+```
+  serviceSetInterval(fn, dur, now, prio)      periodic
+  serviceSetTimeout (fn, dur, now, prio)      one-shot
+  serviceUpdateInterval(id, …)                reschedule in place
+        │
+        └─▶ same call on the scheduler, with the service's name and owner filled in,
+            and the returned id recorded in m_service_task_ids[]
+                  │
+                  └─▶ that list is what makes `ps` show a sensible name,
+                      `pkill <Service>` work, and `srvc stop` freeze the right tasks
+```
 
-| Call | Purpose |
-|---|---|
-| `trackServiceTask(id)` / `untrackServiceTask(id)` / `isServiceTaskTracked(id)` | Explicit list membership. Wrappers call `trackServiceTask` automatically; use `untrackServiceTask` when you cancel a task by other means |
-| `signalAllServiceTasks(sig)` | Deliver a signal (§4.9) to every tracked task. Returns hit count |
-| `countServiceTasks(running, stopped, zombie)` | Bucketed lifecycle counts used by `srvc list`/`srvc status` |
-| `getServiceTaskCount()` / `getServiceTaskId(idx)` | Iterate for status prints |
+The tracked list is fixed-size — six slots by default. `stopService` in the base reaps every one of them, so an override is only needed when you also have sockets or buffers to release; call the base at the end when you do write one. If you ever register a task straight on the scheduler, hand its id to `trackServiceTask(id)` so it is not orphaned on stop.
+
+Persisted configuration always goes through the database service accessors, never `__i_db`. Cross-service reactions go through `__utl_event`, never direct calls — that is what keeps the dependency graph one-directional.
+
+The base also offers `signalAllServiceTasks(sig)`, `countServiceTasks(...)` and the task-id iterators; those are what the `srvc` command renders.
 
 ### 6.2 Service reference
 
-The order below matches the orchestrator's init order in [PdiStack.cpp](src/PdiStack.cpp).
+Ordered the way the orchestrator starts them.
 
 #### 6.2.1 `DatabaseServiceProvider` — `__database_service`
 
-| Flag | Always on (boot dependency) |
-|---|---|
-| Source | [database/DatabaseServiceProvider.{h,cpp}](src/service_provider/database/DatabaseServiceProvider.h) |
-| Depends on | `iDatabaseInterface`, `__factory_reset`, `__utl_event` |
-| Init does | `__i_db.beginConfigs(max)` → `__database.init_database(max)` → boots every registered `<Name>Table` → schedules 5 s `isValidConfigs` check → listens for `EVENT_FACTORY_RESET` |
-| CLI surface | None directly; every other service's `srvc` config is fetched through it |
-
-Fully documented in [§5. Database Layer](#5-database-layer).
+Always present; everything else may need persisted config. It mounts NVM, boots every registered table, optionally polls config validity every five seconds, and listens for the factory-reset event. Fully covered in [§5](#5-database-layer).
 
 #### 6.2.2 `DeviceFactoryReset` — `__factory_reset`
 
-| Flag | Always on |
-|---|---|
-| Source | [device/FactoryResetServiceProvider.{h,cpp}](src/service_provider/device/FactoryResetServiceProvider.h) |
-| Depends on | `iDeviceControlInterface::isDeviceFactoryRequested`, `__utl_event` |
-| Init does | Schedules `check_device_factory_request()` periodically to poll the flash-button (6-7 s hold) |
-| CLI surface | Triggered by `reboot` after factory action; web portal has a "Reset Factory" form |
-| Event contract | Other services listen for `EVENT_FACTORY_RESET` to drop their own caches before the reboot |
+Always present. Polls the flash button for a six-to-seven second hold and fires `EVENT_FACTORY_RESET`. Other services listen for that event to drop their own caches before the reboot. The web portal exposes the same action as a form.
 
 #### 6.2.3 `SerialServiceProvider` — `__serial_service`
 
-| Flag | `ENABLE_SERIAL_SERVICE` |
-|---|---|
-| Source | [transport/SerialServiceProvider.{h,cpp}](src/service_provider/transport/SerialServiceProvider.h) |
-| Depends on | `iSerialInterface` |
-| Init does | Opens the serial port at the configured baud, hooks `processSerial` into `iDeviceControlInterface::handleEvents` |
-| CLI surface | Provides the **default terminal** for the CLI ([§7](#7-command-line--terminal)); `srvc` prints baud and active port. Also exposes JSON payload apply/append hooks that Device-IoT uses for cross-serial sensor read/write |
+Opens the serial port at the configured baud and hooks its input handler into the device event pump. It supplies the default terminal for the CLI, and exposes the JSON apply/append hooks that Device-IoT uses to move sensor payloads across the serial link.
 
 #### 6.2.4 `WiFiServiceProvider` — `__wifi_service`
 
-| Flag | `ENABLE_WIFI_SERVICE` |
-|---|---|
-| Source | [network/WiFiServiceProvider.{h,cpp}](src/service_provider/network/WiFiServiceProvider.h) |
-| Depends on | `iWiFiInterface` (passed via `initService(&__i_wifi)`), `__database_service` (wifi table), optionally `iPingInterface` |
-| Init does | Configures AP from `wifi_config_table`, kicks off STA scan, registers periodic connectivity check (`WIFI_CONNECTIVITY_CHECK_DURATION = 5000 ms`), schedules NAPT-enable one-shot after STA up |
-| Config knobs | `IGNORE_FREE_RELAY_CONNECTIONS`, `ENABLE_DYNAMIC_SUBNETTING`, `ENABLE_NAPT`, `ENABLE_INTERNET_BASED_CONNECTIONS` |
-| CLI surface | `net ip`, `net scansta`, `net connsta,<ssid>,<pass>` |
-| Web surface | "WiFi" section (STA + AP forms, scan, current status), gated by `ALLOW_WIFI_CONFIG_MODIFICATION` |
-| Event contract | Emits `EVENT_WIFI_STA_CONNECTED` / `EVENT_WIFI_STA_GOT_IP` / `EVENT_WIFI_STA_DISCONNECTED` / `EVENT_WIFI_AP_STA(DIS)CONNECTED` / `EVENT_WIFI_INTERNET_UP` / `EVENT_WIFI_INTERNET_DOWN`; consumers (MQTT, OTA, Email, IoT, TLS cert provisioner) react |
+Configures the access point from the WiFi table, starts a station scan, and keeps a connectivity check running every five seconds. NAPT, when enabled, is switched on by a one-shot scheduled after the station link comes up.
+
+The shell surface is `net ip`, `net scansta` and `net connsta,<ssid>,<pass>`; the portal has a WiFi page whose editability is governed by `ALLOW_WIFI_CONFIG_MODIFICATION`.
+
+It is the framework's main event source:
+
+```
+  station connected ──▶ EVENT_WIFI_STA_CONNECTED
+  DHCP / static IP  ──▶ EVENT_WIFI_STA_GOT_IP     ─┬─▶ mDNS announces
+                                                   ├─▶ TLS cert provisioner mints
+                                                   └─▶ services needing a stable address
+  link lost         ──▶ EVENT_WIFI_STA_DISCONNECTED ──▶ MQTT, OTA, IoT stand down
+  AP client in/out  ──▶ EVENT_WIFI_AP_STA(DIS)CONNECTED
+  internet poller   ──▶ EVENT_WIFI_INTERNET_UP / _DOWN
+```
 
 #### 6.2.5 `OtaServiceProvider` — `__ota_service`
 
-| Flag | `ENABLE_OTA_SERVICE` |
-|---|---|
-| Source | [device/OtaServiceProvider.{h,cpp}](src/service_provider/device/OtaServiceProvider.h) |
-| Depends on | `iTcpClientInterface`, `iUpgradeInterface` (via `__i_dvc_ctrl`), `iHttpClientHelper`, OTA config table |
-| Init does | `setInterval(handleOta, ota_freq_ms)` from `ota_config_table::ota_request_freq` |
-| Wire protocol | `GET /api/fordevice/ota-version?mac_id=<mac>&duid=<duid>` → JSON `{ "latest": <ver>, … }`; if newer, `GET /api/fordevice/ota-bin?...&version=<latest>` and apply via `iUpgradeInterface::Upgrade`. HTTP Basic auth (`ota:<mac>` b64), User-Agent `pdistack`; TLS when `ENABLE_TLS_SERVICE` is on |
-| Upgrade strategy | Compile-time selector: `MAKE_STREAM_DIRECT_OTA_UPGRADE` (default) streams body bytes into `Update.write()`; `MAKE_STORAGE_DEPENDENT_OTA_UPGRADE` downloads to `<tempdir>/fw.bin` first (needs `ENABLE_STORAGE_SERVICE`); neither ⇒ SDK `httpUpdate` / `ESPhttpUpdate` fallback |
-| Config knobs | `ALLOW_OTA_CONFIG_MODIFICATION`; `ota_config_table` (host, port, version, frequency) |
-| CLI surface | `srvc` config print |
-| Web surface | "OTA" section |
+Polls for a firmware update on the interval stored in the OTA table:
+
+```
+  GET /api/fordevice/ota-version?mac_id=…&duid=…      →  { "latest": <ver> }
+        │  newer than what's running?
+        ▼
+  GET /api/fordevice/ota-bin?…&version=<latest>       →  bytes
+        │
+        ├─ stream straight into the updater                  (default)
+        ├─ or download to a temp file first                  (needs storage)
+        └─ or hand the URL to the SDK's own updater          (fallback)
+```
+
+Requests carry HTTP basic auth and a `pdistack` user agent, and run over TLS when the TLS service is on. Which of the three upgrade strategies applies is a compile-time choice.
 
 #### 6.2.6 `GpioServiceProvider` — `__gpio_service`
 
-| Flag | `ENABLE_GPIO_SERVICE` (`ENABLE_GPIO_BASIC_ONLY` trims to digital-only for uno) |
-|---|---|
-| Source | [device/GpioServiceProvider.{h,cpp}](src/service_provider/device/GpioServiceProvider.h) |
-| Depends on | `iGpioInterface` (folded into `__i_dvc_ctrl`), `gpio_config_table`, optionally `iTcpClientInterface` (POST sensor data), `__email_service` (event alerts) |
-| Init does | Loads `gpio_config_table`, schedules `handleGpioOperations` (mode/value tick) and `handleGpioModes` (table refresh every `GPIO_TABLE_UPDATE_DURATION = 300000 ms`) |
-| Modes | `OFF`, `DIGITAL_WRITE`, `DIGITAL_READ`, `DIGITAL_BLINK`, `ANALOG_WRITE`, `ANALOG_READ` ([GpioConfig.h](src/config/GpioConfig.h)) |
-| CLI surface | sysfs files at `/sys/class/gpio/<pin>/{value,mode}` — e.g. `echo 1 > /sys/class/gpio/5/value` |
-| Web surface | "GPIO" section + "GPIO Events" submenu (per-pin event conditions over `EMAIL` / `HTTP` channels) |
+Loads the GPIO table, ticks pin modes and values, and refreshes the table every five minutes. Modes are off, digital write, digital read, digital blink, analog write and analog read.
+
+From the shell, GPIO is driven as files under `/sys` — `echo 1 > /sys/class/gpio/5/value`. The portal adds a GPIO page plus an events submenu where a pin condition can be routed to email or an HTTP endpoint.
 
 #### 6.2.7 `MqttServiceProvider` — `__mqtt_service`
 
-| Flag | `ENABLE_MQTT_SERVICE` |
-|---|---|
-| Source | [transport/MqttServiceProvider.{h,cpp}](src/service_provider/transport/MqttServiceProvider.h) |
-| Depends on | `iTcpClientInterface`, `mqtt_general_config_table`, `mqtt_lwt_config_table`, `mqtt_pubsub_config_table` |
-| Init does | Opens broker connection (with LWT), subscribes from `pubsub` table, schedules publish driver |
-| Callback types | `MqttPublishDataCallback`, `MqttSubscribeDataCallback` — applications register these (via `setMqtt*DataCallback`) to inject / receive payloads |
-| Config knobs | `ENABLE_MQTT_DEFAULT_PAYLOAD`, `ALLOW_MQTT_CONFIG_MODIFICATION` |
-| CLI surface | `srvc` config |
-| Web surface | "MQTT" section with General / LWT / PubSub sub-forms |
+Opens the broker connection with a last-will message, subscribes to whatever the pub/sub table lists, and schedules the publish driver. Applications inject and receive payloads by registering publish and subscribe callbacks. The portal has general, LWT and pub/sub forms.
 
 #### 6.2.8 `EmailServiceProvider` — `__email_service`
 
-| Flag | `ENABLE_EMAIL_SERVICE` |
-|---|---|
-| Source | [email/EmailServiceProvider.{h,cpp}](src/service_provider/email/EmailServiceProvider.h) |
-| Depends on | `iTcpClientInterface`, `email_config_table`, SMTP transport ([src/transports/smtp/](src/transports/smtp/)) |
-| Init does | Loads `email_config_table`; schedules `handleEmail` if periodic mail enabled |
-| Config knobs | `DEFAULT_MAIL_HOST`, `DEFAULT_MAIL_PORT` (2525), `DEFAULT_MAIL_FROM/TO/SUBJECT`, `DEFAULT_MAIL_FREQUENCY` (300 s) |
-| Used by | `GpioServiceProvider` for event-over-email |
-| Web surface | "Email" section with credential form + "Test" button |
+Loads the email table and, if periodic mail is enabled, schedules the send. The GPIO service uses it for event alerts. The portal page includes a test button.
 
 #### 6.2.9 `DeviceIotServiceProvider` — `__device_iot_service`
 
-| Flag | `ENABLE_DEVICE_IOT` |
-|---|---|
-| Source | [iot/DeviceIotServiceProvider.{h,cpp}](src/service_provider/iot/DeviceIotServiceProvider.h) |
-| Depends on | `iTcpClientInterface`, `iDeviceIotInterface` (**implemented by the application**, see [§13.3.5](#13-portable-interfaces)), `__mqtt_service`, `__database_service` (iot table) |
-| Init does | Bootstraps registration via `DEVICE_IOT_OTP_REQ_URL` → `DEVICE_IOT_CONFIG_REQ_URL`, then `configureMQTT()` against the returned channel, then schedules `handleSensorData` at the configured `sample rate` |
-| Application hook | The user's sketch calls `initDeviceIotSensor(iDeviceIotInterface*)` to register a sensor implementing `iDeviceIotInterface::{ init, sampleHook, dataHook(payload), resetSampleHook }` |
-| Config keys (server-controlled) | `channelhost`, `channelport`, `channelread`, `channelwrite`, `token`, `keepalive`, `samplerate`, `datarate`, `reconfig`, … (all in [DeviceIotConfig.h](src/config/DeviceIotConfig.h)) |
-| CLI surface | `iot setid,<duid>`, `iot getid`, `iot sethost,<host>`, `iot gethost` |
-| Note | Currently owns its own MQTT config (host / port / topics / credentials) independent of the regular `__mqtt_service` tables — see the notes below |
+Off by default; uncomment `ENABLE_DEVICE_IOT` to build it. The service handles registration and channel setup, and the application supplies the sensor.
 
-**Enabling.** The service is **disabled by default**. To enable, uncomment `ENABLE_DEVICE_IOT` in [devices/DeviceConfig.h](devices/DeviceConfig.h) and rebuild.
+```
+  boot
+   ├─ GET <otp url>      →  { otp, status }
+   ├─ GET <config url>   →  { did, token, channelhost, channelport,
+   │                          channelread, channelwrite, datarate,
+   │                          samplerate, keepalive, reconfig, … }
+   ├─ configureMQTT()    →  writes those values into the MQTT tables
+   └─ sample loop        →  sampleHook() × samplerate  ──▶ dataHook(payload) ──▶ publish
+```
 
-**Bootstrap flow.** On boot the service performs two HTTP calls against the configured IoT host before opening the MQTT channel:
+Both URLs are templates that substitute the MAC and the device unique id at request time. The MQTT identity it builds is worth knowing: the client id is a base64 of `mac:<device-mac>` rather than the raw MAC, the username is the device unique id from the IoT table, and the password is the token the server returned. The last-will topic is the read channel with a payload carrying the device id.
 
-1. `GET DEVICE_IOT_OTP_REQ_URL` — response JSON must carry an `otp` (`DEVICE_IOT_OTP_KEY`) and a `status` (`DEVICE_IOT_OTP_STATUS_KEY`).
-2. `GET DEVICE_IOT_CONFIG_REQ_URL` — response JSON carries the channel config. Both URLs are template strings in [config/DeviceIotConfig.h](src/config/DeviceIotConfig.h) and substitute `[mac]` and `[duid]` at request time.
+Because `configureMQTT()` writes the MQTT tables, Device-IoT's server-supplied broker settings replace whatever the portal had for MQTT when both are in use.
 
-**Server-response config keys.** The keys the parser looks for in the config response (all defined in [config/DeviceIotConfig.h](src/config/DeviceIotConfig.h)):
-
-| JSON key | Macro | Used for |
-|---|---|---|
-| `did` | `DEVICE_IOT_CONFIG_DEVICEID_KEY` | Device id assigned by the server |
-| `token` | `DEVICE_IOT_CONFIG_CHANNEL_TOKEN_KEY` | MQTT `password` |
-| `channelhost` | `DEVICE_IOT_CONFIG_CHANNEL_HOST_KEY` | MQTT broker host |
-| `channelport` | `DEVICE_IOT_CONFIG_CHANNEL_PORT_KEY` | MQTT broker port |
-| `channelread` | `DEVICE_IOT_CONFIG_CHANNEL_READ_KEY` | Subscribe topic (also used as LWT topic) |
-| `channelwrite` | `DEVICE_IOT_CONFIG_CHANNEL_WRITE_KEY` | Publish topic |
-| `ifaceread` / `ifacewrite` / `ifaceevent` | `DEVICE_IOT_CONFIG_INTERFACE_*_KEY` | Per-interface routing hints |
-| `datarate` | `DEVICE_IOT_CONFIG_DATA_RATE_KEY` | Publish frequency (bounded by `SENSOR_DATA_PUBLISH_FREQ_*_LIMIT`) |
-| `samplerate` | `DEVICE_IOT_CONFIG_SAMPLING_RATE_KEY` | Samples per publish (bounded by `SENSOR_DATA_SAMPLES_PER_PUBLISH_MAX_LIMIT`) |
-| `keepalive` | `DEVICE_IOT_CONFIG_MQTT_KEEP_ALIVE_KEY` | MQTT keepalive (bounded by `DEVICE_IOT_MQTT_KEEP_ALIVE_MIN..MAX`) |
-| `reconfig` | `DEVICE_IOT_CONFIG_RECONFIGURE_KEY` | Server-triggered re-registration |
-
-**MQTT credential shape** (built in `configureMQTT()` — see [DeviceIotServiceProvider.cpp](src/service_provider/iot/DeviceIotServiceProvider.cpp)):
-
-- `client_id` = HTTP-basic-style base64 of `mac:<device-mac>` (via `Http_Client::BuildBasicAuthorization`), **not** the raw MAC.
-- `username` = the Device Unique ID (DUID) held in `device_iot_configs.device_iot_duid` — set / read via the `iot setid,<duid>` / `iot getid` CLI commands.
-- `password` = the `token` returned by the server in the config response.
-- `host` / `port` come from the server's `channelhost` / `channelport` at runtime. The **fallback** defaults (`DEVICE_IOT_DEFAULT_CHANNEL_DATA_HOST` = `192.168.0.100`, `..._PORT` = `1883`) live in [config/DeviceIotConfig.h](src/config/DeviceIotConfig.h) if you need to change the compile-time default.
-- LWT topic = `channelread`; LWT payload = `{"duid":"<duid>"}` (see `DEVICE_IOT_MQTT_WILL_TOPIC`).
-
-**IoT host address.** The IoT HTTP host used for the OTP + config bootstrap is stored in `device_iot_configs.device_iot_host` and is set / read via the `iot sethost,<host>` / `iot gethost` CLI commands.
-
-**Independence from the regular MQTT service.** The regular MQTT configs (in [config/MqttConfig.h](src/config/MqttConfig.h) or configured through the web portal) are overwritten by `configureMQTT()` when Device-IoT boots — `__database_service.set_mqtt_*_config_table(...)` is called with the server-supplied values. If you use both, be aware that Device-IoT wins on startup.
-
-The working example sketch is walked through in [§11.6 DeviceIotExample](#116-deviceiotexample--implementing-ideviceiotinterface).
+The application registers its sensor by calling `initDeviceIotSensor(...)` with an object implementing init, sample, data and reset hooks. The shell offers `iot setid`, `iot getid`, `iot sethost` and `iot gethost`. [§11.6](#116-deviceiotexample) walks through the example sketch.
 
 #### 6.2.10 `AuthServiceProvider` — `__auth_service`
 
-| Flag | `ENABLE_AUTH_SERVICE` |
-|---|---|
-| Source | [auth/AuthServiceProvider.{h,cpp}](src/service_provider/auth/AuthServiceProvider.h) |
-| Depends on | `__database_service` (legacy `login_credential_table`); [`__user_store_service`](#6217-userstoreservice--__user_store_service) when `/etc/shadow` exists |
-| Used by | Web `AuthMiddleware` ([§8](#8-web-server)); CLI login/su/passwd; every command with `needauth()` |
-| Model | **Session-aware delegator** — `isAuthorized(u, p)` is a pure verifier that routes to `__user_store_service.verifyPassword` when `/etc/shadow` exists, else falls back to the LoginTable string check. `setAuthorized(bool)` / `getAuthorized()` / `getUsername()` read+write the **current** `session_t` via `SessionManager::current()`. No global auth bit any more — each session is authorised independently |
-| Persistence | LoginTable row is the bootstrap seed only. Actual user directory lives in `/etc/passwd` + `/etc/shadow` (see [§6.2.17](#6217-userstoreservice--__user_store_service)) |
+A session-aware delegator rather than a store. `isAuthorized(user, pass)` verifies against `/etc/shadow` through the user store when that file exists, and against the bootstrap credential row otherwise. `setAuthorized` and `getUsername` read and write the *current* session, so there is no global "logged in" bit — three terminals can be at three different privilege levels at once.
 
 #### 6.2.11 Storage (interface init, no provider)
 
-`ENABLE_STORAGE_SERVICE` doesn't have its own `ServiceProvider` subclass — the FS is used directly by SSH/SFTP, `UserStoreService`, the file-oriented CLI commands (`ls`/`cd`/`mv`/`cp`/`rm`/`mkdir`/`touch`/`cat`/`echo`/`fedit`/`head`/`tail`/`wc`/`df`/`grep`/`hexdump`/`chmod`/`chown`/`umask`/`mount`), and any application code.
+Storage has no service class. The filesystem is used directly by SSH and SFTP, the user store, every file command, and application code.
 
-The global `__i_fs` is a **`VfsDispatcher`** ([src/interface/pdi/impl/modules/storage/VfsDispatcher.{h,cpp}](src/interface/pdi/impl/modules/storage/VfsDispatcher.h)) — an `iFileSystemInterface` implementation that routes every call to a mounted backend selected by **longest-prefix path match**. Per-device `FileSystemInterface` (LittleFS via [external/LittleFSWrapper.{h,cpp}](external/LittleFSWrapper.h) → [FileSystemInterfaceImpl](src/interface/pdi/impl/modules/storage/FileSystemInterfaceImpl.h)) is now `__i_rootfs`, mounted at `/` during `PdiStack::initialize`:
+`__i_fs` is a dispatcher: an `iFileSystemInterface` that routes each call to a mounted backend by longest-prefix match.
 
-```cpp
-__i_fs.mount(FILE_SEPARATOR, &__i_rootfs, "rootfs", VFS_TYPE_LITTLEFS);
-#ifdef ENABLE_PROCFS
-__i_fs.mount("/proc", &__i_procfs, "procfs", VFS_TYPE_PROCFS);
-#endif
-#ifdef ENABLE_SYSFS
-__i_fs.mount("/sys", &__i_sysfs, "sysfs", VFS_TYPE_SYSFS);
-#endif
-#ifdef ENABLE_DEVFS
-__i_fs.mount("/dev", &__i_devfs, "devfs", VFS_TYPE_DEVFS);
-#endif
-#ifdef ENABLE_TMPFS
-__i_fs.mount("/tmp", &__i_tmpfs, "tmpfs", VFS_TYPE_TMPFS);
-#endif
-__i_fs.init();
+```
+  path ─▶ VfsDispatcher ─┬─ /       rootfs   LittleFS, the real flash filesystem
+                         ├─ /proc   procfs   read-only, generated on each read
+                         ├─ /sys    sysfs    peripherals as read/write files
+                         ├─ /dev    devfs    byte-stream nodes
+                         └─ /tmp    tmpfs    RAM-backed, lost on reboot
 ```
 
-Mount table config lives in [config/VfsConfig.h](src/config/VfsConfig.h) — `VFS_MAX_MOUNTS` (default 5), `VFS_MOUNT_PREFIX_MAX` (15), `VFS_MOUNT_NAME_MAX` (11), plus per-backend enable flags (`ENABLE_PROCFS`, `ENABLE_SYSFS`, `ENABLE_DEVFS`, `ENABLE_TMPFS`, all default on). The default five slots are exactly filled by rootfs + procfs + sysfs + devfs + tmpfs — enabling further synthetic backends needs `VFS_MAX_MOUNTS` raised (per-port on tight-RAM targets; `ENABLE_TMPFS` in particular is worth undefining on Arduino UNO since it holds file content in RAM). Inspect the mount table at runtime with the `mount` command ([§7.7](#77-built-in-command-inventory)); `df` reports total/used/free per mount.
+Mounting happens during `initialize()`, and the table is five slots by default — exactly what those five backends need. `mount` shows the table at runtime and `df` reports usage per mount. On a RAM-tight port, `/tmp` is the first thing to drop, since it holds file content in the heap.
 
-**procfs** ([src/interface/pdi/impl/modules/storage/ProcFs.{h,cpp}](src/interface/pdi/impl/modules/storage/ProcFs.h)) — a read-only synthetic filesystem mounted at `/proc`; node contents are generated on each read. Works with the regular file commands (`cd /proc`, `ls`, `cat`, `head`, `wc`, `hexdump`, `grep`); all nodes are `0444`, root-owned, and writes return an error.
+**procfs** nodes are all `0444` and root-owned; writes fail. `/proc/uptime` gives seconds since boot in the Linux two-number layout, `/proc/version` gives the release and config version. Everything that reads files works on them — `cat`, `head`, `wc`, `grep`, `hexdump`.
 
-| Node | Content |
-|---|---|
-| `/proc/uptime` | seconds since boot: `<sec>.<centisec> <sec>.<centisec>` (Linux layout) |
-| `/proc/version` | `PDI Stack version <RELEASE> (<CONFIG_VERSION>)` |
+**sysfs** is where GPIO lives:
 
-**sysfs** ([src/interface/pdi/impl/modules/storage/SysFs.{h,cpp}](src/interface/pdi/impl/modules/storage/SysFs.h)) — a synthetic filesystem mounted at `/sys` that exposes device peripherals as **read/write** files. GPIO pins (gated on `ENABLE_GPIO_SERVICE`) are laid out one directory per pin, listing only non-exceptional pins in the unified digital+analog table:
-
-| Node | Access | Content |
+| Node | Mode | Content |
 |---|---|---|
-| `/sys/class/gpio/<pin>/value` | `0666` | current reading / write value (decimal) |
-| `/sys/class/gpio/<pin>/mode` | `0666` | GPIO mode: `0`=OFF `1`=DIGITAL_WRITE `2`=DIGITAL_READ `3`=DIGITAL_BLINK `4`=ANALOG_WRITE `5`=ANALOG_READ |
+| `/sys/class/gpio/<pin>/value` | `0666` | current reading, or the value to drive |
+| `/sys/class/gpio/<pin>/mode` | `0666` | `0` off · `1` digital write · `2` digital read · `3` blink · `4` analog write · `5` analog read |
 
-Reads return the value the GPIO service maintains (refreshed each operation tick for read-mode pins); writes drive `__gpio_service.m_gpio_config_copy` + persist + re-apply modes. This is the CLI path to GPIO — write mode first, then value: `echo 3 > /sys/class/gpio/4/mode` then `echo 500 > /sys/class/gpio/4/value` blinks GPIO 4 at 500 ms. Directory nodes are `0555`, all nodes root-owned. Write with the `echo` command's `>` redirection ([§7.7](#77-built-in-command-inventory)); the `fedit` editor's tmp-file flow does not apply to synthetic nodes.
+Reads return what the GPIO service last sampled; writes update its config copy, persist it and re-apply the modes. Set mode first, then value — `echo 3 > /sys/class/gpio/4/mode` followed by `echo 500 > /sys/class/gpio/4/value` blinks pin 4 at half-second intervals. Use `echo` with redirection for these; the `fedit` editor works through a temp file and so belongs to real files only.
 
-**devfs** ([src/interface/pdi/impl/modules/storage/DevFs.{h,cpp}](src/interface/pdi/impl/modules/storage/DevFs.h)) — a synthetic filesystem mounted at `/dev` exposing byte-stream device nodes. All nodes are `0666`, root-owned; the `/dev` directory is `0555`.
+**devfs** exposes the usual byte streams, all `0666`:
 
-| Node | `cat` (read) | `echo … >` (write) |
+| Node | Reading it | Writing to it |
 |---|---|---|
-| `/dev/null` | EOF — yields nothing | discarded |
-| `/dev/zero` | `0x00` bytes | discarded |
-| `/dev/random` | random bytes (`__i_dvc_ctrl.random_now()`) | discarded |
-| `/dev/urandom` | same as `random` (no separate entropy pool on MCU) | discarded |
+| `/dev/null` | nothing, immediate EOF | discarded |
+| `/dev/zero` | zero bytes | discarded |
+| `/dev/random`, `/dev/urandom` | random bytes from the device RNG | discarded |
 
-Unbounded reads (`/dev/zero`, `/dev/random`, `/dev/urandom`) are **capped at `DEVFS_STREAM_READ_MAX` bytes (default 64) per read call** — unlike Linux they are not infinite, so `cat /dev/zero` terminates instead of spinning the MCU into a watchdog reset. `random_now()` is an `iUtilityInterface` method: hardware RNG on esp32 (`esp_random`) / esp8266 (`os_random`), a portable micros-seeded xorshift default on UNO / mock (non-cryptographic).
+The endless ones are capped per read call — 64 bytes by default — so `cat /dev/zero` finishes instead of pinning the CPU until the watchdog fires. The RNG behind them is hardware on the ESP ports and a micros-seeded xorshift elsewhere, which is fine for filling buffers and not for keys.
 
-**tmpfs** ([src/interface/pdi/impl/modules/storage/TmpFs.{h,cpp}](src/interface/pdi/impl/modules/storage/TmpFs.h)) — a **RAM-backed read/write** filesystem mounted at `/tmp`. Unlike the synthetic proc/sys/dev backends it actually stores file content and directories in the heap (a `tmpfs_node_t` table), so the full command surface works — `mkdir`, `touch`, `echo … >`, `cat`, `head`, `tail`, `wc`, `grep`, `cp`, `mv`, `rm`, `chmod`, `chown`. Files are stamped with the creating session's uid/gid and `perms & ~umask` (same `currentOwner`/`currentUmask`/`nowEpoch` hooks the LittleFS root uses), so the dispatcher's permission gate enforces access normally. Everything is lost on reboot.
+**tmpfs** is a real read/write filesystem that happens to live in the heap, so the entire command surface works against it — `mkdir`, `touch`, redirection, `cat`, `cp`, `mv`, `rm`, `chmod`, `chown`. Files carry the creating session's uid and gid and the usual umask treatment, so permissions behave exactly as they do on flash. Budgets are a total byte count, a node count and a path length; `df` reports against the byte budget.
 
-Budgets live in [config/TmpFsConfig.h](src/config/TmpFsConfig.h): `TMPFS_MAX_BYTES` (total content, default 4096), `TMPFS_MAX_NODES` (files + dirs, default 24), `TMPFS_MAX_PATH` (default 63). `df` reports usage against `TMPFS_MAX_BYTES`. Example: `mkdir /tmp/work; echo hello > /tmp/work/a.txt; cat /tmp/work/a.txt`. A single `/tmp` mount is the whole RAM-filesystem surface — sufficient scratch space for the target devices without a second RAM store.
+**Permissions** are stored as file attributes and enforced in the dispatcher. Every entry carries type, size, name, ctime, mtime, mode, uid and gid, stamped at creation from the current session with `0644` for files and `0755` for directories, masked by that session's umask.
 
-**Permissions & ownership** are advisory at the wrapper (bits stored via `lfs_setattr`) and enforced at the dispatcher. `file_info_t` carries `m_type`/`m_size`/`m_name`/`m_ctime`/`m_mtime`/`m_perms`/`m_uid`/`m_gid` and every FS entry is stamped on create with the current session's uid/gid (via the protected `currentOwner()` hook, overridden in `FileSystemInterfaceImpl` to pull from `SessionManager`). Default file/dir perms are `0644` / `0755` masked by the caller's umask (`FILE_UMASK_DEFAULT 0022`, per-session via `currentUmask()`).
+```
+  write family    (write, edit, delete, touch)        ─▶ W bits on the path
+  read family     (read, list, search)                ─▶ R bits on the path
+  attribute + permission changes                      ─▶ owner or root
+  ownership changes                                   ─▶ root only
+  create / rename / metadata queries                  ─▶ ungated
+        │
+        └─ root bypasses all of it; entries with no recorded owner read as root-owned
+```
 
-`VfsDispatcher` gates every write/read/mutate at entry via three helpers:
+There is a narrow setuid analogue: a privileged scope that suspends those checks between a begin and an end call. The user store brackets exactly one thing in it — reading and writing `/etc/shadow` on behalf of a `su`, `login` or `passwd` running as a non-root session.
 
-| Op class | Gate | Behavior |
-|---|---|---|
-| `editFile`, `writeFile`, `deleteFile`, `deleteDirectory`, `touch` | `checkAccess(path, W)` | POSIX owner/group/other bits; root (uid=0) bypasses |
-| `readFile`, `getDirFileList`, content-search family (`findInFile`, `readLineInFile`, …) | `checkAccess(path, R)` | Same lookup |
-| `setFileAttr`, `removeFileAttr`, `setFilePermissions` | `checkOwnerOrRoot(path)` | Owner of the file or root |
-| `setFileOwner` | `checkRoot()` | Root only |
-| `createFile`, `createDirectory`, `rename`, `copyFile`, `moveFile`, `isFileExist`, `isDirExist`, `getFileMeta`, `getFileAttr`, `getFileSize` | ungated | Deferred (parent-dir traversal) / metadata-only |
-
-Missing files are treated as "allowed" (creation defer); missing uid/gid attrs on legacy entries default to **root-owned** (0/0).
-
-**Privileged scope** — a setuid analog. `beginPrivileged()` / `endPrivileged()` on the dispatcher increment a depth counter; while depth > 0 all three check helpers return `true`. Used by `UserStoreService::verifyPassword` / `setPassword` to read `/etc/shadow` (0600) on behalf of a non-root session during `su`/`login`/`passwd`. Scope kept as narrow as possible around the shadow read.
-
-Cross-mount `copyFile`/`rename`/`moveFile` (source and destination on different backends, e.g. `cp /tmp/a.txt /home/a.txt`) stream the source file chunk-by-chunk into the destination backend — the first chunk creates/truncates, the rest append; a mid-transfer failure removes the partial destination. Directories don't cross boundaries, and an existing destination is refused. A cross-mount `mv`/`rename` is a stream-copy followed by deleting the source. Same-backend operations still route straight to that backend's native call. Symlinks (`FILE_TYPE_LINK` / `ln -s`) and runtime `mount`/`umount` remain unimplemented.
+Copying, renaming or moving across mounts streams the file chunk by chunk into the destination backend, creating on the first chunk and appending after that; a failure part-way removes the partial destination, and a `mv` is that copy followed by deleting the source. Same-backend operations go straight to the backend's own call. Directories don't cross mounts, and an existing destination is refused.
 
 #### 6.2.12 `WebServer` — `__web_server`
 
-| Flag | `ENABLE_HTTP_SERVER` (+ optional `ENABLE_HTTPS_SERVER` for TLS) |
-|---|---|
-| Source | [webserver/WebServer.{h,cpp}](src/webserver/WebServer.h) |
-| Wired in PdiStack | `__web_server.initService(this->m_server)` where `m_server = &__i_http_server` |
-| HTTP/HTTPS dispatch | If `ENABLE_HTTPS_SERVER` + `ENABLE_TLS_SERVICE` are on, `initService` calls `setServerCertificatePath` / `setServerPrivateKeyPath` (plus `setClientCertificateAuthorityPath` when `ENABLE_HTTPS_SERVER_MTLS`) using the defaults from [TlsConfig.h](src/config/TlsConfig.h), then `begin(HTTPS_DEFAULT_PORT=443, secure=true)`. Otherwise `begin(HTTP_DEFAULT_PORT=80)`. |
-| Loop tick | `__web_server.handle_clients()` is called every `PdiStack::serve()` iteration |
-
-Full breakdown lives in [§8. Web Server](#8-web-server) — it has its own router, middleware chain, controllers, views, and session handler that don't fit the `ServiceProvider` shape.
+Started with the HTTP server interface and ticked from every pass of `serve()`. With HTTPS on, `initService` sets the certificate, key and — under mTLS — client CA paths, then binds 443 with TLS enabled; otherwise it binds 80. It has its own router, middleware chain, controllers and session handling, all covered in [§8](#8-web-server).
 
 #### 6.2.13 `TelnetServiceProvider` — `__telnet_service`
 
-| Flag | `ENABLE_TELNET_SERVICE` |
-|---|---|
-| Source | [transport/TelnetServiceProvider.{h,cpp}](src/service_provider/transport/TelnetServiceProvider.h) |
-| Depends on | `iTcpServerInterface`, `__cmd_service`, `__auth_service` |
-| Init does | Binds port 23 (configurable via `initService(&port)`); accepts one client, hands its `iClientInterface*` to the CLI |
-| Loop tick | Driven by `PdiStack::serve` indirectly through the scheduler |
+Binds port 23, accepts a client, and hands its stream to the CLI as a terminal. Everything after that is the shell.
 
 #### 6.2.14 `SSHServer` — `__sshserver_service`
 
-| Flag | `ENABLE_SSH_SERVICE` (⇒ `ENABLE_NETWORK_SERVICE` ∧ `ENABLE_STORAGE_SERVICE`) |
-|---|---|
-| Source | [shell/ssh/SSHServiceprovider.{h,cpp}](src/service_provider/shell/ssh/SSHServiceprovider.h) (in `LWSSH` namespace) |
-| Depends on | `iTcpServerInterface`, `iFileSystemInterface`, crypto primitives ([src/utility/crypto/](src/utility/crypto/)), `__auth_service` |
-| Key algorithms | See `SSHKeyAlgorithm` enum in [SshConfig.h](src/config/SshConfig.h) — **Ed25519** and **RSA** (2048-bit, `SSH_RSA_KEY_BITS`), both host-key and user-auth |
-| Transport crypto | `curve25519-sha256` key exchange, `aes128-ctr` cipher, and a **negotiated MAC**: `hmac-sha2-256` (preferred) or `hmac-sha1`, Encrypt-and-MAC. The host key is whichever key the device holds — `ssh-ed25519`, or RSA signed with `rsa-sha2-512` / `rsa-sha2-256`; the server advertises the algorithms it actually has (`get_supported_hostkey_algos`) and picks the client's first supported choice (client preference, per RFC 4253). It also sends the RFC 8308 `server-sig-algs` extension so modern clients offer RSA user keys. MAC choice is stored in `session->mac_len` (32 or 20) |
-| Authentication | Two methods, chosen per session. **password** — verified against `/etc/shadow` through `__auth_service`. **publickey** — **Ed25519 or RSA** keys listed in `~/.ssh/authorized_keys` (standard OpenSSH `ssh-ed25519 <base64> comment` / `ssh-rsa <base64> comment` lines); the client signature over the session id is checked with `ed25519_verify` or RSASSA-PKCS1-v1_5 (`rsa-sha2-256`/`rsa-sha2-512`). Policy comes from `/etc/ssh/sshconfig` — `PasswordAuthentication` and `PubkeyAuthentication` (`yes`/`no`), both enabled by default; the file is auto-created on first boot if absent. On a failed attempt the server advertises exactly the methods still allowed. See [§7.9.1 SSH authentication](#791-ssh-authentication) |
-| Concurrency | Up to `SSH_MAX_SESSIONS` ([SshConfig.h](src/config/SshConfig.h), default 2) SSH connections are accepted and serviced concurrently. Graphical SFTP clients (FileZilla / WinSCP) keep a directory-browse connection open and open a **second** connection to transfer or edit a file; the pool serves both |
-| File transfer | SFTP subsystem implemented on top of the file system; supports interactive `sftp` (REALPATH, STAT, OPENDIR/READDIR, OPEN/READ/WRITE, MKDIR/RMDIR, REMOVE, RENAME, FSTAT; SETSTAT is no-op; READLINK/SYMLINK report unsupported), remote edit/save from graphical clients, and SCP via `scp -s` (see [§7.9 SFTP / SCP file transfer](#79-sftp--scp-file-transfer)) |
-| Cost | **Highest of any service** — keys, hash, symmetric AES, large per-session buffers (× `SSH_MAX_SESSIONS`) |
+The most expensive service in the framework, and the most capable: a full SSH server with an SFTP subsystem, written on the framework's own crypto.
+
+```
+  version exchange
+        │
+  KEXINIT ──▶ pick host-key algorithm from what we actually hold
+        │     curve25519-sha256 · aes128-ctr · hmac-sha2-256 or hmac-sha1
+        │
+  KEXDH ────▶ sign the exchange hash with the host key
+        │
+  NEWKEYS ──▶ (RFC 8308 server-sig-algs sent here, so modern clients offer RSA keys)
+        │
+  USERAUTH ─┬─ publickey  ─▶ blob matched against ~/.ssh/authorized_keys, then
+        │   │                signature verified over the session id
+        │   └─ password   ─▶ verified against /etc/shadow
+        │
+  CHANNEL ──┬─ shell      ─▶ a terminal handed to the CLI
+            └─ subsystem  ─▶ SFTP
+```
+
+Host keys live in `/etc/ssh` alongside `sshconfig`, leaving `~/.ssh` to the user's own client keys. The Ed25519 host key is created on service start if it is missing, which takes milliseconds. RSA is generated only when asked for with `sshkgen t=2,f=b`, because 2048-bit keygen on these parts is measured in minutes.
+
+Both authentication methods are on by default and each can be switched off in `/etc/ssh/sshconfig`, which is created with defaults on first boot. When an attempt fails the server advertises exactly the methods still permitted. [§7.9.1](#791-ssh-authentication) has the operational detail.
+
+Two sessions are served concurrently by default, which is what graphical SFTP clients need — they hold a browse connection open and open a second one to move a file. The SFTP subsystem covers path resolution, stat, directory listing, open/read/write, mkdir, rmdir, remove and rename, which is enough for interactive `sftp`, for editing a remote file in FileZilla or WinSCP, and for `scp -s`.
 
 #### 6.2.15 `CommandLineServiceProvider` — `__cmd_service`
 
-| Flag | `ENABLE_CMD_SERVICE` |
-|---|---|
-| Source | [cmd/CommandLineServiceProvider.{h,cpp}](src/service_provider/cmd/CommandLineServiceProvider.h) |
-| Inherits | `ServiceProvider`, `CommandExecutionInterface` |
-| Depends on | `__auth_service`, `SessionManager` ([§6.2.18](#6218-sessionmanager)), every command in [cmd/commands/](src/service_provider/cmd/commands/) |
-| Init does | Registers all command handlers; `PdiStack` calls `SessionManager::attach(serialTerminal)` at boot so the serial slot is populated before first input |
-| Terminal binding | `useTerminal(t)` attaches a `session_t` for terminal `t` (idempotent) and draws the login prompt. `processTerminalInput(t)` looks up the session via `SessionManager::findByTerminal(t)`, sets it as current for the tick, then dispatches. Each in-flight command carries `m_owner = session` so cross-session `getCommandWaitingForUserInput` never returns another session's prompt |
-| Built-in commands | Files (`ls`/`cd`/`pwd`/`mkdir`/`touch`/`mv`/`cp`/`rm`/`cat`/`echo`/`fedit`/`head`/`tail`/`wc`/`df`/`grep`/`hexdump`/`mount`/`chmod`/`chown`/`umask`), auth+users (`login`/`logout`/`whoami`/`id`/`who`/`su`/`passwd`/`useradd`/`userdel`/`groups`), network (`net`/`host`/`ping`/`date`/`tdctl`), device (`srvc`/`ps`/`top`/`kill`/`pkill`/`killall`/`renice`/`ssh`/`tls`/`iot`/`reboot`/`watch`/`uptime`/`cls`/`help`) — full reference in [§7.7](#77-built-in-command-inventory) |
-| Multi-session | Up to `PDI_MAX_SESSIONS` (default 3) sessions run concurrently across serial + telnet + ssh. Each has its own linebuf, cursor, history-walk, cwd, auth, username, and in-flight commands. See [§7.8](#78-multi-terminal-session-lifecycle) |
+Registers every command and owns the binding between terminals and sessions. Attaching a terminal creates or finds its session and draws the login prompt; each input tick looks the session up from the terminal and makes it current before dispatching. Every in-flight command remembers which session owns it, so one session's half-finished prompt is never handed to another.
+
+Up to three sessions run at once across serial, telnet and SSH, each with its own line buffer, cursor, history position, working directory, umask and identity. [§7](#7-command-line--terminal) is the full CLI reference.
 
 #### 6.2.16 TLS (no provider; transport hookup + cert provisioning)
 
-`ENABLE_TLS_SERVICE` doesn't ship its own `ServiceProvider` either — it lives at the **interface + port** level and is consumed by anything that asks `iInstanceInterface` for a fresh client/server. The orchestrator's only direct involvement: when the flag is on, `PdiStack`'s shared HTTP client (`m_client`) is allocated via `__i_instance.getNewTlsClientInstance()` instead of TCP, so OTA / MQTT / Email / IoT / GPIO-post automatically run over TLS.
+TLS has no service class either — it lives at the interface and port level, and anything that asks the instance factory for a client gets a TLS one when the flag is on. That single substitution is what puts OTA, MQTT, email, IoT and GPIO posting on TLS without any of them knowing.
 
-| Flag | `ENABLE_TLS_SERVICE` (+ `ENABLE_HTTPS_SERVER`, `ENABLE_HTTPS_SERVER_MTLS`, `ENABLE_TLS_CERT_GENERATION`, `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME`) |
-|---|---|
-| Backends | **esp8266** → BearSSL: [TlsClientInterface](devices/esp8266/TlsClientInterface.h), [TlsServerInterface](devices/esp8266/TlsServerInterface.h), [BearSSLCertLoader](devices/esp8266/BearSSLCertLoader.h). **esp32** → mbedTLS: [TlsClientInterface](devices/esp32/TlsClientInterface.h), [TlsServerInterface](devices/esp32/TlsServerInterface.h), [MbedTLSCertLoader](devices/esp32/MbedTLSCertLoader.h) |
-| Cert / key paths | Loaded from FS at runtime via the per-port `*CertLoader` namespace. Defaults from [TlsConfig.h](src/config/TlsConfig.h): `/etc/http/server.crt`, `/etc/http/server.key`, `/etc/http/client-ca.crt`, `/etc/ssl/ca-bundle.crt` |
-| Threading | TLS handshakes (EC keygen / ECDSA sign) overflow the default cont_t stack on esp8266, so `ENABLE_TLS_SERVICE` forces `ENABLE_CONTEXTUAL_EXECUTION` and runs BearSSL on a dedicated cooperative task sized by `TLS_TASK_STACK_SIZE` (default 6500 B) |
-| Outbound default | `PdiStack::PDIStack()` calls `setVerifyPeer(false)` on the bundled client so encrypted-but-unverified TLS works out of the box. For production, use `setCertificateAuthorityPath(TLS_DEFAULT_OUTBOUND_CA_BUNDLE_PATH)` and drop the `setVerifyPeer(false)` line |
-| HTTPS server | [HttpServerInterfaceImpl](src/interface/pdi/impl/middlewares/HttpServerInterfaceImpl.h) has a TLS branch (`begin(port, secure=true)`) that wraps each accepted client in the port's TLS server. `Strict-Transport-Security` is emitted when `HTTPS_HSTS_MAX_AGE_SECONDS` is non-zero |
-| Cert provisioning (esp32) | [devices/esp32/TlsCertProvisioner.{h,cpp}](devices/esp32/TlsCertProvisioner.h). `generateCert(...)` issues a self-signed EC/RSA cert with optional CA bit, IPv4/DNS SANs, custom validity. `ensureServerCert(...)` creates one only if missing — wired to `EVENT_WIFI_STA_GOT_IP` when `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` is on |
-| Off-device cert generation | [scripts/GenTlsCerts.py](scripts/GenTlsCerts.py) — OpenSSL-backed alternative for boards without on-device gen (esp8266). EC/RSA, multi-DNS/IP SANs, CA mode, CSR re-signing. Output under `certs/`; upload to the `TLS_DEFAULT_*_PATH` paths |
-| CLI | `tls q=1,t=<EC|RSA>,l=<bits>,n=<CN/DNS>,i=<IPv4>` — generates a server cert on-device (esp32 only). See [§7.7](#77-built-in-command-inventory). |
+BearSSL backs the ESP8266 port and mbedTLS the ESP32 one. Certificates and keys are read from the filesystem at runtime, defaulting to `/etc/http/server.crt`, `/etc/http/server.key`, `/etc/http/client-ca.crt` and `/etc/ssl/ca-bundle.crt`.
+
+Handshakes need more stack than the ESP8266 main context has, so enabling TLS also enables contextual execution and runs the engine on its own cooperative task with a stack sized by `TLS_TASK_STACK_SIZE`.
+
+The bundled outbound client is created with peer verification off so that an encrypted-but-unverified connection works immediately. For production, point it at the CA bundle path and drop that line.
+
+Certificates come from one of two places. On ESP32, the on-device provisioner issues self-signed EC or RSA certs with the SANs you ask for, and `ensureServerCert` creates one only when it is missing — wired to the got-IP event when runtime generation is enabled. Everywhere else, `scripts/GenTlsCerts.py` does the same job with OpenSSL and you upload the result over SFTP.
 
 #### 6.2.17 `UserStoreService` — `__user_store_service`
 
-| Flag | `ENABLE_AUTH_SERVICE` + `ENABLE_STORAGE_SERVICE` |
-|---|---|
-| Source | [user/UserStoreService.{h,cpp}](src/service_provider/user/UserStoreService.h) |
-| Config | [config/UserStoreConfig.h](src/config/UserStoreConfig.h) — `USER_STORE_PASSWD_PATH="/etc/passwd"`, `USER_STORE_SHADOW_PATH="/etc/shadow"`, `USER_STORE_SALT_LEN=8`, `USER_STORE_ROOT_UID=0`, `USER_STORE_DEFAULT_SHELL="cmd"` |
-| Depends on | `__i_fs`, `__database_service` (bootstrap only), `utility/crypto/hash/sha256`, `utility/DataTypeConversions` (hex helpers) |
-| Files | **`/etc/passwd`** — one line per user: `username:x:uid:gid:home:shell` (mode `0644`, world-readable — `id`/`groups` need it). **`/etc/shadow`** — `username:hexhash:hexsalt` (32-byte SHA-256 of `salt‖password`, 8-byte random salt) stamped `0600` (root-only, since it holds the hashes) |
-| Public API | `findUserByName`, `findUserByUid`, `addUser(record, password)` (writes both files, rolls back passwd row on shadow failure), `removeUser` (removes from both), `verifyPassword` (constant-time hash compare), `setPassword` |
-| Bootstrap | On `initService`, if `/etc/passwd` doesn't exist, seeds it with the LoginTable admin as `uid=0, gid=0, home=/, shell=cmd` and hashes the admin password into `/etc/shadow`. Idempotent — reboot doesn't clobber. Also **retroactively re-stamps** `/etc/shadow` to `0600` on every boot in case a pre-perms build left it `0644` |
-| Privileged reads | `verifyPassword` and `setPassword` need to read/write `/etc/shadow` on behalf of a non-root session (during `su`/`login`/`passwd`). They bracket the shadow access in `__i_fs.beginPrivileged()` / `endPrivileged()` — a setuid analog. Scope is kept as narrow as possible; every other UserStore method runs unprivileged |
-| useradd default gid | `useradd` assigns `gid = uid` (each user in their own group). No `/etc/group` yet — group semantics land in a future step |
-| Init order | Called from `PdiStack::initialize` after `__i_fs.init()` and before the CLI, so FS is ready but auth still degrades cleanly to LoginTable if shadow write fails |
-| Auth path | `AuthServiceProvider::isAuthorized(u, p)` (§6.2.10) prefers this service when `/etc/shadow` exists, else falls back to LoginTable. That's the switch that turns pdi-framework from single-record auth into a multi-user OS |
+The user directory, in two files:
+
+```
+  /etc/passwd   0644   username:x:uid:gid:home:shell        world-readable — id and groups need it
+  /etc/shadow   0600   username:hexhash:hexsalt             SHA-256 of salt‖password, 8-byte salt
+```
+
+The API is what you'd expect — look up by name or uid, add a user (writing both files, rolling the passwd row back if the shadow write fails), remove a user, verify a password with a constant-time compare, set a password.
+
+On first start, if `/etc/passwd` is absent, it seeds root from the bootstrap credential row and hashes that password into shadow. The seeding is idempotent, and every boot re-stamps shadow as `0600` in case an older build left it readable.
+
+Verifying or changing a password has to read shadow on behalf of a non-root session, so those two methods — and only those two — bracket the access in the privileged scope described in [§6.2.11](#6211-storage-interface-init-no-provider). `useradd` gives each user their own group by setting gid to uid.
+
+It initialises after the filesystem and before the CLI, and the auth service prefers it whenever shadow exists. That preference is the switch that turns the framework from single-credential auth into a multi-user system.
 
 #### 6.2.18 `SessionManager`
 
-Not a `ServiceProvider` — a static registry that owns the per-session state.
+Not a service — a static registry holding one `session_t` per attached terminal, three by default.
 
-| Source | [session/SessionManager.{h,cpp}](src/service_provider/session/SessionManager.h) |
-|---|---|
-| Config | [config/SessionConfig.h](src/config/SessionConfig.h) — `PDI_MAX_SESSIONS` (default 3). Override to 1 on AVR-class devices |
-| State type | `session_t` in [utility/DataTypeDef.h](src/utility/DataTypeDef.h) — `m_sid`, `m_state`, `m_terminal*`, `m_loginAt`, `m_lastActivityAt`, `m_linebuf`, `m_cursor`, `m_historyIdx`, `m_origTypedPrefix`, `m_prevArgSize`, `m_autoCompleteIdx`, `m_prevCmdSize`, `m_cwd`, `m_lastCwd`, `m_umask` (storage-gated), `m_isAuthorized`, `m_username`, `m_uid`, `m_gid` (auth-gated) |
-| API | `attach(terminal)` / `detach(terminal)` / `findByTerminal` / `current` / `setCurrent` / `getByIndex(i)` / `maxSessions()` / `activeCount()`. Storage-gated: `getPWD`, `getLastPWD`, `setPWD`, `changeDirectory`, `getCurrentUmask`, `setCurrentUmask`. Auth-gated: `getCurrentUid`, `getCurrentGid` — session-scoped cwd/uid/gid/umask with `__i_fs` fallback pre-attach |
-| Login-time caching | `AuthServiceProvider::setAuthorized(true)` looks up the resolved `user_record` via `__user_store_service.findUserByName` and caches `m_uid` / `m_gid` on the session; `m_umask` is reset to `FILE_UMASK_DEFAULT` (`0022`). On logout / clear, all three reset to 0/0/`FILE_UMASK_DEFAULT`. The cache is what `VfsDispatcher` reads on every FS check (single dereference — no `/etc/passwd` scan per file op) |
-| Wire-in | `CommandLineServiceProvider::useTerminal` calls `attach`; `processTerminalInput` calls `findByTerminal` + `setCurrent`; SSH's USERAUTH_SUCCESS attaches early so auth state anchors to the SSH channel; Telnet/SSH `closeSession` calls `detach(theClient)` explicitly |
+A session carries its own line buffer and cursor, history position, autocomplete state, working directory, umask, and — when auth is on — authorisation flag, username, uid and gid.
+
+```
+  terminal attaches      ─▶ session created, login prompt drawn
+  input arrives          ─▶ session found by terminal, made current, command dispatched
+  login succeeds         ─▶ uid, gid cached on the session; umask reset to default
+  every filesystem call  ─▶ dispatcher reads that cached uid/gid — one dereference,
+                            never a scan of /etc/passwd per file operation
+  connection closes      ─▶ session detached
+```
+
+SSH attaches its session as soon as user auth succeeds, so authorisation state is anchored to the channel rather than to whichever command runs first.
 
 #### 6.2.19 `MdnsServiceProvider` — `__mdns_service`
 
-A library-free multicast-DNS + DNS-SD responder (`SERVICE_MDNS`, `ENABLE_MDNS_SERVICE`) — see [§2.4.2](#242-mdns--dns-sd-enable_mdns_service) for the overview.
+The responder from [§2.4.2](#242-mdns-and-dns-sd), running as an ordinary service on raw lwIP UDP. It derives the hostname from the MAC, writes `/etc/hostname`, joins the multicast group when the station gets an IP, and advertises whichever servers this build is running. Responses bundle PTR, SRV, TXT and A so a single query gets everything it needs. `srvc status MDNS` shows what it is announcing.
 
-| Source | [network/MdnsServiceProvider.{h,cpp}](src/service_provider/network/MdnsServiceProvider.h) |
-|---|---|
-| Config | [config/MdnsConfig.h](src/config/MdnsConfig.h) — port 5353, TTLs, multicast group `224.0.0.251`, hostname prefix `pdi-`, `MDNS_MAX_SERVICES`, DNS wire-type codes |
-| Built on | `iUdpInterface` via `__i_instance.getNewUdpInstance()` (raw lwIP UDP); `iWiFiInterface` (MAC → hostname, `EVENT_WIFI_STA_GOT_IP` trigger); `__i_fs` (writes `/etc/hostname`) |
-| Advertises | `_http`/`_https._tcp`, `_ssh._tcp`, `_sftp-ssh._tcp`, `_telnet._tcp` (gated by each server's `ENABLE_*` flag) via `addService(type, proto, port)` |
-| Responds to | A (`<host>.local`), service-enumeration PTR (`_services._dns-sd._udp.local`), per-type PTR, and instance SRV/TXT — bundling PTR+SRV+TXT+A. Receive is callback-driven (no `update()` pump); response buffers are heap-allocated per send and freed immediately |
-| No dependency | Does **not** use `ESP8266mDNS`/`ESPmDNS` — the responder is hand-rolled on lwIP UDP, so the only Arduino-lib coupling stays at the WiFi layer |
+### 6.3 Init order
 
-### 6.3 Init order and why it matters
-
-`PDIStack::initialize` orders the calls deliberately:
+The orchestrator starts services in a deliberate order:
 
 ```
-1. database_service        ← every other service may need persisted config
-2. serial_service          ← provides the boot terminal for log output
-3. wifi_service            ← brings up the network
-4. ota_service             ← may pre-empt all other startup if a new build is queued
-5. gpio_service            ← can fire alerts via http/email once those exist
-6. mqtt_service            ← may publish boot status
-7. email_service           ← used by gpio events
-8. factory_reset           ← always-on; final hook so all services have registered listeners
-9. device_iot_service      ← needs MQTT already up
-10. auth_service           ← gates everything CLI/Web sees
-11. storage init           ← brings the FS up (needed by SSH)
-12. web_server             ← needs auth + storage
-13. telnet, ssh            ← need network + storage + cmd
-14. cmd_service            ← started last so all `srvc` listings are complete
+   1  database        every other service may need persisted config
+   2  serial          gives boot messages somewhere to go
+   3  wifi            brings the network up
+   4  ota             may pre-empt the rest of startup if an update is queued
+   5  gpio            can raise alerts once http and email exist
+   6  mqtt            may publish boot status
+   7  email           used by gpio events
+   8  factory reset   last of the always-on set, so every listener is registered
+   9  device iot      needs MQTT up
+  10  auth            gates everything the CLI and portal expose
+  11  storage         filesystem up — SSH depends on it
+  12  web server      needs auth and storage
+  13  telnet, ssh     need network, storage and the CLI
+  14  cmd             last, so `srvc` sees a complete list
 ```
 
-Two implications you cannot violate:
-- A service initialised *later* can call into one initialised *earlier*; the reverse is undefined.
-- A service that needs another service in its constructor will hit a static-init order trap. Defer all cross-service lookups to `initService` or runtime.
+Two things follow from that. A service started later may call into one started earlier; the reverse is not defined. And a service that needs another one in its *constructor* is relying on static-init order — move the lookup into `initService`.
 
-### 6.4 Cross-service event bus
+### 6.4 The event bus
 
-Direct calls between services are reserved for known-earlier dependencies (OTA → device control). Anything fan-out happens through `__utl_event`. Common event names from [EventConfig.h](src/config/EventConfig.h):
+Direct calls are reserved for dependencies that are known to already exist. Anything fan-out goes through `__utl_event`:
 
 | Event | Fired by | Typical listeners |
 |---|---|---|
-| `EVENT_FACTORY_RESET` | `__factory_reset.factory_reset()` | Database (clear tables), IoT (drop cache), GPIO (reset pins) |
-| `EVENT_WIFI_STA_CONNECTED` / `_STA_DISCONNECTED` | `__wifi_service` | MQTT (re/dis-connect), OTA (suspend), IoT (suspend) |
-| `EVENT_WIFI_STA_GOT_IP` | `__wifi_service` (after DHCP / static IP latches) | Cert provisioner (auto-mint with IP in SAN), services that need a stable address |
-| `EVENT_WIFI_AP_STACONNECTED` / `_STADISCONNECTED` | `__wifi_service` | Captive-portal flows, per-client tracking |
-| `EVENT_WIFI_INTERNET_UP` / `_DOWN` | `__wifi_service` connectivity poller | OTA, IoT, Email |
-| `EVENT_GPIO_TRIGGER` | `__gpio_service` event detector | Email, MQTT, HTTP-post |
-| `EVENT_SERIAL_AVAILABLE` | Serial input bridge | Sketch hooks |
-| `EVENT_OTA_*` | `__ota_service` | Logger, web portal status |
+| `EVENT_FACTORY_RESET` | factory reset | database clears tables, IoT drops cache, GPIO resets pins |
+| `EVENT_WIFI_STA_CONNECTED` / `_DISCONNECTED` | WiFi | MQTT reconnects, OTA and IoT stand down |
+| `EVENT_WIFI_STA_GOT_IP` | WiFi, once the address latches | mDNS, cert provisioner, anything needing a stable address |
+| `EVENT_WIFI_AP_STACONNECTED` / `_STADISCONNECTED` | WiFi | captive-portal flows, per-client tracking |
+| `EVENT_WIFI_INTERNET_UP` / `_DOWN` | connectivity poller | OTA, IoT, email |
+| `EVENT_GPIO_TRIGGER` | GPIO event detector | email, MQTT, HTTP post |
+| `EVENT_SERIAL_AVAILABLE` | serial bridge | sketch hooks |
+| `EVENT_OTA_*` | OTA | logger, portal status |
 
-Use `__utl_event.add_event_listener(name, [&](void* e){ … })` to subscribe; `__utl_event.fire(name, ptr)` to publish.
+Subscribe with `__utl_event.add_event_listener(name, [&](void* e){ … })`, publish with `__utl_event.fire(name, ptr)`.
 
 ### 6.5 Writing a new service
 
-To add (say) a `MetricsServiceProvider`:
+Say you want a metrics service.
 
-1. **Pick a feature flag** in [devices/DeviceConfig.h](devices/DeviceConfig.h) (`ENABLE_METRICS_SERVICE`) and a `service_t` enum value in [ServiceProvider.h](src/service_provider/ServiceProvider.h), guarded by the flag.
-2. **Add the persisted struct** ([§3.4](#3-configuration-system)) and the DB table ([§5.9](#5-database-layer)).
-3. **Create [src/service_provider/metrics/MetricsServiceProvider.{h,cpp}](src/service_provider/metrics/MetricsServiceProvider.h)** deriving from `ServiceProvider`. Register scheduler work through the base wrappers so the task is auto-named, owner-tagged, and tracked (§6.1) — this makes it visible in `ps`, killable via `pkill Metrics`, and controllable via `srvc stop Metrics`:
+1. Add `ENABLE_METRICS_SERVICE` to the device config and a `service_t` value behind the same flag.
+2. Add the persisted struct ([§3.4](#34-the-shape-of-a-service-config)) and its table ([§5.9](#59-adding-a-table)).
+3. Write the provider, scheduling through the base wrappers so the task is named, owned and tracked:
    ```cpp
    MetricsServiceProvider() : ServiceProvider(SERVICE_METRICS, RODT_ATTR("Metrics")) {}
+
    bool initService(void* arg) override {
        __database_service.get_metrics_config_table(&m_cfg);
-       this->serviceSetInterval(
-           [&]{ this->tick(); }, m_cfg.interval_ms, __i_dvc_ctrl.millis_now());
+       this->serviceSetInterval([&]{ this->tick(); },
+                                m_cfg.interval_ms, __i_dvc_ctrl.millis_now());
        return ServiceProvider::initService(arg);
    }
    ```
-4. **Wire it in** the orchestrator: include guarded in [PdiStack.h](src/PdiStack.h), call `__metrics_service.initService(...)` from [PdiStack.cpp](src/PdiStack.cpp) in the right slot per [§6.3](#6-service-providers).
-5. **Surface it**: implement `printConfigToTerminal` / `printStatusToTerminal` so `srvc` lists it; optionally add a CLI command under [cmd/commands/](src/service_provider/cmd/commands/) and a web controller under [webserver/controllers/](src/webserver/controllers/).
-6. **Use events, not direct calls**, when you need to react to other services' state.
+   That alone makes it visible in `ps`, killable with `pkill Metrics`, and controllable with `srvc stop Metrics`.
+4. Include it and call its `initService` from the orchestrator, in the right slot per [§6.3](#63-init-order).
+5. Implement the two print hooks so `srvc` has something to show, and add a command or a web page if it deserves one.
+6. React to other services through events rather than by calling them.
 
-### 6.6 Gotchas
-
-- **Constructor side-effects are a trap.** Allocating, reading the DB, or touching `__i_*` interfaces in your service's constructor will run before `setup()`, before the device's interface globals are initialised. Always defer to `initService`.
-- **Don't `new` in `initService` either.** Use a value member or a static buffer; the embedded heap can fragment over months of uptime.
-- **The base `stopService` reaps every task in `m_service_task_ids[]`** — as long as you registered through the `serviceSet*` wrappers (§6.1), no override is needed. If you registered a task via raw `__task_scheduler.setInterval(...)` (usually a mistake now), it'll leak on stop unless you also call `trackServiceTask(id)` or explicitly `clearInterval` it in your override.
-- **`SERVICE_DATABASE` and `SERVICE_FACTORY` are unconditional** in the `service_t` enum — every build always has them. Don't guard them with `ENABLE_*` even if your minimal build "doesn't need" them.
-- **`printConfigToTerminal` is called from the CLI thread** (whichever lane the terminal is attached to). It must not block. If your config print is slow (e.g. iterates 50 MQTT topics), paginate via repeated `srvc` calls instead.
-- **One global per service.** The `m_services[SERVICE_X]` slot is filled by the constructor; instantiating a second `XServiceProvider` overwrites the pointer and silently breaks `getService(SERVICE_X)`.
+Two habits keep services well-behaved. Do the real work in `initService`, not in the constructor — at construction time the device globals do not exist yet. And prefer value members or static buffers to heap allocation, since these devices stay up for months at a time.
 
 ---
-
 ## 7. Command Line / Terminal
 
-The CLI is the framework's universal control plane. The same set of commands is reachable over **serial** by default, **telnet** on port 23, and **SSH** on port 22 — with login, command history, autocomplete, in-place editing, and a SFTP file-transfer subsystem. The trick that makes one implementation cover three channels: every terminal source surfaces as an `iTerminalInterface*`, and the CLI rebinds that pointer per session.
+The shell is the universal control plane. The same commands are reachable over serial, over telnet on port 23, and over SSH on port 22, with login, history, tab completion, in-place editing and file transfer. One implementation covers all three channels because every source presents itself as an `iTerminalInterface`, and the CLI binds one per session.
 
-Implementation: [src/service_provider/cmd/](src/service_provider/cmd/) (`__cmd_service`) plus the parser primitives in [src/utility/CommandBase.{h,cpp}](src/utility/CommandBase.h). User-facing command table is in [§7.7 Built-in command inventory](#77-built-in-command-inventory).
+Start reading at [src/service_provider/cmd/](src/service_provider/cmd/); the parser lives in `src/utility/CommandBase.h`.
 
 ### 7.1 Layered model
 
 ```
-  Application stream    Serial port   Telnet TCP session   SSH channel
-                            │                │                  │
-                            └────────────────┴──────────────────┘
-                                             │  iTerminalInterface*
-                                             ▼
-                            ┌──────────────────────────────────────┐
-                            │  CommandLineServiceProvider          │  ← src/service_provider/cmd/
-                            │  __cmd_service                       │
-                            │  ─ owns the input ring buffer        │
-                            │  ─ binds one terminal at a time      │
-                            │  ─ history + autocomplete + editing  │
-                            └──────────┬───────────────────────────┘
-                                       │ dispatch
-                                       ▼
-                            ┌──────────────────────────────────────┐
-                            │  CommandBase registry                │  ← src/utility/CommandBase.h
-                            │  static vector<CommandProp>          │     +  src/service_provider/cmd/commands/
-                            │  ─ each command self-registers       │
-                            │  ─ parses `cmd opt=val[,opt=val]…`   │
-                            │  ─ supports free-arg, holding opts,  │
-                            │    waiting-for-input, abort signals  │
-                            └──────────┬───────────────────────────┘
-                                       │ delegate to service
-                                       ▼
-                            ┌──────────────────────────────────────┐
-                            │  Service Providers (§6)              │
-                            │  __wifi_service, __gpio_service,     │
-                            │  __task_scheduler, __i_fs, …         │
-                            └──────────────────────────────────────┘
+   serial port        telnet session        ssh channel
+        │                   │                    │
+        └───────────────────┴────────────────────┘
+                            │  iTerminalInterface*
+                            ▼
+              CommandLineServiceProvider
+                ├─ binds a session per terminal
+                ├─ line editing, history, completion
+                └─ dispatch
+                            │
+                            ▼
+                    CommandBase registry
+                ├─ every command self-registers by name
+                ├─ parses  cmd opt=val[,opt=val]  or positional args
+                └─ supports held options, multi-tick commands, abort
+                            │
+                            ▼
+                   services, scheduler, filesystem
 ```
 
 ### 7.2 The terminal contract
 
-Any source that wants to feed the CLI must implement `iTerminalInterface` (defined in [src/utility/iIOInterface.h](src/utility/iIOInterface.h)). It extends `iIOInterface` with the byte-level I/O methods (`write`/`writeln` overloaded for every primitive, `readStringUntil`, `readLine`, `with_timestamp`) plus terminal-specific affordances. The framework already provides three implementations:
+Anything that wants to feed the CLI implements `iTerminalInterface` — byte-level reads and writes overloaded for every primitive type, plus the terminal affordances. Three implementations ship: the serial port, the client object a TCP server hands back for telnet, and the SSH channel wrapper.
 
-| Source | Class | Provided by |
-|---|---|---|
-| Serial port | `SerialInterface` (also satisfies `iSerialInterface : iClientInterface`) | Device port |
-| Telnet client session | `iClientInterface*` returned by `iTcpServerInterface::accept()` | Device port (TCP) |
-| SSH channel | LWSSH session wrapper | [src/service_provider/shell/ssh/](src/service_provider/shell/ssh/) |
-
-When a telnet or SSH client connects, the corresponding service calls `__cmd_service.useTerminal(client)`, which attaches a fresh `session_t` slot via `SessionManager` and starts a login prompt on that client. Serial keeps its own slot (pinned at boot). Each session's input/output stays isolated — see [§7.8](#78-multi-terminal-session-lifecycle).
+When a telnet or SSH client connects, its service calls `useTerminal(client)`, which attaches a fresh session and draws a login prompt on that client alone. Serial holds its slot from boot. Nothing leaks between sessions.
 
 ### 7.3 Input sequences
 
-The CLI does line editing in-process, so it has to recognise control sequences character-by-character. The enum is in [DataTypeDef.h](src/utility/DataTypeDef.h):
+Line editing happens in-process, so the CLI recognises control sequences byte by byte:
 
 | Sequence | Action |
 |---|---|
-| `CMD_TERM_INSEQ_ENTER` | Submit current line for parsing/execution |
-| `CMD_TERM_INSEQ_BACKSPACE_CHAR` / `_DELETE_CHAR` / `_DELETE` | Edit |
-| `CMD_TERM_INSEQ_LEFT_ARROW` / `_RIGHT_ARROW` | Move cursor in-line |
-| `CMD_TERM_INSEQ_UP_ARROW` / `_DOWN_ARROW` | Walk history (requires `ENABLE_STORAGE_SERVICE`) |
-| `CMD_TERM_INSEQ_HOME` / `_END` | Line start / end |
-| `CMD_TERM_INSEQ_PAGE_UP` / `_PAGE_DOWN` | Scroll long output |
-| `CMD_TERM_INSEQ_TAB` | Autocomplete (cycles registered commands matching the typed prefix) |
-| `CMD_TERM_INSEQ_ESC` | Cancel current line; in `fedit`, open the save/cancel/delete menu (`!w`/`!c`/`!d`) |
-| `CMD_TERM_INSEQ_CTRL_C` / `_CTRL_Z` | Abort the running command; the base `executeTermInputAction` returns `CMD_RESULT_ABORTED` |
+| Enter | submit the line |
+| Backspace, Delete | edit |
+| ←, → | move within the line |
+| ↑, ↓ | walk history (needs storage) |
+| Home, End | jump to line start or end |
+| Page Up, Page Down | scroll long output |
+| Tab | complete, cycling through matching command names |
+| Esc | cancel the line; inside `fedit`, open the save/cancel/delete menu |
+| Ctrl+C, Ctrl+Z | abort the running command |
 
-Long-running commands (`watch`, `fedit`) opt-in to receive these sequences mid-execution by overriding `executeTermInputAction(cmd_term_inseq_t)`.
+A long-running command receives these mid-execution by overriding `executeTermInputAction`.
 
-### 7.4 The `CommandBase` (`cmd_t`) contract
+### 7.4 The command contract
 
-Every command is a `struct CommandBase` (typedef'd `cmd_t`). The struct owns parsing — you only fill in `execute(cmd_term_inseq_t)`. See [src/utility/CommandBase.h](src/utility/CommandBase.h).
+Every command is a `CommandBase`. The base owns parsing; you write `execute()`.
 
-#### Construction
+```cpp
+struct TempCommand : public CommandBase {
+    TempCommand() {
+        Clear();
+        SetCommand(CMD_NAME_TEMP);      // name, at most 8 characters
+        AddOption(CMD_OPTION_NAME_T);   // up to 3 options, names up to 3 characters
+    }
+    const char* getUsage() const override {
+        return RODT_ATTR("temp [t=C|F]  read the temperature sensor (default Celsius)");
+    }
+    bool needauth() override { return true; }
+    cmd_result_t execute(cmd_term_inseq_t) override { … }
+};
+```
 
-A command class:
-1. Calls `SetCommand("ls")` to declare its name (max `CMD_SIZE_MAX = 8` chars).
-2. Calls `AddOption("p")`, `AddOption("m")`, … for each named option (max `CMD_OPTION_MAX = 3`, each name ≤ `CMD_OPTION_SIZE_MAX = 3` chars).
-3. Optionally `setAcceptArgsOptions(true)` to also accept positional/free args.
-4. Optionally `setCmdOptionSeparator(",")` (default), `";"`, or `" "`.
-5. Implements `execute(cmd_term_inseq_t)` returning a `cmd_result_t`.
-6. **Overrides `getUsage() const`** to return an `RODT_ATTR`-wrapped one-line usage string. Format: `"<verb> [args]  brief description"`. `help` prints it under the command name, and `CommandBase::ResultToTerminal` prints it under `CmdErr` whenever the command returns `CMD_RESULT_ARGS_MISSING` / `CMD_RESULT_ARGS_ERROR` / `CMD_RESULT_INVALID_OPTION` — so bad-argument branches never need to inline the string themselves.
-7. Optionally overrides `needauth()` to require login, `executeTermInputAction()` to handle CTRL+C/ESC/etc., `stopRunningInBackground()` for cleanup.
-8. Registers itself via `CommandBase::RegisterCommand("ls", &ListFSCommand::Registrar)` so `__cmd_service` can dispatch by name.
+`getUsage()` is the single source of truth for that command's help. It is what `help` prints, and what the dispatcher prints automatically whenever the command returns an argument error — so no error branch ever needs to repeat a usage string.
 
-#### Parsing rules
+Parsing works like this:
 
-Given input `<cmd> p=4,m=3,v=500` (a command declaring options `p`, `m`, `v`):
-- Tokenise the **command name** at the first space (or end).
-- Look up the option separator (default `,`).
-- For each `key=value` pair, find the key in the declared options and store `optionval` + `optionvalsize`.
-- If `setAcceptArgsOptions(true)` and **no** `=` is present after the command, treat the rest as free positional args mapped into `m_options[0..]` in order.
-- On success: `m_result = CMD_RESULT_OK`, then `execute()` runs.
+```
+   "gpio p=4,m=3,v=500"
+      │     └──┬──┘
+      │        └─ split on the option separator (',' by default; ';' or ' ' if the
+      │           command asks for one), then match each key to a declared option
+      └─ command name, up to the first space
 
-Inside `execute`, options are read by name:
+   "chmod 0644 /etc/passwd"
+      └─ a command that opted into positional args gets them in declaration order
+```
+
+Inside `execute`, options come back by name:
 
 ```cpp
 auto pin = RetrieveOption(CMD_OPTION_NAME_P);
 if (pin == nullptr) return CMD_RESULT_ARGS_MISSING;
-int p = atoi(pin->optionval);
 ```
 
-#### Multi-iteration commands
+A command that cannot finish in one tick — `watch`, `fedit`, an interactive prompt — returns `CMD_RESULT_INCOMPLETE`. The dispatcher keeps the instance alive, counts the iteration, and re-enters `execute` on the next input.
 
-For commands that don't finish in a single tick (e.g. `watch`, `fedit`), `execute` returns `CMD_RESULT_INCOMPLETE`. The service keeps the command active, increments `m_iterations`, and re-enters `execute` on every subsequent input. `Clear()` runs only when `m_result != CMD_RESULT_INCOMPLETE`.
-
-#### Holding option values
-
-By default, parsed `optionval` points into the live receive buffer — so once the next character arrives, the pointer is invalid. If a command needs the value to survive across iterations, it calls `holdOptionValue("c")` which copies the bytes into a `new char[]` owned by the option, freed on `Clear()`. `WatchCommand` uses this for its `c=<command>` payload that has to live for many ticks.
+One thing to know when you do that: a parsed option value points into the live receive buffer, which is gone by the next keystroke. `holdOptionValue("c")` copies the bytes into storage the option owns, freed when the command clears. Any value that has to survive into the next tick needs it.
 
 ### 7.5 Result codes
 
-| `cmd_result_t` | Meaning | What the dispatcher does |
+| Result | Meaning | Dispatcher's response |
 |---|---|---|
-| `CMD_RESULT_OK` | Success | Print blank line; clear options |
-| `CMD_RESULT_INCOMPLETE` | Multi-iter; keep me active | Do not clear; wait for next input |
-| `CMD_RESULT_ARGS_ERROR` / `_ARGS_MISSING` / `_INVALID_OPTION` | Bad usage | Print `CmdErr : <n>` **and** `usage: <getUsage()>` if the command provides one — no need for bad-argument branches to inline usage strings themselves |
-| `CMD_RESULT_NOT_FOUND` / `_INVALID` | No such command / can't parse | Print error |
-| `CMD_RESULT_NEED_AUTH` / `_WRONG_CREDENTIAL` | Login required / failed | Re-prompt via the login flow |
-| `CMD_RESULT_ABORTED` | CTRL+C / CTRL+Z hit | Print error; stop iteration |
-| `CMD_RESULT_FAILED` | Command logic failure | Print error |
-| `CMD_RESULT_TERMINAL_ERR` / `_TERMINAL_ABORTED` / `_TERMINAL_HOLD_BUFFER` | Terminal-side states | Special-cased by the service |
+| `OK` | done | blank line, options cleared |
+| `INCOMPLETE` | keep me alive | nothing cleared; wait for more input |
+| `ARGS_ERROR`, `ARGS_MISSING`, `INVALID_OPTION` | bad usage | error line plus the command's usage string |
+| `NOT_FOUND`, `INVALID` | no such command, or unparsable | error line |
+| `NEED_AUTH`, `WRONG_CREDENTIAL` | login required or failed | back to the login flow |
+| `ABORTED` | Ctrl+C or Ctrl+Z | error line, iteration stops |
+| `FAILED` | the command's own failure | error line |
+| `TERMINAL_*` | terminal-side states | handled by the service |
 
-### 7.6 `CommandLineServiceProvider`
+### 7.6 The dispatcher
 
-[CommandLineServiceProvider.h](src/service_provider/cmd/CommandLineServiceProvider.h) — the runtime around `CommandBase`. It owns the in-flight command list (`m_cmdlist`, session-tagged via `m_owner`) and the persistent history file path; the receive buffer, cursor, history-walk, autocomplete indexes, and cwd all live **on each `session_t`** (see [§6.2.18](#6218-sessionmanager)). Dispatch: `processTerminalInput(t)` resolves the session via `SessionManager::findByTerminal(t)`, sets it current for the tick, then drives `executeCommand`. `useTerminal(t)` attaches a session for a fresh client and draws its login prompt.
+The service owns the list of in-flight commands and the history file path. Everything else — receive buffer, cursor, history position, completion index, working directory — lives on the session. Each input tick resolves the session from the terminal, makes it current, and then runs the command.
 
-#### History & autocomplete
-
-- **History** is persisted only when `ENABLE_STORAGE_SERVICE` is on. The file `CMD_TERMINAL_HISTORY_STATIC_FILEPATH = "/.term_history"` is capped at `CMD_TERMINAL_HISTORY_MAX_LINES = 25`. Older entries are rotated out.
-- **Autocomplete** walks `CommandBase::m_cmd_registry` looking for names that start with the current input prefix. Subsequent TABs cycle through matches (`m_cmdAutoCompleteIndex`).
-- Off devices without storage, ↑/↓ produce no output (no backing store) — autocomplete still works because the registry lives in RAM.
+History is persisted only when storage is available, in a file capped at 25 lines. Completion walks the command registry for names matching the typed prefix and cycles on repeated Tab, and works with or without storage because the registry is in RAM.
 
 ### 7.7 Built-in command inventory
 
-Names come from [CommandCommon.h](src/service_provider/cmd/commands/CommandCommon.h); each `<Name>Command.h` defines the class.
-
-#### User-facing command table
-
 | Command | Options | Brief |
 |---|---|---|
-| ls [\<dir>] | | List files/dirs with mode / owner / group / mtime / size. No arg → current dir; absolute path → listed as-is; relative path → joined with PWD. Owner+group show human names (numeric uid/gid if user record is missing). e.g. **ls**, **ls /proc**, **ls scripts** |
-| mkdir \<dir> | | Create directory. Perms = `0755 & ~umask`; owner = current session's uid/gid. e.g. **mkdir /home/scripts** |
-| touch \<file> | | Create the file empty if missing (perms = `0644 & ~umask`, owner = current session's uid/gid); bump `mtime` if it exists. e.g. **touch /home/notes.txt** |
-| mv \<src> \<dst> | | Move / rename file or dir. e.g. **mv /home/a.txt /home/b.txt** |
-| cp \<src> \<dst> | | Copy file. e.g. **cp /home/a.txt /home/b.txt** |
-| pwd | | Print current working directory. e.g. **pwd** |
-| rm \<file_or_dir> | | Remove file or directory. Requires `+w` on the target for non-root. e.g. **rm /home/notes.txt** |
-| cat \<file> | | Print file contents to terminal (renamed from `fread`). Requires `+r` on the file for non-root. e.g. **cat /home/notes.txt**, **cat /proc/uptime** |
-| echo \<text> [> \<file>] | | Print `<text>`; with `>` redirection, write it to `<file>` via a single `writeFile` (no tmp/append dance — works on synthetic nodes). Requires `+w` on the target for non-root. e.g. **echo hello**, **echo 1 > /sys/class/gpio/5/value**, **echo x > /dev/null**. Note: comma is the shell's option separator, so `<text>` should not contain commas. |
-| fedit \<file> | | Open `<file>` in the scrolling in-place line editor (creates it empty if missing). A nano-style status bar shows the path; edit the active line with ←/→/Home/End/Backspace/Delete, **↑/↓** move between lines and scroll the viewport through the whole file, **ENTER** splits the active line at the cursor. Press **ESC** for the bottom-bar menu: **!w** save, **!c** cancel, **!d** delete current line. Edits stream to a `<file>.tmp` working copy and are committed over the original on `!w`. Requires `+w` on the file for non-root. e.g. **fedit /home/notes.txt** |
-| head \<file> [N] | | Print first N lines (default 10); constant memory. e.g. **head /home/log.txt 5** |
-| tail \<file> [N] | | Print last N lines (default 10); constant memory. e.g. **tail /home/log.txt 5** |
-| wc \<file> | | Print line / word / byte counts (Linux `wc` order). e.g. **wc /home/log.txt** |
-| df | | Print one row per mounted VFS backend: `MOUNT NAME TOTAL USED FREE` in bytes. e.g. **df** |
-| mount | | List active VFS mount points with prefix / type / backend name. e.g. **mount** |
-| chmod \<octal> \<path> | | Set POSIX permission bits (e.g. `0644`, `0755`). Owner-or-root only (enforced by VFS). e.g. **chmod 0644 /etc/passwd** |
-| chown \<uid>[:\<gid>] \<path> | | Change owning uid (and optionally gid) of a file/dir. Root-only. If `:gid` is omitted, `gid = uid`. e.g. **chown 1001 /home/alice** or **chown 1001:1001 /home/alice** |
-| umask [\<octal>] | | Print current session's umask; with an arg, set it. Applied at file/dir creation as `default_perms & ~umask`. Default `0022`. e.g. **umask 0027** |
-| hexdump \<file> | | `hexdump -C` layout: offset, 16 hex bytes, ASCII. e.g. **hexdump /home/bin.dat** |
-| grep \<pattern> \<file_or_dir> | | Search a file or dir (recursive). Output `path:line:col:content` (vim/vscode jump format). Regex subset: `.` `*` `+` `?` `^` `$` `[abc]` `[a-z]` `[^abc]` `\\<char>`. No alternation / groups / backrefs. e.g. **grep ^ERROR /home/log.txt** |
-| cls | | Clear screen. e.g. **cls** |
-| cd \<dir> | | Change directory. e.g. **cd /home/scripts** |
-| login | u=\<user> p=\<pass> | Interactive login (three-line: user then pass). Also inline as `login u=<u>, p=<p>` (comma separator on this legacy command). |
-| logout | | End the session. Serial returns to `login:` prompt; Telnet/SSH channel is closed. |
-| whoami | | Print current session's username. e.g. **whoami** |
-| id | | Print `uid=N(username) gid=N` for the current session's user. e.g. **id** |
-| who | | List active authenticated sessions across serial/telnet/ssh: `USER TTY SID LOGIN IDLE` in seconds. e.g. **who** |
-| groups | | Print the current user's primary gid. e.g. **groups** |
-| su u=\<user> p=\<pass> | u, p (space-separated) | Switch user in the current session. Prompts interactively when args omitted. On success sets session identity + caches uid/gid + jumps to target's home dir. Password verification enters a privileged VFS scope to read `/etc/shadow` (0600). e.g. **su u=alice p=alice123** |
-| passwd p=\<curr> n=\<new> c=\<confirm> | p, n, c (space) | Change own password. Three-phase interactive when omitted (`current:` / `new:` / `confirm:`), all echo-suppressed. Enters a privileged VFS scope for the `/etc/shadow` update. e.g. **passwd p=oldpw n=newpw c=newpw** |
-| useradd u=\<user> p=\<pass> | u, p (space) | **Root-only.** Create a new user. UID auto-assigned to next free slot ≥1; `gid = uid`; home=`/`, shell=`cmd`. Writes both `/etc/passwd` and `/etc/shadow` (rolls back on shadow failure). e.g. **useradd u=alice p=alice123** |
-| userdel u=\<user> | u (space) | **Root-only.** Delete a user from `/etc/passwd` + `/etc/shadow`. Refuses self-delete and uid=0 (root). e.g. **userdel u=alice** |
-| srvc list \| status \<name> \| start \<name> \| stop \<name> \| restart \<name> | positional, space-separated | Service supervisor (systemd-lite). `list` prints every service with state; `status <name>` shows tracked PIDs plus a `service info :` block with each service's own detail (via its `printStatusToTerminal` — e.g. WiFi ip/gateway/rssi, mDNS hostname/services); `start`/`stop`/`restart` deliver `SIG_CONT`/`SIG_STOP` (both) to every task the service owns. Root required for start/stop/restart. e.g. **srvc list**, **srvc status MDNS**, **srvc stop GPIO** |
-| ps [\<sid>] | | List active scheduler tasks POSIX-style with owner, state, %CPU, runs, interval, name. Optional positional filter by owner session id. e.g. **ps** or **ps 1** |
-| top | i=\<ms>; n=\<iters>; u=\<sid> | Same view as `ps`, refreshed on a scheduler task at `i` ms (default 2000, min 500). `n` bounds iterations (omit for forever). Stop with Ctrl+C. e.g. **top i=1500; n=10** |
-| kill [\<sig>] \<pid> | | Deliver a signal to a scheduler task. 1 arg = pid (default TERM). 2 args = sig then pid. Accepted signals: 9 KILL / 15 TERM / 18 CONT / 19 STOP. Root can hit any task; other users only tasks they own. e.g. **kill 8** or **kill 9 8** |
-| pkill [\<sig>] \<name> | | Same as `kill` but matches by task name; hits every task with that name. 1 arg = name (default TERM). 2 args = sig then name. Prints `signaled N task(s)`. e.g. **pkill MQTT** or **pkill 19 MQTT** |
-| killall [\<sig>] \<name> | | Like `pkill` but default signal is `SIG_KILL` (impolite). e.g. **killall GPIO** |
-| renice \<nice> \<pid> | nice signed -20..19 | Change POSIX nice on a live task. Auto-triggers scheduler resort. Same owner/root gate as `kill`. e.g. **renice -5 10** |
-| ssh q=\<query>,t=\<algo> | q (1=KEYGEN), t (1=Ed25519, 2/3=RSA 2048-bit) | SSH command. q=1 generates a host keypair of the given algorithm. RSA keygen is **slow on-device** — roughly **6 minutes on ESP8266**, **~1 minute on ESP32** (Ed25519 is near-instant). e.g. **ssh q=1,t=1** (Ed25519) or **ssh q=1,t=2** (RSA) |
-| net \<options> | ip, scansta, connsta | Query network params. **ip** shows STA/AP info; **scansta** lists nearby SSIDs; **connsta** joins one. e.g. **net connsta,\<ssid>,\<password>** |
-| host \<name> | | Resolve a hostname to an IPv4 address, trying IP-literal → `/etc/hosts` → DNS. e.g. **host example.com**, **host localhost** |
-| ping \<host> [count] | | ICMP-echo a host (resolved via the same `host` rules). Default 4 packets, max 10. Streams each reply/timeout live (`seq=N time=X ms` / `seq=N timeout`), then a `transmitted / received / loss` + `rtt min/avg/max` summary. e.g. **ping google.com**, **ping 8.8.8.8 3** |
-| date [-u] [-n] [-s \<epoch>] [+\<format>] | | Show or set the NTP clock. No arg → local time `%Y-%m-%d %H:%M:%S`; **-u** UTC; **+\<format>** custom (`%Y %y %m %b %d %H %M %S %%`); **-s \<unix-epoch>** sets the UTC clock (auth-gated); **-n** forces an NTP resync. e.g. **date**, **date -u +%H:%M**, **date -s 1753294080** |
-| tdctl | | `timedatectl` — clock status: local time, universal time, time zone, NTP sync state, NTP server. e.g. **tdctl** |
-| reboot | | Reboot the device. e.g. **reboot** |
-| watch | c=\<command> i=\<interval_ms> n=\<iterations> | Run a command periodically. Default interval 1 s, infinite iterations. Stop with Ctrl+C. Options separated by `;`. e.g. **watch c=net ip; i=3000; n=10** |
-| iot \<options> | setid, getid, sethost, gethost | Manage IoT config. **setid/getid** for device unique ID; **sethost/gethost** for IoT HTTP host. e.g. **iot setid,\<DeviceID>** or **iot sethost,\<HostAddress>** |
-| help | | List every registered command with its one-line usage (from each command's `getUsage()`; name column padded to 12 chars for alignment). Available before login. Tab-completion works on partial names. e.g. **help** |
-| uptime | | Time since boot as `up Xd Yh Zm Ws`. Wraps at ~49.7 days. e.g. **uptime** |
-| tls q=\<query>,t=\<algo>,l=\<bits>,n=\<CN/DNS>,i=\<IPv4> | q (1=CERTGEN), t (0=EC, 1=RSA), l (key bits / curve size), n (CN or DNS SAN), i (IPv4 SAN) | On-device TLS cert generation. esp32 builds with `ENABLE_TLS_CERT_GENERATION` only. Output at `TLS_DEFAULT_SERVER_CERT_PATH` / `TLS_DEFAULT_SERVER_KEY_PATH`. e.g. **tls q=1,t=0,l=256,n=device.local,i=192.168.1.50** |
-| elfload \<path> | | **esp32 only** (`ENABLE_PROGRAM_EXEC`). Load an external relocatable ELF program from the filesystem and launch it as a **background** preemptive task; returns immediately with its pid. Manage it with `ps` / `kill <pid>`; `SIG_STOP`/`SIG_CONT` don't apply. Image freed on exit or kill. See [§7.13](#713-dynamic-app-loading-esp32). e.g. **elfload /apps/hello.app.elf** |
+| ls [\<dir>] | | List with mode, owner, group, mtime and size. No arg lists the current directory; relative paths join it. Owner and group show names, falling back to numbers. e.g. **ls**, **ls /proc** |
+| mkdir \<dir> | | Create a directory, `0755` masked by umask, owned by the session. e.g. **mkdir /home/scripts** |
+| touch \<file> | | Create empty at `0644` masked by umask, or bump mtime if it exists. e.g. **touch /home/notes.txt** |
+| mv \<src> \<dst> | | Move or rename, across mounts if needed. e.g. **mv /home/a.txt /home/b.txt** |
+| cp \<src> \<dst> | | Copy a file, across mounts if needed. e.g. **cp /home/a.txt /home/b.txt** |
+| pwd | | Print the working directory. |
+| rm \<path> | | Remove a file or directory; needs write permission. e.g. **rm /home/notes.txt** |
+| cat \<file> | | Print a file; needs read permission. e.g. **cat /proc/uptime** |
+| echo \<text> [> \<file>] | | Print text, or write it to a file with `>` — a single write, so it works on synthetic nodes too. e.g. **echo 1 > /sys/class/gpio/5/value** |
+| fedit \<file> | | Scrolling in-place line editor. A status bar shows the path; ←/→/Home/End/Backspace edit the active line, ↑/↓ move through the file, Enter splits at the cursor. Esc opens the menu: **!w** save, **!c** cancel, **!d** delete line. Edits stream to a temp copy and commit on save. e.g. **fedit /home/notes.txt** |
+| head \<file> [N] | | First N lines, default 10, in constant memory. |
+| tail \<file> [N] | | Last N lines, default 10, in constant memory. |
+| wc \<file> | | Lines, words, bytes. |
+| df | | One row per mount: total, used, free. |
+| mount | | The mount table: prefix, type, backend. |
+| chmod \<octal> \<path> | | Set permission bits; owner or root. e.g. **chmod 0644 /etc/passwd** |
+| chown \<uid>[:\<gid>] \<path> | | Change owner, root only; gid defaults to uid. e.g. **chown 1001 /home/alice** |
+| umask [\<octal>] | | Show or set this session's umask, default `0022`. |
+| hexdump \<file> | | Offset, sixteen hex bytes, ASCII. |
+| grep \<pattern> \<path> | | Search a file or directory tree, printing `path:line:col:content`. Regex subset: `.` `*` `+` `?` `^` `$` `[abc]` `[a-z]` `[^abc]` and escapes. e.g. **grep ^ERROR /home/log.txt** |
+| cls | | Clear the screen. |
+| cd \<dir> | | Change directory; `~` and `-` work. |
+| login | u=, p= | Interactive login, or inline with both options. |
+| logout | | End the session — serial returns to the prompt, telnet and SSH close. |
+| whoami | | The session's username. |
+| id | | `uid=N(name) gid=N`. |
+| who | | Active sessions across all channels: user, tty, sid, login time, idle. |
+| groups | | The current user's primary group. |
+| su u=\<user> p=\<pass> | u, p | Switch user in this session, prompting when arguments are omitted. On success the identity, uid, gid and home directory all follow. |
+| passwd p=\<curr> n=\<new> c=\<confirm> | p, n, c | Change your own password; prompts in three echo-suppressed phases when arguments are omitted. |
+| useradd u=\<user> p=\<pass> | u, p | Root only. Next free uid, gid equal to uid, home `/`. Writes both user files. |
+| userdel u=\<user> | u | Root only. Removes from both files; refuses root and self. |
+| srvc list \| status \| start \| stop \| restart | positional | Service supervisor. `list` shows state per service, `status <name>` adds tracked pids and that service's own detail, and start/stop/restart signal every task it owns. Root for the last three. e.g. **srvc status MDNS** |
+| ps [\<sid>] | | Scheduler tasks with owner, state, %CPU, run count, interval and name; optional owner filter. |
+| top | i=, n=, u= | The `ps` view on a repeating tick — interval, iteration bound, owner filter. Ctrl+C stops it. |
+| kill [\<sig>] \<pid> | | Signal a task: 9 KILL, 15 TERM, 18 CONT, 19 STOP. One argument is a pid, two are signal then pid. |
+| pkill [\<sig>] \<name> | | Same, matched by name across every task carrying it. |
+| killall [\<sig>] \<name> | | Same as `pkill`, defaulting to KILL. |
+| renice \<nice> \<pid> | | Change nice, -20..19, and re-sort immediately. |
+| sshkgen t=\<algo>[,f=\<dir>] | t, f | Generate an SSH key pair. `t=1` Ed25519, `t=2` or `3` RSA. Without `f` it prompts for the directory — **a]** `~/.ssh` for client keys, **b]** `/etc/ssh` for host keys, the default — and an explicit path also works. Ed25519 is instant; RSA takes about a minute on ESP32 and six on ESP8266. e.g. **sshkgen t=1**, **sshkgen t=2,f=b** |
+| net \<option> | ip, scansta, connsta | Network state and control. e.g. **net connsta,\<ssid>,\<password>** |
+| host \<name> | | Resolve a name: IP literal, then `/etc/hosts`, then DNS. |
+| ping \<host> [count] | | ICMP echo, default four packets and at most ten, streaming each reply and finishing with a loss and rtt summary. |
+| date [-u] [-n] [-s \<epoch>] [+\<fmt>] | | Show or set the clock. `-u` for UTC, `+fmt` for a custom format, `-s` to set, `-n` to force an NTP resync. |
+| tdctl | | Clock status: local and universal time, zone, sync state, server. |
+| reboot | | Reboot. |
+| watch | c=, i=, n= | Run a command repeatedly. Options are separated by `;` so the inner command may contain commas. e.g. **watch c=net ip; i=3000; n=10** |
+| iot \<option> | setid, getid, sethost, gethost | Device unique id and IoT host. |
+| help | | Every registered command with its usage line. Works before login. |
+| uptime | | `up Xd Yh Zm Ws`. |
+| tls q=1,t=,l=,n=,i= | | On-device certificate generation, ESP32 with cert generation enabled. e.g. **tls q=1,t=0,l=256,n=device.local,i=192.168.1.50** |
+| elfload \<path> | | ESP32 only. Load an ELF from the filesystem and run it as a background task, returning its pid. See [§7.12](#712-dynamic-app-loading-esp32). |
 
-Each command's implementation lives in [src/service_provider/cmd/commands/](src/service_provider/cmd/commands/) — one `<Name>Command.h` per verb, with names registered in [CommandCommon.h](src/service_provider/cmd/commands/CommandCommon.h).
+Path arguments behave the POSIX way everywhere: a leading `/` is absolute, anything else resolves against the session's working directory, and `cd` also takes `~` and `-`.
 
-**Path arguments** work the POSIX way in every file command (`ls`, `cd`, `cat`, `cp`, `mv`, `rm`, `mkdir`, `touch`, `chmod`, `chown`, `head`, `tail`, `wc`, `grep`, `hexdump`, `fedit`): a leading `/` is treated as an absolute path, anything else resolves against the session's current directory. `cd` additionally supports `~` (home) and `-` (previous directory).
-
-**Positional vs named options.** Commands with ≤2 required args use the **positional** style (`setAcceptArgsOptions(true)` + space separator, args at `m_options[0]`/`[1]`) — matches POSIX and reduces typing: `chmod 0644 /etc/passwd`, `renice -5 10`, `kill 9 12`. Commands with an optional leading arg (`kill [<sig>] <pid>`, `pkill`, `killall`) dispatch on **arg count** — 1 arg = target, 2 args = sig then target — no numeric-vs-name ambiguity. Named options (`x=y`) are retained for commands with many optional slots, sensitive input (`login`/`su`/`passwd`/`useradd`/`userdel`), or optional-in-the-middle patterns (`top i=… n=… u=…`).
+On argument style: commands with at most two arguments take them positionally, which is both shorter to type and what muscle memory expects — `chmod 0644 /etc/passwd`, `renice -5 10`. Where a leading argument is optional, the count disambiguates: one argument is the target, two are signal then target. Named `x=y` options are kept for commands with many optional slots, for anything that takes a password, and for patterns where the optional argument sits in the middle.
 
 ### 7.8 Multi-terminal session lifecycle
 
-Up to `PDI_MAX_SESSIONS` (default 3) sessions can run concurrently — one each across serial, telnet, and ssh — with fully independent state. There is one `CommandLineServiceProvider` singleton dispatcher, and one `SessionManager::m_sessions[PDI_MAX_SESSIONS]` slot array; each slot holds its own `linebuf`, `cursor`, `history/autocomplete` cursors, `cwd`, `isAuthorized`, `username`, `uid`, `gid`, `umask`, `loginAt`, `lastActivityAt` (see [§6.2.18](#6218-sessionmanager)). The uid/gid/umask trio is populated at login (`AuthServiceProvider::setAuthorized(true)`) so every downstream FS check is a single dereference — no per-op `/etc/passwd` scan.
+Three sessions can run at once, one per channel, with fully independent state. There is a single dispatcher and an array of session slots; each slot holds its own line buffer, cursor, history and completion position, working directory, umask, and identity.
 
 ```
-boot
- └─ PdiStack::initialize
-       __i_fs.init()
-       __user_store_service.initService()          // bootstraps /etc/passwd + /etc/shadow if missing
-       SessionManager::attach(serialTerminal)      // pins slot 0 for serial
-       login prompt on serial
+  boot ──▶ filesystem up
+        ──▶ user store bootstraps /etc/passwd and /etc/shadow if absent
+        ──▶ serial terminal attached, login prompt drawn
 
-(any time) telnet client connects on :23
- └─ TelnetServiceProvider::handle()
-       accept() → iClientInterface* c
-       __cmd_service.useTerminal(c) ─┐
-                                      ├─ SessionManager::attach(c) → next free slot
-                                      └─ startInteraction() draws login: on c
-       every tick with c-side data:
-           processTerminalInput(c) → findByTerminal(c) → SessionManager::setCurrent(s)
-                                    → session-scoped input/exec
-       on disconnect:
-           SessionManager::detach(c)               // slot freed
+  telnet connect ──▶ accept ──▶ useTerminal(client)
+                                  ├─ session attached to the next free slot
+                                  └─ login prompt on that client only
+                  ──▶ each tick: find session by terminal, make current, dispatch
+                  ──▶ disconnect: session detached, slot freed
 
-(any time) SSH client connects on :22
- └─ USERAUTH_SUCCESS:
-       SessionManager::attach(m_sshclient) + setAuthorized(true)   // anchor auth to SSH slot
-    channel-open:
-       __cmd_service.useTerminal(m_sshclient)     // idempotent attach + prompt
-    shell data ticks:
-       processTerminalInput(m_sshclient) → same session-scoped path
-    close:
-       SessionManager::detach(m_sshclient)
+  ssh connect    ──▶ user auth succeeds ──▶ session attached and marked authorised
+                  ──▶ channel opens     ──▶ useTerminal, prompt
+                  ──▶ each tick: same session-scoped path
+                  ──▶ close: session detached
 ```
 
-Two invariants make it work:
+Two invariants carry the whole design. First, the current session is switched once per tick, at the top of input handling, and the static terminal pointer moves with it — so prompt drawing, new command instances and the auth delegators all see the right session without anyone passing it around. Second, every in-flight command records which session created it, and the lookups that find waiting commands filter on that. A telnet login prompt waiting for a username cannot be fed by SSH keystrokes.
 
-1. **Per-tick context switch.** At the top of `processTerminalInput(t)`, cmd_service calls `SessionManager::setCurrent(findByTerminal(t))` and re-points the static `ServiceProvider::m_terminal` to `t`. Downstream code (prompt drawing, new command instances, `__auth_service` delegators) automatically sees the right session for this tick without any explicit parameter passing.
+Long-running commands capture their terminal and owner when they start, so their output keeps flowing to the right session no matter what the other sessions are doing.
 
-2. **Owner-tagged in-flight commands.** Every `cmd_t` created via `getCommandToExecute` gets `m_owner = SessionManager::current()`. `getCommandWaitingForUserInput` and `getActiveCommandByName` filter by owner, so a Telnet-side `login` prompt waiting for a username never picks up SSH-side keystrokes as its input.
+### 7.9 SFTP and SCP file transfer
 
-Constraints:
-- Telnet transport currently accepts **one client at a time** ([TelnetServiceProvider.cpp](src/service_provider/transport/TelnetServiceProvider.cpp)); the session layer supports more, but Telnet needs a client-vector refactor to exercise it.
-- Long-running commands (e.g. `watch`) capture their `m_terminal` and `m_owner` at creation time, so their output continues to flow to the correct session regardless of what other sessions do in later ticks.
+The SSH service opens an SFTP subsystem on demand, and the same handlers serve `scp -s` for single files, interactive `sftp`, and graphical clients like FileZilla and WinSCP — including editing a remote file in place, which works because the session pool serves the second connection those clients open.
 
-### 7.9 SFTP / SCP file transfer
+```
+scp -s <local-file>  pdiStack@<device-ip>:<remote-path>     # upload
+scp -s pdiStack@<device-ip>:<remote-path>  <local-file>     # download
+sftp -P 22 pdiStack@<device-ip>                             # interactive
+```
 
-The SSH service ([§6.2.14](#6-service-providers)) opens an SFTP subsystem on demand. Two clients are supported: `scp -s …` (force SFTP) for single-file copies, and interactive `sftp` for full session browsing. Both ride the same handlers in `handleChannelSubsystemSftpRequest`.
+| Operation | What you type | Purpose |
+|---|---|---|
+| REALPATH | `pwd`, `cd` | resolve `.`, `..` and relative paths |
+| STAT, LSTAT, FSTAT | `ls`, `stat` | size, type, attributes |
+| OPENDIR, READDIR, CLOSE | `ls` | directory listing, 16 entries per response |
+| OPEN, READ, WRITE, CLOSE | `get`, `put` | file transfer |
+| MKDIR, RMDIR | `mkdir`, `rmdir` | directories |
+| REMOVE | `rm` | delete |
+| RENAME | `rename` | rename without overwriting |
 
-Graphical SFTP clients (FileZilla, WinSCP) work too, including remote **edit/save** — that path needs a second concurrent connection, which the server supports (see the Concurrency row in [§6.2.14](#6214-sshserver--__sshserver_service)).
+Data records arrive small — the SSH crypto window caps them at 256 bytes — and stream straight to the filesystem, so a transfer never needs a whole-file buffer. Combined with flash write costs when overwriting, throughput lands between roughly 0.2 and 1 KB/s, which is why firmware goes over OTA rather than SFTP.
+
+Directory listings are read once when the directory opens and paginated across responses, released when it closes. One handle is tracked per session, which is what an interactive client uses. Idle SFTP sessions are reaped after a minute so a suspended client cannot hold a pool slot; interactive shell sessions are never idle-reaped, because a person may sit at a prompt for as long as they like.
 
 #### 7.9.1 SSH authentication
 
-The SSH server authenticates each session by **password** or **public key**, governed by `/etc/ssh/sshconfig` (auto-created on first boot):
+Password and public key are both accepted, and `/etc/ssh/sshconfig` decides which are offered:
 
 ```
 # /etc/ssh/sshconfig
@@ -1789,89 +1555,39 @@ PasswordAuthentication yes
 PubkeyAuthentication   yes
 ```
 
-- **Password** — checked against the device user store (`/etc/shadow`) via `__auth_service`; the same credentials as the serial / telnet login.
-- **Public key** — **Ed25519 or RSA (2048-bit)**. Add the peer's public key (one per line, standard OpenSSH `ssh-ed25519 <base64> comment` or `ssh-rsa <base64> comment` format — copy it from your `~/.ssh/id_ed25519.pub` or `~/.ssh/id_rsa.pub`) to the device's `~/.ssh/authorized_keys`:
+Passwords are checked against `/etc/shadow` — the same credentials as serial and telnet. Public keys are Ed25519 or 2048-bit RSA, listed one per line in the device's `~/.ssh/authorized_keys` in the standard OpenSSH format, which is exactly what you copy out of your own `id_ed25519.pub`:
 
 ```
-fedit ~/.ssh/authorized_keys        # paste the ssh-ed25519 / ssh-rsa line, then !w to save
+fedit ~/.ssh/authorized_keys        # paste the line, then !w
 ```
 
-Set either key to `no` to disable that method. With `PasswordAuthentication no`, only clients holding an authorized private key can log in:
+Set either option to `no` to switch that method off. With passwords off, only a holder of an authorised private key gets in:
 
 ```
 ssh -i ~/.ssh/id_ed25519 pdiStack@<device-ip>
-ssh -i ~/.ssh/id_rsa     pdiStack@<device-ip>
 ```
 
-Notes:
-- `authorized_keys` is a single file under the device home directory (not per-user).
-- The server's own host key is either Ed25519 — stored as raw bytes in `~/.ssh/ed25519{,.pub,.seed}` (generate with `ssh q=1,t=1`) — or RSA, in `~/.ssh/rsa{,.pub}` (`ssh q=1,t=2`). RSA host-key generation is slow on-device (~6 min on ESP8266, ~1 min on ESP32); Ed25519 is near-instant. The key is presented to clients in standard SSH wire format during the handshake.
+The device's own host keys are separate, in `/etc/ssh`. Ed25519 lives in `/etc/ssh/ed25519` with its `.pub` and `.seed`, and is created automatically the first time the SSH service starts. RSA lives in `/etc/ssh/rsa` and is generated only when you ask for it with `sshkgen t=2,f=b`, since 2048-bit keygen costs about a minute on ESP32 and six on ESP8266. Either way the key goes onto the wire in standard SSH format during the handshake. `authorized_keys` is one file under the device home directory, shared by all users.
 
-#### User-facing commands
+### 7.10 Background commands and Ctrl+C
 
-Upload a file from the desktop to the device (as user `pdiStack`):
+`watch` and `top` run as scheduler tasks behind a shell session, and they are the template for any long-running command:
 
 ```
-scp -s <desktop-path-to-test.txt> pdiStack@<device-ip>:<dest-path-to-store-test.txt>
+  1  parse arguments, holdOptionValue() anything that must outlive this tick
+  2  register a scheduler task under the command's name, so it shows up in ps
+  3  set m_runinbackground and return INCOMPLETE, so the instance stays alive
+  4  override stopRunningInBackground() to remove that task and clear the flag
 ```
 
-Download a file from the device to the desktop:
+Ctrl+C handling is generic: the dispatcher walks its command list and calls `stopRunningInBackground()` on every backgrounded command owned by the current session. A new background command inherits that behaviour with no wiring in the shell. `ps` shows what is currently running, under the command's own name.
 
-```
-scp -s pdiStack@<device-ip>:<dest-path-to-test.txt> <desktop-path-to-store-test.txt>
-```
+### 7.11 Adding a command
 
-Open an interactive SFTP shell to browse and manage the device's storage:
+Say you want `temp`.
 
-```
-sftp -P 22 pdiStack@<device-ip>
-```
-
-The following SFTP operations are implemented (sufficient for OpenSSH `sftp` client interactive use):
-
-| Operation | sftp command | Purpose |
-|---|---|---|
-| `REALPATH` | `pwd`, `cd` | resolve relative / `.` / `..` paths to absolute |
-| `STAT` / `LSTAT` / `FSTAT` | `cd`, `ls`, `stat` | file/dir attributes (size, type) |
-| `OPENDIR` / `READDIR` / `CLOSE` | `ls`, `ls -l` | directory listing (paginated, 16 entries/response) |
-| `OPEN` / `READ` / `WRITE` / `CLOSE` | `get`, `put` | file read / create / write |
-| `MKDIR` / `RMDIR` | `mkdir`, `rmdir` | directory create / remove |
-| `REMOVE` | `rm` | delete file |
-| `RENAME` | `rename` | rename file or directory (does not overwrite) |
-| `SETSTAT` / `FSETSTAT` | `chmod`, `chown` | accepted but no-op (FS has no perm/time storage) |
-| `READLINK` / `SYMLINK` | — | reported as unsupported (no symlink layer) |
-
-Idle SFTP sessions are reaped automatically after the configured timeout (default 60 s) so a suspended or dead client never wedges a pool slot (freeing it for another connection). Interactive SSH shell sessions are NOT idle-reaped — only the SFTP subsystem is.
-
-**Note** the framework handles the SSH chunks in smaller size which can make the file transfer little bit slower. On top if we are overwriting an existing file then it can add the file-edit overhead as well. So speed can be as slow as 0.2 kbps and as fast as 1 kbps.
-
-Implementation notes:
-- Bolus chunks (the SFTP protocol's data records) are received small (≤256 B per the SSH crypto window) and streamed straight into `__i_fs` — there is no full-file RAM buffer.
-- File-edit overhead (overwriting an existing file) is significant on flash filesystems; the README's 0.2-1 kB/s figure reflects this.
-- Only **one SFTP handle at a time** is tracked per session — opening a second file/dir while one is still open reuses the slot. Sufficient for `sftp` interactive use (one operation in flight) but not for parallel transfers.
-- Directory listings are cached once at `OPENDIR` time into the session (`Sftp::dir_entries`) and paginated across multiple `READDIR` responses (16 entries per response). Memory is released on `CLOSE` or session destruction (RAII).
-- SFTP sessions only have an **idle timeout** (default 60 s, in `handle()`); plain SSH shell sessions are not idle-reaped because a human may pause at the prompt indefinitely.
-
-### 7.10 Background commands and CTRL+C semantics
-
-`watch` and `top` are the two built-ins that run as scheduler tasks in the background of a shell session. Both follow the same template — the model any user-supplied long-running command should copy:
-
-1. Parse args and hold any pointers that must outlive a tick (e.g. `holdOptionValue("c")` in `watch` so the child command string survives).
-2. Register a scheduler task via `__task_scheduler.register_task(fn, interval, ..., name)` with the command name so it shows up in `ps`.
-3. Set `m_runinbackground = true` and return `CMD_RESULT_INCOMPLETE` so the dispatcher keeps the command instance alive.
-4. Override `stopRunningInBackground()` to call `__task_scheduler.remove_task(...)` on the tracked id and clear `m_runinbackground`.
-
-**Ctrl+C dispatch is generic.** [CommandLineServiceProvider.cpp](src/service_provider/cmd/CommandLineServiceProvider.cpp) walks its `m_cmdlist` and calls `stopRunningInBackground()` on **every** command with `isRunningInBackground() == true` owned by the current session. So Ctrl+C works out of the box for any new background command — no per-command wiring in the shell dispatcher.
-
-For a live inspection of what's currently running in the background, use `ps` — background commands appear with their `CMD_NAME_*` as the row name (e.g. `watch`, `top`).
-
-### 7.11 Adding a new command
-
-To add `temp` (read a temperature sensor):
-
-1. **Decide options.** Say `t=<unit>` (C/F) — one option, default C.
-2. **Add the name** to [CommandCommon.h](src/service_provider/cmd/commands/CommandCommon.h): `#define CMD_NAME_TEMP "temp"`.
-3. **Create [src/service_provider/cmd/commands/TempCommand.h](src/service_provider/cmd/commands/TempCommand.h)**:
+1. Add the name — `#define CMD_NAME_TEMP "temp"` — keeping it within eight characters.
+2. Write the command:
    ```cpp
    struct TempCommand : public CommandBase {
        TempCommand() {
@@ -1886,127 +1602,82 @@ To add `temp` (read a temperature sensor):
        cmd_result_t execute(cmd_term_inseq_t) override {
            auto unit = RetrieveOption(CMD_OPTION_NAME_T);
            bool celsius = !(unit && unit->optionval[0] == 'F');
-           float t = readSensor(celsius);
-           m_terminal->writeln(t);
+           m_terminal->writeln(readSensor(celsius));
            return CMD_RESULT_OK;
        }
        static void* Registrar(void*) { static TempCommand cmd; return &cmd; }
    };
    ```
-   The `getUsage()` string is what `help` prints and what `CommandBase::ResultToTerminal` prints under `CmdErr` on `CMD_RESULT_ARGS_MISSING` / `_ARGS_ERROR` / `_INVALID_OPTION` — one source of truth per command, always in flash.
-4. **Register it** by including the header in [CommandLineServiceProvider.h](src/service_provider/cmd/CommandLineServiceProvider.h) **and** calling `CommandBase::RegisterCommand(CMD_NAME_TEMP, &TempCommand::Registrar)` from `CommandLineServiceProvider::initService` (mirror the pattern used by sibling commands).
-5. **Done.** `temp` will autocomplete via TAB, appear in history, respect CTRL+C if you ever make it multi-iteration, and show up in `help` with its usage line.
+3. Include the header in the CLI service and register the name against the registrar, next to its siblings.
 
-### 7.12 Gotchas
+That is the whole job. Tab completion, history, help, argument-error usage printing and Ctrl+C all come from the base.
 
-- **`CMD_SIZE_MAX = 8`** — command names are silently truncated past 8 chars. Use short verbs.
-- **`CMD_OPTION_MAX = 3`** and **`CMD_OPTION_SIZE_MAX = 3`** — a command with 4+ options or option names longer than 2 chars (`+ null`) must split into sub-commands or use positional args.
-- **One bound terminal at a time.** Telnet and SSH cannot both have the prompt simultaneously — the *first* connection wins until it disconnects. There is no session multiplexing.
-- **History needs storage.** Without `ENABLE_STORAGE_SERVICE` the ↑/↓ keys are dead; the autocomplete via TAB still works (registry lives in RAM).
-- **Option values are pointers into the input buffer by default.** If your `execute` may live across input arrivals (CTRL+C handler, multi-iteration), `holdOptionValue` first.
-- **`needauth()` is the only gate.** A command returning `true` only fires after a successful `login`; setting it on a "harmless" command still adds friction. Use it for anything mutating state.
-- **`watch` semicolon-separates options because the inner command can use commas.** When chaining your own composite commands, pick a separator that doesn't appear in payloads.
-- **`fedit` takes over the terminal until you exit.** It is a full-screen editor holding that session; the terminal is unavailable for `srvc` / `ps` on that channel until you leave via ESC → `!w` (save) or `!c` (cancel). The watchdog still fires inside the session.
-- **No quoted args.** Values cannot contain `,` (or whichever separator), `=`, or spaces inside an option value. Escape at the producer or accept the constraint.
+A few limits shape command design. Names are capped at eight characters and options at three, each name up to three characters, so a verb that wants more either splits into sub-commands or takes positional arguments. Option values cannot contain the separator, an `=`, or spaces, since there is no quoting — pick a separator that doesn't collide with your payload, which is why `watch` separates on `;`. And `needauth()` is the only permission gate, so put it on anything that changes state.
 
-### 7.13 Dynamic app loading (esp32)
+### 7.12 Dynamic app loading (esp32)
 
-With `ENABLE_PROGRAM_EXEC` the `elfload` command loads a relocatable ELF from the filesystem into RAM, resolves its external symbols against the firmware, runs its entry point (`int main(int argc, char *argv[])`), and frees it — `dlopen`-style loading without reflashing.
+With `ENABLE_PROGRAM_EXEC`, `elfload` reads a relocatable ELF off the filesystem, resolves its external symbols against the running firmware, and launches its `main()` as a background preemptive task:
 
 ```
 elfload /apps/hello.app.elf
 ```
 
-It is **esp32-only** (uses the vendored Espressif ELF loader in [devices/esp32/elf_loader/](devices/esp32/elf_loader/)) and requires `ENABLE_STORAGE_SERVICE`; it pulls in `ENABLE_CONTEXTUAL_EXECUTION` since the program runs on a preemptive task. The flag is off by default; enable it in [devices/DeviceConfig.h](devices/DeviceConfig.h), with loader tuning in [devices/esp32/config/ElfLoaderConfig.h](devices/esp32/config/ElfLoaderConfig.h). The path is read through the normal VFS (absolute or relative, subject to permissions), so apps arrive by the usual routes — SFTP or HTTP upload.
+The command returns to the prompt immediately with a pid. The app runs concurrently and its output arrives asynchronously; `ps` lists it and `kill <pid>` ends it. It also ends when `main()` returns, and the image is freed on either path. Because it is a task rather than a scheduler entry, stop and continue don't apply to it.
 
-The program starts as a **background preemptive task**: `elfload` returns to the prompt immediately with the task's pid, and the app runs concurrently (its `printf` output goes to the console asynchronously). List it with `ps`, stop it with `kill <pid>`. It ends when its `main()` returns or when killed; `SIG_STOP` / `SIG_CONT` do **not** apply to it (only exit or kill). The loaded image is freed automatically on both paths.
+The path goes through the normal VFS, so apps arrive by SFTP or HTTP upload like any other file. The feature is ESP32-only, needs storage, and brings contextual execution with it.
 
-The app must be a small position-independent ELF built for the loader (not an ESP-IDF firmware image), calling only symbols the firmware exports (libc `printf`/`memcpy`/`sleep`/… are already available). Build one with the [`elf_loader`](https://components.espressif.com/components/espressif/elf_loader) component's template — with ESP-IDF installed and its environment activated:
+The program must be a small position-independent ELF built against the loader — not an ESP-IDF firmware image — calling only symbols the firmware exports; the common libc entries are already there. Build one from Espressif's template with the IDF environment active:
 
 ```bash
 idf.py create-project-from-example "espressif/elf_loader=*:build_elf_file_example"
-cd build_elf_file_example        # edit main/main.c — keep int main(int argc, char *argv[])
-idf.py set-target esp32          # plain esp32 (no PSRAM), matches the loader config
-idf.py elf                       # -> build/hello_world.app.elf  (a small ET_DYN)
+cd build_elf_file_example        # edit main/main.c, keeping int main(int argc, char *argv[])
+idf.py set-target esp32          # plain esp32, matching the loader config
+idf.py elf                       # → build/hello_world.app.elf
 ```
 
-Upload `build/hello_world.app.elf` to the device (SFTP or HTTP upload) and run `elfload /hello_world.app.elf`. What makes it loadable is the two lines in the project's top `CMakeLists.txt` — `include(elf_loader)` then `project_elf(<name>)`.
+What makes the output loadable is two lines in the project's top-level `CMakeLists.txt`: `include(elf_loader)` and `project_elf(<name>)`. Upload the result and run it.
 
 ---
-
 ## 8. Web Server
 
-The web server is the **on-device admin portal**. When `ENABLE_HTTP_SERVER` is on, every device runs an HTTP/1.1 server on its access-point IP (`192.168.0.1` by default) that lets a phone or laptop log in, configure WiFi, drive GPIO pins, watch the dashboard, upload files, and manage MQTT/OTA/Email/IoT — without flashing or serial cables. With `ENABLE_HTTPS_SERVER` (+ `ENABLE_TLS_SERVICE`) the same portal serves on port 443 with TLS-wrapped sockets — no controller / page / route changes, just a different `begin()` call and a cert/key on disk. See [§8.7.1 HTTPS wiring](#871-https-wiring--certificates) for the full flow.
+The web server is the on-device admin portal. With `ENABLE_HTTP_SERVER` on, the device serves HTTP/1.1 on its access-point address — `192.168.0.1` by default — so a phone or laptop can log in, configure WiFi, drive GPIO, watch a dashboard, upload files and manage MQTT, OTA, email and IoT without a cable. Adding `ENABLE_HTTPS_SERVER` moves the same portal to 443 over TLS; no controller, page or route changes, only a different `begin()` call and a certificate on disk.
 
-Structurally it is the framework's largest subsystem (≈7 KLOC), but it follows a small handful of concepts: an `HttpServer` orchestrator, a `RouteHandler` that maps URIs to callbacks, a `Middleware` chain (currently mostly auth), a `WebResourceProvider` that owns the response buffer and the static fragments, per-feature `Controller`s, and a set of HTML page templates broken into header/body/footer.
+It is the largest subsystem in the framework, but it is built from a handful of pieces: an orchestrator, a route registry, a middleware check, a resource provider that owns the response buffer, one controller per feature, and HTML fragments in flash.
 
-Implementation: [src/webserver/](src/webserver/). Global instance: `__web_server`. Wired into `PdiStack::initialize` ([PdiStack.cpp](src/PdiStack.cpp)) and ticked from `PdiStack::serve` via `__web_server.handle_clients()` ([PdiStack.cpp](src/PdiStack.cpp)).
+Start reading at [src/webserver/](src/webserver/).
 
 ### 8.1 Layered model
 
 ```
-              ┌────────────────────────────────────────────┐
-  iHttpServer │  iHttpServerInterface  (port: §13.3.3)      │  ← bytes in/out, route registration
-  Interface   │  default: HttpServerInterfaceImpl          │
-              └──────────────────────┬─────────────────────┘
-                                     │  on(uri, cb), arg(), header(), send()
-              ┌──────────────────────▼─────────────────────┐
-              │  HttpServer  ─ owns one instance of every  │  ← src/webserver/WebServer.{h,cpp}
-              │  *Controller, ENABLE_*-gated.              │     (subclasses ServiceProvider)
-              └──────────────────────┬─────────────────────┘
-                                     │  controllers self-boot
-              ┌──────────────────────▼─────────────────────┐
-              │  Controller (base)  +  HomeController,     │  ← src/webserver/controllers/
-              │  LoginController, DashboardController,     │
-              │  OtaController, WiFiConfigController,      │
-              │  GpioController, MqttController,           │
-              │  EmailConfigController, DeviceIotController│
-              │  StorageController                          │
-              └────────┬──────────────────────────┬────────┘
-                       │ register_route(uri, fn,  │  build response via
-                       │   middleware, redirect)  │  m_web_resource & helpers
-                       ▼                          ▼
-              ┌──────────────────────┐  ┌──────────────────────────────────┐
-              │  RouteHandler        │  │  WebResourceProvider (m_web_     │  ← resources/
-              │  __web_route_handler │  │  resource): page buffer, server  │
-              └──────────┬───────────┘  │  ptr, DB accessors, MIME helpers │
-                         │              └────────────────┬─────────────────┘
-                         ▼                               │
-              ┌──────────────────────┐                   │  emits HTML using
-              │  Middleware          │                   ▼
-              │  ├─ AUTH_MIDDLEWARE  │   ┌──────────────────────────────────┐
-              │  │   (session check) │   │  pages/  (Header, Footer,        │
-              │  └─ EwSessionHandler │   │  HomePage, Dashboard, LoginPage, │
-              │      (cookie ops)    │   │  *ConfigPage, StorageListPage,   │
-              └──────────────────────┘   │  NotFound, LogoutPage)           │
-                                         │  helpers/  (DynamicPageBuild     │
-                                         │  Helper, HtmlTagsAndAttr,        │
-                                         │  icon/SvgIcons)                  │
-                                         └──────────────────────────────────┘
+   iHttpServerInterface           bytes in and out, route registration
+        │  on(uri, cb) · arg() · header() · send()
+        ▼
+   HttpServer                     owns one controller per feature, each flag-gated
+        │  boots every controller once
+        ▼
+   Controllers                    home · login · dashboard · wifi · ota · gpio
+        │                         mqtt · email · iot · storage
+        ├─ register_route(uri, fn, middleware, redirect) ──▶ RouteHandler
+        │                                                       │
+        │                                                   Middleware
+        │                                                    ├─ none
+        │                                                    └─ auth ─▶ session cookie check
+        │
+        └─ build the response ──▶ WebResourceProvider
+                                    ├─ the page buffer and the server pointer
+                                    ├─ shortcuts into the database service
+                                    └─ HTML fragments in flash: header · page · footer
 ```
 
-Reading the diagram: a request hits the port (`iHttpServerInterface::handleClient` ⇒ matches a URI to a registered lambda) ⇒ the lambda runs middleware ⇒ on pass, the controller method runs, pulls config from `__database_service`, composes HTML using header/page/footer fragments + `DynamicPageBuildHelper`, and `send`s through the server. On fail, middleware sends a `301` to `/login`.
+A request enters through the port, which matches the URI to a registered lambda. The lambda runs its middleware; on a pass the controller method runs, pulls config from the database service, composes HTML from the fragments and sends it. On a fail the middleware sends a redirect to `/login` and the controller never runs.
 
-### 8.2 `HttpServer` orchestrator
+### 8.2 The orchestrator
 
-[WebServer.h](src/webserver/WebServer.h). Despite its name, this class is a `ServiceProvider` ([§6.2.12](#6-service-providers)) — but unlike the others, it directly owns its sub-objects as value members rather than registering as singletons elsewhere.
+`HttpServer` is a service provider that owns its controllers as value members rather than as singletons. Home, dashboard and login are always present; the rest appear with their feature flag — OTA, WiFi, GPIO, MQTT, email, IoT and storage.
 
-| Member | Always present | `ENABLE_*` gated |
-|---|---|---|
-| `HomeController m_home_controller` | yes | — |
-| `DashboardController m_dashboard_controller` | yes | — |
-| `LoginController m_login_controller` | yes | — |
-| `OtaController m_ota_controller` | | `ENABLE_OTA_SERVICE` |
-| `WiFiConfigController m_wificonfig_controller` | | `ENABLE_WIFI_SERVICE` |
-| `GpioController m_gpio_controller` | | `ENABLE_GPIO_SERVICE` |
-| `MqttController m_mqtt_controller` | | `ENABLE_MQTT_SERVICE` |
-| `EmailConfigController m_emailconfig_controller` | | `ENABLE_EMAIL_SERVICE` |
-| `DeviceIotController m_device_iot_controller` | | `ENABLE_DEVICE_IOT` |
-| `StorageController m_storage_controller` | | `ENABLE_STORAGE_SERVICE` |
+`initService` stashes the server pointer, hands it to the resource provider, and walks the controller registry calling `boot()` on each. Every controller put itself into that registry when it was constructed, so registration needs no wiring.
 
-`initService(iHttpServerInterface*)` stashes the server pointer, attaches it to `__web_resource.m_server`, and iterates the static `Controller::m_controllers` registry calling each `controller->boot()`. Every controller's constructor pushes itself onto that registry (see [§8.4](#8-web-server)), so booting is automatic at static-init plus one pass at `initService` time.
-
-The final step in `initService` is the `begin()` call — and this is where the HTTPS branch lives:
+The last thing `initService` does is bind the listener, and that is the only place TLS shows up:
 
 ```cpp
 #if defined(ENABLE_HTTPS_SERVER) && defined(ENABLE_TLS_SERVICE)
@@ -2021,53 +1692,33 @@ this->m_server->begin(HTTP_DEFAULT_PORT);                                 // 80
 #endif
 ```
 
-No controller, page, route, middleware, or session code is conditional on TLS — the only thing the build flips is which `begin()` overload runs at the bottom of `initService`. Cert/key paths are macros from [TlsConfig.h](src/config/TlsConfig.h) so a sketch can override them by `#define`-ing before any framework include.
+Nothing else in the subsystem is conditional on TLS. The per-tick `handle_clients()` is a single call into the port; all the work happens inside the route lambdas.
 
-`handle_clients()` is a one-liner: `m_server->handleClient()`. All actual work happens inside the route lambdas the controllers registered.
+### 8.3 Routes
 
-### 8.3 Route registry — `RouteHandler` + `Routes.h`
+URIs are constants in one header, so a typo is a compile error rather than a dead link.
 
-URIs are constants in [routes/Routes.h](src/webserver/routes/Routes.h). The full set:
-
-| Route | Purpose | Middleware |
+| Route | Purpose | Gate |
 |---|---|---|
-| `/` | Home / menu landing | None |
-| `/login` | Login form + POST handler | None |
-| `/logout` | Drop session, redirect to `/login` | AUTH |
-| `/login-config` | Change username/password | AUTH |
-| `/dashboard` | Live device summary | AUTH |
-| `/listen-dashboard` | Long-poll/SSE-style dashboard updates | AUTH |
-| `/wifi-config` | WiFi STA/AP form | AUTH |
-| `/ota-config` | OTA host/port/version | AUTH |
-| `/email-config` | SMTP credentials | AUTH |
-| `/gpio-manage` | Per-pin GPIO panel | AUTH |
-| `/gpio-server`, `/gpio-config`, `/gpio-write`, `/gpio-event` | GPIO subforms | AUTH |
-| `/gpio-monitor`, `/listen-monitor` | Live GPIO graphs (analog) | AUTH |
-| `/mqtt-manage`, `/mqtt-general-config`, `/mqtt-lwt-config`, `/mqtt-pubsub-config` | MQTT subforms | AUTH |
-| `/device-register-config` | IoT register / OTP | AUTH |
-| `/storage`, `/storage-fileupload`, `/storage-filelist`, `/storage-filedel` | File browser & upload | AUTH |
+| `/` | menu landing | — |
+| `/login` | form and its POST | — |
+| `/logout` | drop the session | auth |
+| `/login-config` | change username and password | auth |
+| `/dashboard`, `/listen-dashboard` | live device summary and its updates | auth |
+| `/wifi-config` | station and AP form | auth |
+| `/ota-config` | host, port, version | auth |
+| `/email-config` | SMTP credentials | auth |
+| `/gpio-manage`, `/gpio-server`, `/gpio-config`, `/gpio-write`, `/gpio-event` | GPIO panel and its subforms | auth |
+| `/gpio-monitor`, `/listen-monitor` | live analog graphs | auth |
+| `/mqtt-manage`, `/mqtt-general-config`, `/mqtt-lwt-config`, `/mqtt-pubsub-config` | MQTT forms | auth |
+| `/device-register-config` | IoT registration | auth |
+| `/storage`, `/storage-fileupload`, `/storage-filelist`, `/storage-filedel` | file browser and upload | auth |
 
-[RouteHandler](src/webserver/handlers/RouteHandler.h) extends `Middleware` and adds two methods:
+Registering one takes a URI, a callback, an optional middleware level and an optional redirect target. There is also a hook for the not-found handler, which the home controller owns.
 
-```cpp
-void register_route(const char* uri,
-                    CallBackVoidArgFn fn,
-                    middlwares level = NO_MIDDLEWARE,
-                    const char* redirect = WEB_SERVER_LOGIN_ROUTE);
-void register_not_found_fn(CallBackVoidArgFn fn);
-```
+### 8.4 Controllers
 
-Global instance: `__web_route_handler`. Controllers reach it via `m_route_handler` (a base-class pointer set in `Controller`'s ctor).
-
-### 8.4 `Controller` base class and the controller registry
-
-[Controller.h](src/webserver/controllers/Controller.h). Each controller:
-
-- Inherits `Controller`, which on construction pushes `this` into the static `Controller::m_controllers` vector.
-- Holds protected pointers `m_web_resource` (the response buffer / page helpers) and `m_route_handler` (the global route registry).
-- Implements `boot()` to register its routes.
-
-A typical controller body (paraphrased from [LoginController.h](src/webserver/controllers/LoginController.h)):
+A controller inherits the base — which registers it — holds pointers to the resource provider and the route registry, and implements `boot()`:
 
 ```cpp
 class LoginController : public Controller {
@@ -2075,195 +1726,118 @@ public:
     LoginController() : Controller("LoginController") {}
 
     void boot() override {
-        m_route_handler->register_route(
-            WEB_SERVER_LOGIN_ROUTE,
-            [&] { this->handleLoginRoute(); });
-
-        m_route_handler->register_route(
-            WEB_SERVER_LOGOUT_ROUTE,
-            [&] { this->handleLogoutRoute(); });
-
-        m_route_handler->register_route(
-            WEB_SERVER_LOGIN_CONFIG_ROUTE,
-            [&] { this->handleLoginConfigRoute(); },
-            AUTH_MIDDLEWARE);                    // gated
+        m_route_handler->register_route(WEB_SERVER_LOGIN_ROUTE,
+                                        [&] { this->handleLoginRoute(); });
+        m_route_handler->register_route(WEB_SERVER_LOGOUT_ROUTE,
+                                        [&] { this->handleLogoutRoute(); });
+        m_route_handler->register_route(WEB_SERVER_LOGIN_CONFIG_ROUTE,
+                                        [&] { this->handleLoginConfigRoute(); },
+                                        AUTH_MIDDLEWARE);
     }
-
-private:
-    void handleLoginRoute();
-    void handleLogoutRoute();
-    void handleLoginConfigRoute();
 };
 ```
 
-#### Controller inventory
+Ten controllers ship, one per feature area, each owning the routes in its own prefix. The GPIO and MQTT ones are by far the largest, because they carry the most form state.
 
-| Controller | Source | Routes owned |
-|---|---|---|
-| `HomeController` | [HomeController.h](src/webserver/controllers/HomeController.h) | `/`, plus the `register_not_found_fn` 404 handler |
-| `LoginController` | [LoginController.h](src/webserver/controllers/LoginController.h) | `/login`, `/logout`, `/login-config` |
-| `DashboardController` | [DashboardController.h](src/webserver/controllers/DashboardController.h) | `/dashboard`, `/listen-dashboard` |
-| `WiFiConfigController` | [WiFiConfigController.h](src/webserver/controllers/WiFiConfigController.h) | `/wifi-config` |
-| `OtaController` | [OtaController.h](src/webserver/controllers/OtaController.h) | `/ota-config` |
-| `GpioController` | [GPIOController.h](src/webserver/controllers/GPIOController.h) (~900 lines) | All `/gpio-*` |
-| `MqttController` | [MQTTController.h](src/webserver/controllers/MQTTController.h) (~560 lines) | All `/mqtt-*` |
-| `EmailConfigController` | [EmailConfigController.h](src/webserver/controllers/EmailConfigController.h) | `/email-config` |
-| `DeviceIotController` | [DeviceIotController.h](src/webserver/controllers/DeviceIotController.h) | `/device-register-config` |
-| `StorageController` | [StorageController.h](src/webserver/controllers/StorageController.h) | All `/storage-*` |
+Since every route ends up in one global registry, URI constants have to be unique — two controllers claiming the same path means the second one wins.
 
 ### 8.5 Middleware
 
-[Middleware.h](src/webserver/middlewares/Middleware.h). Three levels:
+The auth level asks the session handler whether the request carries a live session; if it doesn't, the request gets a redirect to the configured target and the route never runs. A route registered without a level is public.
 
-| Level | Action |
-|---|---|
-| `NO_MIDDLEWARE` | Pass straight through to the route handler |
-| `AUTH_MIDDLEWARE` | Check `EwSessionHandler::has_active_session()`; on fail, send `301` with `Location: <redirect>` (default `/login`) and abort the route |
-| `API_MIDDLEWARE` | Currently a no-op stub — slot reserved for API-key/HMAC validation |
+Middleware lives on the session handler rather than as a separate chain, so a new level means extending the enum and adding a branch — routes then opt in by naming it.
 
-The middleware machinery extends `EwSessionHandler` rather than being a separate chain. Adding a new middleware level means: extend the `middlwares` enum, add an `else if` branch in `handle_middleware`, and route handlers can opt in with the new value.
+### 8.6 Sessions
 
-### 8.6 Sessions — `EwSessionHandler`
+Sessions are cookie-based. The cookie name and its max age come from the credential table — `pdi_session` and five minutes by default. Logging in derives a token and sets the cookie; each guarded request parses the incoming `Cookie` header against the stored credentials; logging out and every redirect send an expired cookie back.
 
-[SessionHandler.h](src/webserver/handlers/SessionHandler.h). The framework's session model is **cookie-based**:
+There is no server-side session table. The token is derived at login rather than rotated, and logout invalidates it on the client.
 
-- Session name comes from `login_credential_table::session_name` (default `pdi_session` from [ServerConfig.h](src/config/ServerConfig.h)).
-- Cookie max-age comes from `login_credential_table::cookie_max_age` (default 300 s).
-- `EW_COOKIE_BUFF_MAX_SIZE = 60` is the working buffer used to read/parse the incoming `Cookie:` header.
-- `create_session()` builds a `Set-Cookie` header with a derived token and writes it on the login response.
-- `has_active_session()` parses the request's `Cookie:` header against the persisted credentials.
-- `send_inactive_session_headers()` overwrites with an expired cookie — used on `/logout` and 301 redirects.
+### 8.7 Composing a response
 
-The session token is derived per-login rather than rotated periodically; a logout invalidates it on the client only. There is no server-side session table — the auth layer is intentionally minimal.
+The resource provider holds the server pointer for the current request, the page buffer, and shortcuts into the database service so controllers never include database headers.
 
-### 8.7 Response composition — `WebResourceProvider` and pages
-
-[WebResource.h](src/webserver/resources/WebResource.h). Holds:
-
-- `iHttpServerInterface* m_server` — the current request/response context.
-- The page buffer (`PAGE_HTML_MAX_SIZE = 1800` bytes — yes, **per-page HTML is capped at ~1.8 KB**; bigger pages stream in chunks via `send(..., send_in_chunks=true)`).
-- Accessor shortcuts into `__database_service` so controllers don't need to import the DB headers.
-
-`collect_resource(iHttpServerInterface*)` is called from `HttpServer::initService` to stash the server pointer that controllers will reach through `m_web_resource->m_server` for `arg()`, `hasArg()`, `header()`, `addHeader()`, `send()`.
-
-#### Pages
-
-[src/webserver/pages/](src/webserver/pages/) ships HTML fragments as raw C strings declared in `PROG_RODT_ATTR` (program memory). The composition pattern is fixed three-part:
+Pages are raw HTML strings kept in program memory and sent in three chunks:
 
 ```cpp
-m_web_resource->m_server->send(
-    HTTP_RESP_OK, MIME_TYPE_HTML, headerHtml,  /*chunked=*/true);
-m_web_resource->m_server->send(
-    HTTP_RESP_OK, MIME_TYPE_HTML, bodyHtml,    /*chunked=*/true);
-m_web_resource->m_server->send(
-    HTTP_RESP_OK, MIME_TYPE_HTML, footerHtml,  /*chunked=*/true);
+m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_HTML, headerHtml, /*chunked=*/true);
+m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_HTML, bodyHtml,   /*chunked=*/true);
+m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_HTML, footerHtml, /*chunked=*/true);
 ```
 
-[Header.h](src/webserver/pages/Header.h) and [Footer.h](src/webserver/pages/Footer.h) are the framing every page reuses. The middle slot is one of [HomePage.h](src/webserver/pages/HomePage.h), [Dashboard.h](src/webserver/pages/Dashboard.h), [LoginPage.h](src/webserver/pages/LoginPage.h), [WiFiConfigPage.h](src/webserver/pages/WiFiConfigPage.h), [OtaConfigPage.h](src/webserver/pages/OtaConfigPage.h), [GpioConfigPage.h](src/webserver/pages/GpioConfigPage.h), [MqttConfigPage.h](src/webserver/pages/MqttConfigPage.h), [EmailConfigPage.h](src/webserver/pages/EmailConfigPage.h), [DeviceIotPage.h](src/webserver/pages/DeviceIotPage.h), [LoginConfigPage.h](src/webserver/pages/LoginConfigPage.h), [LogoutPage.h](src/webserver/pages/LogoutPage.h), [StorageListPage.h](src/webserver/pages/StorageListPage.h), [NotFound.h](src/webserver/pages/NotFound.h).
+The header and footer are shared by every page; the middle is whichever page is being served. Sending in chunks is what lets a page exceed the 1800-byte single-send buffer, which is why every composed page uses it.
 
-#### Helpers
+Three helpers carry the dynamic markup: a page builder that turns C structs into form inputs, tables and option lists; a set of tag and attribute constants that keep allocations down; and an inline SVG icon set.
 
-| Helper | Purpose |
-|---|---|
-| [DynamicPageBuildHelper.h](src/webserver/helpers/DynamicPageBuildHelper.h) | Convert C structs into HTML form inputs (text/number/checkbox/select), generate tables, escape values, build option lists — the bulk of dynamic markup |
-| [HtmlTagsAndAttr.h](src/webserver/helpers/HtmlTagsAndAttr.h) | String constants for common tag/attr names — keeps allocations down |
-| [icon/SvgIcons.h](src/webserver/helpers/icon/SvgIcons.h) | Inline SVGs used in the menu / dashboard |
+#### 8.7.1 HTTPS wiring and certificates
 
-#### 8.7.1 HTTPS wiring & certificates
+The same server implementation runs in TLS mode, with responsibility split like this:
 
-When `ENABLE_HTTPS_SERVER` is on alongside `ENABLE_TLS_SERVICE`, the **same** `HttpServerInterfaceImpl` ([src/interface/pdi/impl/middlewares/HttpServerInterfaceImpl.{h,cpp}](src/interface/pdi/impl/middlewares/HttpServerInterfaceImpl.h)) runs in TLS mode. The split of responsibility is:
+```
+  HttpServer::initService     sets cert, key, optional client CA, then begin(443, secure)
+        │
+  iHttpServerInterface        adds the TLS setters and the secure flag; they are no-ops
+        │                     in a non-TLS build, so existing ports compile untouched
+        ▼
+  HttpServerInterfaceImpl     listener switches to the TLS server instance; each accepted
+        │                     client still looks like an ordinary client to the parser
+        ▼
+  port TLS backend            BearSSL on esp8266, mbedTLS on esp32 — loads PEM from the
+                              filesystem at the configured paths
+```
 
-| Layer | What it does in HTTPS mode |
-|---|---|
-| `HttpServer::initService` ([§8.2](#82-httpserver-orchestrator)) | Calls `setServerCertificatePath` / `setServerPrivateKeyPath` (+ `setClientCertificateAuthorityPath` if `ENABLE_HTTPS_SERVER_MTLS`), then `begin(HTTPS_DEFAULT_PORT, secure=true)`. Paths come from [TlsConfig.h](src/config/TlsConfig.h) macros. |
-| `iHttpServerInterface` ([§13.3.3](#13-portable-interfaces)) | Adds the TLS-only methods `setServerCertificatePath`, `setServerPrivateKeyPath`, `setClientCertificateAuthorityPath`, and the `secure` arg on `begin(port, secure)`. All three setters are no-op stubs in the non-TLS build, so existing ports compile unchanged. |
-| `HttpServerInterfaceImpl::begin(port, secure=true)` | Switches the listener over to `__i_instance.getNewTlsServerInstance()`. Each accepted client is a `iTlsClientInterface*` masquerading as the same `iClientInterface` shape the request parser already uses — so handler code never sees raw TLS frames. |
-| Port-level TLS backend | esp8266 → BearSSL, esp32 → mbedTLS — loads PEM/DER from the FS at the configured paths via `TlsCryptoLoader` ([devices/esp8266/BearSSLCertLoader.{h,cpp}](devices/esp8266/BearSSLCertLoader.h), [devices/esp32/MbedTLSCertLoader.{h,cpp}](devices/esp32/MbedTLSCertLoader.h)). |
-| Cert provisioning | Two paths — on-device `tls q=1,t=…,n=…,i=…` CLI command (esp32 only, gated on `ENABLE_TLS_CERT_GENERATION`; auto-mint at first STA-got-IP if `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME`); off-device [scripts/GenTlsCerts.py](scripts/GenTlsCerts.py) for esp8266. See [§6.2.16](#6-service-providers). |
-
-Required filesystem layout (defaults from [TlsConfig.h](src/config/TlsConfig.h) — overridable per project):
-
-| Path macro | Default | Purpose |
+| Path | Default | Purpose |
 |---|---|---|
-| `TLS_DEFAULT_SERVER_CERT_PATH` | `/etc/http/server.crt` | HTTPS server certificate (PEM; may be a chain) |
-| `TLS_DEFAULT_SERVER_KEY_PATH` | `/etc/http/server.key` | HTTPS server private key (PEM; EC or RSA) |
-| `TLS_DEFAULT_CLIENT_CA_PATH` | `/etc/http/client-ca.crt` | CA bundle for mTLS client-cert verification (only if `ENABLE_HTTPS_SERVER_MTLS`) |
+| server certificate | `/etc/http/server.crt` | PEM, may be a chain |
+| server key | `/etc/http/server.key` | PEM, EC or RSA |
+| client CA | `/etc/http/client-ca.crt` | only under mTLS |
 
-Upload these via SFTP ([§6.2.14](#6-service-providers)) after first boot, then `reboot` — the HTTPS listener picks them up on the next `initService` pass. The storage service creates `/etc/http/` lazily; you don't need to `mkdir` it ahead of time.
+Upload those over SFTP after first boot and reboot; the listener picks them up on the next start. The directory is created for you.
 
-HTTPS-specific response headers worth knowing:
+Certificates come either from the on-device `tls` command on ESP32 — optionally minted automatically the first time the device gets an IP — or from `scripts/GenTlsCerts.py` off-device.
 
-- **`Strict-Transport-Security`** — emitted by the HTTPS server when `HTTPS_HSTS_MAX_AGE_SECONDS` ([HttpConfig.h](src/config/HttpConfig.h)) is non-zero. Default is **0** (header not sent). Turn on only with a CA-signed cert; with a self-signed cert HSTS hard-fails the browser click-through and locks the portal out.
+One header is worth a decision rather than a default: `Strict-Transport-Security` is sent only when its max-age is non-zero, and it ships as zero. Turn it on once you have a CA-signed certificate. With a self-signed one, the browser will pin HTTPS and refuse the click-through until the pin expires.
 
-### 8.8 Request lifecycle (end to end)
+### 8.8 Request lifecycle
 
 ```
-client request
-    │
-    ▼
-iHttpServerInterface::handleClient()
-    │  parse method + URI + headers + args
-    │
-    ▼
-matching route lambda registered in __web_route_handler
-    │  (the lambda was captured by Controller::boot())
-    │
-    ▼
-Middleware::handle_middleware(level, redirect)
-    │  if AUTH and !has_active_session(): send 301 → /login, return
-    │
-    ▼
-Controller::handleXxxRoute()
-    │  read args/headers via m_web_resource->m_server->arg(name)
-    │  pull config: __database_service.get_<x>_config_table(&cfg)
-    │  on POST: validate, set table, optionally fire event / restart service
-    │  build HTML: header + page + footer through send(..., chunked=true)
-    │
-    ▼
-iHttpServerInterface::send(code, mime, body, chunked)
-    │
-    ▼
-bytes back to client
+  client request
+      │
+  handleClient()                parse method, URI, headers, args
+      │
+  route lambda                  the one Controller::boot() registered for this URI
+      │
+  middleware                    auth? no live session → 301 to /login, stop here
+      │
+  controller method             read args, load config, on POST validate and persist,
+      │                         then send header + page + footer
+      ▼
+  send(code, mime, body, chunked)  ──▶  bytes back to the client
 ```
 
-### 8.9 Per-route data flow examples
+### 8.9 Three routes worth tracing
 
-**`/wifi-config` POST** (from [WiFiConfigController.h](src/webserver/controllers/WiFiConfigController.h)):
-1. Middleware: AUTH passes.
-2. Read `arg("sta_ssid")`, `arg("sta_password")`, AP fields.
-3. `__database_service.get_wifi_config_table(&cur)` to preserve untouched fields.
-4. Apply args to the struct.
-5. `__database_service.set_wifi_config_table(&cur)`.
-6. Emit success page; schedule `__wifi_service.configure_wifi_station(...)` via `__task_scheduler.setTimeout(..., 1)` so the response flushes before the radio drops.
-7. Device reconnects with new credentials.
+**`/wifi-config` POST.** Auth passes, the controller reads the station and AP arguments, loads the current WiFi table so untouched fields survive, applies the new values, saves, and renders the success page. The actual reconnect is scheduled a tick later — the response has to flush before the radio drops out from under it.
 
-**`/listen-monitor` (analog GPIO live graph)**:
-- Browser issues repeated GETs (long-poll style); each returns the latest analog sample as JSON.
-- `GpioController::handleAnalogMonitor` reads the pin via `__i_dvc_ctrl.gpioRead(ANALOG_READ, pin)`, builds `{ "p":N, "v":val }`, sends.
+**`/listen-monitor`.** The browser polls; each request reads the analog pin and returns a small JSON object with the pin and its value. That is the whole live-graph mechanism.
 
-**`/storage-fileupload` (multipart)**:
-- `StorageController` reads the upload via the server's chunked body API, writes to the file system via `__i_fs.createFile/appendFile`.
-- Filename is sanitised against `MIN_ACCEPTED_ARG_SIZE`.
+**`/storage-fileupload`.** The controller reads the multipart body through the server's chunked API and writes it to the filesystem as it arrives, so upload size is bounded by flash rather than by RAM.
 
-### 8.10 Adding a new page
+### 8.10 Adding a page
 
-To add a `/metrics` page that shows live counters:
+For a `/metrics` page:
 
-1. **Add the route constant** in [routes/Routes.h](src/webserver/routes/Routes.h):
-   ```c
-   #define WEB_SERVER_METRICS_ROUTE "/metrics"
-   ```
-2. **Create `MetricsPage.h`** under [src/webserver/pages/](src/webserver/pages/) with the body HTML as a `PROG_RODT_ATTR` const.
-3. **Create `MetricsController`** under [src/webserver/controllers/](src/webserver/controllers/):
+1. Add the route constant next to the others.
+2. Add `MetricsPage.h` with the body HTML as a program-memory constant.
+3. Write the controller:
    ```cpp
    class MetricsController : public Controller {
    public:
        MetricsController() : Controller("MetricsController") {}
        void boot() override {
-           m_route_handler->register_route(
-               WEB_SERVER_METRICS_ROUTE,
-               [&]{ this->handleMetrics(); },
-               AUTH_MIDDLEWARE);
+           m_route_handler->register_route(WEB_SERVER_METRICS_ROUTE,
+                                           [&]{ this->handleMetrics(); },
+                                           AUTH_MIDDLEWARE);
        }
    private:
        void handleMetrics() {
@@ -2273,285 +1847,198 @@ To add a `/metrics` page that shows live counters:
        }
    };
    ```
-4. **Add a value-member** in [WebServer.h](src/webserver/WebServer.h) (under the matching `ENABLE_*` if optional), plus `#include` of the controller header. No registry plumbing — the base-class constructor self-registers.
-5. **Add a menu entry** in the existing home/header page so users can navigate to it.
+4. Add it as a value member of `HttpServer`, behind a flag if it is optional, and include its header. Nothing else — the base constructor registers it.
+5. Add a menu entry so people can reach it.
 
-### 8.11 Gotchas
-
-- **Page size cap (`PAGE_HTML_MAX_SIZE = 1800`).** A single non-chunked `send` is truncated to 1.8 KB. Always pass `send_in_chunks=true` for composed pages, and split big HTML into header/body/footer fragments.
-- **Cookie storage is single-row.** Only one logged-in user at a time is well-supported; concurrent sessions reuse the same cookie token.
-- **`API_MIDDLEWARE` is a stub.** Don't assume `API_MIDDLEWARE` enforces anything — if you're shipping an API surface, add the check now.
-- **Page strings live in flash (`PROG_RODT_ATTR`).** Don't `strcpy` them into RAM unless you have to; pass them straight to `send()` which handles flash-string reads.
-- **All controller routes go through one global `RouteHandler`.** Two controllers registering the same URI silently overwrite each other on the underlying `iHttpServerInterface::on()` — make URI constants unique.
-- **`handle_clients` is called every `serve()` tick.** Long controller methods stall the entire main loop. If a route needs >100 ms of work (e.g. mass file delete), schedule it via `__task_scheduler.setTimeout(..., 1, now())` and return a 202 immediately.
-- **No CSRF protection.** Forms rely on session cookies only; same-origin assumed. Don't expose the portal on the WAN.
-- **Static-init order across controllers.** `Controller::m_controllers` is a static vector; controllers constructed during static init push into it. If your controller's constructor side-effects depend on another global, defer to `boot()` — which only runs from `initService`.
-- **HTTPS or HTTP, not both.** The current `WebServer::initService` calls `begin()` exactly once — either on `HTTPS_DEFAULT_PORT (443)` with `secure=true` or on `HTTP_DEFAULT_PORT (80)`. Building with `ENABLE_HTTPS_SERVER` flips the whole portal to TLS; there's no parallel plaintext listener. If you need both (e.g. redirect 80 → 443), drive a second `iTcpServerInterface` from a sketch.
-- **HTTPS fails closed if cert/key are missing.** With `ENABLE_HTTPS_SERVER`, the listener refuses connections (or never starts, depending on the port) when `/etc/http/server.crt` / `/etc/http/server.key` aren't on the FS. Provision before flipping the flag — or use `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` on esp32 so an `EVENT_WIFI_STA_GOT_IP` listener auto-mints a self-signed pair on first boot.
-- **Self-signed cert + browser HSTS is a foot-gun.** Default `HTTPS_HSTS_MAX_AGE_SECONDS = 0` keeps the header off. If you turn HSTS on while serving a self-signed cert, the browser pins HTTPS-only for the configured age and hard-fails the click-through — you'll lose portal access until the pin expires or you clear it manually.
-- **Session cookie isn't marked `Secure`.** The framework's session cookie ([§8.6](#86-sessions--ewsessionhandler)) doesn't carry the `Secure` attribute even under HTTPS, so it'll fall through plaintext if you ever ran the portal on HTTP. After switching to HTTPS, factory-reset the credential row (or change the session name) to invalidate any HTTP-issued cookies still in client caches.
+Two habits keep the portal responsive. Pass page strings straight to `send()` rather than copying them into RAM; it reads flash directly. And keep controller methods short — `handle_clients()` runs on every pass of the main loop, so a route that needs real work should schedule it and return immediately rather than blocking the loop while it runs.
 
 ---
-
 ## 9. Logger
 
-The logger is deliberately one of the smallest subsystems in the framework. There is **no per-tag filtering and no JSON formatter** — four levels, a printf-style varargs formatter, and one shared logger object. It splits along a single axis: **console** logs go to the serial terminal only; **syslog** logs go to the serial terminal, a file under `/var/log`, and (optionally) a remote collector. The cleverness is in *how it disappears*: when a level's console gate is off, every `LogI(...)` / `LogE(...)` site for that level compiles to nothing — zero flash, zero RAM, zero runtime cost.
+The logger is deliberately the smallest interesting subsystem in the framework: four levels, a printf-style formatter, and one shared object. It splits along a single axis — console lines go to the serial terminal, syslog lines go to the terminal *and* a file, and optionally to a remote collector. The interesting part is how it disappears. When a level's gate is off, every call site for that level compiles to nothing at all.
 
-Implementation: [src/interface/pdi/impl/log/LogManager.{h,cpp}](src/interface/pdi/impl/log/LogManager.h) (the one logger), [src/interface/pdi/impl/log/LogMacros.h](src/interface/pdi/impl/log/LogMacros.h) (the one macro home), [src/interface/pdi/iLoggerInterface.h](src/interface/pdi/iLoggerInterface.h) (the logger contract), [src/service_provider/network/SyslogServiceProvider.{h,cpp}](src/service_provider/network/SyslogServiceProvider.h) (the syslog file + forward sink), [src/utility/DataTypeDef.h](src/utility/DataTypeDef.h) (default no-op macros), [src/config/SyslogConfig.h](src/config/SyslogConfig.h) (paths, sizes, forward target).
+Start reading at [src/interface/pdi/impl/log/LogManager.h](src/interface/pdi/impl/log/LogManager.h).
 
-### 9.1 One logger — `LogManager`
+### 9.1 One logger
 
-`LogManager` (`extern LogManager __log_manager;`) is the single logger for the whole stack, on every port. It implements [`iLoggerInterface`](src/interface/pdi/iLoggerInterface.h) — a two-method contract, `init(iIOInterface*)` and `log(logger_type_t, const char* fmt, ...)` — and holds one pointer: the serial terminal it writes to, as an `iIOInterface*`.
+`__log_manager` is the single logger for the whole stack on every port. Its contract is two methods — initialise with an I/O interface, and log a level with a format string. It holds exactly one pointer: the terminal it writes to.
 
-The device port does **not** implement the logger. Its only responsibility is to expose its serial terminal; the stack wires it in during boot:
+The device port does not implement a logger. Its only job is to expose its serial terminal, which the stack wires in during boot:
 
 ```cpp
-// PdiStack::initialize
-__log_manager.init(__i_dvc_ctrl.getTerminal());   // getTerminal() returns an iIOInterface*
+__log_manager.init(__i_dvc_ctrl.getTerminal());
 ```
 
-`init()` stores the terminal and opens it at 115200 baud if it isn't already. There is no separate lifecycle macro to remember to call — `PdiStack::initialize` does this for you.
+That happens inside `initialize()`, so there is no lifecycle call to remember.
 
-For a `SysLog*` line, `LogManager` formats it and echoes it to the console, then hands it to a registered **sink** — the syslog service ([§9.7](#97-where-syslog-goes)) — which owns file persistence and any remote forwarding. `LogManager` itself never touches the filesystem or the network; when no sink is registered, `SysLog*` is simply a console line.
+For a syslog line, the manager formats it, echoes it to the console, and hands it to whatever sink is registered — the syslog service, which owns the file and the network. The manager itself never touches either. With no sink registered, a syslog line is simply a console line.
 
 ### 9.2 Levels
 
-| `logger_type_t` | Console macro | Syslog macro | When to use |
+| Level | Console | Console + file | Use it for |
 |---|---|---|---|
-| `INFO_LOG` | `LogI(fmt, ...)` | `SysLogI(fmt, ...)` | State transitions, lifecycle ("`Starting MQTT Service`") |
-| `ERROR_LOG` | `LogE(fmt, ...)` | `SysLogE(fmt, ...)` | Recoverable failures, validation rejects |
-| `WARNING_LOG` | `LogW(fmt, ...)` | `SysLogW(fmt, ...)` | Unusual conditions, deprecated paths |
-| `SUCCESS_LOG` | `LogS(fmt, ...)` | `SysLogS(fmt, ...)` | Confirmation of high-value operations (`"OTA applied"`) |
+| info | `LogI` | `SysLogI` | state transitions and lifecycle |
+| error | `LogE` | `SysLogE` | recoverable failures, rejected input |
+| warning | `LogW` | `SysLogW` | unusual conditions |
+| success | `LogS` | `SysLogS` | confirmation of something that mattered |
 
-Each macro is a single **variadic** form — the same macro takes a plain string or a format string with arguments:
+Each macro is variadic, so the same one takes a bare string or a format:
 
 ```cpp
-LogI("Starting WiFi service");        // plain
-LogI("NTP validity : %d", valid);     // formatted
+LogI("Starting WiFi service");
+LogI("NTP validity : %d", valid);
 ```
 
-Because every call routes through the formatter, a plain message must not contain an unescaped `%` (see [§9.8](#98-gotchas)).
+Reach for `Log*` for chatty development tracing that should never reach flash, and `SysLog*` for lines worth surviving a reboot. The framework's own error paths use `SysLogE`.
 
-### 9.3 Console vs syslog
-
-- **`Log*`** — console only. Writes to the serial terminal. Gated per level by `ENABLE_CONSOLE_LOG_*`.
-- **`SysLog*`** — console **and** file (**and** a remote collector when forwarding is on). Writes the line to the serial terminal, appends it to `/var/log/syslog.<level>`, and — with `ENABLE_SYSLOG_FORWARD` — ships it to a syslog collector. Active when `ENABLE_SYSLOG_SERVICE` is defined; when it is off, `SysLog*` degrades to the matching `Log*` (console-only), so call sites need no `#ifdef`.
-
-Use `Log*` for chatty, dev-time tracing you never want on flash storage; use `SysLog*` for lines worth surviving a reboot (errors, lifecycle milestones). The framework's app layer — `service_provider/`, `transports/`, `helpers/` — routes its error-level lines through `SysLogE`.
-
-### 9.4 Feature flags
-
-Console gates (in [devices/DeviceConfig.h](devices/DeviceConfig.h)):
+### 9.3 Flags
 
 | Flag | Effect |
 |---|---|
-| `ENABLE_CONSOLE_LOG_INFO` | Enables `LogI` |
-| `ENABLE_CONSOLE_LOG_ERROR` | Enables `LogE` |
-| `ENABLE_CONSOLE_LOG_WARNING` | Enables `LogW` |
-| `ENABLE_CONSOLE_LOG_SUCCESS` | Enables `LogS` |
-| `ENABLE_CONSOLE_LOG_ALL` | Shorthand for *all of the above* |
+| `ENABLE_CONSOLE_LOG_INFO` / `_ERROR` / `_WARNING` / `_SUCCESS` | enables that level's console macro |
+| `ENABLE_CONSOLE_LOG_ALL` | all four |
+| `ENABLE_SYSLOG_SERVICE` | the file sink behind `SysLog*`; needs storage, and is defined inside that guard so it is simply absent on ports without a filesystem |
+| `ENABLE_SYSLOG_FORWARD` | also ships each line to a collector; needs syslog and network, and stays idle until a host is configured |
 
-Syslog gates:
+With every console gate off and syslog off, the build is silent: nothing on serial, nothing on flash. When syslog is off, `SysLog*` degrades to the matching console macro, so call sites never need an `#ifdef`.
 
-| Flag | Effect |
-|---|---|
-| `ENABLE_SYSLOG_SERVICE` | Enables the file sink behind `SysLog*`. Requires `ENABLE_STORAGE_SERVICE`; auto-defined inside that guard in [DeviceConfig.h](devices/DeviceConfig.h), so it is simply absent on storage-less ports (uno). |
-| `ENABLE_SYSLOG_FORWARD` | Also ships each `SysLog*` line to a remote collector (RFC 3164 over UDP). Requires `ENABLE_SYSLOG_SERVICE` **and** `ENABLE_NETWORK_SERVICE`; auto-defined when both are on. Idle until `SYSLOG_REMOTE_HOST` is set. |
+### 9.4 How a level disappears
 
-With every console gate off and `ENABLE_SYSLOG_SERVICE` off, the shipping configuration is **silent** — release builds emit nothing on serial and write no files.
-
-### 9.5 The disappearing-macro pattern
-
-Console macros are zero-cost when off via a two-layer definition. **Layer 1** lives in [DataTypeDef.h](src/utility/DataTypeDef.h) (included early everywhere) as the unconditional no-op stub:
-
-```cpp
-#define LogI(f, args...) // info log
-#define LogE(f, args...) // error log
-#define LogW(f, args...) // warning log
-#define LogS(f, args...) // success log
+```
+  DataTypeDef.h        #define LogI(f, args...)          ← included early, everywhere
+        │                                                  a no-op, so LogI() always compiles
+        ▼
+  LogMacros.h          #if defined(LogI) && gate-is-on
+                       #undef  LogI
+                       #define LogI(f, args...) __log_manager.log(INFO_LOG, RODT_ATTR(f), ##args)
 ```
 
-So `LogI("...")` is always legal C++, even on a build with no logger — it just expands to nothing.
+`LogMacros.h` deliberately has no include guard, because the undef-and-redefine dance is idempotent: re-including it after the gates become visible upgrades the stubs in place. It reaches the service layer through `ServiceProvider.h` and the device layer through each port's base header, which covers everything.
 
-**Layer 2** lives in [LogMacros.h](src/interface/pdi/impl/log/LogMacros.h) and upgrades a level's stub to the real call only when its gate is on:
+The result is identical to hand-stripping every call site with `#ifdef`, while the code reads naturally.
 
-```cpp
-#if defined(LogI) && ( defined(ENABLE_CONSOLE_LOG_INFO) || defined(ENABLE_CONSOLE_LOG_ALL) )
-#undef LogI
-#define LogI(f, args...) __log_manager.log(INFO_LOG, RODT_ATTR(f), ##args)
-#endif
+### 9.5 Flash strings and the formatter
+
+Every macro wraps its format string in `RODT_ATTR`, which keeps the literal in flash rather than RAM — a few hundred call sites then cost flash they were going to occupy anyway and no RAM at all. The manager copies the format into a short-lived buffer before walking it.
+
+The formatter is the framework's own and understands `%d`, `%u`, `%x`, `%c`, `%f` and `%s`. There are no width, precision or length modifiers, so cast a 64-bit value down before logging it. Since every message goes through the formatter, a literal percent sign needs escaping — write `%%`, or pass the text as a `%s` argument.
+
+Console output streams to the terminal character by character with no line buffer, which is what keeps it usable on the RAM-starved boards.
+
+### 9.6 Where syslog goes
+
+```
+  SysLogE("…")
+      │
+  LogManager   format ──▶ console echo
+      │
+      └─▶ sink: SyslogServiceProvider
+              ├─▶ /var/log/syslog.<level>     appended, NTP-timestamped
+              └─▶ RFC 3164 datagram over UDP  when forwarding is on
 ```
 
-`LogMacros.h` has **no include guard** on purpose: the `#if defined(...)` / `#undef` / `#define` dance is idempotent, so re-including it after the gates become visible simply upgrades the no-op defaults in place. It reaches both layers of the codebase:
-
-- **Service layer + PdiStack** — [ServiceProvider.h](src/service_provider/ServiceProvider.h) includes it, so every service and `PdiStack` inherit it.
-- **Device layer** — each device base header (`devices/<port>/<port>.h`) includes it at its end, so every device `.cpp` inherits it.
-
-Net effect: a *zero-byte* console logger for any disabled level, identical to hand-`#ifdef`-stripping every call site — but written naturally.
-
-### 9.6 The flash-string convention
-
-Each console macro wraps its format string in `RODT_ATTR(...)`:
-
-```cpp
-#define LogI(f, args...) __log_manager.log(INFO_LOG, RODT_ATTR(f), ##args)
-```
-
-That keeps the literal in flash (`PROGMEM` on AVR, `.rodata` on ESP) rather than RAM — a few hundred log call sites cost flash they were going to occupy anyway, and zero RAM. `LogManager::log` copies the flash format into a short-lived RAM buffer (`CHARPTR_WRAP_RO`, auto-freed) before walking it.
-
-The formatter is the framework's own, not libc's, and understands only `%d %u %x %c %f %s` — no width, precision, or length modifiers (no `%lu`, `%.2f`). Cast a 64-bit value down before logging it. The console path streams straight to the terminal character by character with no line buffer, which is what keeps it usable even on the RAM-starved uno.
-
-### 9.7 Where syslog goes
-
-`LogManager` never writes files or sockets itself. It formats a `SysLog*` line, echoes it to the console, and hands it to the **syslog service** ([SyslogServiceProvider](src/service_provider/network/SyslogServiceProvider.h)), which owns everything downstream — the file write and, when enabled, the remote forward. The service registers itself as the logger's sink during boot (before the other services start, so their boot-time `SysLog*` lines are captured), and `SysLog*` call sites stay oblivious to where the line lands.
-
-**Files.** When `ENABLE_SYSLOG_SERVICE` is on, each line is appended to a file chosen by level:
+The service registers itself as the sink during boot, before the other services start, so their startup lines are captured too.
 
 | Level | File |
 |---|---|
-| `INFO_LOG` | `/var/log/syslog.info` |
-| `ERROR_LOG` | `/var/log/syslog.error` |
-| `WARNING_LOG` | `/var/log/syslog.warning` |
-| `SUCCESS_LOG` | `/var/log/syslog.success` |
+| info | `/var/log/syslog.info` |
+| error | `/var/log/syslog.error` |
+| warning | `/var/log/syslog.warning` |
+| success | `/var/log/syslog.success` |
 
-Files split by **level** only — the logger carries no service/unit identity, so level is the only axis. Every file line is **timestamped**: the service prefixes each line with the NTP date (`SYSLOG_FILE_TS_FMT`, default `"%Y-%m-%d %H:%M:%S "`), re-stamping after any newline embedded in the message and closing each entry on its own line; before the clock syncs the field renders as dashes. The `/var/log` directory is created lazily on the first write. Each file grows to `SYSLOG_FILE_MAX_SIZE` (8 KB) then restarts from empty — a truncate-and-restart rotation, no numbered archives. A single assembled line is capped at `SYSLOG_LINE_MAX` (200 bytes). All limits, paths, and the timestamp format live in [SyslogConfig.h](src/config/SyslogConfig.h). A re-entry guard drops any log emitted from inside a syslog write, so the sink can't recurse.
+Files split by level, because level is the only identity a line carries. Each file line is prefixed with the NTP date, re-stamped after any embedded newline, and rendered as dashes until the clock syncs. `/var/log` is created on the first write. A file grows to 8 KB and then restarts from empty, and an assembled line is capped at 200 bytes. A re-entry guard drops anything logged from inside a syslog write, so the sink cannot recurse into itself.
 
-Read them from the CLI like any other file: `cat /var/log/syslog.error`, `tail /var/log/syslog.info 20`, `grep MQTT /var/log/syslog.info`.
+Read them like any other file — `cat /var/log/syslog.error`, `tail /var/log/syslog.info 20`, `grep MQTT /var/log/syslog.info`.
 
-**Remote forwarding.** Setting `ENABLE_SYSLOG_FORWARD` makes the same service *also* ship each line to a collector as an **RFC 3164** datagram over UDP (`SYSLOG_REMOTE_PORT`, default 514), built directly on `iUdpInterface` — no vendor syslog library. Point it at a collector with `SYSLOG_REMOTE_HOST` (empty ⇒ compiled but idle); the address is resolved through [`NameResolver`](src/service_provider/network/NameResolver.h) once the station has an IP. Each datagram is `<PRI>timestamp hostname pdi: message` — PRI from the level (`local0` facility), timestamp from NTP (omitted until synced), hostname = the device IP. `srvc status syslog` shows the collector, whether it resolved, and the socket state. The file write and the forward are independent: file logging works with no network, and forwarding rides on top when the network is present.
+Remote forwarding builds the datagram directly on the UDP interface, with no vendor syslog library: `<PRI>timestamp hostname pdi: message`, where PRI comes from the level under the `local0` facility, the timestamp comes from NTP once synced, and the hostname is the device address. The collector host is resolved through the name resolver once the station has an IP, and `srvc status syslog` shows the target, whether it resolved, and the socket state. File writing and forwarding are independent — files work with no network at all, and forwarding rides on top when there is one.
 
-### 9.8 Gotchas
-
-- **Plain messages must not contain a bare `%`.** Every `Log*` / `SysLog*` call goes through the formatter, so `LogI("100% done")` mis-parses the `%`. Escape it (`%%`) or pass it as an argument (`LogI("%s", "100% done")`).
-- **Only `%d %u %x %c %f %s` are supported, no length modifiers.** Use `%d`/`%u` for 32-bit ints and cast 64-bit values down first — `%lu` / `%lld` are not understood.
-- **No runtime level filtering.** Disabling `ENABLE_CONSOLE_LOG_INFO` removes every `LogI` from the binary; you cannot turn one back on without recompiling.
-- **`SysLog*` needs storage.** On a port without `ENABLE_STORAGE_SERVICE` (uno), `ENABLE_SYSLOG_SERVICE` is never defined and `SysLog*` silently falls back to console-only `Log*`.
-- **The logger and the CLI share the serial terminal.** Both write through the same `iIOInterface`, so on a single-UART board their output interleaves on one stream — expected.
-- **Console output is un-prefixed; syslog *files* are timestamped.** `Log*` lines (and the console echo of `SysLog*` lines) arrive exactly as written — prepend your own with `LogI("[%u] ...", (uint32_t)millis())` if you want one. The `/var/log/syslog.*` file lines get an automatic NTP date prefix ([§9.7](#97-where-syslog-goes)); the console does not.
+Two things follow from the design. Levels are compile-time, so turning `LogI` back on means a rebuild. And the logger shares the serial terminal with the shell, so on a single-UART board their output interleaves — which is exactly what you want while watching a device boot.
 
 ---
-
 ## 10. Transports
 
-Transports are the **protocol implementations** that sit between the byte-level `iClientInterface` (which the device port provides) and the feature services (which deal in domain payloads). The three transports — HTTP, MQTT, SMTP — share one design: take a `iClientInterface*`, speak the wire protocol on it, hand the parsed result back to a service. They have **no device knowledge**, **no scheduling of their own**, and **no global state** other than per-instance buffers.
+A transport speaks a wire protocol on a byte stream. It sits between the `iClientInterface` the device port provides and the service that deals in payloads. All three — HTTP, MQTT, SMTP — share the same shape: take a client, speak the protocol on it, hand the parsed result back. None of them knows about the device, owns a schedule, or keeps global state beyond its own buffers.
 
-Implementation: [src/transports/](src/transports/). No global instances — each consumer creates an instance with an `iClientInterface*` it owns.
-
-### 10.1 Why transports are separate from services
-
-Three reasons the framework keeps these layers split:
-
-1. **Reuse.** Both `WebServer` and `HTTP_CLIENT` need HTTP parsing; both `MqttServiceProvider` and `DeviceIotServiceProvider` need MQTT. A service owns *what to do*; the transport owns *how to speak the protocol*.
-2. **Replaceability.** A device port that ships an SDK-native MQTT client can offer a `iClientInterface`-shaped wrapper and the framework's `MQTTClient` falls away — services don't change.
-3. **Testability off-device.** Transports are pure C++ that take a stream — they can be exercised against a memory-backed `iClientInterface` mock without WiFi.
-
-The service layer never opens its own socket: it asks `iInstanceInterface::getNewTcpClientInstance()` for a fresh `iTcpClientInterface*`, hands it to the transport, and lets the transport drive.
-
-### 10.2 Transport summary
-
-| Transport | Path | Class | Consumer services | Wire spec |
-|---|---|---|---|---|
-| HTTP | [transports/http/](src/transports/http/) | `Http_Client` | `OtaServiceProvider`, `DeviceIotServiceProvider`, `GpioServiceProvider` (HTTP-post mode), `WebServer` indirectly | HTTP/1.1 (default), 1.0 supported; placeholders for 2/3. HTTPS works through the same class — see [§10.3 HTTPS](#https--same-client-different-socket) |
-| MQTT | [transports/mqtt/](src/transports/mqtt/) | `MQTTClient` (+ `mqtt_msg_*` builders) | `MqttServiceProvider`, `DeviceIotServiceProvider` | MQTT 3.1.1 |
-| SMTP | [transports/smtp/](src/transports/smtp/) | `SMTPClient` | `EmailServiceProvider` | SMTP with `AUTH LOGIN`, no STARTTLS yet |
-
-### 10.3 HTTP — `Http_Client`
-
-Header: [HTTPClient.h](src/transports/http/HTTPClient.h). Two POD records — `http_req_t` and `http_resp_t` — carry request/response metadata; the class itself is the state machine that drives a connection through `iClientInterface`.
-
-#### Lifecycle
-
-```cpp
-Http_Client http;
-http.Begin();                                  // resets internal state
-http.SetClient(__i_instance.getNewTcpClientInstance());
-http.SetTimeout(HTTP_REQUEST_DURATION);        // 10000 ms by default
-http.SetKeepAlive(true);
-http.SetFollowRedirects(true);
-http.SetRedirectLimit(3);
-http.SetHttpVersion(HTTP_VERSION_1_1);
-http.SetDefaultHeaders(true);                  // adds Host, User-Agent, Connection
-http.AddReqHeader("X-Device", mac);
-
-int16_t code = http.Get("http://api.example.com/v1/ping");
-// or: http.Post(url, jsonBody);
-// or: http.SendRequest("PATCH", url, body, len);
-
-char *body; int16_t len;
-http.GetResponse(body, len);                   // body is borrowed; do not free
-char *agent;
-http.GetRespHeader("Server", agent);
-
-http.End(/*preserve_client=*/true);            // close session, optionally keep socket for next request
+```
+   service          knows what to do, when to retry, what to persist
+      │  hands over an iClientInterface* it owns
+      ▼
+   transport        knows how to speak the protocol; parses bytes, nothing else
+      │
+      ▼
+   iClientInterface  plaintext TCP or TLS — the transport can't tell
 ```
 
-The class exposes the usual `Get` / `Post` / `SendRequest`, request-shaping setters (URL, timeout, keep-alive, headers, basic-auth, user-agent, redirect policy, HTTP version), and matching `GetResponse` / `GetRespHeader` accessors. Requests are synchronous; a negative return signals a transport-level failure (connect/read/timeout) before an HTTP status is available. Full signatures in [HTTPClient.h](src/transports/http/HTTPClient.h).
+That split buys three things. The same HTTP parsing serves both the client and the portal. A port that ships an SDK-native MQTT client can present it as an `iClientInterface` and the framework's own client falls away without any service noticing. And because a transport is plain C++ over a stream, it can be exercised against a memory-backed mock with no radio involved.
 
-#### Defaults (from [HttpConfig.h](src/config/HttpConfig.h))
+Live in [src/transports/](src/transports/). There are no globals — each consumer creates an instance.
 
-| Macro | Value | Meaning |
-|---|---|---|
-| `HTTP_DEFAULT_PORT` | 80 | Used if URL omits port |
-| `HTTPS_DEFAULT_PORT` | 443 | Used if URL omits port for `https://` |
-| `HTTP_DEFAULT_VERSION` | `HTTP_VERSION_1_1` | Request line version |
-| `HTTP_DEFAULT_KEEP_ALIVE_MS` | 30000 | Connection: keep-alive timeout sent to peer |
-| `HTTP_REQUEST_DURATION` | 10000 (Common.h) | Per-request total budget |
-| `HTTP_CLIENT_BUF_SIZE` | 640 | Working buffer used during parse |
-| `HTTP_CLIENT_MAX_READ_MS` | 1500 | Per-chunk read timeout inside the parse loop |
-| `HTTP_REQUEST_RETRY` | 1 | Connect retries before giving up |
+| Transport | Class | Used by | Speaks |
+|---|---|---|---|
+| HTTP | `Http_Client` | OTA, IoT, GPIO posting, and the portal indirectly | HTTP/1.1, and 1.0 |
+| MQTT | `MQTTClient` plus the message builders | MQTT service, IoT service | MQTT 3.1.1 |
+| SMTP | `SMTPClient` | email service | SMTP with AUTH LOGIN |
 
-#### Status codes
+### 10.1 HTTP
 
-`http_resp_t::status_code` carries the standard HTTP code on success; on transport failure (connect/read/timeout) the `Get`/`Post`/`SendRequest` return is a negative `int16_t`. The full enum (`HTTP_RESP_*`) is in [HttpConfig.h](src/config/HttpConfig.h).
-
-#### HTTPS — same client, different socket
-
-`Http_Client` doesn't know or care whether its underlying `iClientInterface*` is plaintext TCP or TLS. To make any request HTTPS, only the factory call changes:
+Two POD records carry request and response metadata; the class is the state machine between them.
 
 ```cpp
 Http_Client http;
 http.Begin();
+http.SetClient(__i_instance.getNewTcpClientInstance());
+http.SetTimeout(HTTP_REQUEST_DURATION);   // 10 s
+http.SetKeepAlive(true);
+http.SetFollowRedirects(true);
+http.SetDefaultHeaders(true);             // Host, User-Agent, Connection
+http.AddReqHeader("X-Device", mac);
 
-// HTTPS instead of HTTP:
+int16_t code = http.Get("http://api.example.com/v1/ping");
+
+char *body; int16_t len;
+http.GetResponse(body, len);              // borrowed buffer — copy if you need it later
+http.End(/*preserve_client=*/true);
+```
+
+Requests are synchronous. A negative return means the transport failed before there was an HTTP status to report — connect, read or timeout.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| port | 80, or 443 for `https://` | used when the URL omits one |
+| version | HTTP/1.1 | request line |
+| keep-alive | 30 s | what is advertised to the peer |
+| request budget | 10 s | whole request |
+| working buffer | 640 B | used during parsing |
+| per-chunk read | 1.5 s | inside the parse loop |
+| connect retries | 1 | everything above this belongs to the service |
+
+**HTTPS is the same client on a different socket.** The class never opens the connection, so making a request encrypted is a change of factory call and nothing else:
+
+```cpp
 iTlsClientInterface* tls = __i_instance.getNewTlsClientInstance();
-tls->setCertificateAuthorityPath(TLS_DEFAULT_OUTBOUND_CA_BUNDLE_PATH);   // optional
-tls->setSNIHostname("api.example.com");                                  // recommended
+tls->setCertificateAuthorityPath(TLS_DEFAULT_OUTBOUND_CA_BUNDLE_PATH);
+tls->setSNIHostname("api.example.com");
 http.SetClient(tls);
 
 int16_t code = http.Get("https://api.example.com/v1/ping");
 ```
 
-What you get for free: full handshake, peer-cert verification (when configured), record-level read/write, the same `GetResponse` / `GetRespHeader` parsing. What you should know:
+Handshake, verification, record framing and the same response parsing all come along. Worth knowing: the URL scheme is informational. A TLS client with an `http://` URL still travels encrypted; a TCP client with an `https://` URL connects in plaintext on port 443. Pair them deliberately. `setVerifyPeer(false)` keeps the channel encrypted while skipping chain validation, which is right for a self-signed development box and wrong for anything crossing a network you don't own.
 
-- **The URL scheme is informational** — `Http_Client` doesn't open the socket, the client does. Passing a TLS client and a `http://...` URL still works (and travels encrypted); passing a TCP client and `https://...` connects in plaintext on the URL's port. Pair them correctly.
-- **Default port follows the URL** — `https://` uses `HTTPS_DEFAULT_PORT = 443` from [HttpConfig.h](src/config/HttpConfig.h), `http://` uses `HTTP_DEFAULT_PORT = 80`.
-- **`setVerifyPeer(false)` on the client** keeps the channel encrypted but skips chain validation — fine for dev / self-signed; **never** for production paths that cross an untrusted network.
-- **`HTTPS_HSTS_MAX_AGE_SECONDS`** (server-side, [HttpConfig.h](src/config/HttpConfig.h)) is `0` by default — the HTTPS server doesn't emit `Strict-Transport-Security` until you set it non-zero (only do so when serving a CA-signed cert, otherwise the header hard-fails self-signed click-through).
+When TLS is enabled, the client bundled into `PdiStack` is already the TLS one, so OTA, IoT and GPIO posting go over HTTPS without a line of sketch code.
 
-The bundled `m_client` in `PdiStack` is already TLS-allocated when `ENABLE_TLS_SERVICE` is on (see [src/PdiStack.cpp](src/PdiStack.cpp)), so OTA, IoT, GPIO-post, and any other service that borrows that pointer automatically run over HTTPS without sketch changes.
+There is no HTTP *server* class here. The server side lives at the interface layer with a portable default implementation, plumbed through the web server, and `begin(port, secure)` is what flips it into TLS ([§8.7.1](#871-https-wiring-and-certificates)).
 
-#### Server-side HTTP / HTTPS
+### 10.2 MQTT
 
-There is no `Http_Server` class in `transports/` — the **server** side lives at the interface layer ([`iHttpServerInterface`](src/interface/pdi/middlewares/iServerInterface.h)) with a portable default in [src/interface/pdi/impl/middlewares/HttpServerInterfaceImpl.{h,cpp}](src/interface/pdi/impl/middlewares/HttpServerInterfaceImpl.h). This split is intentional: the client is reused stand-alone; the server is plumbed through the `WebServer` ([§8](#8-web-server)) and never speaks bare HTTP.
-
-HTTPS uses the **same** `HttpServerInterfaceImpl` — `begin(port, secure=true)` flips it into TLS mode, where each accepted client is wrapped via `__i_instance.getNewTlsServerInstance()` (so the request parser still sees decrypted bytes through the same `iClientInterface` API). Wiring details — cert/key path defaults, mTLS, HSTS — live in [§6.2.12](#6-service-providers) and [§6.2.16](#6-service-providers).
-
-### 10.4 MQTT — `MQTTClient` + `mqtt_msg_*`
-
-Two files split by concern:
-
-- [Mqtt_msg.{h,cpp}](src/transports/mqtt/Mqtt_msg.h) — pure protocol encoder/decoder. Free functions like `mqtt_msg_publish(conn, topic, data, len, qos, retain, &msgId)` produce wire-format `mqtt_message_t` records from a fixed-size buffer. No I/O.
-- [MqttClient.{h,cpp}](src/transports/mqtt/MqttClient.h) — `MQTTClient` class, the connection state machine: handshake, keep-alive, subscribe/publish, QoS-1/2 acknowledgement, callback dispatch.
-
-#### Lifecycle
+Split in two by concern: a pure encoder and decoder that turns operations into wire records with no I/O at all, and the client class that owns the connection state machine — handshake, keep-alive, subscriptions, QoS acknowledgement, callback dispatch.
 
 ```cpp
 MQTTClient mqtt;
-mqtt.begin(client, &generalCfg, &lwtCfg);     // wires client + config tables
+mqtt.begin(client, &generalCfg, &lwtCfg);
 mqtt.OnConnected(&onMqttConnected);
-mqtt.OnData(&onMqttData);                     // (args, topic, topic_len, data, len)
+mqtt.OnData(&onMqttData);              // (args, topic, topic_len, data, len)
 mqtt.OnDisconnected(&onMqttDisconnected);
-mqtt.OnTimeout(&onMqttTimeout);
 
 mqtt.InitConnection(host, MQTT_DEFAULT_PORT, /*security=*/0);
 mqtt.InitClient(clientId, user, pass, /*keepAlive=*/60, /*cleanSession=*/1);
@@ -2560,186 +2047,122 @@ mqtt.InitLWT(willTopic, willMsg, /*qos=*/1, /*retain=*/0);
 mqtt.Connect();
 mqtt.Subscribe("ctrl/+/cmd", /*qos=*/1);
 mqtt.Publish("sensor/temp", payload, len, /*qos=*/1, /*retain=*/0);
-// ... mqtt.Disconnect() / mqtt.DeleteClient() during shutdown
 ```
 
-The class covers the usual MQTT surface: connection setup (`Init*`, `Connect` / `Disconnect`), `Publish` / `Subscribe` (QoS 0/1/2), Last-Will registration, and per-event `On*` callback slots (`OnConnected`, `OnData`, `OnSubscribed`, `OnTimeout`, …). `Subscribe` returns success on enqueue, not on SUBACK — wait for `OnSubscribed` before assuming the topic is live. Full signatures in [MqttClient.h](src/transports/mqtt/MqttClient.h).
+`Subscribe` reports success when the packet is enqueued, not when the broker acknowledges it — wait for the subscribed callback before publishing on a topic you just asked for.
 
-#### Callbacks and threading
+Callbacks fire on whichever lane drives the MQTT service, which by default is the inline scheduler. Don't block inside one; schedule the expensive part as a follow-up tick, the way the IoT service does.
 
-All callbacks fire on whatever lane drives `MqttServiceProvider::handleMqttPublish` / `handleMqttSubScribe`. By default that is the inline scheduler. Don't block in a callback — schedule any expensive work as a follow-up via `__task_scheduler.setTimeout(..., 1, now())`, exactly as the `DeviceIotServiceProvider` does it (see [DeviceIotServiceProvider.cpp grep](src/service_provider/iot/DeviceIotServiceProvider.cpp)).
+The encoder is usable on its own when you need a packet without owning a connection — bind a buffer, build a connect or publish record, and write its bytes to whatever stream you have.
 
-#### Defaults
+Defaults are port 1883 and a 60-second keep-alive. The service translates its three config tables into the `Init*` calls above.
 
-| Macro | Value |
-|---|---|
-| `MQTT_DEFAULT_PORT` | 1883 |
-| `MQTT_DEFAULT_KEEPALIVE` | 60 s |
+### 10.3 SMTP
 
-Service-level tables (`mqtt_general_config_table`, `mqtt_lwt_config_table`, `mqtt_pubsub_config_table`) live in [MqttConfig.h](src/config/MqttConfig.h); the `MqttServiceProvider` translates them into the `Init*` calls above.
-
-#### Direct use of `mqtt_msg_*`
-
-Useful when you need to encode a packet without owning a connection — e.g. SSH-tunnelled MQTT, or a unit test. `mqtt_msg_init(&conn, buf, size)` binds a buffer; subsequent `mqtt_msg_connect`, `mqtt_msg_publish`, `mqtt_msg_subscribe`, etc. return a `mqtt_message_t*` whose `data`/`length` you write to whatever stream you have. `mqtt_get_total_length` and `mqtt_get_id` parse incoming frames.
-
-### 10.5 SMTP — `SMTPClient`
-
-Implementation: [SMTPClient.{h,cpp}](src/transports/smtp/SMTPClient.h). A blocking, command-response client built on top of `iClientInterface`. Each `sendXxx` issues one SMTP verb and waits for the expected reply code (or arbitrary expected string).
-
-#### Lifecycle
+A blocking, command-response client. Each helper issues one verb and waits for the reply code it expects.
 
 ```cpp
 SMTPClient smtp;
-smtp.begin(client, host, port);
+smtp.begin(client, host, port);        // stores parameters; connects on first send
 
-smtp.sendHello(domain);                    // EHLO/HELO
-smtp.sendAuthLogin(username, password);    // AUTH LOGIN (base64 user, base64 pass)
-smtp.sendFrom(sender);                     // MAIL FROM:<...>
-smtp.sendTo(recipient);                    // RCPT TO:<...>
-smtp.sendDataCommand();                    // DATA
+smtp.sendHello(domain);
+smtp.sendAuthLogin(username, password);
+smtp.sendFrom(sender);
+smtp.sendTo(recipient);                // once per recipient
+smtp.sendDataCommand();
 smtp.sendDataHeader(sender, recipient, subject);
-smtp.sendDataBody(body);                   // string overloads
-smtp.sendQuit();                           // QUIT
+smtp.sendDataBody(body);
+smtp.sendQuit();
 smtp.end();
 ```
 
-The class exposes one `sendXxx` helper per SMTP verb (`sendHello`, `sendAuthLogin`, `sendFrom`, `sendTo`, `sendDataCommand`, `sendDataHeader`, `sendDataBody`, `sendQuit`), plus low-level primitives (`readResponse`, `waitForExpectedResponse`, `sendCommandAndGetCode`) for callers that want to drive the protocol directly. `begin` only stores parameters; the connection opens on the first send. Full signatures in [SMTPClient.h](src/transports/smtp/SMTPClient.h).
+Lower-level primitives are exposed too — read a response, wait for an expected one, send a command and get its code — for callers that want to drive the protocol themselves.
 
-#### Defaults & status
+Every verb blocks on the wire with a five-second timeout, so a flaky link can add up across a single message. That is why the email service schedules sending off the critical path rather than calling it from a request handler. The body goes out as given, so anything that needs encoding gets encoded by the caller.
 
-| Macro / type | Value |
-|---|---|
-| `SMTP_DEFAULT_TIMEOUT` | 5000 ms (`MILLISECOND_DURATION_5000`) |
-| `enum smtp_reply_code` | Standard reply codes (220, 250, 334, 354, 235, 221, …) |
-| `enum smtp_command_status` | Success/failure of each helper |
+### 10.4 Helpers
 
-#### Limitations to know
+Three small shims sit alongside the transports so service code stays terse. The client helper wraps connect, disconnect, send and read on any client with timeout discipline and chunked I/O — anyone working at the byte level, like the SSH tunnel, uses these rather than the raw interface. The HTTP helper maps status codes, MIME types and methods to strings. The storage helper maps filenames to MIME types for the file commands and SFTP.
 
-- **No STARTTLS.** SMTP is plaintext on whatever port you give it; for TLS-only providers you need a port that supports TLS at the `iClientInterface` level.
-- **No multi-recipient batching.** Loop `sendTo` per recipient between `MAIL FROM` and `DATA`.
-- **Blocking.** All verbs synchronously block on the wire — call from a service tick that already accepts a multi-second tail latency. `EmailServiceProvider::sendMail` schedules this off the critical path.
-- **No body encoding.** The transport doesn't quoted-printable / base64 the body. If you need attachments or non-ASCII, encode at the caller.
+### 10.5 Adding a transport
 
-### 10.6 Helpers (`src/helpers/`)
+For CoAP, say:
 
-Two small shims live alongside the transports to keep service code terse:
+1. Write the client under `src/transports/coap/`, taking an `iClientInterface*` and exposing begin, send, receive and a callback for responses.
+2. Keep it free of the database and the scheduler. A transport parses bytes; it does not own time or persistence.
+3. Put the service on top, under `src/service_provider/transport/`. That is where config, scheduling and events live.
+4. Add one flag, guard the orchestrator wiring with it, and you are done.
 
-- [ClientHelper.{h,cpp}](src/helpers/ClientHelper.h) — `connectToServer`, `disconnect`, `isConnected`, `sendPacket`, `readPacket`. These work on any `iClientInterface*` and add timeout discipline + chunked write/read. Anyone using a transport at the byte level (e.g. SSH tunnel) reaches for these instead of the raw interface.
-- [HttpHelper.h](src/helpers/HttpHelper.h) — `getHttpStatusString(code)`, `getMimeTypeString(mimetype_t)`, `getHttpMethodString(http_method_t)`, plus the static `HTTP_SERVER_DEFAULT_STATIC_PATH = "/var/www/static/"`. Used by `Http_Client`, `WebServer`, and the web controllers.
-- [StorageHelper.h](src/helpers/StorageHelper.h) — `getMimeTypeString` / `getMimeTypeExtension` for filename ↔ MIME mapping; pulled in by the FS CLI and SFTP.
-
-### 10.7 Adding a new transport
-
-If you want to add (say) CoAP:
-
-1. **Create [src/transports/coap/CoAPClient.{h,cpp}](src/transports/coap/CoAPClient.h)** that takes a `iClientInterface*` (UDP-shaped, so the port must expose UDP via the same interface) and exposes a `begin/send/receive` API plus callbacks for incoming responses.
-2. **Keep it free of `__database_service` and `__task_scheduler`.** Transports do not own time or persistence — they parse bytes.
-3. **Build the service on top** under `src/service_provider/transport/CoAPServiceProvider.{h,cpp}` — that's the layer that owns config, scheduling, and event dispatch.
-4. **Wire one new flag** (`ENABLE_COAP_SERVICE`) in [DeviceConfig.h](devices/DeviceConfig.h), guard the orchestrator wiring in [PdiStack.h](src/PdiStack.h) / [PdiStack.cpp](src/PdiStack.cpp), and you're done.
-
-### 10.8 Gotchas
-
-- **Transports don't own the `iClientInterface*`.** Whoever called `getNewTcpClientInstance()` must `delete` it after `End`/`Disconnect`/`end`. Forgetting leaks one socket per request — fatal on long-uptime nodes.
-- **No retry loops in transports.** `HTTP_REQUEST_RETRY = 1` covers connect; everything else is a single attempt. Retries belong to the service layer (which knows whether the failure is recoverable).
-- **HTTP response body is a borrowed pointer.** `GetResponse(&body, &len)` returns an internal buffer; if you need it past the next request, copy.
-- **MQTT `Subscribe` returns true on enqueue, not on SUBACK.** Wait for `OnSubscribed` (or skip waiting and accept best-effort) before publishing on the freshly-subscribed topic.
-- **SMTP timeouts are per-verb.** A flaky link can sum up to `n × SMTP_DEFAULT_TIMEOUT` for one email; bound the service-side budget explicitly.
-- **HTTP/2 and /3 enums exist; the implementation does not.** Setting `HTTP_VERSION_2` silently degrades to 1.1. Don't ship code that depends on multiplexed requests until the impl lands.
+Two rules apply to every transport. The client instance belongs to whoever created it — the transport will not delete it, and a leaked socket per request is fatal on a node that stays up for months. And retries belong to the service, which is the layer that knows whether a failure is worth repeating; transports make one attempt.
 
 ---
-
 ## 11. Examples Walkthrough
 
-[examples/](examples/) ships two tracks: one **end-user** example that just brings the whole framework up, and one **`Dev/` tree** with task-focused snippets demonstrating each extension surface. They are minimum-viable code on purpose — copy, adapt, ship.
+[examples/](examples/) has two tracks: one end-user sketch that brings the whole framework up, and a `Dev/` tree of task-focused snippets, one per extension surface. They are deliberately minimal — copy, adapt, ship.
 
-Available examples:
+| Example | Demonstrates |
+|---|---|
+| `PdiStack` | the smallest possible sketch: initialise, then serve |
+| `TaskScheduling` | all three task modes, plus rescheduling and cancelling |
+| `AddingDatabaseTable` | app-side persistence without touching the codegen |
+| `AddingController` | a custom web route behind auth |
+| `MqttExample` | configuring MQTT from code and wiring callbacks |
+| `DeviceIotExample` | implementing the IoT sensor interface |
 
-| Example | Path | Lines | Demonstrates |
-|---|---|---|---|
-| `PdiStack` | [examples/PdiStack/PdiStack.ino](examples/PdiStack/PdiStack.ino) | 13 | The smallest possible sketch — `initialize()` + `serve()` |
-| `TaskScheduling` | [examples/Dev/TaskScheduling/TaskScheduling.ino](examples/Dev/TaskScheduling/TaskScheduling.ino) | 112 | All three task modes (inline / cooperative / preemptive) plus update + clear |
-| `AddingDatabaseTable` | [examples/Dev/AddingDatabaseTable/AddingDatabaseTable.ino](examples/Dev/AddingDatabaseTable/AddingDatabaseTable.ino) | 123 | Ad-hoc app-side persistence without going through codegen |
-| `AddingController` | [examples/Dev/AddingController/AddingController.ino](examples/Dev/AddingController/AddingController.ino) | 93 | Adding a custom web route with auth middleware |
-| `MqttExample` | [examples/Dev/MqttExample/MqttExample.ino](examples/Dev/MqttExample/MqttExample.ino) | 120 | Programmatic MQTT config + publish / subscribe callbacks |
-| `DeviceIotExample` | [examples/Dev/DeviceIotExample/](examples/Dev/DeviceIotExample/) | 184 | Implementing `iDeviceIotInterface` to feed the IoT pipeline |
-
-### 11.1 `PdiStack` — the everything-on sketch
+### 11.1 `PdiStack`
 
 ```cpp
 #include <PdiStack.h>
 
-void setup() {
-    PdiStack.initialize();
-}
-
-void loop() {
-    PdiStack.serve();
-}
+void setup() { PdiStack.initialize(); }
+void loop()  { PdiStack.serve(); }
 ```
 
-That's the whole file. Every service in [devices/DeviceConfig.h](devices/DeviceConfig.h) that is `ENABLE_*`'d brings itself up under [`PDIStack::initialize`](src/PdiStack.cpp), and `serve()` ticks them all on every loop iteration. The sketch you flash to a brand-new device.
+That is the entire file. Every service the device config enables brings itself up inside `initialize()`, and `serve()` ticks all of them. This is what you flash to a fresh board.
 
-What you should see after flash:
+After flashing you should see the boot banner on serial at 115200, the `pdiStack` access point appear, and the portal at `http://192.168.0.1` accept the default login with every menu live.
 
-1. Serial @ 115200 prints the boot banner (`Starting PDIStack ! / Release / Config`).
-2. WiFi AP `pdiStack` (password `pdiStack@123`) appears in the available networks.
-3. Connect, browse to `http://192.168.0.1`, log in as `pdiStack` / `pdiStack@123`.
-4. The dashboard, GPIO, MQTT, OTA, Email, Storage menus are all live.
+Start here. Every other example assumes `initialize()` already ran.
 
-**When to start here:** every other example assumes `initialize()` ran first. Use this to validate the build before adding code.
+### 11.2 `TaskScheduling`
 
-### 11.2 `TaskScheduling` — the scheduler in three modes
+Four behaviours layered on the bare stack: a one-shot a second after boot, a periodic task at three seconds, a second one-shot at fifteen seconds that changes the periodic task's cadence to one second, and a third at thirty that cancels it. That is the whole registration API exercised in one file.
 
-This example layers four behaviours on the bare stack:
-
-- A one-shot `timeout_task` fired 1 s after boot via `__task_scheduler.setTimeout(...)`.
-- A periodic `interval_task` started at 3 s cadence via `setInterval`, with the returned id captured in `variable_time_task_id`.
-- A second one-shot at 15 s that calls `updateInterval` to **change the periodic task's cadence** to 1 s.
-- A third one-shot at 30 s that calls `clearInterval` to remove it.
-
-Inside `#ifdef ENABLE_CONTEXTUAL_EXECUTION` (esp8266 and esp32 both ship the threading port now), two more tasks demonstrate the contextual lanes — each is a `while(1) { … sleep(500); }` body promoted via `scheduleUnderExecSched` with a 1 KB per-task stack:
+Behind the contextual-execution flag, two more tasks show the other lanes — each a `while(1) { … sleep(500); }` body promoted onto its own stack:
 
 ```cpp
 int cooperative_task_id = __task_scheduler.register_task(cooperative_task);
-__task_scheduler.scheduleUnderExecSched(
-    &__i_cooperative_scheduler, cooperative_task_id,
-    TASK_MODE_COOPERATIVE, 1 * 1024);
+__task_scheduler.scheduleUnderExecSched(&__i_cooperative_scheduler,
+                                        cooperative_task_id,
+                                        TASK_MODE_COOPERATIVE, 1 * 1024);
 ```
 
-Maps directly to [§4. Task Scheduler](#4-task-scheduler) — particularly §4.4 (API by use case) and §4.8 (contextual scheduling).
+Turn the console log gates off before running this one, or the framework's own output interleaves with the demo prints and the schedule becomes hard to read.
 
-**Disable `ENABLE_CONSOLE_LOG_*`** before running this example, or the framework's own log output will interleave with the demo prints and obscure the schedule.
+### 11.3 `AddingDatabaseTable`
 
-### 11.3 `AddingDatabaseTable` — app-side persistence without codegen
-
-The framework's normal DB flow runs through `DBTableSchema.json` and the codegen ([§5.5](#5-database-layer)). This example shows the **escape hatch**: define a `DatabaseTable<addr, T>` subclass directly in your sketch and register it via the same static-init mechanism the framework uses for its own tables.
-
-Key lines:
+The normal database flow goes through the JSON schema and the generator. This example takes the escape hatch: declare a table subclass directly in the sketch and let the same static-init mechanism register it.
 
 ```cpp
 #if defined(DEVICE_ARDUINOUNO)
 #define STUDENT_TABLE_ADDRESS  800
 #else
-#define STUDENT_TABLE_ADDRESS  2500     // addresses ≤ 2499 reserved by framework
+#define STUDENT_TABLE_ADDRESS  2500     // the framework owns everything below this
 #endif
 
 struct student_table { student_t students[MAX_STUDENTS]; int student_count; };
 
 class StudentTable : public DatabaseTable<STUDENT_TABLE_ADDRESS, student_table> {};
-StudentTable __student_table;          // static-init self-registers (see §5.3)
+StudentTable __student_table;           // registers itself at static-init
 ```
 
-Then in `setup` after `PdiStack.initialize()`: build a `student_table` value, call `__student_table.set(&value)`. A scheduled task every 5 s reads back via `__student_table.get(&value)` and prints it.
+After `initialize()`, the sketch builds a value and calls `set`, and a five-second task reads it back with `get` and prints it.
 
-Three things this example teaches well:
+Three things it teaches. Pick an address above the framework's range — 2500 on the ESP ports, 800 on UNO. Keep the struct POD, fixed-size arrays and scalars only, because it is written to NVM as raw bytes. And accept the trade: a table declared in the sketch never passes through the generator, so tooling that walks generated tables will not see it.
 
-1. **Address picking.** The comment at lines 9-14 is the canonical guidance — pick `≥ 2500` on esp\* (`≥ 800` on UNO) to stay out of the framework's pre-allocated range from [DBTableSchema.json](devices/esp32/config/DBTableSchema.json).
-2. **POD struct discipline.** `student_t` is a fixed-size `_name[20]` + `uint8_t` + `enum` — no `String`, no pointer, no `pdiutil::string`. Required by the raw-NVM serialiser ([§3.4](#3-configuration-system), [§5.7](#5-database-layer)).
-3. **No JSON schema edit needed.** Because the table lives in the sketch, the codegen never sees it. Trade-off: it won't appear in `srvc` listings or any other reflective tooling that walks the generated tables.
+### 11.4 `AddingController`
 
-### 11.4 `AddingController` — extending the web portal
-
-A new route `/test-route` behind `AUTH_MIDDLEWARE`. The pattern from [§8.4](#8-web-server) and [§8.10](#8-web-server) made concrete:
+A `/test-route` behind auth, which is [§8.10](#810-adding-a-page) made concrete:
 
 ```cpp
 class TestController : public Controller {
@@ -2747,849 +2170,660 @@ public:
     TestController() : Controller("test") {}
 
     void boot() override {
-        m_route_handler->register_route(
-            "/test-route",
-            [&]{ this->handleTestRoute(); },
-            AUTH_MIDDLEWARE);
+        m_route_handler->register_route("/test-route",
+                                        [&]{ this->handleTestRoute(); },
+                                        AUTH_MIDDLEWARE);
     }
 
-    void handleTestRoute() {
-        char* _page = new char[PAGE_HTML_MAX_SIZE];
-        memset(_page, 0, PAGE_HTML_MAX_SIZE);
-        strcat_ro(_page, WEB_SERVER_HEADER_HTML);
-        strcat_ro(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_TOP);
-        concat_svg_menu_card(_page, WEB_SERVER_HOME_MENU_TITLE_DASHBOARD,
-                             SVG_ICON48_PATH_DASHBOARD, WEB_SERVER_DASHBOARD_ROUTE);
-        strcat_ro(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_BOTTOM);
-        strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
-        m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
-        delete[] _page;
-    }
+    void handleTestRoute() { … }
 };
 
-TestController test_controller;        // static-init self-registers (see §8.4)
+TestController test_controller;        // registers itself at static-init
 ```
 
-Things to copy:
+Copy the self-registration, the `strcat_ro` flash-aware string building, and the middleware argument — that one parameter is the whole difference between a private page and a public one.
 
-- **Self-registration via the constructor** — no manual list to update.
-- **`strcat_ro(...)` for flash-string concatenation** — the framework's flash-aware version of `strcat`, preserving the `RODT_ATTR` discipline of [§12.2](#122-flash-strings--rodt_attr-and-prog_rodt_attr).
-- **`AUTH_MIDDLEWARE`** is the only line that gates the route; without it, the route is public.
+The example composes its page into a heap buffer to keep the code short. Production controllers stream instead, sending header, body and footer as three chunked calls, which is what [§8.7](#87-composing-a-response) describes and what the shipped controllers do.
 
-Things to **not** copy verbatim:
+### 11.5 `MqttExample`
 
-- The 5 KB `new char[PAGE_HTML_MAX_SIZE]` allocation per request. Real controllers (see [§8.7](#8-web-server)) compose pages in chunked `send(..., true)` calls so the response streams to the client without an intermediate buffer. The example's allocator-based version is illustrative; chunked is the right pattern for production.
-- The hard-coded comment "PAGE_HTML_MAX_SIZE defined in framework as 5000" is **stale** — it's currently 1800. See [§8.7](#8-web-server).
+The pattern for configuring MQTT from code rather than the portal, which is what fleet provisioning needs:
 
-### 11.5 `MqttExample` — programmatic MQTT setup
+```
+  read the three MQTT tables from NVM
+        ▼
+  overwrite the fields you care about
+        ▼
+  write them back
+        ▼
+  register publish and subscribe callbacks
+        ▼
+  schedule handleMqttConfigChange() ~10 ms out, so setup() finishes first
+```
 
-This is the pattern for any sketch that wants MQTT configured **from code**, not from the web portal — useful for fleet provisioning. Three sequential steps in `configure_mqtt()`:
+That last deferral is doing real work: it lets the current call stack unwind and pending output flush before the service reconnects. The same shape recurs in WiFi, OTA and IoT.
 
-1. **Read** the three MQTT tables from NVM via `__database_service.get_mqtt_*_config_table(&local)`.
-2. **Overwrite** the relevant fields with `memcpy(local.host, MQTT_HOST, …)` etc.
-3. **Write** the tables back with `__database_service.set_mqtt_*_config_table(&local)`.
-4. **Register callbacks** with `__mqtt_service.setMqttPublishDataCallback(...)` and `setMqttSubscribeDataCallback(...)`.
-5. **Trigger the service to reload** via `__task_scheduler.setTimeout([&]{ __mqtt_service.handleMqttConfigChange(); }, 10, millis())`.
+The publish callback fills a buffer with what to send; the subscribe callback receives topic and payload per inbound message. A `[mac]` token in the client id, the topics or the will message is substituted with the device's MAC at runtime, which gives fleet-wide uniqueness without templating in the sketch.
 
-The 10 ms `setTimeout` is doing real work — it defers the reload off the `setup()` stack so any pending log output flushes first. The pattern recurs across services (WiFi, OTA, IoT).
+### 11.6 `DeviceIotExample`
 
-The callback signatures match [§6.2.7](#6-service-providers):
-- `void publish_callback(char* payload, uint16_t length)` — fills `payload` with the data to publish.
-- `void subscribe_callback(uint32_t* args, const char* topic, uint32_t tlen, const char* data, uint32_t dlen)` — called per inbound message.
+The IoT service is the one contract where the application implements the interface rather than consuming it. The example splits it across a header and a source file — declaring the sensor class and its sample buffer, then implementing init, the sample hook, the data hook that builds the JSON payload, and the reset hook — with the sketch doing only this:
 
-The `[mac]` token in `MQTT_CLIENT_ID`, topics, and the LWT message is replaced by the framework with the device's MAC at runtime — handy for fleet uniqueness without sketch-side templating.
+```cpp
+DeviceIotSensor sensor;
 
-### 11.6 `DeviceIotExample` — implementing `iDeviceIotInterface`
+void setup() {
+    PdiStack.initialize();
+    __device_iot_service.initDeviceIotSensor(&sensor);
+}
+```
 
-The IoT service is the only one whose contract requires the **application** to implement an interface ([§13.3.5](#13-portable-interfaces)). This example has the implementation split across two files:
+From there the service drives everything: sampling at the configured rate, building a payload at the publish rate, and pushing it to the channel the server handed out.
 
-- [DeviceIotSensor.h](examples/Dev/DeviceIotExample/DeviceIotSensor.h) — declares `class DeviceIotSensor : public iDeviceIotInterface` and the per-sensor state (`m_sensor_samples[]`, `m_sensor_sample_index`, `m_sensor_sample_value`).
-- [DeviceIotSensor.cpp](examples/Dev/DeviceIotExample/DeviceIotSensor.cpp) — implements `init()`, `sampleHook()` (gather one sample), `dataHook(pdiutil::string& payload)` (build the JSON to publish), `resetSampleHook()` (clear the sample buffer).
-- [DeviceIotExample.ino](examples/Dev/DeviceIotExample/DeviceIotExample.ino) — registers the sensor:
-  ```cpp
-  DeviceIotSensor sensor;
-  void setup() {
-      PdiStack.initialize();
-      __device_iot_service.initDeviceIotSensor(&sensor);
-  }
-  ```
+It is the only example with a separate `.h` and `.cpp` rather than a single sketch file, because the Arduino preprocessor handles a class with virtual overrides poorly when it lives inline in an `.ino`.
 
-Once `__device_iot_service.initDeviceIotSensor(&sensor)` is called, the service drives the schedule itself: `sampleHook` runs at the configured sample rate, `dataHook` runs at the configured publish rate, and the payload is pushed to the configured MQTT channel ([§6.2.9](#6-service-providers)).
+### 11.7 Suggested order
 
-This is the **only** example with a sketch-side `.h` and `.cpp` rather than a single `.ino` — necessary because `iDeviceIotInterface` has a constructor + multiple virtual overrides, which Arduino's `.ino` preprocessor handles poorly for non-trivial classes.
+Start with `PdiStack` to confirm the toolchain. Then `TaskScheduling`, because the scheduler is the primitive you reach for as soon as you add behaviour. Then `MqttExample` for the read-modify-write-then-reload pattern, which transfers directly to WiFi, OTA and IoT. After that, take whichever of `AddingDatabaseTable`, `AddingController` and `DeviceIotExample` matches what you are building.
 
-### 11.7 Suggested example order for a new contributor
-
-1. **`PdiStack`** — confirm the toolchain works end-to-end.
-2. **`TaskScheduling`** — the scheduler is the most useful primitive once you start adding behaviour.
-3. **`MqttExample`** — see the get-set-callback-trigger pattern in real code; reusable for WiFi/OTA/IoT.
-4. **`AddingDatabaseTable`** — if your project has app-specific persistent state.
-5. **`AddingController`** — if your project needs a custom web page.
-6. **`DeviceIotExample`** — only if you're publishing telemetry through the IoT pipeline.
-
-### 11.8 Gotchas
-
-- **Examples assume `DeviceSetup.py` has already run.** Without it, every example fails to compile with mock-device misses ([§2.2](#22-installation-flow)).
-- **Most examples `#error` if their dependency flag is off.** `AddingController` requires `ENABLE_HTTP_SERVER`; `MqttExample` requires `ENABLE_MQTT_SERVICE`; `DeviceIotExample` requires `ENABLE_DEVICE_IOT`. The default `DeviceConfig.h` has all three on, but if you've trimmed for memory, re-enable before running the matching example.
-- **`AddingController` references a stale `PAGE_HTML_MAX_SIZE = 5000`.** Current value is 1800 ([§8.7](#8-web-server)). The example's response will fit, but the *comment* should not be quoted as authoritative.
-- **`TaskScheduling`'s contextual section needs `ENABLE_CONTEXTUAL_EXECUTION`.** Off by default even on esp8266. Uncomment the matching block in [devices/DeviceConfig.h](devices/DeviceConfig.h).
-- **`AddingDatabaseTable` writes to NVM on every boot.** Repeated flash + boot cycles wear the storage. Comment out the writes once you've verified the read path.
+Two practical notes. Run `DeviceSetup.py` before compiling any of them if you are not on the ESP32 default. And most examples stop the build with an `#error` when their feature flag is off — the stock config has them all on, so this only bites after you have trimmed the config for memory.
 
 ---
-
 ## 12. Memory & Performance Notes
 
-This section is a cross-cutting reference of the **memory model** and **what each subsystem actually costs** in flash, RAM, and CPU. None of it introduces new mechanics — it collects the constraints that have shown up in pieces through earlier sections so you can size a build before you compile it.
+Nothing new here — this collects the constraints that appear piecemeal in earlier sections, so you can size a build before compiling it.
 
-### 12.1 The memory budget per target
+### 12.1 Budget per target
 
-Rough usable budget after the Arduino core, lwIP, and stdlib are linked. Treat these as orders of magnitude, not exact ceilings.
+Roughly what is left after the Arduino core, lwIP and the standard library are linked. Orders of magnitude, not guarantees.
 
-| Target | Flash | RAM | NVM (EEPROM-emulated) | Realistic ceiling |
+| Target | Flash | RAM | NVM | What fits |
 |---|---|---|---|---|
-| Arduino UNO (ATmega328P) | 32 KB | 2 KB | 1 KB | Serial + Storage(EEPROM) + GPIO_BASIC + CMD; **no network** |
-| ESP8266 | 1 MB | ~50 KB free heap | ~4 KB | Default full build minus SSH (key sizes + crypto blow heap); contextual execution feasible |
-| ESP32 | 4 MB | ~250 KB free heap | ~4 KB | Default full build comfortably; can spare a second contextual lane |
+| Arduino UNO | 32 KB | 2 KB | 1 KB | serial, EEPROM storage, basic GPIO, shell — no network |
+| ESP8266 | 1 MB | ~50 KB free heap | ~4 KB | the full build short of SSH; contextual execution is comfortable |
+| ESP32 | 4 MB | ~250 KB free heap | ~4 KB | the full build, with room for a second contextual lane |
 
-These are why [DeviceConfig.h](devices/DeviceConfig.h) gates entire feature groups on `DEVICE_ARDUINOUNO` and why `MAX_DB_TABLES` is 5 on UNO vs. 15 on esp\*.
+That table is why entire feature groups are gated on the board in the device config, and why the table limit is 5 on UNO against 15 on the ESP ports.
 
-### 12.2 Flash strings — `RODT_ATTR` and `PROG_RODT_ATTR`
+### 12.2 Keeping strings out of RAM
 
-Two macros, one purpose: keep string literals out of RAM.
+Two macros, one purpose:
 
-| Macro | Defined where | Effect on devices with flash strings (esp*) | Effect on others (mock, UNO) |
-|---|---|---|---|
-| `RODT_ATTR("text")` | `devices/<board>/<board>_device_config.h` | Expands to `(const char*)F("text")` — wraps the literal in the Arduino `F()` macro so it stays in flash | Falls through to the default `#define RODT_ATTR(x) x` in [DataTypeDef.h](src/utility/DataTypeDef.h) — plain literal, identical behaviour |
-| `PROG_RODT_ATTR` | same | Expands to `PROGMEM` (storage qualifier on the variable) | Empty — variable lives in normal `.rodata` |
-| `PROG_RODT_PTR` | same | Expands to `PGM_P` — the right pointer type to read flash strings on AVR | Empty — `const char*` works directly |
+| Macro | On the ESP ports | Elsewhere |
+|---|---|---|
+| `RODT_ATTR("text")` | wraps the literal so it stays in flash | plain literal, same behaviour |
+| `PROG_RODT_ATTR` | a storage qualifier that puts the variable in flash | empty; the variable is already read-only data |
+| `PROG_RODT_PTR` | the right pointer type for reading flash on AVR | a plain `const char*` |
 
-**Rule:** every string literal that ships in the binary belongs in `RODT_ATTR(...)` (when used inline) or in a `static const char foo[] PROG_RODT_ATTR = "...";` (when held in a named variable). The framework's CLI prompts, terminal output, HTTP page fragments, log messages, and every `srvc` name follow this rule — it's why the binary is dense rather than RAM-hungry.
+The rule is simple: a literal used inline goes in `RODT_ATTR(...)`, and one held in a named variable is declared `static const char foo[] PROG_RODT_ATTR = "…"`. Every prompt, page fragment, log message and service name in the framework follows it, which is why the binary is dense rather than RAM-hungry.
 
-### 12.3 Reading a flash string back — `rofn::to_charptr`
+When a consumer genuinely cannot take a flash pointer, `rofn::to_charptr()` copies the string into a fresh heap buffer and hands it over — and the caller owns it from there. It is an escape hatch, not a default; every call is an allocation.
 
-Some consumers can't accept a flash pointer directly (e.g. a function that calls `strcpy` instead of `strcpy_P`). The framework exposes `rofn::to_charptr(const void* rostr)` ([DataTypeDef.h](src/utility/DataTypeDef.h); implementation per device, e.g. [esp32_pdi.cpp](devices/esp32/esp32_pdi.cpp)) that:
+### 12.3 The expensive features
 
-1. Reads the flash string into a fresh `new char[len+1]`.
-2. Returns the RAM pointer.
-3. **Caller owns the memory** — must `delete[]` it.
+A handful of choices dominate the budget.
 
-Use this sparingly. Every call allocates from the heap; it's a one-way escape hatch, not a default.
+**SSH** is the heaviest single flag. Turning it on effectively commits you to ESP32-class memory.
 
-### 12.4 The expensive features, called out
+**TLS** costs about what SSH does in flash, and more than NAPT in heap. On ESP8266 the two cannot coexist — both want more of the same fixed heap than exists. Inbound HTTPS and outbound TLS share the same backend, so enabling both costs nothing extra.
 
-A small number of choices dominate the budget:
+What matters with TLS is per-session, not per-build:
 
-- **SSH** is by far the heaviest enable. If you turn it on, you've effectively committed to esp32-class memory.
-- **TLS** is comparable to SSH in flash and worse than NAPT in heap — and `ENABLE_TLS_SERVICE` **cannot coexist with `ENABLE_NAPT` on esp8266** because both want too much of the same fixed heap. Pick one. Inbound HTTPS (`ENABLE_HTTPS_SERVER`) and outbound TLS clients share the same per-port BearSSL/mbedTLS code so there's no extra cost for enabling both.
-  - **Per-live-session footprint matters more than the flat enable cost.** Each accepted (or outbound) TLS client triggers, *for the lifetime of that one connection*: a dedicated worker task (one stack — `TLS_TASK_STACK_SIZE` ≈ 6.5 KB, allocated from heap on FreeRTOS), the TLS I/O record buffers, plus SSL workflow state (session keys, cipher contexts, certificate chain in RAM during validation, handshake scratch). On **esp8266 / BearSSL** this drops free heap by **10-15 KB per active session** — drastic on a ~30-40 KB working budget; `TLS_IBUF_SIZE + TLS_OBUF_SIZE` (~3 KB) dominates, BearSSL engine state adds another 3-5 KB. On **esp32 / mbedTLS** the drop is **~35-50 KB per active session** — most of it is mbedTLS's internal `IN_CONTENT_LEN` + `OUT_CONTENT_LEN` record buffers (default 16 KB each in IDF), plus ~10 KB of `ssl_context`/`config`/x509/pk/RNG state. Trim `MBEDTLS_SSL_IN/OUT_CONTENT_LEN` in `sdkconfig.defaults` to drop esp32 per-session below 20 KB if you control your peer's record sizes. **All of that memory is released as soon as the client closes** — the worker task exits (FreeRTOS reaps the stack via the idle task on esp32, so reclamation may lag the close by one main-loop yield), buffers are freed, session state is torn down. Plan capacity for the worst-case number of concurrent TLS clients, not the average; an idle build looks healthy because nothing is allocated.
-- **NAPT** is invisible in flash but expensive in heap because lwIP allocates the translation table. Disable on builds that don't bridge the AP to the STA.
-- **HTTP server controllers** each carry their own form-validation code; the 12 of them add up. If you don't need the portal, drop `ENABLE_HTTP_SERVER` even when `ENABLE_WIFI_SERVICE` stays on.
-- **Contextual execution** is cheap in flash but the per-task stacks live in RAM for the lifetime of the task. Two cooperative tasks at 1 KB each is 2 KB of RAM you can't reclaim — and turning on `ENABLE_TLS_SERVICE` adds at least one 6.5 KB cooperative task on esp8266 to host BearSSL work off the cont_t stack.
-- **`pdiutil::string` and `pdiutil::vector` allocate** — even though they hide the heap, every push/append can fragment over time. Reserve up-front (`m_tasks.reserve(MAX_SCHEDULABLE_TASKS)` in [TaskScheduler.cpp](src/utility/TaskScheduler.cpp)) when the size is known.
+```
+   one live TLS session holds
+        ├─ a worker task stack        ~6.5 KB
+        ├─ record buffers             in + out
+        └─ engine state               keys, cipher contexts, cert chain during validation
 
-### 12.5 Heap discipline
+   esp8266 / BearSSL   10-15 KB per session   on a 30-40 KB working budget
+   esp32   / mbedTLS   35-50 KB per session   mostly the 16 KB record buffers
+                                              trim them in sdkconfig to halve this
+```
 
-The framework expects to run for **weeks to months** without rebooting. The patterns that keep it stable:
+Every byte of that comes back when the client disconnects — the worker exits, buffers are freed, state is torn down, though on FreeRTOS the stack is reclaimed by the idle task a moment later. Size for the worst-case number of *concurrent* sessions; an idle build always looks healthy because none of it is allocated yet.
 
-1. **Don't `new` after `setup()`.** The single `m_client = __i_instance.getNewT(cp|ls)ClientInstance()` in [PdiStack.cpp](src/PdiStack.cpp) is acceptable because it happens once at static-init (the TLS branch picks the right factory at compile time via `ENABLE_TLS_SERVICE`). Anything that allocates per request, per tick, or per event will fragment.
-2. **Reserve container sizes up front.** Both `__task_scheduler.m_tasks` and `__database.m_database_tables` reserve at `init` time so push_backs don't reallocate.
-3. **Reuse buffers.** Web controllers reuse the `WebResourceProvider`'s 1.8 KB scratch. Transports reuse caller-owned `iClientInterface*` instances. The MQTT parser uses a static `PROTO_PARSER` ring.
-4. **Hold-then-free, never hold-forever.** `CommandBase::holdOptionValue` ([§7.4](#7-command-line--terminal)) allocates a fresh buffer for the option value, but `Clear()` frees it at the end of every command iteration.
-5. **No std-exception machinery.** PdiSTL's exception support is stubbed where the toolchain allows; `throw`/`catch` outside crypto/`pdistl` corners costs more than it's worth on a 50 KB heap.
-6. **Check the heap before allocating big.** For code paths that genuinely *can* be skipped under memory pressure (TLS handshake, large web response composition), prefer `pdiutil::safe_new<T>(args...)` / `safe_new_array<T>(n)` from [SafeAlloc.h](src/utility/SafeAlloc.h) — they refuse the allocation (returning `nullptr`) if the free heap would dip below `PDI_SAFE_ALLOC_HEAP_MARGIN` (default 2 KB), letting the caller bail cleanly instead of crashing inside a third-party lib.
+**NAPT** is invisible in flash and expensive in heap, because lwIP holds the translation table. Leave it off unless the device is bridging its AP to the station link.
 
-When something fragments, the symptom is `register_task` returning `-1`, `new` returning `nullptr` inside a transport, or `pdiutil::vector` failing to grow. The framework doesn't `LogE` these by default — wire your own check on `__task_scheduler.m_tasks.size()` if you suspect a leak.
+**The portal's controllers** each carry their own form-validation code, and there are a dozen. If you don't need the portal, drop the HTTP server even while keeping WiFi.
 
-### 12.6 CPU and tick budget
+**Contextual execution** is cheap in flash and costs RAM for the lifetime of every task, since each one owns its stack. Two cooperative tasks at a kilobyte each is two kilobytes you don't get back until they exit.
 
-The main loop is `PdiStack::serve()` ([§1.6](#1-architecture-overview)). Every iteration:
+**The containers allocate.** `pdiutil::string` and `pdiutil::vector` hide the heap but still use it, and repeated growth fragments. Reserve up front wherever the size is known, the way the scheduler reserves its task table.
 
-| Step | Typical cost |
+### 12.4 Heap discipline
+
+The framework is built to run for weeks or months between reboots, which shapes a few habits.
+
+Don't allocate after `setup()`. Anything that allocates per request, per tick or per event will fragment eventually. Reserve container sizes at init. Reuse buffers — the portal reuses one scratch buffer, transports reuse a caller-owned client, the MQTT parser uses a static ring. Where a buffer must be held across ticks, hold and then free, the way a held command option is released when the command clears.
+
+For the paths that genuinely can be skipped under pressure — a TLS handshake, a large page composition — use `pdiutil::safe_new<T>()` and `safe_new_array<T>(n)`. They refuse the allocation and return null when the free heap would fall below the configured margin, which lets the caller back out cleanly instead of failing somewhere deep inside a library.
+
+When fragmentation does set in, the symptoms are recognisable: `register_task` returning -1, a transport getting null from an allocation, or a vector failing to grow.
+
+### 12.5 CPU and tick budget
+
+| Step of `serve()` | Typical cost |
 |---|---|
-| `__web_server.handle_clients()` | <1 ms idle, 5-50 ms during a request |
-| `__task_scheduler.run()` | <1 ms idle; runs at most **one** inline task per iteration (the "run-one-then-break" pattern, [§4.5](#4-task-scheduler)) |
-| `__i_dvc_ctrl.yield()` | Vendor SDK time slice — 1-3 ms typical |
-| `__i_dvc_ctrl.handleEvents()` | <1 ms unless a service handler is slow |
-| Contextual scheduler ticks (if enabled) | Depends on per-task work |
+| web server client handling | under 1 ms idle, 5-50 ms during a request |
+| scheduler | under 1 ms idle; at most one inline task per pass |
+| device yield | the vendor SDK's slice, 1-3 ms |
+| event dispatch | under 1 ms unless a handler is slow |
+| contextual ticks | whatever those tasks do |
 
-Loop frequency ranges from **hundreds of Hz idle** down to **~10 Hz during heavy HTTP/SSH activity**. Two implications:
+Loop frequency runs from hundreds of hertz when idle down to around ten during heavy HTTP or SSH traffic. So anything needing sub-100 ms response belongs on a contextual lane rather than in an inline task, and shortening the WiFi connectivity check below five seconds starts competing with the loop's real work.
 
-- **Anything that needs sub-100 ms response should not live in an inline task.** Use the `contextual` lanes or accept the jitter.
-- **WiFi yields are not free.** Reducing `WIFI_CONNECTIVITY_CHECK_DURATION` below 5 s starts to compete with serve-loop work.
-
-### 12.7 Boot-time profile
+### 12.6 Boot profile
 
 ```
-power-on
- ├─ static-init: every __<x> global constructed     ~10-50 ms
- ├─ PDIStack ctor: m_client = __i_instance.getNewT(cp|ls)ClientInstance() ~1 ms
-setup()
- ├─ __database_service.initService                  ~50-200 ms  (NVM read of every table)
- ├─ serial init, terminal greeting                  ~10 ms
- ├─ wifi init + STA scan                            ~500-3000 ms  (the dominant boot cost)
- ├─ http server, telnet, ssh accept loops           ~50 ms
- ├─ cmd_service prompt                              ~10 ms
-loop() — steady state begins
+  power-on
+    ├─ static init of every global                 10-50 ms
+    ├─ the shared client is constructed             ~1 ms
+  setup()
+    ├─ database: read every table from NVM        50-200 ms
+    ├─ serial and terminal greeting                 ~10 ms
+    ├─ WiFi init and station scan               500-3000 ms   ← dominates
+    ├─ http, telnet, ssh listeners                  ~50 ms
+    └─ shell prompt                                 ~10 ms
+  loop()
 ```
 
-Total to first prompt: ~1-4 seconds depending on whether STA connection happens immediately.
+One to four seconds to first prompt, depending mostly on how quickly the station associates.
 
-### 12.8 Performance-sensitive choices
+### 12.7 Choices that pay off
 
-- **`RODT_ATTR` everywhere.** Skipping it doesn't break anything but it does silently move 50-200 bytes of strings to RAM per file. Always wrap.
-- **`pdiutil::string` vs. `char[]`.** Use `char[]` for NVM-shaped fixed-size data (the config structs); use `pdiutil::string` for transient runtime work where size isn't known. Mixing them in one struct defeats the NVM serialisation contract.
-- **`int` vs. `int32_t` in config tables.** Always use the explicit-size type — `sizeof(int)` differs between AVR and ESP and that breaks NVM portability between ports of the same build (though the framework doesn't ship NVM images across ports today).
-- **Avoid `printf` family.** Use [DataTypeConversions](src/utility/DataTypeConversions.h) — the framework saves 4-8 KB by not pulling in libc's formatter.
-- **SFTP throughput cap.** SCP/SFTP is 0.2-1 KB/s (see [§7.9 SFTP / SCP file transfer](#79-sftp--scp-file-transfer)). Large file movement is not a use case; firmware-update should go through OTA, not SFTP.
+Wrap every literal in `RODT_ATTR` — skipping it breaks nothing and quietly moves a few hundred bytes per file into RAM.
 
-### 12.9 Profiling on-device
+Use `char[]` for anything NVM-shaped and `pdiutil::string` for transient work; mixing them inside one config struct breaks the serialisation contract.
 
-Three handles for runtime visibility:
+Use explicit-width integer types in config structs. `sizeof(int)` differs between AVR and the ESP parts, and an NVM layout that depends on it is not portable.
 
-- **`ps`** lists every scheduler task with its rolling `%CPU`, run count, and last-run interval — your best signal that a service is hogging the loop ([§4.9](#4-task-scheduler)).
-- **`srvc list`** enumerates every service with its state and tracked task count; **`srvc status <name>`** drills into one — covers DB validity, WiFi connectivity, MQTT connect state.
-- **`iUtilityInterface::measure_lastfn_stack()`** ([§13.3.1](#13-portable-interfaces)) — optional; a port that implements it lets you wrap critical work with `__i_dvc_ctrl.measure_lastfn_stack()` calls to estimate per-fn stack high-water marks. esp* ports don't implement it today.
+Stay away from the `printf` family; the framework's own conversions save four to eight kilobytes by never linking libc's formatter.
 
-### 12.10 Gotchas
+Move firmware over OTA rather than SFTP — file transfer runs at 0.2 to 1 KB/s by design ([§7.9](#79-sftp-and-scp-file-transfer)).
 
-- **`pdiutil::vector::reserve` is a *hint*.** Pushing past the reservation reallocates and copies. Always reserve to the *worst case*, not the *typical case*.
-- **`PAGE_HTML_MAX_SIZE = 1800`** is per-`send` chunk, not per-response. Compose pages in three calls ([§8.7](#8-web-server)) — one big string overflows silently.
-- **`NAPT` table growth is unbounded** by default in lwIP. If your AP carries dozens of clients, the heap will climb. The framework has no per-client throttle.
-- **`fedit` rewrites its `<file>.tmp` working copy as you edit** ([§7.7](#77-built-in-command-inventory)). A line change that alters length rebuilds the tail of the temp file, so editing large files means real flash writes — `fedit` is for small config edits, not bulk content.
-- **`__task_scheduler` runs *one* inline task per `serve()` tick.** Twenty registered tasks at 100 ms cadence each can starve each other if your serve loop runs less than 10 times per second. Profile with `ps` (or `top` for a live view).
+### 12.8 Looking at a running device
+
+`ps` gives every scheduler task with its rolling CPU share, run count and interval — the fastest way to spot a service hogging the loop. `srvc list` shows service state and task counts, and `srvc status <name>` drills into one, covering database validity, WiFi state, MQTT connection and the rest. A port that implements the optional stack-measurement hook additionally lets you bracket critical work and read back a high-water mark.
+
+Two behaviours to keep in mind while reading those numbers. The scheduler runs one inline task per pass, so twenty tasks at a 100 ms cadence will pace each other if the loop is turning over ten times a second. And a page send is capped per chunk rather than per response, which is why composed pages go out in three calls.
 
 ---
-
 ## 13. Portable Interfaces
 
-The interface layer is the **contract** between the framework and any device. Every type is an abstract C++ class with pure-virtual methods, no state, and no platform headers — it depends only on standard types, the framework's own [pdistl](src/utility/pdistl/) primitives, and other interfaces in this layer. Each one is implemented by exactly one device-side class per build (selected at compile time) and surfaced as a single global `__i_*` symbol.
+The interface layer is the contract between the framework and a device. Every type here is abstract: pure virtual methods, no state, no platform headers, depending only on standard types and other interfaces. Each is implemented by exactly one device-side class per build and reached through a single `__i_*` global.
 
 ### 13.1 Layout
 
 ```
-src/interface/pdi/
-├── iDatabaseInterface.h       NVM-backed key/blob store
-├── iLoggerInterface.h         Structured log sink
-├── iDeviceIotInterface.h      Application hook for the IoT service
-├── drivers/                   "Bare metal" surfaces
-│   ├── iGpioInterface.h           Digital/analog/blink GPIO
-│   └── iWdtInterface.h            Watchdog
-├── middlewares/               Higher-level building blocks
-│   ├── iDeviceControlInterface.h  Composite (gpio + wdt + util + upgrade + …)
-│   ├── iClientInterface.h         Generic stream client + iTcpClientInterface
-│   │                              + iTlsClientInterface (ENABLE_TLS_SERVICE)
-│   ├── iServerInterface.h         iTcpServerInterface + iTlsServerInterface
-│   │                              + iHttpServerInterface (with HTTPS hooks)
-│   ├── iNtpInterface.h            Time sync + clock set
-│   ├── iPingInterface.h           Reachability check + per-packet stats
-│   ├── iUdpInterface.h            Raw UDP socket (mDNS; future DHCP/syslog)
-│   └── iUpgradeInterface.h        OTA primitive
-├── modules/                   Stand-alone feature surfaces
-│   ├── serial/iSerialInterface.h
-│   ├── storage/iStorageInterface.h        Raw byte-addressable backing store
-│   ├── storage/iFileSystemInterface.h     Files & directories on top of storage
-│   └── wifi/iWiFiInterface.h
-├── threading/                 Optional execution-context surfaces
-│   ├── iContext.h, iMutex.h, iCondvar.h, iExecution.h
-│   ├── cooperative/iCooperative.h
-│   └── preemptive/iPreemptive.h
-└── impl/                      Default implementations reusable across ports
-    ├── middlewares/HttpServerInterfaceImpl.{h,cpp}
-    └── modules/storage/FileSystemInterfaceImpl.{h,c,cpp}
+  src/interface/pdi/
+    iDatabaseInterface        NVM-backed blob store
+    iLoggerInterface          the log sink
+    iDeviceIotInterface       the application's hook into the IoT service
+
+    drivers/                  bare-metal surfaces
+      iGpioInterface          digital, analog, blink
+      iWdtInterface           watchdog
+
+    middlewares/              higher-level building blocks
+      iDeviceControlInterface composite: gpio + wdt + utility + upgrade
+      iClientInterface        stream client, then TCP, then TLS
+      iServerInterface        TCP server, TLS server, HTTP server
+      iNtpInterface           time sync and clock set
+      iPingInterface          reachability and per-packet stats
+      iUdpInterface           raw UDP
+      iUpgradeInterface       the OTA primitive
+
+    modules/                  standalone features
+      serial/ storage/ wifi/  serial port, storage + filesystem, WiFi
+
+    threading/                optional execution contexts
+      iContext iMutex iCondvar iExecution + cooperative/ preemptive/
+
+    impl/                     portable defaults a port can adopt as-is
+      HttpServerInterfaceImpl · FileSystemInterfaceImpl
 ```
 
-In addition, [src/utility/](src/utility/) ships three foundational interfaces that the `pdi/` headers build on — they live with the utilities because they have no device dependency at all:
+Three more interfaces live with the utilities rather than here, because they have no device dependency at all: the byte and line I/O contract that every stream-like thing derives from, the utility interface holding time, randomness and yielding, and the instance factory that hands out fresh clients, servers, sockets and filesystem handles.
 
-| Foundation interface | Path | Role |
-|---|---|---|
-| `iIOInterface` / `iTerminalInterface` | [src/utility/iIOInterface.h](src/utility/iIOInterface.h) | Byte/line I/O contract — base of every stream-like interface (serial, TCP client, terminal sessions) |
-| `iUtilityInterface` | [src/utility/iUtilityInterface.h](src/utility/iUtilityInterface.h) | `wait`, `millis_now`, `micros_now` (64-bit µs — powers `ps` %CPU), `random_now` (HW RNG on esp; xorshift default), `yield`, `log`, optional stack measurement |
-| `iInstanceInterface` | [src/utility/iInstanceInterface.h](src/utility/iInstanceInterface.h) | Factory: new TCP client/server, get utility/filesystem |
+### 13.2 Conventions
 
-### 13.2 Naming and discovery conventions
+Interface types start with a lowercase `i`. Each header forward-declares the concrete class the port will define and, at the bottom, declares the singleton:
 
-- All interface types are prefixed with a lowercase `i` (`iWiFiInterface`, `iClientInterface`).
-- Each interface header forward-declares the **concrete** derived class with the canonical name (`class DeviceControlInterface;`) and at the bottom declares the singleton:
-  ```cpp
-  extern DeviceControlInterface __i_dvc_ctrl;
-  ```
-  This is what couples a port to the framework's expected symbol — the device's `.cpp` defines the matching variable.
-- Composite interfaces use multiple inheritance to bundle smaller contracts; see [`iDeviceControlInterface`](src/interface/pdi/middlewares/iDeviceControlInterface.h) which inherits from `iGpioInterface`, `iWdtInterface`, `iUtilityInterface`, and `iUpgradeInterface`.
-- Stream-like things (serial, TCP, terminal sessions) all share `iTerminalInterface` as a base, so the terminal, logger, and CLI can write to any of them uniformly.
+```cpp
+extern DeviceControlInterface __i_dvc_ctrl;
+```
 
-### 13.3 Interface reference
+That declaration is the coupling — the port's source file defines the matching variable, and everything above finds it by name.
 
-Each row below: what the interface models, who implements it on a typical port, who consumes it from above.
+Composites are built by multiple inheritance rather than by aggregation, which is why device control alone gives you GPIO, watchdog, utility and upgrade. And everything stream-like shares the terminal base, which is what lets the logger, the shell and the web writer target any of them without caring which.
 
-#### 13.3.1 Core (always required)
+### 13.3 Reference
 
-| Interface | Path | Implementer | Primary consumers | Key methods |
-|---|---|---|---|---|
-| `iDeviceControlInterface` | [middlewares/iDeviceControlInterface.h](src/interface/pdi/middlewares/iDeviceControlInterface.h) | Device | `PDIStack`, every service via `__i_dvc_ctrl` | `initDeviceSpecificFeatures`, `resetDevice`, `restartDevice`, `eraseConfig`, `getDeviceId`, `getDeviceMac`, `isDeviceFactoryRequested`, `getTerminal`, `handleEvents` (+ inherited GPIO/WDT/utility/upgrade) |
-| `iDatabaseInterface` | [iDatabaseInterface.h](src/interface/pdi/iDatabaseInterface.h) | Device | `DatabaseServiceProvider`, every config table | `beginConfigs(size)`, `cleanAllConfigs`, `isValidConfigs`, `getMaxDBSize`, plus templated typed read/write |
-| `iInstanceInterface` | [src/utility/iInstanceInterface.h](src/utility/iInstanceInterface.h) | Device | Services that need fresh TCP/UDP/TLS/FS instances (MQTT pool, SSH, OTA, HTTPS, mDNS) | `getNewTcpClientInstance`, `getNewTcpServerInstance`, `getNewUdpInstance`, `getNewTlsClientInstance` / `getNewTlsServerInstance` (`ENABLE_TLS_SERVICE`), `getFileSystemInstance`, `getUtilityInstance` |
-| `iUtilityInterface` | [src/utility/iUtilityInterface.h](src/utility/iUtilityInterface.h) | Inherited via `iDeviceControlInterface` | Scheduler, event bus, logger, `DevFs` (`/dev/random`) | `wait`, `millis_now`, `micros_now`, `random_now`, `yield`, `log`, optional `can_measure_stack` / `measure_lastfn_stack` |
-| `iIOInterface`, `iTerminalInterface` | [src/utility/iIOInterface.h](src/utility/iIOInterface.h) | Any stream (serial, TCP, etc.) | Logger, CLI, web body writers | `write`/`writeln` family (overloaded for all primitive types + `RODT_ATTR` strings), `with_timestamp`, `connect`/`disconnect` |
+#### 13.3.1 Core, always required
+
+| Interface | Implemented by | Used by | Key methods |
+|---|---|---|---|
+| `iDeviceControlInterface` | device | the orchestrator and every service | device init, reset, restart, erase config, device id and MAC, factory-request check, `getTerminal`, `handleEvents`, plus everything it inherits |
+| `iDatabaseInterface` | device | the database service and every table | begin, clean, validate, report size, and the typed read/write templates |
+| `iInstanceInterface` | device | anything needing a fresh connection | new TCP client and server, new UDP socket, new TLS client and server, filesystem and utility handles |
+| `iUtilityInterface` | inherited through device control | scheduler, event bus, logger, `/dev/random` | `wait`, `millis_now`, `micros_now`, `random_now`, `yield`, `log`, optional stack measurement |
+| `iIOInterface`, `iTerminalInterface` | any stream | logger, shell, web writers | the write family overloaded for every primitive, timestamps, connect and disconnect |
 
 #### 13.3.2 Drivers
 
-| Interface | Path | Implementer | Consumers | Key methods |
-|---|---|---|---|---|
-| `iGpioInterface` | [drivers/iGpioInterface.h](src/interface/pdi/drivers/iGpioInterface.h) | Device (via `DeviceControlInterface`) | `GpioServiceProvider`, `SysFs` (`/sys/class/gpio`) | `gpioMode`, `gpioWrite`, `gpioRead`, `gpioFromPinMap`, `isExceptionalGpio`, blink instance create/release |
-| `iGpioBlinkerInterface` | same file | Device | GPIO service for blink mode | `setConfig`, `updateConfig`, `start`, `stop`, `isRunning` |
-| `iWdtInterface` | [drivers/iWdtInterface.h](src/interface/pdi/drivers/iWdtInterface.h) | Device (folded into `DeviceControlInterface`) | Long-running services, scheduler | `enableWdt(mode)`, `disableWdt`, `feedWdt` |
+| Interface | Used by | Key methods |
+|---|---|---|
+| `iGpioInterface` | GPIO service, `/sys/class/gpio` | mode, write, read, pin mapping, exceptional-pin check, blinker create and release |
+| `iGpioBlinkerInterface` | GPIO service in blink mode | configure, update, start, stop, running |
+| `iWdtInterface` | long-running services, the scheduler | enable, disable, feed |
 
-#### 13.3.3 Middlewares (networking & device-level operations)
+#### 13.3.3 Middlewares
 
-| Interface | Path | Implementer | Consumers | Notes |
-|---|---|---|---|---|
-| `iClientInterface` | [middlewares/iClientInterface.h](src/interface/pdi/middlewares/iClientInterface.h) | Serial, TCP, telnet/SSH sessions | Terminal sessions, transports | Adds only `setTimeout` on top of `iTerminalInterface` — the I/O surface |
-| `iTcpClientInterface` | same file | Device | OTA, MQTT, SMTP, HTTP client | Adds `getLocalIp`, `getRemoteIp`, ports, `setKeepAlive`, `setNoDelay` |
-| `iTlsClientInterface` | same file | Device (esp8266 via BearSSL, esp32 via mbedTLS) | Same consumers as TCP when `ENABLE_TLS_SERVICE` is on — orchestrator allocates this instead of plain TCP, see [src/PdiStack.cpp](src/PdiStack.cpp) | Extends `iTcpClientInterface`: `setCertificateAuthorityPath`, `setClientCertificatePath`, `setClientPrivateKeyPath`, `setSNIHostname`, `setVerifyPeer`, `isSecure()` |
-| `iTcpServerInterface` | [middlewares/iServerInterface.h](src/interface/pdi/middlewares/iServerInterface.h) | Device | Telnet, SSH, raw TCP services | `begin(port)`, `hasClient`, `accept`, `close` |
-| `iTlsServerInterface` | same file | Device | HTTPS server, future TLS-wrapped Telnet/MQTT brokers | Extends `iTcpServerInterface`: `setServerCertificatePath`, `setServerPrivateKeyPath`, `setClientCertificateAuthorityPath` (mTLS). `accept()` returns a TLS-capable client transparently |
-| `iHttpServerInterface` | same file | Device (or `impl/HttpServerInterfaceImpl`) | `WebServer` | Routing (`on`, `onNotFound`), args/headers, `send(code, mime, body, chunked)`. With TLS: `begin(port, secure=true)` plus `setServerCertificatePath` / `setServerPrivateKeyPath` / `setClientCertificateAuthorityPath` |
-| `iUdpInterface` | [middlewares/iUdpInterface.h](src/interface/pdi/middlewares/iUdpInterface.h) | Device (esp8266/esp32, raw lwIP UDP) | mDNS responder (and future UDP: DHCP/syslog/SSDP) | `begin(port)`, `joinMulticastGroup`, `send`, `setOnPacketCallback` (delivers `udp_packet_t`), `close`. Allocated via `iInstanceInterface::getNewUdpInstance()` |
-| `iNtpInterface` | [middlewares/iNtpInterface.h](src/interface/pdi/middlewares/iNtpInterface.h) | Device | Logger timestamps, IoT, sessions, `date`/`tdctl` | `init_ntp_time`, `is_valid_ntptime`, `get_ntp_time`, `set_ntp_time` (clock set via `date -s`) |
-| `iPingInterface` | [middlewares/iPingInterface.h](src/interface/pdi/middlewares/iPingInterface.h) | Device | WiFi service (internet check), `ping` CLI | `init_ping(wifi)`, `ping(target, count, on_packet)`, `isPingComplete`, `isHostRespondingToPing`, `getPingStats` (per-packet callback + tx/rx/rtt stats) |
-| `iUpgradeInterface` | [middlewares/iUpgradeInterface.h](src/interface/pdi/middlewares/iUpgradeInterface.h) | Device (folded into `DeviceControlInterface`) | `OtaServiceProvider` | `Upgrade(path, version) → upgrade_status_t` |
+| Interface | Used by | Notes |
+|---|---|---|
+| `iClientInterface` | terminals, transports | the I/O surface plus a timeout |
+| `iTcpClientInterface` | OTA, MQTT, SMTP, HTTP | adds local and remote addresses, keep-alive, no-delay |
+| `iTlsClientInterface` | the same consumers, when TLS is on | adds CA path, client cert and key, SNI hostname, peer verification |
+| `iTcpServerInterface` | telnet, SSH, raw TCP | begin, has-client, accept, close |
+| `iTlsServerInterface` | the HTTPS server | adds cert, key and client CA; `accept()` hands back a TLS-capable client transparently |
+| `iHttpServerInterface` | the web server | routing, args and headers, `send(code, mime, body, chunked)`, and `begin(port, secure)` |
+| `iUdpInterface` | the mDNS responder | begin, join multicast, send, packet callback, close |
+| `iNtpInterface` | log timestamps, IoT, sessions, `date` | init, validity, get, set |
+| `iPingInterface` | the WiFi internet check, the `ping` command | ping with a count and a per-packet callback, completion, stats |
+| `iUpgradeInterface` | the OTA service | one call: upgrade from a path |
 
 #### 13.3.4 Modules
 
-| Interface | Path | Implementer | Consumers | Notes |
-|---|---|---|---|---|
-| `iSerialInterface` | [modules/serial/iSerialInterface.h](src/interface/pdi/modules/serial/iSerialInterface.h) | Device | `SerialServiceProvider`, logger, CLI | Derives from `iClientInterface`; serial is just another stream |
-| `iStorageInterface` | [modules/storage/iStorageInterface.h](src/interface/pdi/modules/storage/iStorageInterface.h) | Device (EEPROM / flash / SD adapter) | `iFileSystemInterface`, `littlefs` | Byte-addressable: `read`, `write`, `erase`, `size` |
-| `iFileSystemInterface` | [modules/storage/iFileSystemInterface.h](src/interface/pdi/modules/storage/iFileSystemInterface.h) | Device (often via [`FileSystemInterfaceImpl`](src/interface/pdi/impl/modules/storage/FileSystemInterfaceImpl.h)) | SSH/SFTP + file-oriented CLI commands | 42 virtuals: file/dir CRUD, traversal, line/offset lookup, search (`findInFile`, `getLineNumbersInFile`, offset⇄line), custom file attributes. Constructed with an `iStorageInterface&` |
-| `iWiFiInterface` | [modules/wifi/iWiFiInterface.h](src/interface/pdi/modules/wifi/iWiFiInterface.h) | Device (esp8266/esp32) | `WiFiServiceProvider`, `net` CLI | STA + AP, scan (sync/async), `enableNAPT`, `setMode`/`getMode` |
-
-#### 13.3.5 Optional helpers
-
-| Interface | Path | Implementer | Consumers | Notes |
-|---|---|---|---|---|
-| `iLoggerInterface` | [iLoggerInterface.h](src/interface/pdi/iLoggerInterface.h) | **Framework** ([`LogManager`](src/interface/pdi/impl/log/LogManager.h), not the device) | `Log*` / `SysLog*` macros | `init(iIOInterface*)`, `log(type, fmt, …)`. The device supplies only its serial terminal (`iIOInterface`) via `getTerminal()`; `LogManager` is the sole implementer |
-| `iDeviceIotInterface` | [iDeviceIotInterface.h](src/interface/pdi/iDeviceIotInterface.h) | **Application** (not device) | `DeviceIotServiceProvider` | `sampleHook`, `dataHook(payload)`, `resetSampleHook` — implemented in the user's sketch to feed IoT payloads |
-
-> Note: `iDeviceIotInterface` is the only `i*Interface` whose implementer is the *application*, not the device port. It is the framework's intentional extension point for "what to publish, on what schedule".
-
-#### 13.3.6 Threading (only required for contextual execution)
-
-| Interface | Path | Implementer | Consumers | Notes |
-|---|---|---|---|---|
-| `iContext` | [threading/iContext.h](src/interface/pdi/threading/iContext.h) | Device (CPU-specific) | Cooperative + preemptive schedulers | `save(out)`, `restore(in)` — raw register save/restore |
-| `iMutex` | [threading/iMutex.h](src/interface/pdi/threading/iMutex.h) | Device | Anything sharing state across contexts | `lock`/`unlock` + `critical_lock`/`critical_unlock` (IRQ-safe) |
-| `iConditionVar` | [threading/iCondvar.h](src/interface/pdi/threading/iCondvar.h) | Device | Cooperative scheduler primitives | `wait(mtx)`, `notify_one`, `notify_all` |
-| `iExecutionContext` | [threading/iExecution.h](src/interface/pdi/threading/iExecution.h) | Device | Schedulers | `start`, `suspend`, `resume` |
-| `iExecutive` | same file | Device | Tasks | Carries stack pointer/size + entry/arg + back-link to `task_t` |
-| `iExecutionScheduler` | same file | Device | `TaskScheduler` | `schedule_task`, `mute`, `yield`, `sleep`, `run`, optional `enable_sched`/`disable_sched` and cross-scheduler hand-off |
-| `iCooperative`, `iCooperativeScheduler` | [threading/cooperative/iCooperative.h](src/interface/pdi/threading/cooperative/iCooperative.h) | Device | Cooperative-mode tasks | Specialisation tags |
-| `iPreemptive`, `iPreemptiveScheduler` | [threading/preemptive/iPreemptive.h](src/interface/pdi/threading/preemptive/iPreemptive.h) | Device | Preemptive-mode tasks | Specialisation tags |
-
-The `SoftIrq` machinery in [iExecution.h](src/interface/pdi/threading/iExecution.h) lives in the interface header because it is the shared protocol between any ISR (device side) and the scheduler (utility side): the ISR sets a bit via `raise_softirq()`, the main context drains it with `fetch_softirq_bits()`. Ports that need preemption must wire their tick ISR to this protocol.
-
-### 13.4 The `impl/` directory — shared default implementations
-
-Not every interface is best re-written per device. [src/interface/pdi/impl/](src/interface/pdi/impl/) holds **portable default implementations** that a device can adopt as-is:
-
-| Default impl | What it gives you | When a port should override |
+| Interface | Used by | Notes |
 |---|---|---|
-| [`HttpServerInterfaceImpl`](src/interface/pdi/impl/middlewares/HttpServerInterfaceImpl.h) | A protocol-correct HTTP/1.1 server built on top of `iTcpServerInterface` + `iTcpClientInterface`. When `ENABLE_TLS_SERVICE` is on, `begin(port, secure=true)` wraps accepted connections via `__i_instance.getNewTlsServerInstance()` so the same impl serves HTTPS without a separate file | Almost never — only if the SDK provides a measurably better native HTTP server |
-| [`FileSystemInterfaceImpl`](src/interface/pdi/impl/modules/storage/FileSystemInterfaceImpl.h) | LittleFS-based filesystem on top of any `iStorageInterface` | Only if the SDK exposes its own FS more efficiently |
+| `iSerialInterface` | serial service, logger, shell | derives from the client interface — serial is just another stream |
+| `iStorageInterface` | the filesystem, LittleFS | byte-addressable read, write, erase, size |
+| `iFileSystemInterface` | SSH, SFTP, every file command | file and directory CRUD, traversal, line and offset lookup, search, custom attributes |
+| `iWiFiInterface` | WiFi service, `net` | station and AP, sync and async scan, NAPT, mode |
 
-This is how the framework keeps the porting effort small: a new device only needs raw `iTcpServerInterface` + `iStorageInterface`, and the rest of the stack (HTTP server, HTTPS server, file system) is inherited. The TLS client/server classes are **not** in `impl/` because BearSSL vs. mbedTLS are fundamentally different libraries — each port supplies its own pair from scratch.
+#### 13.3.5 Optional
 
-### 13.5 Lifecycle and threading expectations
+| Interface | Implemented by | Notes |
+|---|---|---|
+| `iLoggerInterface` | the framework, not the device | the device supplies only its terminal; `LogManager` is the sole implementation |
+| `iDeviceIotInterface` | the application | sample, data and reset hooks — the one interface whose implementer is your sketch |
 
-Every interface implementation must respect three contracts:
+That last one is the framework's deliberate extension point for "what to publish, and how often".
 
-1. **Construction is cheap and side-effect-free.** Singletons are constructed before `setup()` — they must not allocate from the heap, touch hardware, or open ports in their constructor. All real work belongs in an `init*` method invoked from `PDIStack::initialize()` (or from another service's `initService`).
-2. **Methods are non-blocking unless explicitly otherwise.** Anything that could take more than a few milliseconds (TCP connect, NTP fetch, OTA download) must return early or expose a state-machine; long-form work is driven by the scheduler, not held inside the interface call.
-3. **No re-entrancy assumed.** The framework runs single-threaded inline by default. If the port enables contextual execution, the *implementation* (not the caller) is responsible for guarding shared state with `iMutex` — interfaces document where this matters per-method.
+#### 13.3.6 Threading, only for contextual execution
 
-### 13.6 Adding a new interface
+| Interface | Notes |
+|---|---|
+| `iContext` | raw register save and restore, CPU-specific |
+| `iMutex` | lock and unlock, plus IRQ-safe critical variants |
+| `iConditionVar` | wait, notify one, notify all |
+| `iExecutionContext` | start, suspend, resume |
+| `iExecutive` | stack pointer and size, entry point and argument, back-link to the task |
+| `iExecutionScheduler` | schedule, mute, yield, sleep, run, and optional cross-scheduler hand-off |
+| `iCooperative`, `iPreemptive` and their schedulers | specialisation tags for the two lanes |
 
-The bar for adding an interface is "is there at least one device that can implement it differently?". If yes:
+The soft-IRQ machinery lives in the same header because it is the protocol between an ISR on the device side and the scheduler on the utility side:
 
-1. Decide the group: `drivers/` (silicon-level), `middlewares/` (network/device), `modules/` (orthogonal feature), `threading/` (execution), or top-level (cross-cutting like database/logger).
-2. Forward-declare the concrete class, declare `extern Concrete __i_<name>;` at the bottom.
-3. Add a guard so no existing port has to provide it until it opts in — usually via the same `ENABLE_*` flag that gates the consuming service.
-4. Provide a stub in [devices/mockdevice/](devices/mockdevice/) so the off-device build still links.
-5. Document required vs optional methods in this section.
+```
+   tick ISR ──▶ raise_softirq(bit)
+                        │
+   main context ──▶ fetch_softirq_bits() ──▶ scheduler acts
+```
 
-A new interface that ships with only one device implementation is a smell — collapse it into the device-specific code until a second port appears.
+A port that wants preemption wires its tick ISR to exactly that.
+
+### 13.4 Shared default implementations
+
+Not every interface is worth rewriting per device. Two portable defaults ship under `impl/`, and both are what a new port should reach for first.
+
+The HTTP server implementation is a protocol-correct HTTP/1.1 server built on nothing but the TCP server and client interfaces — and with TLS enabled, the same file serves HTTPS by wrapping accepted connections. The filesystem implementation is LittleFS on top of any storage interface.
+
+So a new device needs to supply raw TCP and raw storage, and inherits the HTTP server, the HTTPS server and the whole filesystem for free. The TLS classes are deliberately not here, because BearSSL and mbedTLS are different enough that each port supplies its own pair.
+
+### 13.5 What an implementation must promise
+
+Construction is cheap and free of side effects. The singletons are constructed before `setup()` runs, so a constructor must not allocate, touch hardware, or open a port — that work belongs in an init method the orchestrator calls.
+
+Methods do not block unless they say so. Anything that might take more than a few milliseconds — a TCP connect, an NTP fetch, an OTA download — either returns early or exposes a state machine, and the scheduler drives the long form.
+
+Re-entrancy is not assumed. The framework is single-threaded by default; when a port enables contextual execution, the implementation rather than the caller is responsible for guarding shared state.
+
+### 13.6 Adding an interface
+
+The bar is whether at least two devices could implement it differently. If they could:
+
+1. Pick the group — drivers for silicon, middlewares for network and device operations, modules for orthogonal features, threading for execution, top level for cross-cutting concerns.
+2. Forward-declare the concrete class and declare the `extern` singleton at the bottom.
+3. Guard it with the same flag that gates the service consuming it, so no existing port has to provide anything until it opts in.
+4. Add a stub to the mock device so the off-device build still links.
+5. Write it up here.
+
+An interface with exactly one implementation is usually a sign the abstraction is premature — keep it in device-specific code until a second port needs it.
 
 ---
-
 ## 14. Device Layer & Porting Guide
 
-The device layer is the **only** place where vendor SDK / Arduino-core symbols are allowed. Everything above it talks to the device through abstract `i*Interface` pointers defined in [src/interface/pdi/](src/interface/pdi/). A port is the work of providing one folder under [devices/](devices/) that implements those interfaces for a specific MCU family.
+The device layer is the only place vendor SDK and Arduino-core symbols are allowed. Everything above it talks through abstract interfaces. A port is one folder under [devices/](devices/) implementing those interfaces for one MCU family.
 
-### 14.1 Anatomy of a device folder
-
-A complete port looks like this (using esp32 as the canonical example):
+### 14.1 What a port contains
 
 ```
-devices/esp32/
-├── esp32.h                       SDK / Arduino-core umbrella include
-├── esp32_device_config.h         Per-port platform macros (RODT_ATTR / PROG_RODT_ATTR / strcat_ro
-│                                 / strcpy_ro family, CRITICAL_SECTION_ENTER/EXIT, etc.)
-├── esp32_pdi.h                   Header aggregator — included by src/interface/pdi.h
-├── esp32_pdi.cpp                 Source aggregator — see §14.3
-├── esp32_pdi.c                   (Optional) C-side aggregator for pure-C sources
-├── DeviceControlInterface.{h,cpp}   Required — implements iDeviceControlInterface
-├── DatabaseInterface.{h,cpp}        Required — implements iDatabaseInterface
-├── InstanceInterface.{h,cpp}        Required — factory for runtime instances
-├── SerialInterface.{h,cpp}          If ENABLE_SERIAL_SERVICE
-├── StorageInterface.{h,cpp}         If ENABLE_STORAGE_SERVICE
-├── FileSystemInterface.{h,cpp}      If ENABLE_STORAGE_SERVICE
-├── WiFiInterface.{h,cpp}            If ENABLE_WIFI_SERVICE
-├── HttpServerInterface.{h,cpp}      If ENABLE_WIFI_SERVICE / HTTP_SERVER
-├── TcpClientInterface.{h,cpp}       If ENABLE_NETWORK_SERVICE
-├── TcpServerInterface.{h,cpp}       If ENABLE_NETWORK_SERVICE
-├── UdpInterface.{h,cpp}             If ENABLE_NETWORK_SERVICE
-├── NtpInterface.{h,cpp}             If ENABLE_NETWORK_SERVICE
-├── PingInterface.{h,cpp}            If ENABLE_NETWORK_SERVICE
-├── TlsClientInterface.{h,cpp}       If ENABLE_TLS_SERVICE  (esp8266 → BearSSL, esp32 → mbedTLS)
-├── TlsServerInterface.{h,cpp}       If ENABLE_TLS_SERVICE
-├── BearSSLCertLoader.{h,cpp}        esp8266 only: PEM/DER load helpers used by TlsClient/Server
-│                                    (TlsCryptoLoader namespace)
-├── MbedTLSCertLoader.{h,cpp}        esp32 only: same role, against mbedTLS
-├── TlsCertProvisioner.{h,cpp}       esp32 only — if ENABLE_TLS_CERT_GENERATION
-│                                    (self-signed EC/RSA cert issuance using mbedTLS)
-├── ExceptionsNotifier.{h,cpp}       Optional — crash / exception capture
-├── config/
-│   └── DBTableSchema.json        Per-device DB schema; consumed by scripts
-├── core/
-│   └── EEPROM.{h,cpp}            Vendor-specific helpers (e.g. EEPROM emulator)
-└── threading/                    Optional — only if the port provides cooperative
-    │                              and/or preemptive execution contexts
-    ├── Cooperative.{h,cpp}          iCooperativeScheduler implementation
-    ├── CooperativeCondvar.{h,cpp}   iConditionVar pair for the cooperative lane
-    ├── Preemptive.{h,cpp}           iPreemptiveScheduler implementation
-    ├── PreemptiveMutex.{h,cpp}      iMutex implementation (IRQ-safe critical_lock pair)
-    ├── XtensaContext.{h,cpp}        (esp8266) Xtensa register save/restore — iContext
-    └── XtensaTimer.{h,cpp}          (esp8266) Hardware-timer ISR driving preemption
+  devices/esp32/
+    esp32.h                     umbrella include for the SDK and core
+    esp32_device_config.h       platform macros: flash strings, critical sections
+    esp32_pdi.h                 header aggregator — what the framework sees
+    esp32_pdi.cpp               source aggregator — see below
+
+    DeviceControlInterface      required
+    DatabaseInterface           required
+    InstanceInterface           required
+
+    SerialInterface             with the serial service
+    StorageInterface            with storage
+    FileSystemInterface         with storage
+    WiFiInterface               with WiFi
+    HttpServerInterface         with the web server
+    TcpClient / TcpServer       with networking
+    UdpInterface                with networking
+    NtpInterface / PingInterface with networking
+    TlsClient / TlsServer       with TLS — BearSSL on esp8266, mbedTLS on esp32
+    cert loader                 per backend, loads PEM and DER off the filesystem
+    TlsCertProvisioner          esp32, with on-device cert generation
+    ExceptionsNotifier          optional crash capture
+
+    config/DBTableSchema.json   this board's table layout
+    core/                       vendor helpers, e.g. an EEPROM emulator
+    threading/                  optional: the cooperative and preemptive lanes
 ```
 
-esp32 currently uses FreeRTOS task / mutex / semaphore primitives under the hood for its threading port (no `XtensaContext`/`XtensaTimer` files needed), while esp8266 ships the bare-metal Xtensa context save/restore + hardware-timer drive shown above.
+The two ends of the spectrum are worth looking at. The mock device is header-only stubs, used when no board is selected so the framework still compiles for analysis or off-device tests. The Arduino UNO port has no network, storage-beyond-EEPROM, or web server at all — device control, database, serial, storage, filesystem and the instance factory, and nothing more.
 
-Compare with the minimal end of the spectrum:
+For threading, ESP32 builds on FreeRTOS primitives while ESP8266 ships bare-metal Xtensa context switching driven by a hardware timer. Both satisfy the same interfaces.
 
-- [devices/mockdevice/](devices/mockdevice/) — header-only stub used when no `DEVICE_*` is defined; lets the framework compile for static analysis or off-device unit tests.
-- [devices/arduinouno/](devices/arduinouno/) — no WiFi/Network/HTTP/Storage; ships only `DeviceControl`, `Database`, `Serial`, `Storage` (EEPROM-only), `FileSystem`, `Instance`.
+### 14.2 Required versus optional
 
-### 14.2 Which interfaces are required vs optional
+| Interface | When | Notes |
+|---|---|---|
+| device control | always | GPIO, reset, watchdog, yield, events, terminal |
+| database | always | NVM for the config store |
+| instance factory | always | hands out fresh clients, servers and handles |
+| serial | with the serial service | the serial terminal |
+| storage + filesystem | with storage | LittleFS, SPIFFS or an SD adapter |
+| WiFi, HTTP server | with WiFi | station and AP, the embedded server |
+| TCP client and server | with networking | MQTT, SMTP, OTA, telnet, SSH |
+| NTP, ping | with networking | time sync and reachability |
+| TLS client and server | with TLS | when on, the orchestrator hands these out instead of plain TCP, and every outbound service upgrades transparently |
+| cert provisioner | with on-device cert generation | esp32; free functions rather than a virtual interface |
+| threading family | with contextual execution | also required by TLS, which runs off the main stack |
+| GPIO and watchdog | always, folded in | implemented as part of device control rather than as separate classes |
 
-| Interface | Required? | Trigger flag | Notes |
-|---|---|---|---|
-| `iDeviceControlInterface` | **Always** | — | GPIO, reset, WDT, yield, events, terminal accessor |
-| `iDatabaseInterface` | **Always** | — | NVM read/write for the config DB |
-| `iInstanceInterface` | **Always** | — | Factory for fresh TCP client/server and FS handles |
-| `iSerialInterface` | Conditional | `ENABLE_SERIAL_SERVICE` | Powers the serial terminal |
-| `iStorageInterface` + `iFileSystemInterface` | Conditional | `ENABLE_STORAGE_SERVICE` | LittleFS / SPIFFS / SD adapter |
-| `iWiFiInterface`, `iHttpServerInterface` | Conditional | `ENABLE_WIFI_SERVICE` | WiFi STA+AP control, embedded HTTP server |
-| `iTcpClientInterface`, `iTcpServerInterface` | Conditional | `ENABLE_NETWORK_SERVICE` | Raw TCP for MQTT/SMTP/OTA |
-| `iNtpInterface`, `iPingInterface` | Conditional | `ENABLE_NETWORK_SERVICE` | Time sync, ICMP-based reachability |
-| `iTlsClientInterface`, `iTlsServerInterface` | Conditional | `ENABLE_TLS_SERVICE` | TLS-wrapped TCP. Backend per port: BearSSL (esp8266), mbedTLS (esp32). When on, the orchestrator allocates these instead of plain TCP for `m_client`, so HTTP/MQTT/SMTP/OTA/IoT all upgrade to TLS transparently |
-| `TlsCertProvisioner` (free functions, not a virtual interface) | Optional | `ENABLE_TLS_CERT_GENERATION` (esp32 only) | On-device self-signed cert/key issuance for the HTTPS server |
-| `iExecution`, `iMutex`, `iCondvar`, `iContext` | Optional | `ENABLE_CONTEXTUAL_EXECUTION` | Needed for cooperative/preemptive task modes. Implicitly required by `ENABLE_TLS_SERVICE` so BearSSL/mbedTLS can run off the main loop's stack |
-| `iGpioInterface`, `iWdtInterface` | Folded into `iDeviceControlInterface` | — | Implemented as part of `DeviceControl`, not separate classes today |
+A port is valid the moment the always rows compile and link. Everything else arrives as you turn flags on.
 
-A port is "valid" the moment the **always** rows compile and link; every other row can be added incrementally as you turn on more `ENABLE_*` flags in [devices/DeviceConfig.h](devices/DeviceConfig.h).
+### 14.3 The two aggregators
 
-### 14.3 The two aggregator files
-
-Every port provides a pair of aggregators with a strict role split:
-
-- **`<name>_pdi.h`** — declares which interface *headers* are visible to the rest of the framework. Each include is wrapped in the matching `ENABLE_*` guard so unused interfaces cost zero. See [devices/esp32/esp32_pdi.h](devices/esp32/esp32_pdi.h).
-- **`<name>_pdi.cpp`** — `#include`s the implementation `.cpp` files (this is intentional, driven by the Arduino build layout). Every device translation unit ends up flattened into a **single object file** per build, so anything you mark `static` inside `devices/<board>/*.cpp` is per-port, not per-file — and those `.cpp` files must not be `#include`d from anywhere outside this chain.
-
-Optionally:
-
-- **`<name>_pdi.c`** — the same trick for C-only translation units.
-- **`<name>.h`** — a small umbrella header pulling in the Arduino core / vendor SDK headers; included by every per-interface header so they don't each repeat the SDK plumbing.
-
-### 14.4 Device selection flow
+Every port supplies a pair, with a strict split:
 
 ```
-scripts/DeviceSetup.py -d esp8266
-        │
+  <name>_pdi.h     which interface headers the framework can see
+                   each include wrapped in its ENABLE_* guard, so unused interfaces cost nothing
+
+  <name>_pdi.cpp   #includes the implementation .cpp files
+                   the Arduino build flattens the port into one object file, which means
+                   anything marked static there is per-port, not per-file — and those .cpp
+                   files must never be included from outside this chain
+```
+
+There is an optional C-side aggregator for pure-C translation units, and the umbrella header exists so each per-interface header can pull in the SDK once rather than repeating the plumbing.
+
+### 14.4 How a board gets selected
+
+```
+  DeviceSetup.py -d esp8266
         │  writes
         ▼
-devices/DeviceSetup.h               #define DEVICE_ESP8266
-        │
-        │  #include'd by
+  devices/DeviceSetup.h        #define DEVICE_ESP8266
+        │  included by
         ▼
-devices/DeviceConfig.h              cascades into ENABLE_* feature flags;
-        │                           ALSO pulls in devices/<board>/<board>_device_config.h
-        │                           via #if defined(DEVICE_*) → so RODT_ATTR, PROG_RODT_ATTR,
-        │                           strcat_ro family, CRITICAL_SECTION_ENTER/EXIT
-        │                           are defined before any framework header sees them
-        │
-        │  pulled in transitively from
+  devices/DeviceConfig.h       cascades into ENABLE_* flags, and pulls in
+        │                      esp8266_device_config.h so the platform macros exist
+        │                      before any framework header is parsed
         ▼
-src/config/Config.h                 (everything in src/* sees the flags + platform macros)
-        │
+  src/config/Config.h          now everything under src/ sees flags and macros
         ▼
-src/interface/pdi.h                 selects <name>_pdi.h via #if defined(DEVICE_*)
-        │
+  src/interface/pdi.h          picks esp8266_pdi.h
         ▼
-devices/esp8266/esp8266_pdi.h       brings in the per-device interface headers
-                                    (which transitively include esp8266.h for SDK symbols)
+  the port's interface headers  which transitively pull in the SDK
 ```
 
-**Three** files need a matching entry when adding a device:
-1. [devices/DeviceConfig.h](devices/DeviceConfig.h) — the `#if defined(DEVICE_*)` cascade at the top (to include `<board>_device_config.h`) **and** any per-device limits (`MAX_DIGITAL_GPIO_PINS`, `MAX_DB_TABLES`, etc.).
-2. [src/interface/pdi.h](src/interface/pdi.h) — the `#if defined(DEVICE_*)` cascade that picks `<board>_pdi.h`.
-3. [library.properties](library.properties) — add the architecture to the `architectures=` list.
+Adding a board touches exactly three files outside its own folder: the device config cascade, the interface selector, and the architecture list in `library.properties`.
 
-### 14.5 Per-device global singletons
+### 14.5 The singletons a port must define
 
-Each port instantiates exactly one object per interface and names it according to the framework's convention. The rest of the framework refers to these names directly — they are part of the contract.
+Each port instantiates exactly one object per interface, under the name the framework expects — those names are part of the contract.
 
-| Symbol | Defined in (esp32 example) | Required when |
-|---|---|---|
-| `__i_dvc_ctrl` | [DeviceControlInterface.cpp](devices/esp32/DeviceControlInterface.cpp) | Always |
-| `__i_db` | [DatabaseInterface.cpp](devices/esp32/DatabaseInterface.cpp) | Always |
-| `__i_instance` | [InstanceInterface.cpp](devices/esp32/InstanceInterface.cpp) | Always |
-| `__i_serial` | [SerialInterface.cpp](devices/esp32/SerialInterface.cpp) | `ENABLE_SERIAL_SERVICE` |
-| `__i_storage`, `__i_fs` | [StorageInterface.cpp](devices/esp32/StorageInterface.cpp), [FileSystemInterface.cpp](devices/esp32/FileSystemInterface.cpp) | `ENABLE_STORAGE_SERVICE` |
-| `__i_wifi`, `__i_http_server` | [WiFiInterface.cpp](devices/esp32/WiFiInterface.cpp), [HttpServerInterface.cpp](devices/esp32/HttpServerInterface.cpp) | `ENABLE_WIFI_SERVICE` |
-| `__i_ntp`, `__i_ping` | [NtpInterface.cpp](devices/esp32/NtpInterface.cpp), [PingInterface.cpp](devices/esp32/PingInterface.cpp) | `ENABLE_NETWORK_SERVICE` |
-| `__i_cooperative_scheduler`, `__i_preemptive_scheduler` | [devices/esp8266/threading/](devices/esp8266/threading/), [devices/esp32/threading/](devices/esp32/threading/) | `ENABLE_CONTEXTUAL_EXECUTION` |
+| Symbol | Required when |
+|---|---|
+| `__i_dvc_ctrl`, `__i_db`, `__i_instance` | always |
+| `__i_serial` | serial service |
+| `__i_storage`, `__i_fs` | storage |
+| `__i_wifi`, `__i_http_server` | WiFi |
+| `__i_ntp`, `__i_ping` | networking |
+| `__i_cooperative_scheduler`, `__i_preemptive_scheduler` | contextual execution |
 
-If your port skips a flag, also skip the symbol — it must not exist when the corresponding `ENABLE_*` is off.
+If the port skips a flag it must also skip the symbol — the name should not exist when its feature is off.
 
 ### 14.6 The optional threading port
 
-Cooperative / preemptive task modes require five additional pieces, implemented under [devices/esp8266/threading/](devices/esp8266/threading/) and [devices/esp32/threading/](devices/esp32/threading/):
+Four pieces make the contextual lanes work: a scheduler for each lane, a context implementation that saves and restores CPU state, a matching mutex and condition variable, and a periodic tick source to drive preemption.
 
-- An `iExecution`-derived scheduler (one for cooperative, one for preemptive).
-- An `iContext` implementation that saves/restores CPU state (e.g. `XtensaContext` on esp8266; FreeRTOS task primitives on esp32).
-- An `iMutex` and `iCondvar` pair appropriate for the mode.
-- A periodic tick source for the preemptive lane (e.g. `XtensaTimer` on esp8266; FreeRTOS scheduler tick on esp32).
+Leave the layer out and contextual tasks are simply unavailable — inline tasks keep working, because they run on the loop's own stack. [§4](#4-task-scheduler) covers the trade-offs.
 
-If a port omits this layer, contextual tasks are simply unavailable — inline tasks continue to work because they share the `loop()` stack. Section [5. Task Scheduler](#4-task-scheduler) details the API and the trade-offs.
+Enabling TLS turns this layer on implicitly, because both SSL backends need more stack than the Arduino main context has; the handshake runs on a dedicated cooperative task instead.
 
-`ENABLE_TLS_SERVICE` implicitly turns this layer on — BearSSL (esp8266) and mbedTLS (esp32) handshakes overflow the default Arduino main stack, so the TLS work runs on a dedicated cooperative task sized by `TLS_TASK_STACK_SIZE`.
+### 14.7 Per-board database schema
 
-### 14.7 Per-device database schema
+Each port carries its own table schema describing what lives in NVM on that board, tuned to its capacity. The setup script turns it into C++ table sources. Format is in [§5.5](#55-where-the-tables-come-from).
 
-Each port carries its own [config/DBTableSchema.json](devices/esp32/config/DBTableSchema.json) describing the tables present in NVM for that board (capacity-tuned). `scripts/DeviceSetup.py` invokes `CreateDBSourceFromJson.py` against this file to emit C++ table sources under [src/database/tables/](src/database/tables/). See section [6. Database Layer] for the schema format.
+### 14.8 Porting, step by step
 
-### 14.8 Adding a new device — step by step
+Say the board is `myboard`.
 
-Suppose you are porting to a board called `myboard`.
-
-1. **Create the folder and umbrella headers**
+1. **Create the folder** with three files to start: the SDK umbrella header, the platform-macro header, and a copy of an existing board's table schema.
    ```
    devices/myboard/
-   ├── myboard.h                  // pulls in Arduino.h / vendor SDK
-   ├── myboard_device_config.h    // per-port platform macros: RODT_ATTR, PROG_RODT_ATTR,
-   │                              // strcat_ro / strcpy_ro family, CRITICAL_SECTION_ENTER/EXIT
-   └── config/DBTableSchema.json  // start from devices/esp32/config/DBTableSchema.json
+     myboard.h
+     myboard_device_config.h
+     config/DBTableSchema.json
    ```
-   Wire `myboard_device_config.h` into the device-config cascade by adding a `#elif defined(DEVICE_MYBOARD)` branch in [devices/DeviceConfig.h](devices/DeviceConfig.h) alongside the existing esp8266/esp32/arduinouno includes.
-2. **Implement the always-required interfaces**: `DeviceControlInterface`, `DatabaseInterface`, `InstanceInterface`. Each `.h` derives from the matching `i*Interface` in [src/interface/pdi/](src/interface/pdi/); each `.cpp` defines the global singleton with the canonical `__i_*` name.
-3. **Write the two aggregators**
-   - `myboard_pdi.h` — mirror [esp32_pdi.h](devices/esp32/esp32_pdi.h), keeping only the interfaces you've implemented and guarding each with the right `ENABLE_*`.
-   - `myboard_pdi.cpp` — mirror [esp32_pdi.cpp](devices/esp32/esp32_pdi.cpp), `#include`ing the corresponding `.cpp` files.
-4. **Register the device in the selector**
+   Add a branch for it in the device-config cascade so those macros are picked up.
+2. **Implement the three required interfaces** — device control, database, instance factory — each deriving from its abstract counterpart, each defining its `__i_*` global.
+3. **Write the two aggregators**, mirroring an existing board's pair and keeping only what you have implemented.
+4. **Register the board** in the interface selector:
    ```cpp
-   // src/interface/pdi.h
    #elif defined(DEVICE_MYBOARD)
    #include "../../devices/myboard/myboard_pdi.h"
    ```
-5. **Add per-device limits** in [devices/DeviceConfig.h](devices/DeviceConfig.h) (`MAX_DIGITAL_GPIO_PINS`, `MAX_ANALOG_GPIO_PINS`, `MAX_DB_TABLES`, and gate any service flags the board cannot support, mirroring the `DEVICE_ARDUINOUNO` pattern).
-6. **Run the setup script** from `scripts/`:
-   ```bash
-   python3 DeviceSetup.py -d myboard
-   ```
-   This writes `devices/DeviceSetup.h` with `#define DEVICE_MYBOARD` and generates the DB table sources.
-7. **Build the bundled example** ([examples/PdiStack/](examples/PdiStack/)) for the new board to validate.
-8. **Iterate on optional interfaces** (network, storage, WiFi, …), enabling the matching `ENABLE_*` in `DeviceConfig.h` one at a time and adding the corresponding `*Interface.{h,cpp}` files.
-9. **(Optional) Add TLS support** by implementing `TlsClientInterface` / `TlsServerInterface` against your board's preferred SSL stack (e.g. mbedTLS via ESP-IDF, BearSSL on smaller boards) plus a cert-loader namespace (`TlsCryptoLoader`) for PEM/DER ingestion from the FS. Wire `__i_instance.getNewTlsClient/ServerInstance()` to allocate them. See [devices/esp8266/TlsClientInterface.h](devices/esp8266/TlsClientInterface.h) and [devices/esp32/TlsClientInterface.h](devices/esp32/TlsClientInterface.h) as references — both implement the same `iTlsClientInterface` contract on different SSL stacks.
-10. **(Optional) Add the threading port** under `devices/myboard/threading/` if you want `ENABLE_CONTEXTUAL_EXECUTION` (or you've turned on TLS, which requires it). Provide `Cooperative` / `Preemptive` schedulers + matching `Mutex` / `Condvar`. The two existing ports — bare-metal Xtensa context on esp8266, FreeRTOS-backed on esp32 — show both ends of the implementation spectrum.
+5. **Add the per-board limits** — pin counts, table count — and switch off any service the board cannot support, the way the UNO port does.
+6. **Generate the setup files**: `python3 DeviceSetup.py -d myboard`.
+7. **Build the bundled example** for the new board. That is the first real validation.
+8. **Add optional interfaces one flag at a time**, rebuilding as you go.
+9. **Add TLS** if the board can carry it, by implementing the client and server against whichever SSL stack it has and wiring the factory to hand them out. The two existing ports implement the same contract on different libraries, so either is a usable reference.
+10. **Add the threading port** if you want the contextual lanes, or if you turned on TLS. The bare-metal and the RTOS-backed implementations bracket the range of what this can look like.
 
-### 14.9 Validation checklist
+### 14.9 Before you call it done
 
-A port is ready to merge when:
-
-- [ ] `devices/mockdevice/` still compiles (you didn't accidentally couple `src/` to a vendor header).
-- [ ] The bundled `examples/PdiStack` builds with all flags this board *can* support enabled.
-- [ ] Every `__i_*` symbol expected by the build's `ENABLE_*` set is defined exactly once.
-- [ ] `iUtilityInterface::micros_now()` returns monotonic 64-bit µs across the platform's native counter wrap. Reference impls: ESP8266 → `micros64()`; ESP32 → `esp_timer_get_time()`; AVR → wrap-tracking around 32-bit `micros()` (loop-context only). `ps` should show non-zero `%CPU` for any task with sub-ms callbacks after a few ticks.
-- [ ] The `srvc list` CLI command lists every service your build started; `srvc stop <name>` freezes it (SIG_STOP), `srvc start <name>` resumes (SIG_CONT).
-- [ ] `reboot` and factory-reset both round-trip without losing the DB.
-- [ ] If `ENABLE_STORAGE_SERVICE` is on, SFTP upload/download via `scp` works.
-- [ ] If `ENABLE_CONTEXTUAL_EXECUTION` is on, a sample task scheduled under `__i_cooperative_scheduler` and `__i_preemptive_scheduler` prints from both lanes without stack corruption.
-- [ ] If `ENABLE_TLS_SERVICE` is on, `__i_instance.getNewTlsClientInstance()` returns a non-null instance and a manual TLS handshake against a known peer (e.g. `curl --resolve` to the device, or outbound to a public HTTPS endpoint) completes without panic.
-- [ ] If `ENABLE_HTTPS_SERVER` is on, the portal answers on port 443 once `/etc/http/server.{crt,key}` are present.
-- [ ] If `ENABLE_TLS_CERT_GENERATION` is on (esp32 only), `tls q=1,t=0,l=256,n=test,i=1` writes both files to the configured paths.
+- The mock device still compiles — proof that nothing under `src/` picked up a vendor header.
+- The bundled example builds with every flag the board can support.
+- Every `__i_*` symbol the flag set implies is defined exactly once.
+- Microsecond time is monotonic across the platform's counter wrap, and `ps` shows non-zero CPU share for tasks with sub-millisecond callbacks after a few ticks.
+- `srvc list` shows every service the build started, and stop and start actually freeze and resume them.
+- Reboot and factory reset both round-trip without losing the database.
+- With storage on, upload and download over SFTP work.
+- With contextual execution on, a task on each lane runs and prints without corrupting a stack.
+- With TLS on, the factory returns a live instance and a handshake against a known peer completes.
+- With HTTPS on, the portal answers on 443 once the certificate and key are on the filesystem.
+- With on-device cert generation on, the `tls` command writes both files where the config says.
 
 ---
-
 ## 15. Utility Library
 
-[src/utility/](src/utility/) is the framework's foundation: small, dependency-light primitives every layer above uses. Anything in this directory may include the abstract interfaces from [src/interface/pdi/](src/interface/pdi/) but **not** any device header — the same `.cpp` must compile under every port without conditional includes.
+[src/utility/](src/utility/) is the foundation: small, dependency-light primitives every layer above uses. Anything here may include the abstract interfaces, but never a device header — the same source file compiles under every port with no conditionals.
 
-Most of these have appeared in passing in earlier sections. This section is the index — what's in the box, the public API, and where each piece is used.
+Most of these have already appeared in passing. This is the index.
 
-### 15.1 Inventory
+| Component | What it is |
+|---|---|
+| interface foundations | the three abstract bases the framework rests on: stream I/O, utility, instance factory |
+| type definitions | `task_t`, task states and signals, `session_t`, callback aliases, input sequences, addresses |
+| database engine | [§5](#5-database-layer) |
+| task scheduler | [§4](#4-task-scheduler) |
+| command base | [§7](#7-command-line--terminal) |
+| event bus | cross-service publish and subscribe |
+| string operations | bounded C-string helpers for fixed-size NVM data |
+| data conversions | integer, hex and BCD conversions with no `printf` |
+| Base64 | encode, decode, and a unique-key generator |
+| regex | a minimal engine behind `grep` |
+| safe alloc | heap-checked allocation that refuses to breach a margin |
+| queues | a byte ring, a record queue, and a length-prefixed parser |
+| crypto | hashes, HMAC, AES, Curve25519, Ed25519, RSA |
+| PdiSTL | a trimmed standard library for constrained targets |
+| umbrella header | one include that pulls the whole foundation in |
 
-| Component | Path | Purpose |
-|---|---|---|
-| **Interface foundations** | `iIOInterface.h`, `iUtilityInterface.h`, `iInstanceInterface.h` | Three abstract bases the entire framework rests on |
-| **Type definitions** | `DataTypeDef.h` | `task_t`, `task_state_t` (`READY`/`RUNNING`/`SLEEPING`/`STOPPED`/`ZOMBIE`), `signal_t` (`SIG_HUP`/`KILL`/`TERM`/`CONT`/`STOP`), `session_t`, `serial_event_t`, `CallBack*Fn` aliases, `cmd_term_inseq_t`, `ipaddress_t`, etc. |
-| **Database engine** | `Database.{h,cpp}` | See [§5](#5-database-layer) |
-| **Task scheduler** | `TaskScheduler.{h,cpp}` | See [§4](#4-task-scheduler) |
-| **Command base** | `CommandBase.{h,cpp}` | See [§7](#7-command-line--terminal) |
-| **Event bus** | `EventUtil.{h,cpp}` | Cross-service pub/sub |
-| **String operations** | `StringOperations.{h,cpp}` | C-string helpers tuned for fixed-size NVM data |
-| **Data type conversions** | `DataTypeConversions.{h,cpp}` | int/string/BCD/hex conversions without `printf` |
-| **Base64** | `Base64.{h,cpp}` | Encoding + 16-byte unique key generator |
-| **Regex match** | `RegexMatch.{h,cpp}` | Minimal regex engine — `.` `*` `+` `?` `^` `$` `[abc]` `[a-z]` `[^abc]` `\<char>`. No alternation or grouping. Powers the `grep` CLI |
-| **Safe alloc** | `SafeAlloc.{h,cpp}` | Heap-checked `pdiutil::safe_new<T>(args...)` / `safe_new_array<T>(n)` + `safe_delete` / `safe_delete_array` (null-safe). Refuses allocations that would breach `PDI_SAFE_ALLOC_HEAP_MARGIN` (default 2 KB headroom). Used by the TLS path to bail cleanly on tight heap |
-| **Queue / RingBuf / Proto** | `queue/queue.{h,cpp}`, `queue/ringbuf.{h,cpp}`, `queue/proto.{h,cpp}` | Byte queues and a length-prefixed parser |
-| **Utility umbrella** | `Utility.{h,cpp}` | Single `#include <utility/Utility.h>` that pulls the lot in (conditional on `ENABLE_*`) |
-| **Crypto** | `crypto/` | SHA-1/256/512, HMAC-SHA1/256, AES (ECB/CBC/CTR), Curve25519, Ed25519, RSA (bignum + PKCS#1) |
-| **PdiSTL** | `pdistl/` | A trimmed C++ standard library subset for memory-constrained devices |
-| **Fiber** | `fiber/` | Reserved namespace, currently empty |
+### 15.1 Event bus
 
-### 15.2 Interface foundations (recap)
+`__utl_event` is a synchronous publisher. Services add listeners at boot and fire events from state changes, without any of them taking a direct dependency on another. Event names are centralised, and the usage patterns are in [§6.4](#64-the-event-bus).
 
-The three abstract bases — `iIOInterface` / `iTerminalInterface` (stream I/O + VT100 helpers), `iUtilityInterface` (`wait`, `millis_now`, `micros_now`, `yield`, `log`), and `iInstanceInterface` (factory for TCP/TLS/FS handles) — are documented in [§13.1](#13-portable-interfaces); listed here only as a cross-reference.
+### 15.2 String operations
 
-### 15.3 `EventUtil` — cross-service pub/sub
+Bounded, `printf`-free helpers — substring search, trim, compare, find-and-replace, a small JSON field extractor, IPv4 conversions, case folding. Every one takes an explicit length bound, defaulting to 300, because the NVM config strings are fixed-size arrays that are often not null-terminated. Keep the bound.
 
-[EventUtil.h](src/utility/EventUtil.h). Global `__utl_event` is the framework's synchronous publisher: services `add_event_listener(event, handler)` at boot and `execute_event(event, arg)` from state changes without taking a direct dependency on each other. Event names live in [EventConfig.h](src/config/EventConfig.h); usage patterns are in [§6.4](#6-service-providers) and [§16.9](#169-react-to-an-event).
+### 15.3 Data conversions
 
-### 15.4 `StringOperations` — fixed-size C-string toolkit
+Integer, hex and BCD conversions in both directions with no `stdio` dependency. Using these instead of libc's formatter is worth four to eight kilobytes of flash on the smaller targets.
 
-[StringOperations.h](src/utility/StringOperations.h). Bounded, `printf`-free helpers (`__strstr`, `__strtrim`, `__are_str_equals`, `__find_and_replace`, `__get_from_json`, IPv4 ↔ string, case, etc.) built for the fixed-size, possibly-not-null-terminated char arrays used by the NVM config structs — every function takes an explicit length bound (default 300).
+### 15.4 Base64
 
-### 15.5 `DataTypeConversions` — no-`stdio` numeric formatting
+Encode and decode, plus a unique-key generator that the web session handler uses for cookie tokens and the SSH keygen uses for seeds.
 
-[DataTypeConversions.h](src/utility/DataTypeConversions.h). Integer / hex / BCD / string conversions (`StringToUint*`, `Int32ToString`, `BcdToUint8`, `StringToHex16`, …) with no `printf` dependency — using them instead of libc's formatter saves 4-8 KB of flash on AVR/ESP8266 builds.
+### 15.5 Queues
 
-### 15.6 `Base64`
+Three layers, useful when byte-level discipline matters:
 
-[Base64.h](src/utility/Base64.h). `base64Encode(input, len, *res)` for standard Base64, plus `genUniqueKey(*key, len)` used by the web session handler for cookie tokens. **No decode helper** — call sites that need it (SMTP `AUTH LOGIN`, SSH parsing) write it inline.
+```
+  RINGBUF        a byte ring — put, get, init over a caller-supplied buffer
+      │
+  QUEUE          length-tagged records on top of the ring
+      │
+  PROTO_PARSER   length-prefixed packets with a completion callback
+```
 
-### 15.7 Queues — `QUEUE`, `RINGBUF`, `PROTO`
+MQTT uses the parser to reassemble frames out of a TCP byte stream, which is what they exist for. New code that just needs a container should reach for `pdiutil::vector` instead. One parser belongs to one stream — it carries state across calls.
 
-Three layers, originally from `tuanpmt/esp_mqtt`, retained intact:
+### 15.6 Crypto
 
-| Layer | Path | Use |
-|---|---|---|
-| **`RINGBUF`** | [queue/ringbuf.h](src/utility/queue/ringbuf.h) | Byte ring with `RINGBUF_Init(r, buf, size)`, `RINGBUF_Put(r, c)`, `RINGBUF_Get(r, *c)` — the substrate |
-| **`QUEUE`** | [queue/queue.h](src/utility/queue/queue.h) | Length-tagged record queue built on a ring; `QUEUE_Init`, `QUEUE_Puts`, `QUEUE_Gets`, `QUEUE_IsEmpty` |
-| **`PROTO_PARSER`** | [queue/proto.h](src/utility/queue/proto.h) | Length-prefixed packet parser with a completion callback — used by MQTT to assemble frames out of TCP byte streams |
+A small, production-quality kit. Everything is plain functions over fixed-size buffers, with no allocation and no hidden global state beyond contexts you own.
 
-These are used internally by [src/transports/mqtt/](src/transports/mqtt/) and incidentally by the serial event bus. New code should reach for `pdiutil::vector` or `pdistl::deque` unless the byte-level discipline of the ring matters.
+| Kind | What's there |
+|---|---|
+| hashes | SHA-1, SHA-256, SHA-512, each with streaming and one-shot forms |
+| HMAC | HMAC-SHA1, HMAC-SHA256 |
+| symmetric | AES-128 and AES-256 in ECB, CBC and CTR |
+| key agreement | Curve25519, including the bridge from an Ed25519 private key |
+| signing | Ed25519, and RSA with a portable big-integer layer and PKCS#1 v1.5 |
 
-### 15.8 Crypto — `src/utility/crypto/`
+The Curve25519 and Ed25519 code comes from the standard portable reference. The RSA and big-integer layer is self-contained and device-agnostic — the caller injects the RNG and a watchdog-yield hook, which is what makes on-device keygen survivable. SSH uses all of it: host key generation, the key exchange, host-key signing, public-key authentication, and AES-CTR for transport encryption.
 
-The framework ships a minimal but production-quality crypto kit. Everything is plain C-style functions over fixed-size buffers; no allocation, no state hidden in globals (except per-context structs you own).
+One property worth knowing before you rely on it: constant-time behaviour holds only where the upstream implementation provides it. Ed25519 verification is constant-time; the table-based AES and the big-integer path are not hardened against timing observation.
 
-#### Hashes
+### 15.7 PdiSTL
 
-| Algorithm | Header | API shape |
-|---|---|---|
-| SHA-1 | [hash/sha1.h](src/utility/crypto/hash/sha1.h) | `SHA1Init/Update/Final`, one-shot `SHA1(out, in, len)` |
-| SHA-256 | [hash/sha256.h](src/utility/crypto/hash/sha256.h) | `sha256_init/update/final`, one-shot `sha256(msg, len, out)` |
-| SHA-512 | [hash/sha512.h](src/utility/crypto/hash/sha512.h) | `sha512_init/update/final`, one-shot `sha512(msg, len, out)` |
-| HMAC-SHA1 | [hmac/hmac_sha1.h](src/utility/crypto/hmac/hmac_sha1.h) | One-shot `hmac_sha1(key, klen, data, dlen, out)` |
-| HMAC-SHA256 | [hmac/hmac_sha256.h](src/utility/crypto/hmac/hmac_sha256.h) | One-shot `hmac_sha256(key, klen, data, dlen, out)` |
+A trimmed subset of the C++ standard library for targets that have no libstdc++, adopted from ArduinoSTL by way of uClibc++. Containers live under `pdiutil::` — `string`, `vector`, `function`, the smart pointers and the usual set — and algorithms under `pdistd::`. The C-library wrappers and the ABI glue come along so the framework builds on toolchains that ship neither.
 
-#### Symmetric
+In framework code, write `pdiutil::string` and `pdiutil::vector` with the namespace spelled out, never a `using namespace`. It keeps a later swap to the host standard library mechanical.
 
-| Cipher | Header | Modes |
-|---|---|---|
-| AES-128 / AES-256 (compile-time) | [symmetric/aes/aes.h](src/utility/crypto/symmetric/aes/aes.h) | `ECB_encrypt/decrypt(ctx, buf)`, `CBC_encrypt/decrypt_buffer(ctx, buf, len)`, `CTR_xcrypt_buffer(ctx, buf, len[, resetCtx])` |
+`pdiutil::string` is not `std::string` — some methods are missing or named differently, and the small-buffer and allocator behaviour differ. Check the header before assuming an API is there.
 
-`struct AES_ctx` is initialised with `AES_init_ctx(ctx, key)` or `AES_init_ctx_iv(ctx, key, iv)`; reset the IV mid-stream via `AES_ctx_set_iv`.
+### 15.8 The umbrella header
 
-#### Asymmetric
-
-| Algorithm | Header | API highlights |
-|---|---|---|
-| Curve25519 (X25519 ECDH) | [asymmetric/curve25519/curve25519.h](src/utility/crypto/asymmetric/curve25519/curve25519.h) | `crypto_scalarmult_base(q, n)`, `crypto_scalarmult(q, n, p)`, `curve25519_create_keypair(pub, priv)`, `curve25519_create_keypair_with_ed25519privkey(pub, priv, ed_priv)` |
-| Ed25519 (signing) | [asymmetric/ed25519/ed25519.h](src/utility/crypto/asymmetric/ed25519/ed25519.h) | `ed25519_create_seed`, `ed25519_create_keypair(pub, priv, seed)`, `ed25519_sign(sig, msg, len, pub, priv)`, `ed25519_verify(sig, msg, len, pub) → int`, `ed25519_key_exchange(shared, pub, priv)`, `ed25519_private_to_curve25519` for SSH bridging |
-| RSA (signing) | [asymmetric/rsa/rsa.h](src/utility/crypto/asymmetric/rsa/rsa.h), [rsa/bignum.h](src/utility/crypto/asymmetric/rsa/bignum.h) | Portable big-integer (Montgomery mod-exp, Miller-Rabin) + RSASSA-PKCS1-v1_5. `rsa_generate_keypair(key, bits, rng)`, `rsa_sign_pkcs1` / `rsa_verify_pkcs1` (SHA-256 & SHA-512, CRT sign). Caps at `RSA_MAX_KEY_BITS` (2048). Keygen is heavy — see [§7.9.1](#791-ssh-authentication) for on-device timings |
-
-The Curve25519 / Ed25519 primitives are upstream from the standard portable Ed25519 reference (see [ed25519/readme.md](src/utility/crypto/asymmetric/ed25519/readme.md)); the RSA + bignum code is a self-contained device-agnostic implementation (caller injects the RNG and a watchdog-yield hook). They are used by [src/service_provider/shell/ssh/](src/service_provider/shell/ssh/) for SSH host key generation, the key exchange handshake, host-key signing, and public-key user authentication. AES-CTR powers the SSH transport encryption.
-
-#### `fixedint.h`
-
-[crypto/fixedint.h](src/utility/crypto/fixedint.h) is a small stdint shim used by the crypto primitives — only relevant if you port them to a non-C99 toolchain.
-
-### 15.9 PdiSTL — `src/utility/pdistl/`
-
-A trimmed subset of the C++ standard library for memory-constrained targets. Adopted from [mike-matera/ArduinoSTL](https://github.com/mike-matera/ArduinoSTL) (based on uClibc++). Lives under namespaces `pdiutil::` (containers — `string`, `vector`, `function`, `shared_ptr`, `unique_ptr`, plus the usual container set) and `pdistd::` (`min`, `max`, `swap`, `<algorithm>`). Standard C-library wrappers (`<cstring>`, `<cstdint>`, `<cmath>`, …) and the C++ ABI glue (`abi/`) are also provided so the framework builds on toolchains that don't ship libstdc++. Per-feature `__UCLIBCXX_*` toggles live in `system_configuration.h`.
-
-**Rule of thumb:** in framework code, use `pdiutil::string` and `pdiutil::vector`, always with the explicit namespace prefix (no `using namespace`) — a future swap to the host `std::` is then mechanical.
-
-### 15.10 The umbrella header
-
-[Utility.h](src/utility/Utility.h) is the **one include** that pulls in: the right scheduler variant (timer vs. cooperative based on `ENABLE_TIMER_TASK_SCHEDULER`), event bus, conversions, string ops, queue, Base64, I/O, and `CommandBase` (when CMD is enabled). Anything in `src/` that does `#include <utility/Utility.h>` gets the whole foundation in one shot. New code should follow this pattern rather than reaching for individual files.
-
-### 15.11 Gotchas
-
-- **`fiber/` is empty.** It's a reserved namespace for future coroutine/fiber primitives. Don't try to import from it.
-- **`pdiutil::string` is not `std::string`.** Some methods are missing or renamed; check the header before relying on a particular API. SBO size and allocator semantics differ from libstdc++.
-- **`StringOperations` always takes a length.** Don't drop the default — the framework's NVM strings are often non-null-terminated up to their buffer size, and the default-300 cap is what keeps the helpers safe.
-- **Crypto routines are constant-time only where the upstream made them so.** Ed25519 verify is, AES is table-based and timing-side-channel sensitive, and the RSA big-integer path (Montgomery mod-exp / CRT sign) is not timing-hardened. Don't run on a network where timing attacks are in the threat model without auditing.
-- **`Base64` has no decode.** Plan for that if your code path needs round-trip Base64.
-- **`PROTO_PARSER` keeps state across calls.** Don't share one parser across two connections; allocate one per stream.
-- **The umbrella header has a transitive cost.** It pulls 20+ headers. If a file *only* needs `StringOperations`, include that one directly to keep your TU lean — `Utility.h` is for files that genuinely consume the whole surface.
+`utility/Utility.h` is the single include that pulls in the scheduler variant the config selected, the event bus, conversions, string operations, the queues, Base64, I/O and the command base. It is the right include for a file that genuinely consumes the whole foundation, and the wrong one for a file that needs a single helper — it carries twenty-odd headers with it.
 
 ---
-
 ## 16. Extending the Framework
 
-Every section so far has its own "how do I add one of these?" subsection. This section is the **cross-reference index** — pick what you're building, follow the cookbook, jump to the deep dive when you need it. The intent is that an experienced embedded developer can skim this page and ship a non-trivial extension without re-reading the whole document.
+Every section above has its own "how do I add one of these" part. This one is the index: find what you're building, follow the short version, and jump to the deep dive when you need it.
 
-### 16.1 Decision: which extension surface fits?
+### 16.1 Which surface fits
 
-| You want to… | Reach for | Section |
+| You want to | Reach for | Detail |
 |---|---|---|
-| Support a new MCU / board | **Add a device port** | [§16.2](#162-add-a-new-device) → [§14](#14-device-layer--porting-guide) |
-| Add a missing hardware capability across all ports | **Add a portable interface** | [§16.3](#163-add-a-new-interface) → [§13.6](#13-portable-interfaces) |
-| Add a new framework-level feature (logging sink, fleet manager, …) | **Add a service provider** | [§16.4](#164-add-a-new-service-provider) → [§6.5](#6-service-providers) |
-| Speak a new wire protocol (CoAP, gRPC, …) | **Add a transport** | [§16.5](#165-add-a-new-transport) → [§10.7](#10-transports) |
-| Persist new configuration to NVM | **Add a database table** | [§16.6](#166-add-a-new-database-table) → [§5.9](#5-database-layer) |
-| Add a screen to the on-device portal | **Add a web page / controller** | [§16.7](#167-add-a-new-web-page) → [§8.10](#8-web-server) |
-| Add a terminal command | **Add a CLI command** | [§16.8](#168-add-a-new-cli-command) → [§7.11](#7-command-line--terminal) |
-| Hand-roll persistence in a sketch without touching codegen | **Use the DB escape hatch** | [§11.3 `AddingDatabaseTable`](#113-addingdatabasetable--app-side-persistence-without-codegen) |
-| React to a service event without coupling to it | **Subscribe to the event bus** | [§16.9](#169-react-to-an-event) → [§6.4](#6-service-providers), [§15.3](#15-utility-library) |
-| Run periodic / long-running work | **Use the task scheduler** | [§4](#4-task-scheduler) |
-| Encrypt outbound HTTP / MQTT / SMTP / OTA without changing service code | **Turn on `ENABLE_TLS_SERVICE`** — orchestrator swaps `m_client` to a TLS-capable instance, every service that holds it auto-upgrades | [§6.2.16](#6-service-providers), [§12.4](#124-the-expensive-features-called-out) |
-| Serve the on-device portal over HTTPS | **Turn on `ENABLE_HTTPS_SERVER`** + drop cert/key into `/etc/http/server.{crt,key}` | [§6.2.12](#6-service-providers), [§6.2.16](#6-service-providers) |
-| Provision an HTTPS cert | **`tls` CLI** on esp32 *or* [scripts/GenTlsCerts.py](scripts/GenTlsCerts.py) off-device | [§2.3](#23-what-the-scripts-do), [§17.5](#175-frequently-asked-questions) |
-| Talk to an existing service from the sketch | **Call the singleton** | [§16.10](#1610-call-an-existing-service-from-a-sketch) |
+| support a new board | a device port | [§14](#14-device-layer--porting-guide) |
+| add a hardware capability across all ports | a portable interface | [§13.6](#136-adding-an-interface) |
+| add a framework-level feature | a service provider | [§6.5](#65-writing-a-new-service) |
+| speak a new wire protocol | a transport | [§10.5](#105-adding-a-transport) |
+| persist new configuration | a database table | [§5.9](#59-adding-a-table) |
+| add a screen to the portal | a controller and a page | [§8.10](#810-adding-a-page) |
+| add a terminal command | a command class | [§7.11](#711-adding-a-command) |
+| persist something only your sketch cares about | the database escape hatch | [§11.3](#113-addingdatabasetable) |
+| react to another service without coupling to it | the event bus | [§6.4](#64-the-event-bus) |
+| run periodic or long work | the scheduler | [§4](#4-task-scheduler) |
+| encrypt everything outbound | turn on TLS — the orchestrator swaps the shared client and every service follows | [§6.2.16](#6216-tls-no-provider-transport-hookup--cert-provisioning) |
+| serve the portal over HTTPS | turn on HTTPS and drop a cert and key on the filesystem | [§8.7.1](#871-https-wiring-and-certificates) |
+| call a service from a sketch | the global | [§16.9](#169-calling-a-service-from-a-sketch) |
 
-If your need straddles two of these, the **lower** layer in the stack is usually the right answer — adding a transport is preferable to adding a service that hard-codes a protocol; adding an interface is preferable to a service that touches the vendor SDK.
+When a need straddles two rows, the lower layer is usually right. A transport beats a service that hard-codes a protocol; an interface beats a service that reaches for a vendor header.
 
-### 16.2 Add a new device
+### 16.2 A new device
 
-Full guide: [§14.8](#148-adding-a-new-device--step-by-step). The shape:
+Create the folder with its SDK umbrella header, its platform-macro header and the two aggregators. Implement device control, database and the instance factory, defining their globals. Branch on the new `DEVICE_*` in both the device config and the interface selector. Add the per-board limits. Run the setup script, build the bundled example, then add optional interfaces one flag at a time. Finally add the architecture to `library.properties`. Full walk-through in [§14.8](#148-porting-step-by-step), checklist in [§14.9](#149-before-you-call-it-done).
 
-1. `devices/<board>/` folder with the umbrella header (`<board>.h` for SDK includes), the platform-macro header (`<board>_device_config.h` for `RODT_ATTR` / `strcat_ro` / `CRITICAL_SECTION_*`), and the two aggregators (`<board>_pdi.h` / `<board>_pdi.cpp`).
-2. Implement the **always-required** trio (`DeviceControlInterface`, `DatabaseInterface`, `InstanceInterface`) and define their `__i_*` singletons.
-3. Branch on `DEVICE_<NAME>` in [src/interface/pdi.h](src/interface/pdi.h) **and** in [devices/DeviceConfig.h](devices/DeviceConfig.h) (the second branch pulls in `<board>_device_config.h`).
-4. Add per-board limits in [devices/DeviceConfig.h](devices/DeviceConfig.h).
-5. `python3 scripts/DeviceSetup.py -d <board>`.
-6. Build [examples/PdiStack](examples/PdiStack/) against the new board.
-7. Iterate on optional interfaces (network, storage, WiFi, threading, TLS) one flag at a time.
-8. Add the architecture to `library.properties`.
+### 16.3 A new interface
 
-Validation checklist: [§14.9](#149-validation-checklist).
+Pick the group, write the header with pure virtuals plus a forward-declared concrete class and its `extern` singleton, guard it behind the flag that gates its consumers, and add a mock stub so off-device builds still link. If more than one port would end up writing the same logic, put a default implementation under `impl/` instead.
 
-### 16.3 Add a new interface
+The bar is that two ports would genuinely implement it differently. One implementation means it belongs in the device folder for now.
 
-Full guide: [§13.6](#13-portable-interfaces). The shape:
+### 16.4 A new service
 
-1. Pick the right group: `drivers/`, `middlewares/`, `modules/`, `threading/`, or top-level.
-2. Write [src/interface/pdi/.../i<Name>.h](src/interface/pdi/) with pure virtuals, forward-declared concrete class, `extern Concrete __i_<name>;`.
-3. Guard inclusion behind an `ENABLE_*` if your consumers are gated.
-4. Add a stub in [devices/mockdevice/](devices/mockdevice/) so off-device builds link.
-5. Provide a default implementation under [src/interface/pdi/impl/](src/interface/pdi/impl/) if more than one port would re-implement the same logic.
-
-**The bar:** at least one port should genuinely implement it *differently* from another. A single-port interface is a smell — keep it concrete in the device until the second port shows up.
-
-### 16.4 Add a new service provider
-
-Full guide: [§6.5](#6-service-providers). The shape:
-
-1. New `ENABLE_<NAME>_SERVICE` flag in [devices/DeviceConfig.h](devices/DeviceConfig.h).
-2. New `SERVICE_<NAME>` enum value (guarded by the flag) in [src/service_provider/ServiceProvider.h](src/service_provider/ServiceProvider.h).
-3. `src/service_provider/<group>/<Name>ServiceProvider.{h,cpp}` deriving from `ServiceProvider`:
-   ```cpp
-   <Name>ServiceProvider() : ServiceProvider(SERVICE_<NAME>, RODT_ATTR("<Name>")) {}
-   bool initService(void* arg) override { /* register tasks, listeners */ return ServiceProvider::initService(arg); }
-   ```
-4. Conditional include in [src/PdiStack.h](src/PdiStack.h) + `initService(...)` call in [src/PdiStack.cpp](src/PdiStack.cpp), slotted per the **init order rules** ([§6.3](#6-service-providers)).
-5. Override `printConfigToTerminal` / `printStatusToTerminal` so the `srvc` CLI sees you.
-6. (Optional) Add a CLI command ([§16.8](#168-add-a-new-cli-command)) and/or a web controller ([§16.7](#167-add-a-new-web-page)).
-7. (Optional) Persist config via a database table ([§16.6](#166-add-a-new-database-table)).
-
-Anti-patterns: ctor side-effects, direct service-to-service coupling for fan-out (use events), allocating after `setup()`. See [§6.6](#6-service-providers).
-
-### 16.5 Add a new transport
-
-Full guide: [§10.7](#10-transports). The shape:
-
-1. `src/transports/<proto>/<Proto>Client.{h,cpp}` that takes an `iClientInterface*` and exposes `begin / send / receive / end`. No `__database_service`, no `__task_scheduler` — transports parse bytes, period.
-2. Build a `<Proto>ServiceProvider` *on top* — the service owns the schedule, config, and event dispatch.
-3. One new `ENABLE_*` flag, wired through [PdiStack.h](src/PdiStack.h) / [PdiStack.cpp](src/PdiStack.cpp) the usual way.
-
-The split matters: a transport written this way is reusable from sketches and from other services without dragging the framework in. See HTTP / MQTT / SMTP as references.
-
-### 16.6 Add a new database table
-
-Two paths, depending on whether your table belongs to **the framework** or **your application**.
-
-**Framework table** (must round-trip through every port, surface in `srvc`, be visible to the web portal) — full guide [§5.9](#5-database-layer):
-
-1. Define the struct in a new or existing [src/config/<X>Config.h](src/config/) with the [§3.4](#3-configuration-system) 6-part contract.
-2. Pick a free address using the gap calculator.
-3. Add a `defItems` entry to each `devices/<board>/config/DBTableSchema.json` that needs it.
-4. Regenerate: `python3 scripts/DeviceSetup.py -d <board>`.
-5. Add include + global + accessor pair in [DatabaseServiceProvider.{h,cpp}](src/service_provider/database/DatabaseServiceProvider.h) under your `ENABLE_*` flag.
-6. Raise `MAX_DB_TABLES` if needed.
-
-**Sketch-local table** (only the application code needs to see it):
-
-- Use the escape hatch from [§11.3](#113-addingdatabasetable--app-side-persistence-without-codegen) — `class MyTable : public DatabaseTable<ADDR, my_struct> {};` directly in the `.ino`. No codegen, no schema edit. The trade-off: not visible to the framework's reflective tools.
-
-### 16.7 Add a new web page
-
-Full guide: [§8.10](#8-web-server). The shape:
-
-1. Add the route constant to [src/webserver/routes/Routes.h](src/webserver/routes/Routes.h).
-2. Create `MyPage.h` under [src/webserver/pages/](src/webserver/pages/) holding the body HTML as a `PROG_RODT_ATTR` const string.
-3. Create `MyController` under [src/webserver/controllers/](src/webserver/controllers/) deriving from `Controller`, register the route in `boot()` (with `AUTH_MIDDLEWARE` unless deliberately public).
-4. Add a value-member of the controller in [src/webserver/WebServer.h](src/webserver/WebServer.h), conditional on the appropriate flag.
-5. Add a menu entry on the home page so users can navigate to it.
-
-For sketch-side controllers (no framework edit), see [examples/Dev/AddingController/](examples/Dev/AddingController/AddingController.ino) and [§11.4](#114-addingcontroller--extending-the-web-portal).
-
-Compose the response in three chunked `send(..., send_in_chunks=true)` calls — header / body / footer — to stay under the per-`send` 1.8 KB cap ([§8.7](#8-web-server), [§8.11](#8-web-server)).
-
-### 16.8 Add a new CLI command
-
-Full guide: [§7.11](#7-command-line--terminal). The shape:
-
-1. Add `CMD_NAME_<X>` to [src/service_provider/cmd/commands/CommandCommon.h](src/service_provider/cmd/commands/CommandCommon.h).
-2. Create [src/service_provider/cmd/commands/<X>Command.h](src/service_provider/cmd/commands/) — a struct derived from `CommandBase` that calls `SetCommand`, `AddOption`s in its ctor and implements `execute(cmd_term_inseq_t)` returning a `cmd_result_t`.
-3. Include the header in [CommandLineServiceProvider.h](src/service_provider/cmd/CommandLineServiceProvider.h) and call `CommandBase::RegisterCommand(CMD_NAME_<X>, &<X>Command::Registrar)` from `CommandLineServiceProvider::initService`.
-
-The new command auto-completes via TAB, gets history via ↑/↓ (storage required), and respects CTRL+C / CTRL+Z if you override `executeTermInputAction`.
-
-Constraints to know: command name ≤ 8 chars, ≤ 3 options, option names ≤ 2 chars ([§7.12](#7-command-line--terminal)).
-
-### 16.9 React to an event
-
-Service-to-service coupling for fan-out should go through `__utl_event`, not direct calls:
+Add the flag, add the `service_t` value behind it, and write the provider:
 
 ```cpp
-__utl_event.add_event_listener(EVENT_WIFI_CONNECTED, [&](void* arg) {
-    // your handler — runs on the inline scheduler lane
-});
+<Name>ServiceProvider() : ServiceProvider(SERVICE_<NAME>, RODT_ATTR("<Name>")) {}
+
+bool initService(void* arg) override {
+    // load config, register tasks through the base wrappers, add listeners
+    return ServiceProvider::initService(arg);
+}
 ```
 
-To fire your own:
+Include it in the orchestrator and call its `initService` in the right slot for the init order. Implement the two print hooks so `srvc` can show it. Add a command, a page or a table if it earns them.
 
-```cpp
-__utl_event.execute_event(EVENT_MY_THING, &payload);   // synchronous
-```
+### 16.5 A new transport
 
-Add new event names to [src/config/EventConfig.h](src/config/EventConfig.h). The framework's own events are listed in [§6.4](#6-service-providers).
+Write the client under `src/transports/<proto>/`, taking an `iClientInterface*` and exposing begin, send, receive and end. Keep the database and the scheduler out of it. Put the service on top, wire one flag through the orchestrator, done.
 
-### 16.10 Call an existing service from a sketch
+That split is what makes a transport reusable from a sketch, or from a second service, without dragging the framework along. HTTP, MQTT and SMTP are the references.
 
-Every `ENABLE_*`'d service is a global, named per [§1.7](#1-architecture-overview):
+### 16.6 A new table
+
+Two paths, depending on who needs to see it.
+
+A framework table — one that has to round-trip on every port and show up in tooling — means defining the struct in a config header, picking a free address, adding a schema entry for each board that carries it, regenerating, and adding the accessor pair to the database service. [§5.9](#59-adding-a-table) has the detail.
+
+A sketch-local table skips all of that: declare a `DatabaseTable<ADDR, my_struct>` subclass in the `.ino` and let static-init register it, as in [§11.3](#113-addingdatabasetable). It never passes through the generator, so framework tooling will not see it.
+
+### 16.7 A new page
+
+Add the route constant, add a page header holding the body HTML in program memory, write the controller and register the route in `boot()` — with the auth middleware unless the page is deliberately public — then add it as a member of the web server and put a menu entry on the home page. Compose the response as header, body and footer in three chunked sends.
+
+A sketch can add a controller the same way without touching the framework; [§11.4](#114-addingcontroller) shows it.
+
+### 16.8 A new command
+
+Add the name constant, write the command struct with its options and `execute`, then include and register it in the CLI service. Completion, history and Ctrl+C come for free. Keep the name within eight characters and the options within three ([§7.11](#711-adding-a-command)).
+
+### 16.9 Calling a service from a sketch
+
+Every enabled service is a global, and that is the whole API surface an application needs:
 
 ```cpp
 #include <PdiStack.h>
@@ -3597,25 +2831,20 @@ Every `ENABLE_*`'d service is a global, named per [§1.7](#1-architecture-overvi
 void setup() {
     PdiStack.initialize();
 
-    // configuration
     wifi_config_table cfg;
     __database_service.get_wifi_config_table(&cfg);
     memcpy(cfg.sta_ssid, "MyNet", 6);
     __database_service.set_wifi_config_table(&cfg);
 
-    // service control
     __wifi_service.scan_aps_and_configure_wifi_station_async(0);
 
-    // GPIO
     __i_dvc_ctrl.gpioMode(DIGITAL_WRITE, 2);
     __i_dvc_ctrl.gpioWrite(DIGITAL_WRITE, 2, 1);
 
-    // scheduling
     __task_scheduler.setInterval([&] {
         __i_dvc_ctrl.getTerminal()->writeln("tick");
     }, 1000, millis());
 
-    // events
     __utl_event.add_event_listener(EVENT_WIFI_CONNECTED, [&](void*) {
         // reactive code
     });
@@ -3624,193 +2853,174 @@ void setup() {
 void loop() { PdiStack.serve(); }
 ```
 
-This is the **only** API contract you have to know for application code — every service is reachable through one named global, every singleton is reachable through one `__i_*` symbol, every operation is sync-and-cheap or scheduled-and-deferred.
+Reacting to an event uses the same bus the framework does — add a listener by name, fire your own with a payload, and put new event names in the central header.
 
-### 16.11 Where extensions tend to go wrong
+### 16.10 What to watch for
 
-A quick scan of the most common ways extensions fail to land cleanly:
+A handful of habits separate an extension that lands cleanly from one that fights the framework.
 
-- **Constructor-time work.** The single most repeated mistake — covered in [§13.5](#13-portable-interfaces), [§6.6](#6-service-providers), [§12.10](#1210-gotchas). Use `init*` methods, not constructors.
-- **Direct cross-service calls instead of events.** If your new service `__x_service` calls into `__y_service` from a callback, you have created a hidden ordering dependency that breaks on init-order changes. Use events for fan-out, direct calls only when the dependency is structural (e.g. `MqttServiceProvider` always needs `__database_service`).
-- **Holding pointers into transient buffers.** `CommandBase` option values, web request args, HTTP response bodies are all borrowed pointers ([§7.4](#7-command-line--terminal), [§10.8](#10-transports), [§8.7](#8-web-server)). Copy or call `holdOptionValue` if you need the bytes past the next call.
-- **Pulling vendor headers above the device layer.** If your service or interface file `#include <esp_wifi.h>`, the build breaks for every other port. Push the dependency down into `devices/<board>/`.
-- **Forgetting the codegen step.** A new framework-level table needs a JSON schema edit *and* the script re-run *and* the `DatabaseServiceProvider.{h,cpp}` edit. Skipping any one of the three leaves an inconsistent state.
-- **Ignoring the `ENABLE_*` triple-gate.** A new feature flag must guard (1) the device aggregator include, (2) the orchestrator include, (3) the orchestrator's `initService` call. Miss one and the build either fails to link or carries dead code. See [§3.3](#3-configuration-system).
-- **One global per slot.** Two `XServiceProvider` instances overwrite `m_services[SERVICE_X]` silently. Two `<X>Table` globals at the same address are quietly skipped by `Database::register_table`. One per slot, always.
+Do the work in `init*`, not in a constructor. Globals are constructed before `setup()`, when the device interfaces do not exist yet.
+
+Use events for fan-out and direct calls only for structural dependencies. A service calling another from a callback creates an ordering dependency that breaks the next time init order changes.
+
+Copy borrowed pointers. Command option values, request arguments and HTTP response bodies all point into buffers that are about to be reused.
+
+Keep vendor headers below the device layer. One `#include <esp_wifi.h>` in a service breaks the build for every other port.
+
+Remember that a feature flag gates three things — the device aggregator include, the orchestrator include, and the orchestrator's init call. Miss one and you get either a link error or dead code in the binary.
+
+And keep one global per slot. A second service instance overwrites the first in the service table, and a second table at the same address is quietly skipped at registration.
 
 ---
-
 ## 17. Troubleshooting & FAQ
 
-Common problems and recurring questions. Each entry is short — deep explanations live in the sections they point to.
+Short entries; the explanations live in the sections they point at.
 
-### 17.1 Build & flash problems
+### 17.1 Build and flash
 
-**`undefined reference to lfs_*` at link time.**
-You're on an old checkout that still expects the LittleFS submodule. LittleFS is now vendored under [external/littlefs/](external/littlefs/) — pull `main` to get the in-tree sources. See [§2.4](#24-vendored-externals).
+**The build succeeds for ESP8266 or UNO but the device misbehaves.**
+The setup script was never run for that target, so the ESP32 fallback produced an ESP32-shaped binary — right code, wrong table addresses and flags. Run `python3 DeviceSetup.py -d <board>` and rebuild ([§2.5](#25-how-the-esp32-default-works)).
 
-**`fatal error: DeviceSetup.h: No such file or directory`.**
-You're on an old checkout that still hard-required `DeviceSetup.h`. The current header uses `#if __has_include("DeviceSetup.h")` to fall back to ESP32. Pull `main`, or run the setup script if you want a non-default target: `python3 DeviceSetup.py -d <board>`. See [§2.2](#22-installation-flow).
+**The build succeeds but `srvc list` is empty and no access point appears.**
+Same cause seen from the other end: `devices/DeviceSetup.h` still names the previous board. Re-run the script, or delete the file to fall back to ESP32.
 
-**Build succeeds against ESP8266 / UNO but device misbehaves at runtime.**
-You installed via Library Manager (or copied a fresh repo) without running `DeviceSetup.py -d <board>` for the actual target. The ESP32 fallback in `DeviceConfig.h` produced an ESP32-shaped binary. Run the setup script for your target board. See [§2.6](#26-gotchas).
+**`multiple definition of __i_<x>`.**
+Either two ports define the same singleton, or a device `.cpp` was included from outside its aggregator chain. Every device translation unit must be reached through exactly one aggregator ([§14.3](#143-the-two-aggregators)).
 
-**Build succeeds, but `srvc list` lists no services and the AP never appears.**
-`devices/DeviceSetup.h` still points at the wrong device — usually because you switched boards without re-running the setup script. Re-run with the new `-d <board>`, or `rm devices/DeviceSetup.h` to fall back to ESP32. See [§2.6](#26-gotchas).
+**`fatal error: esp_wifi.h: No such file or directory` while building for AVR.**
+A vendor header leaked above the device layer. Push the include down into the port ([§16.10](#1610-what-to-watch-for)).
 
-**`multiple definition of __i_<x>` link error.**
-Two ports defined the same singleton, or you referenced a `devices/<board>/*.cpp` from somewhere other than its aggregator. Per [§14.3 The two aggregator files](#143-the-two-aggregator-files), each device translation unit must be reached through exactly one `.cpp`-include chain.
+**Compile errors inside `pdiutil::function` or `pdiutil::vector` on an unusual target.**
+The toolchain is missing the GCC extensions PdiSTL relies on. Use a GCC-based toolchain.
 
-**`fatal error: esp_wifi.h: No such file or directory` building for AVR.**
-A vendor-specific header leaked above the device layer. The fix is to push that include down into `devices/<board>/`. See [§16.11](#16-extending-the-framework).
+### 17.2 Boot and runtime
 
-**Compile error mentioning `pdiutil::function` / `pdiutil::vector` on an obscure target.**
-The host compiler is missing GCC's variadic-macro / variadic-template extensions used in [PdiSTL](src/utility/pdistl/). Switch to a GCC-based toolchain. See [§9.9](#9-logger), [§15.11](#15-utility-library).
+**The device factory-resets every five seconds.**
+NVM is invalid — a corrupt checksum, or a struct that changed shape since the last flash. With auto-reset on, one cycle recovers it. If it loops, a table has outgrown its address slot ([§5.9](#59-adding-a-table)).
 
-### 17.2 Boot & runtime problems
+**Boot stops after the banner and no access point appears.**
+The station connect is timing out against stale credentials. Hold the flash button for six or seven seconds to factory-reset, join the access point, and set fresh ones.
 
-**Device boots but `srvc list` shows nothing or factory-resets every 5 s.**
-NVM is in an invalid state (corrupt checksum, mismatched schema after a struct edit). With `AUTO_FACTORY_RESET_ON_INVALID_CONFIGS` on (the default), the device auto-recovers — wait one reset cycle. If it loops, the table sizes have outgrown the address allocation; see [§5.10](#5-database-layer).
+**`initialize()` completes but no log output appears.**
+No console log gate is set, so every call site compiled away. Enable at least the info gate ([§9.3](#93-flags)).
 
-**Boot hangs after `Starting PDIStack !` with no AP.**
-WiFi STA connect is timing out. `WIFI_STATION_CONNECT_ATTEMPT_TIMEOUT` defaults to 1 s ([§3.3.3](#3-configuration-system)) — short. Usually means the configured STA credentials are stale. Hold the flash button 6-7 s to factory-reset (assuming `CONFIG_CLEAR_TO_DEFAULT_ON_FACTORY_RESET`), reconnect to AP, set fresh credentials.
+**The application runs once and stops.**
+`PdiStack.serve()` is missing from `loop()`. Without it the scheduler never advances.
 
-**`PdiStack.initialize()` runs to completion but `LogI` calls print nothing.**
-No `ENABLE_CONSOLE_LOG_*` flag is set in [devices/DeviceConfig.h](devices/DeviceConfig.h) — every `Log*` site compiled to nothing. Uncomment at least `ENABLE_CONSOLE_LOG_INFO`. See [§9.8](#9-logger).
+**`register_task` always returns -1.**
+The slot table is full at 25. Either raise the limit or find the service leaking tasks — `ps` shows the population ([§4.7](#47-behaviour-worth-knowing-before-you-lean-on-it)).
 
-**Application code runs once and stops.**
-Almost always missing `PdiStack.serve()` in `loop()`. Without it the inline scheduler never advances and nothing periodic fires. The minimal sketch is [examples/PdiStack/PdiStack.ino](examples/PdiStack/PdiStack.ino).
+**One service starves the others and the loop feels jittery.**
+The scheduler runs one inline task per pass, so a task doing too much per call delays everything behind it. Split it into a state machine or move it to a cooperative lane ([§4.5](#45-what-happens-on-a-tick)).
 
-**Heap fragmentation after hours/days of uptime.**
-Symptoms: `register_task` returning `-1`, `pdiutil::vector` growth failing, transports refusing new connections. You're allocating inside a hot path. The discipline is in [§12.5](#125-heap-discipline) — pre-reserve containers, hold-then-free, no `new` after `setup()`.
+**Free heap drifts down over days.**
+Something is allocating in a hot path. The habits that prevent it are in [§12.4](#124-heap-discipline).
 
-**`__task_scheduler.register_task` always returns `-1`.**
-The slot table (`MAX_SCHEDULABLE_TASKS = 25`) is full. Either you have a legitimate need for more (raise the constant in [src/config/Common.h](src/config/Common.h)) or a service is leaking tasks (`ps` will show the population). See [§4.7](#4-task-scheduler).
+### 17.3 Network and portal
 
-**One service starves the others; serve loop feels jittery.**
-The scheduler runs **one** inline task per `serve()` iteration ([§4.5](#4-task-scheduler)). If a task does too much work per call, every other task suffers. Split into a state machine or promote to a cooperative lane.
+**Cannot join the `pdiStack` access point.**
+The password is `pdiStack@123`, case-sensitive. Confirm the radio is up with `srvc status WiFi` over serial.
 
-### 17.3 Network / portal problems
+**Cannot reach `http://192.168.0.1`.**
+With dynamic subnetting on, the access point may have chosen a different subnet — use the `.1` of whatever your client was given.
 
-**Cannot connect to the `pdiStack` AP.**
-Default password is `pdiStack@123` (case-sensitive). Confirm the AP is up via `srvc list` + `srvc status WiFi` over serial. If still missing, `ENABLE_WIFI_SERVICE` may be off — re-check [devices/DeviceConfig.h](devices/DeviceConfig.h).
+**The login form keeps bouncing back to itself.**
+The cookie is being rejected or the five-minute session expired. Private browsing windows often refuse cookies for a bare IP.
 
-**Cannot reach `http://192.168.0.1` from the AP.**
-Default subnet is hardcoded in [WifiConfig.h](src/config/WifiConfig.h). If `ENABLE_DYNAMIC_SUBNETTING` is on, the AP may have picked a different subnet; check the IP your phone/laptop got from DHCP and use that subnet's `.1`.
-
-**Login form keeps redirecting to `/login`.**
-Cookie is being rejected or session expired (default 300 s). Check the browser actually accepts cookies for the device IP; private-mode windows often don't.
-
-**The page is truncated mid-HTML.**
-A `send()` was called without `send_in_chunks=true` and the payload exceeded `PAGE_HTML_MAX_SIZE = 1800`. Compose pages in three chunked sends (header/body/footer) — see [§8.7](#8-web-server) and the stale-comment caveat in [§11.4](#114-addingcontroller--extending-the-web-portal).
+**A page arrives truncated mid-HTML.**
+A `send()` went out without chunking and exceeded the per-send buffer. Compose in header, body and footer ([§8.7](#87-composing-a-response)).
 
 **MQTT connects but no callbacks fire.**
-For inbound data, confirm `Subscribe` was actually acknowledged by waiting for the `OnSubscribed` callback before publishing on the same topic. `Subscribe` returns success on *enqueue*, not on SUBACK ([§10.8](#10-transports)).
+Wait for the subscribed callback before publishing on that topic — `Subscribe` reports enqueue, not acknowledgement ([§10.2](#102-mqtt)).
 
-**OTA pings the server but never updates.**
-The framework only updates when **the server's `latest` version is strictly newer than the device's `FIRMWARE_VERSION`** (see [§6.2.5 OtaServiceProvider](#6-service-providers)). Bump `FIRMWARE_VERSION` in [GlobalConfig.h](src/config/GlobalConfig.h) before publishing.
+**OTA polls the server but never updates.**
+The device only updates when the server's version is strictly newer than the firmware version compiled into it. Bump the firmware version before publishing ([§6.2.5](#625-otaserviceprovider--__ota_service)).
 
-**Email send times out.**
-SMTP is plaintext; the framework has **no STARTTLS** ([§10.5](#10-transports)). TLS-only SMTP providers (Gmail SMTP submission, SES) won't work. Use a relay that accepts plain SMTP on the LAN, or a mailtrap-style test sink.
+**Email sends time out.**
+SMTP goes out in plaintext, so providers that require TLS on submission will not complete. Use a relay that accepts plain SMTP, or a test sink ([§10.3](#103-smtp)).
 
-**HTTPS server returns connection-refused / handshake-fail.**
-Cert/key not on the device FS, or paths don't match the defaults. Upload via SFTP to `/etc/http/server.crt` and `/etc/http/server.key` (paths overridable via `TLS_DEFAULT_SERVER_*_PATH` in [TlsConfig.h](src/config/TlsConfig.h)). On esp32, the on-device `tls q=1,t=0,l=256,n=<CN>,i=<IPv4>` command can generate them in place; on esp8266, use [scripts/GenTlsCerts.py](scripts/GenTlsCerts.py) off-device and upload. Watch for `ENABLE_HTTPS_SERVER_MTLS` builds — they additionally need `/etc/http/client-ca.crt`. See [§6.2.16](#6-service-providers).
+**HTTPS refuses connections or fails the handshake.**
+The certificate and key are missing from the filesystem or sitting at different paths than configured. Upload them to `/etc/http/server.crt` and `/etc/http/server.key`; under mTLS the client CA is needed too ([§8.7.1](#871-https-wiring-and-certificates)).
 
 **Outbound HTTPS to an unknown CA fails.**
-The bundled `m_client` in `PdiStack` defaults to `setVerifyPeer(false)` so first-boot demos work without provisioned trust anchors. For production cross-network paths, edit [src/PdiStack.cpp](src/PdiStack.cpp): drop the `setVerifyPeer(false)` line and uncomment `setCertificateAuthorityPath(TLS_DEFAULT_OUTBOUND_CA_BUNDLE_PATH)`, then upload a CA bundle to `/etc/ssl/ca-bundle.crt`.
+The bundled client ships with peer verification off so first-boot demos work. For production, point it at `/etc/ssl/ca-bundle.crt` and drop the `setVerifyPeer(false)` line.
 
-**esp8266 TLS handshake stack-overflows / fails on a 16 KB record.**
-Two ceilings: (1) BearSSL ECDSA sign needs more than the 4864 B default Arduino cont_t stack — the TLS task runs on a dedicated `TLS_TASK_STACK_SIZE = 6500` B stack; lower at your own risk. (2) `TLS_IBUF_SIZE = 2048` defaults below BearSSL's spec maximum of ~17 KB. Peers that emit 16 KB records will fail the handshake — bump it (and accept the heap cost) only if you can't control the peer.
+**ESP8266 TLS handshakes fail on large records.**
+Two ceilings meet here. The handshake runs on a dedicated task stack sized by `TLS_TASK_STACK_SIZE` because the default main stack is too small for an ECDSA sign, and the inbound record buffer defaults well below the 16 KB a peer may emit. Raise the buffer — and pay the heap — only when you cannot control the peer.
 
-**HTTPS portal works on esp32 but esp8266 rejects every connection.**
-Most likely `ENABLE_NAPT` is also on. The two cannot coexist on esp8266 — both want too much of the same fixed heap. Disable NAPT for HTTPS builds. See [§12.4](#124-the-expensive-features-called-out).
+**HTTPS works on ESP32 and refuses everything on ESP8266.**
+NAPT is almost certainly on as well. The two cannot share that heap ([§12.3](#123-the-expensive-features)).
 
-**`EVENT_WIFI_STA_GOT_IP` listener (auto cert-gen) never fires.**
-`ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` is gated on both `ENABLE_TLS_CERT_GENERATION` (esp32 only) and a successful STA association. Confirm STA is actually getting an IP via `net ip`; auto-mint won't run on AP-only mode.
+**The auto cert-generation listener never fires.**
+It hangs off the station getting an IP, so it does not run in AP-only mode. Check with `net ip`.
 
-### 17.4 CLI / terminal problems
+### 17.4 Shell
 
-**Telnet / SSH login fails with the right credentials.**
-The CLI uses the same login row as the web portal (`login_credential_table`). If you've changed credentials via the web, telnet/SSH inherits them. If `srvc status Auth` shows defaults, factory reset.
+**Telnet or SSH rejects the right credentials.**
+The shell shares the portal's credential row. If they were changed through the portal, the shell inherits them.
 
-**SSH won't accept any client.**
-You probably never generated a host key pair. From the CLI:
+**SSH accepts no clients.**
+The Ed25519 host key is created when the service starts, so this means the write failed — a full or unmounted filesystem. Check `df`, then regenerate:
 ```
-ssh q=1,t=1
+sshkgen t=1,f=b
 ```
-(`q=1` is `SSH_COMMAND_QUERY_KEYGEN`, `t` selects the algorithm — `1`=Ed25519, `2`/`3`=RSA 2048-bit — see [SshConfig.h](src/config/SshConfig.h)). Prefer `t=1`: Ed25519 generates instantly, whereas on-device RSA keygen takes ~6 min on ESP8266 and ~1 min on ESP32.
+`t=1` is Ed25519 and is instant; `f=b` is the `/etc/ssh` host-key directory.
 
-**`scp -s …` is slow.**
-By design — the framework streams SFTP in small bolus chunks (≤256 B) and has overwrite overhead on flash filesystems. Expected throughput 0.2-1 KB/s ([§6.2.14](#6-service-providers), [§7.9](#7-command-line--terminal)). Use OTA, not SFTP, for firmware.
+**`scp -s` is slow.**
+Transfers stream in small chunks and pay flash-write cost on overwrite, which lands around 0.2 to 1 KB/s. Firmware belongs on OTA ([§7.9](#79-sftp-and-scp-file-transfer)).
 
-**Two telnet clients can't connect simultaneously.**
-The Telnet transport currently holds a single `m_client`, so a second telnet TCP connect is refused until the first disconnects. The session layer itself supports `PDI_MAX_SESSIONS` concurrent slots — serial + telnet + ssh coexist fine, and multi-telnet just needs a client-vector refactor in [TelnetServiceProvider.cpp](src/service_provider/transport/TelnetServiceProvider.cpp) ([§7.8](#78-multi-terminal-session-lifecycle)).
+**`fedit` will not exit.**
+Press Esc for the menu, then `!w` to save and leave or `!c` to discard.
 
-**`fedit` won't exit.**
-Press **ESC** to open the menu, then **!w** to save (commit + exit) or **!c** to cancel. See [§7.7 Built-in command inventory](#77-built-in-command-inventory).
+**Tab completion works but the arrow keys don't recall history.**
+History is a file, so it needs storage; completion reads the in-RAM registry and works either way ([§7.6](#76-the-dispatcher)).
 
-**TAB autocomplete works but ↑/↓ history doesn't.**
-History is persisted to `/.term_history` — only available when `ENABLE_STORAGE_SERVICE` is on. Autocomplete uses the in-RAM command registry and works regardless. See [§7.6](#7-command-line--terminal).
+### 17.5 Questions that come up
 
-**Command name longer than 8 chars is silently truncated.**
-`CMD_SIZE_MAX = 8`. Shorten the name. See [§7.12](#7-command-line--terminal).
+**Can I run two `PdiStack` instances?**
+No. One global stack, one singleton per interface and per service — and on these memory budgets there would be no gain.
 
-### 17.5 Frequently asked questions
+**Can I use Arduino `String` instead of `pdiutil::string`?**
+In your sketch, yes. In framework code, no — its allocator differs per core, which is exactly the portability the framework is built to avoid depending on.
 
-**Q. Can I run multiple `PDIStack` instances?**
-No. The framework relies on a single global `PdiStack` plus one singleton per interface and per service. There's no path to multi-instance — and on the target memory budgets, no point.
+**Why are command names so short?**
+Eight characters for a name and three for an option are sized for AVR-class RAM, and the cost of loosening them multiplies across every command slot.
 
-**Q. Can I use `String` (Arduino) instead of `pdiutil::string`?**
-In sketch code, yes. In framework code, no — `String`'s allocator differs by core and breaks the off-AVR portability the framework relies on. See [§15.9](#15-utility-library).
+**Why is SSH so heavy?**
+Host keys, key exchange, streaming AES and per-session protocol state add roughly 150 KB of flash and 8 to 16 KB of heap per session. That is why ESP32 is the recommended target for SSH builds ([§12.3](#123-the-expensive-features)).
 
-**Q. Why are command names so short?**
-`CMD_SIZE_MAX = 8` and `CMD_OPTION_SIZE_MAX = 3` are sized for AVR-class RAM. Loosening them costs RAM proportional to `MAX_SCHEDULABLE_TASKS × CMD_OPTION_MAX × CMD_OPTION_SIZE_MAX`. The trade-off was made for UNO.
+**Can the device be reconfigured without reflashing?**
+Yes. Everything persisted in NVM is reachable from the portal, the shell, or a sketch. Flashing only changes defaults ([§3.8](#38-defaults-are-not-current-values)).
 
-**Q. Why is SSH so heavy?**
-Ed25519 / RSA host keys + Curve25519 ECDH + AES-CTR streaming + per-session protocol state. Roughly +150 KB flash and +8-16 KB heap per session ([§12.4](#124-the-expensive-features-called-out)). It's why ESP32 is the recommended target for SSH builds. RSA also adds a big-integer keygen path that is very slow on ESP8266 (~6 min) versus ~1 min on ESP32 — Ed25519 host keys avoid that cost entirely.
+**Where do logs go?**
+Console lines go to serial at 115200. With syslog on, those lines also land in `/var/log/syslog.<level>`, and with forwarding on they go to a collector as well ([§9.6](#96-where-syslog-goes)).
 
-**Q. Can the device be configured without flashing — e.g. from a USB serial bootstrap?**
-Yes. After the first boot, every persisted config in NVM can be changed via the web portal, the CLI, or another sketch that calls `__database_service.set_*_table`. Flash only changes *defaults* ([§3.8](#3-configuration-system)).
+**How do I turn on TLS?**
+Set `ENABLE_TLS_SERVICE` — BearSSL on ESP8266, mbedTLS on ESP32. Add `ENABLE_HTTPS_SERVER` for the portal, `ENABLE_HTTPS_SERVER_MTLS` for client certificates, and on ESP32 the cert-generation flags for on-boot minting. It is the most expensive flag in the framework ([§12.3](#123-the-expensive-features)), and on ESP8266 it cannot share the board with NAPT.
 
-**Q. Where do logs go?**
-Console (`Log*`) lines go to the serial terminal at 115200. With `ENABLE_SYSLOG_SERVICE` on, `SysLog*` lines additionally land in `/var/log/syslog.<level>` on the filesystem ([§9.7](#97-where-syslog-goes)). There is no built-in telnet/SSH/HTTP/remote-syslog fan-out.
+**How do I provision certificates?**
+On ESP32, `tls q=1,t=0,l=256,n=device.local,i=192.168.1.50` writes a self-signed EC pair straight to the configured paths. Anywhere else, `python3 scripts/GenTlsCerts.py --dns device.local --ip 192.168.1.50` produces them off-device for upload. Run the script once with `--gen-ca` and reuse that CA for every device, and a client that trusts it trusts your whole fleet.
 
-**Q. How do I enable TLS?**
-TLS ships in-tree as of the last release. Set `ENABLE_TLS_SERVICE` in [devices/DeviceConfig.h](devices/DeviceConfig.h) — esp8266 uses BearSSL, esp32 uses mbedTLS. Add `ENABLE_HTTPS_SERVER` for the inbound web portal (cert/key at `/etc/http/server.{crt,key}`), `ENABLE_HTTPS_SERVER_MTLS` for client-cert auth (`/etc/http/client-ca.crt`), `ENABLE_TLS_CERT_GENERATION` + `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` (esp32 only) for on-boot auto-mint. Cost is significant — see [§12.4](#124-the-expensive-features-called-out). On esp8266 `ENABLE_TLS_SERVICE` cannot coexist with `ENABLE_NAPT`. Full reference: [§6.2.16](#6-service-providers).
+**Is there a simulator?**
+The mock device lets the framework compile off-device for analysis; it does not simulate behaviour. Interactive testing means real hardware.
 
-**Q. How do I provision certs?**
-Two paths. **On-device (esp32 only):** `tls q=1,t=0,l=256,n=device.local,i=192.168.1.50` from the CLI generates and stores a self-signed EC P-256 cert + key at the default `TlsConfig.h` paths. **Off-device (any board):** `python3 scripts/GenTlsCerts.py --dns device.local --ip 192.168.1.50` produces files under `certs/`, then upload via SFTP. For a stable dev CA, run with `--gen-ca` once and use `--ca-cert`/`--ca-key` for each device cert thereafter — every device that trusts that CA bundle then trusts every device cert it signs.
+**How do I unit-test framework code?**
+Mock the interfaces the unit depends on and link against its source. Bring your own harness — PdiSTL builds on host x86 with GCC.
 
-**Q. Is there a Wokwi / on-host simulator?**
-Not bundled. `devices/mockdevice/` is a header-only stub that lets the framework *compile* off-device for static analysis, but it doesn't simulate behaviour. For interactive testing, flash to real hardware.
-
-**Q. How do I unit-test framework code?**
-The interface-based design supports it: mock the `i*Interface` your unit depends on and link against the unit's `.cpp`. The framework doesn't ship a test harness — bring your own (CppUTest, Catch2, …). PdiSTL works on host x86 with GCC.
-
-**Q. What's the upgrade path from the old `esp8266-framework` repo?**
-Migration is mostly mechanical — rename `__i_dvc_ctrl` calls, replace `String` with `pdiutil::string`, follow the [§14.8 device port guide](#148-adding-a-new-device--step-by-step) if you had a custom board.
-
-**Q. Does the framework receive security updates?**
-Crypto primitives are upstream (`ed25519`, `curve25519`, `aes`, `sha*`) — vendored copies. There's no automated CVE tracking. If you ship a product on it, mirror the upstream sources and watch their release feeds yourself.
-
-**Q. Can I disable the auto-factory-reset behaviour?**
-Yes — comment out `AUTO_FACTORY_RESET_ON_INVALID_CONFIGS` in [devices/DeviceConfig.h](devices/DeviceConfig.h). Then invalid NVM halts further service initialization until manually cleared, which is sometimes what you want during development.
-
-**Q. Where do I report bugs / file issues?**
+**Where do I report issues?**
 GitHub: <https://github.com/Suraj151/pdi-framework>.
 
-### 17.6 When you're really stuck
+### 17.6 When you're properly stuck
 
-The best signal-to-noise loop on an unknown problem:
+```
+  1  enable console logging, flash, watch serial at 115200
+  2  srvc list              what actually booted
+  3  srvc status <name>     that service's state and its pids
+  4  ps                     %CPU finds the hog; OWN ties tasks to sessions
+  5  top i=2000; n=10       the same view over time
+  6  srvc stop / start      freeze and resume, and watch the state column flip
+  7  srvc status DB         NVM validity
+  8  reboot                 explicitly, so you keep the serial output
+```
 
-1. **Enable logs.** Uncomment `ENABLE_CONSOLE_LOG_ALL` in [devices/DeviceConfig.h](devices/DeviceConfig.h), flash, watch serial @ 115200.
-2. **List services.** `srvc list` over the terminal — confirms what actually booted, with per-service state and task counts.
-3. **Print a service's status.** `srvc status <name>` — state, tracked PIDs, ready to correlate against `ps`.
-4. **List active tasks.** `ps` — column `%CPU` is your CPU-hog detector; the `OWN` column ties tasks back to their owning session or kernel.
-5. **Watch tasks over time.** `top i=2000; n=10` (built-in refresh), or `watch c=ps; i=2000; n=10` for a scroll-preserving variant.
-6. **Poke lifecycle live.** `srvc stop <name>` freezes the service (SIG_STOP its tasks), `srvc start <name>` resumes; `kill 19 <pid>` / `kill 18 <pid>` do the same at task granularity. Watch `ST` in `ps` flip `S`→`T`→`S`.
-7. **Check NVM integrity.** `srvc status DB` reports DB validity; outside that, an `AUTO_FACTORY_RESET_ON_INVALID_CONFIGS` build will reset every 5 s if NVM is bad.
-8. **Reboot.** `reboot` — the explicit version, since pulling power loses serial output.
-
-If none of those localise the issue, open a GitHub issue with: device + board-package version, the relevant `ENABLE_*` flags, the serial log up to and including the failure, and the exact command sequence that reproduces.
-
+If none of that localises it, open an issue with the board and package version, the flags you have set, the serial log through the failure, and the exact sequence that reproduces it.

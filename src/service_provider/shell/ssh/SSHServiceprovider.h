@@ -67,6 +67,9 @@ private:
     // Create SSH_CONFIG_FILE with default policy when it is missing.
     void createDefaultSshConfig();
 
+    // Create the ed25519 host key in SSH_HOST_KEY_DIR when it is missing.
+    void createDefaultHostKeys();
+
     // Run the state machine for the current session (m_session).
     void serviceSession();
 

@@ -43,6 +43,8 @@ created Date    : 1st June 2025
 /* SSH server configuration file and its option keys */
 #define SSH_CONFIG_DIR "/etc/ssh"
 #define SSH_CONFIG_FILE "/etc/ssh/sshconfig"
+/* Server host keys live with the server config, ~/.ssh holds the user's client keys */
+#define SSH_HOST_KEY_DIR SSH_CONFIG_DIR
 #define SSH_CONFIG_KEY_PASSWORD_AUTH "PasswordAuthentication"
 #define SSH_CONFIG_KEY_PUBKEY_AUTH "PubkeyAuthentication"
 

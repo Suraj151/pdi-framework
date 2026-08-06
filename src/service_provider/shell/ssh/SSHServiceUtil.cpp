@@ -1146,24 +1146,83 @@ void LWSSH::build_rsa_hostkey_blob(const rsa_key& key, pdiutil::vector<uint8_t>&
     append_mpint(out, nb.data(), (int32_t)nb.size());
 }
 
-static void rsa_ssh_paths(char* sshdir, size_t dirsz, char* priv, size_t privsz, char* pub, size_t pubsz) {
-    const char* homedir = __i_fs.getHomeDirectory();
-    pdiutil::string ssh_dir = CHARPTR_WRAP(SSH_DEFAULT_DIR);
+/**
+ * @brief Build the full path of a key file.
+ *
+ * @param out Output buffer for the path.
+ * @param outsize Size of the output buffer.
+ * @param dir Directory holding the key files.
+ * @param algo Key algorithm name, e.g. "ed25519" or "rsa".
+ * @param suffix File suffix, "" for the private key, ".pub" or ".seed".
+ */
+void LWSSH::build_key_path(char* out, uint16_t outsize, const char* dir, const char* algo, const char* suffix) {
+    __snprintf(out, outsize, "%s/%s%s", dir, algo, suffix);
+}
+
+static bool ensure_key_dir(const char* dir) {
+    if (__i_fs.isDirExist(dir)) return true;
+    return __i_fs.createDirectory(dir) >= 0;
+}
+
+/**
+ * @brief Generate and store an ed25519 key pair in the given directory.
+ *
+ * Writes the private key, the public key and the seed the private key was
+ * derived from, overwriting any existing ed25519 key in that directory.
+ *
+ * @param dir Directory to write the key files into, created when missing.
+ * @return True when all three files are written.
+ */
+bool LWSSH::generate_ed25519_key(const char* dir) {
+
+    if (nullptr == dir || !ensure_key_dir(dir)) return false;
+
+    uint8_t pubkey[ED25519_PUBKEY_SIZE];
+    uint8_t privkey[ED25519_PRIVKEY_SIZE];
+    uint8_t seed[ED25519_SEED_SIZE];
+    memset(pubkey, 0, sizeof(pubkey));
+    memset(privkey, 0, sizeof(privkey));
+    memset(seed, 0, sizeof(seed));
+
+    genUniqueKey((char*)seed, sizeof(seed));
+    ed25519_create_keypair(pubkey, privkey, seed);
+    __i_dvc_ctrl.yield();
+
+    pdiutil::string ed_algo = CHARPTR_WRAP(SSH_KEY_ALGO_ED25519_STR);
+    char path[64];
+
+    memset(path, 0, sizeof(path));
+    build_key_path(path, sizeof(path), dir, ed_algo.c_str(), "");
+    int status = __i_fs.writeFile(path, (const char*)privkey, sizeof(privkey));
+
+    if (status >= 0) {
+        memset(path, 0, sizeof(path));
+        build_key_path(path, sizeof(path), dir, ed_algo.c_str(), ".pub");
+        status = __i_fs.writeFile(path, (const char*)pubkey, sizeof(pubkey));
+    }
+
+    if (status >= 0) {
+        memset(path, 0, sizeof(path));
+        build_key_path(path, sizeof(path), dir, ed_algo.c_str(), ".seed");
+        status = __i_fs.writeFile(path, (const char*)seed, sizeof(seed));
+    }
+
+    return status >= 0;
+}
+
+static void rsa_ssh_paths(const char* dir, char* priv, size_t privsz, char* pub, size_t pubsz) {
     pdiutil::string rsa_algo = CHARPTR_WRAP(SSH_KEY_ALGO_RSA_STR);
-    __snprintf(sshdir, dirsz, "%s/%s", (strlen(homedir) > 1 ? homedir : ""), ssh_dir.c_str());
-    __snprintf(priv, privsz, "%s/%s", sshdir, rsa_algo.c_str());
-    __snprintf(pub, pubsz, "%s/%s.pub", sshdir, rsa_algo.c_str());
+    build_key_path(priv, privsz, dir, rsa_algo.c_str(), "");
+    build_key_path(pub, pubsz, dir, rsa_algo.c_str(), ".pub");
 }
 
 // Private file: ssh-string sequence n,e,d,p,q,dp,dq,qinv. Public file: host-key blob.
-bool LWSSH::save_rsa_host_key(const rsa_key& key) {
-    char sshdir[30]; char priv[45]; char pub[45];
-    memset(sshdir, 0, sizeof(sshdir)); memset(priv, 0, sizeof(priv)); memset(pub, 0, sizeof(pub));
-    rsa_ssh_paths(sshdir, sizeof(sshdir), priv, sizeof(priv), pub, sizeof(pub));
+bool LWSSH::save_rsa_key(const rsa_key& key, const char* dir) {
+    if (nullptr == dir || !ensure_key_dir(dir)) return false;
 
-    if (!__i_fs.isDirectory(sshdir)) {
-        if (__i_fs.createDirectory(sshdir) < 0) return false;
-    }
+    char priv[64]; char pub[64];
+    memset(priv, 0, sizeof(priv)); memset(pub, 0, sizeof(pub));
+    rsa_ssh_paths(dir, priv, sizeof(priv), pub, sizeof(pub));
 
     pdiutil::vector<uint8_t> pb;
     append_bn_string(pb, key.n);
@@ -1185,9 +1244,10 @@ bool LWSSH::save_rsa_host_key(const rsa_key& key) {
 
 bool LWSSH::load_rsa_host_key(rsa_key& key) {
     rsa_key_init(&key);
-    char sshdir[30]; char priv[45]; char pub[45];
-    memset(sshdir, 0, sizeof(sshdir)); memset(priv, 0, sizeof(priv)); memset(pub, 0, sizeof(pub));
-    rsa_ssh_paths(sshdir, sizeof(sshdir), priv, sizeof(priv), pub, sizeof(pub));
+    pdiutil::string keydir = CHARPTR_WRAP(SSH_HOST_KEY_DIR);
+    char priv[64]; char pub[64];
+    memset(priv, 0, sizeof(priv)); memset(pub, 0, sizeof(pub));
+    rsa_ssh_paths(keydir.c_str(), priv, sizeof(priv), pub, sizeof(pub));
 
     if (!__i_fs.isFileExist(priv)) return false;
 
@@ -1212,25 +1272,21 @@ bool LWSSH::load_rsa_host_key(rsa_key& key) {
 }
 
 bool LWSSH::ed25519_hostkey_exists() {
-    const char* homedir = __i_fs.getHomeDirectory();
-    char sshdir[30]; char priv[45]; char pub[45];
-    memset(sshdir, 0, sizeof(sshdir)); memset(priv, 0, sizeof(priv)); memset(pub, 0, sizeof(pub));
-    pdiutil::string ssh_dir = CHARPTR_WRAP(SSH_DEFAULT_DIR);
+    pdiutil::string keydir = CHARPTR_WRAP(SSH_HOST_KEY_DIR);
+    char priv[64]; char pub[64];
+    memset(priv, 0, sizeof(priv)); memset(pub, 0, sizeof(pub));
     pdiutil::string ed_algo = CHARPTR_WRAP(SSH_KEY_ALGO_ED25519_STR);
-    __snprintf(sshdir, sizeof(sshdir), "%s/%s", (strlen(homedir) > 1 ? homedir : ""), ssh_dir.c_str());
-    __snprintf(priv, sizeof(priv), "%s/%s", sshdir, ed_algo.c_str());
-    __snprintf(pub, sizeof(pub), "%s/%s.pub", sshdir, ed_algo.c_str());
+    build_key_path(priv, sizeof(priv), keydir.c_str(), ed_algo.c_str(), "");
+    build_key_path(pub, sizeof(pub), keydir.c_str(), ed_algo.c_str(), ".pub");
     return __i_fs.isFileExist(priv) && __i_fs.isFileExist(pub);
 }
 
 bool LWSSH::rsa_hostkey_exists() {
-    const char* homedir = __i_fs.getHomeDirectory();
-    char sshdir[30]; char priv[45];
-    memset(sshdir, 0, sizeof(sshdir)); memset(priv, 0, sizeof(priv));
-    pdiutil::string ssh_dir = CHARPTR_WRAP(SSH_DEFAULT_DIR);
+    pdiutil::string keydir = CHARPTR_WRAP(SSH_HOST_KEY_DIR);
+    char priv[64];
+    memset(priv, 0, sizeof(priv));
     pdiutil::string rsa_algo = CHARPTR_WRAP(SSH_KEY_ALGO_RSA_STR);
-    __snprintf(sshdir, sizeof(sshdir), "%s/%s", (strlen(homedir) > 1 ? homedir : ""), ssh_dir.c_str());
-    __snprintf(priv, sizeof(priv), "%s/%s", sshdir, rsa_algo.c_str());
+    build_key_path(priv, sizeof(priv), keydir.c_str(), rsa_algo.c_str(), "");
     return __i_fs.isFileExist(priv);
 }
 

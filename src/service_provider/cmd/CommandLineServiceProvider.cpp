@@ -108,9 +108,7 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   ReniceCommand::RegisterCommand();
 
   #ifdef ENABLE_SSH_SERVICE
-  // SSHCommand *sshcmd = new SSHCommand();
-  // m_cmdlist.push_back(sshcmd);
-  SSHCommand::RegisterCommand();
+  SSHKeygenCommand::RegisterCommand();
   #endif
 
   #ifdef ENABLE_TLS_CERT_GENERATION

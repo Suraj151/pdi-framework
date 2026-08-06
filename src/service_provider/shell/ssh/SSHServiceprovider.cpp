@@ -14,6 +14,7 @@ created Date    : 6th Apr 2025
 
 #include "SSHServiceprovider.h"
 #include <utility/SafeAlloc.h>
+#include <utility/crypto/asymmetric/ed25519/ed25519.h>
 #include <service_provider/session/SessionManager.h>
 #ifdef ENABLE_CMD_SERVICE
 #include <service_provider/cmd/CommandLineServiceProvider.h>
@@ -72,6 +73,7 @@ bool SSHServer::start(uint16_t port) {
 bool SSHServer::initService(void *arg) {
 
     createDefaultSshConfig();
+    createDefaultHostKeys();
 
     bool started = false;
 
@@ -120,6 +122,22 @@ void SSHServer::createDefaultSshConfig() {
         "PubkeyAuthentication yes\n");
 
     __i_fs.createFile(cfgfile.c_str(), defaultcfg.c_str());
+}
+
+/**
+ * @brief Create the default host key in SSH_HOST_KEY_DIR when it is missing.
+ *
+ * Only an ed25519 host key is created here, it takes milliseconds. An RSA host
+ * key needs minutes of computation and stays an explicit "sshkgen t=2" action.
+ */
+void SSHServer::createDefaultHostKeys() {
+
+    if (ed25519_hostkey_exists()) {
+        return;
+    }
+
+    pdiutil::string keydir = CHARPTR_WRAP(SSH_HOST_KEY_DIR);
+    generate_ed25519_key(keydir.c_str());
 }
 
 /**
@@ -303,19 +321,16 @@ bool SSHServer::getSSHKeyPairs(SSHKeyAlgorithm type, pdiutil::vector<uint8_t> &p
     bool bStatus = false;
     if (type == SSH_KEY_ALGO_ED25519) {
 
-        const char* homedir = __i_fs.getHomeDirectory();
-        char sshdir[30]; memset(sshdir, 0, sizeof(sshdir));
         char privkeyOrseed_path[45]; memset(privkeyOrseed_path, 0, sizeof(privkeyOrseed_path));
         char pubkey_path[45]; memset(pubkey_path, 0, sizeof(pubkey_path));
         pubkey.clear();
         privkey.clear();
         int bytesRead = 0;
 
-        pdiutil::string ssh_dir = CHARPTR_WRAP(SSH_DEFAULT_DIR);
+        pdiutil::string keydir = CHARPTR_WRAP(SSH_HOST_KEY_DIR);
         pdiutil::string ed_algo = CHARPTR_WRAP(SSH_KEY_ALGO_ED25519_STR);
-        __snprintf(sshdir, sizeof(sshdir), "%s/%s", (strlen(homedir) > 1 ? homedir : ""), ssh_dir.c_str());
-        __snprintf(privkeyOrseed_path, sizeof(privkeyOrseed_path), (privkeyInSeedPlusPubkeyformat ? "%s/%s.seed" : "%s/%s"), sshdir, ed_algo.c_str());
-        __snprintf(pubkey_path, sizeof(pubkey_path), "%s/%s.pub", sshdir, ed_algo.c_str());
+        build_key_path(privkeyOrseed_path, sizeof(privkeyOrseed_path), keydir.c_str(), ed_algo.c_str(), (privkeyInSeedPlusPubkeyformat ? ".seed" : ""));
+        build_key_path(pubkey_path, sizeof(pubkey_path), keydir.c_str(), ed_algo.c_str(), ".pub");
 
         if (!__i_fs.isFileExist(privkeyOrseed_path) || !__i_fs.isFileExist(pubkey_path)) {
             return bStatus; // No SSH keys found, cannot proceed

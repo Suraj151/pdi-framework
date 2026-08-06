@@ -245,8 +245,10 @@ int parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet);
 bool parse_userauth_request(const pdiutil::vector<uint8_t>& payload, SSHUserAuthRequest& req);
 void load_ssh_config(ssh_config_t& config);
 
+void build_key_path(char* out, uint16_t outsize, const char* dir, const char* algo, const char* suffix);
+bool generate_ed25519_key(const char* dir);
 void build_rsa_hostkey_blob(const rsa_key& key, pdiutil::vector<uint8_t>& out);
-bool save_rsa_host_key(const rsa_key& key);
+bool save_rsa_key(const rsa_key& key, const char* dir);
 bool load_rsa_host_key(rsa_key& key);
 void ssh_rng_fill(uint8_t* buf, size_t len);
 bool ed25519_hostkey_exists();

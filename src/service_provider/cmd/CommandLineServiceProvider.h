@@ -42,7 +42,7 @@ created Date    : 1st June 2019
 #include "commands/KillCommand.h"
 #include "commands/PkillCommand.h"
 #include "commands/ReniceCommand.h"
-#include "commands/SSHCommand.h"
+#include "commands/SSHKeygenCommand.h"
 #include "commands/TlsCommand.h"
 #include "commands/RebootCommand.h"
 #include "commands/NetworkCommand.h"
