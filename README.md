@@ -1,6 +1,6 @@
 # PDI Framework — Portable Device Interface Stack
 
-One C++ codebase that runs on an ESP32, an ESP8266 or an Arduino UNO. Application and service code is written against interfaces — `iWiFiInterface`, `iFileSystemInterface`, `iTcpServerInterface` and friends — and each board ships an adapter that implements them. Nothing above the adapter layer knows which chip it is sitting on.
+One C++ codebase that runs on an ESP32, an ESP8266 or an Arduino UNO. Application and service code is written against interfaces — `iWiFiInterface`, `iFileSystemInterface`, `iTcpServerInterface`, etc — and each board ships an adapter that implements them. Nothing above the adapter layer knows which chip it is sitting on.
 
 What comes out of the box is closer to a small system than to a sketch template: a WiFi captive portal and web UI, an HTTP/HTTPS server, MQTT, OTA, an SSH server with SFTP and scp, Telnet, SMTP, a virtual filesystem with users and permissions, a task scheduler with three execution models, and a Linux-flavoured shell sitting on top of all of it.
 
@@ -29,8 +29,10 @@ What comes out of the box is closer to a small system than to a sketch template:
 1. **Install** from the **Arduino Library Manager** (search "pdi-framework"). Builds for ESP32 by default.
    For ESP8266 / Arduino UNO, run: `python3 scripts/DeviceSetup.py -d <board>`.
 2. Open **File → Examples → pdi-framework → PdiStack**, then compile and upload.
-3. On your phone or laptop, look for the WiFi network **`pdiStack`** — password **`pdiStack@123`**.
-4. Browse to **http://192.168.0.1** and log in as **`pdiStack` / `pdiStack@123`**.
+
+   Note : ESP32 require 1.4MB+ app size so make sure you will select suitable partition scheme that fits required app size.
+4. On your phone or laptop, look for the WiFi network **`pdiStack`** — password **`pdiStack@123`**.
+5. Browse to **http://192.168.0.1** and log in as **`pdiStack` / `pdiStack@123`**.
 
 That's it — the device is now running a web portal, a remote shell and file transfer.
 
