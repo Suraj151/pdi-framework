@@ -189,29 +189,17 @@ TlsClientInterface::BearSSLState::BearSSLState() :
 TlsClientInterface::BearSSLState::~BearSSLState() {
     TlsCryptoLoader::freeCertChain(certChain, certChainCount, certBacking);
     TlsCryptoLoader::freeTrustAnchors(trustAnchors, trustAnchorsCount);
-    if (ibuf != nullptr) {
-        free(ibuf);
-        ibuf = nullptr;
-    }
-    if (obuf != nullptr) {
-        free(obuf);
-        obuf = nullptr;
-    }
+    pdiutil::safe_delete_array(ibuf);
+    pdiutil::safe_delete_array(obuf);
     pdiutil::safe_delete(noopX509);
 }
 
 bool TlsClientInterface::BearSSLState::allocIoBuffers(size_t ibufSize, size_t obufSize) {
-    ibuf = static_cast<uint8_t*>(malloc(ibufSize));
-    obuf = static_cast<uint8_t*>(malloc(obufSize));
+    ibuf = pdiutil::safe_new_array<uint8_t>(ibufSize);
+    obuf = pdiutil::safe_new_array<uint8_t>(obufSize);
     if (!ibuf || !obuf) {
-        if (ibuf != nullptr) {
-            free(ibuf);
-            ibuf = nullptr;
-        }
-        if (obuf != nullptr) {
-            free(obuf);
-            obuf = nullptr;
-        }
+        pdiutil::safe_delete_array(ibuf);
+        pdiutil::safe_delete_array(obuf);
         return false;
     }
     ibufLen = ibufSize;
@@ -427,10 +415,10 @@ void TlsClientInterface::stopTlsWorker() {
     LogI("TLS stopTlsWorker : %d\n", taskid);
 
     task_t* t = __task_scheduler.get_task(taskid);
-    if (t && t->_task_exec) {
+    if (t && t->m_task_exec) {
         __i_cooperative_scheduler.destroy_cooperative(
-            static_cast<Cooperative*>(t->_task_exec));
-        t->_task_exec = nullptr;
+            static_cast<Cooperative*>(t->m_task_exec));
+        t->m_task_exec = nullptr;
     }
     __task_scheduler.remove_task(taskid);
 }

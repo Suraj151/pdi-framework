@@ -241,14 +241,83 @@ int32_t TcpClientInterface::read(uint8_t* buffer, uint32_t size) {
     memset(buffer, 0, size);
     memcpy(buffer, m_rxBuffer, bytesToRead);
 
-    memmove(m_rxBuffer, m_rxBuffer + bytesToRead, m_rxBufferSize - bytesToRead);
-    m_rxBufferSize -= bytesToRead;
-
-    if(m_pcb != nullptr)
-        tcp_recved(m_pcb, bytesToRead);
+    consumeRxBuffer(bytesToRead);
     TCP_GUARD_END
 
     return bytesToRead;
+}
+
+/**
+ * @brief Drop the leading bytes of the receive buffer and open the tcp window.
+ */
+void TcpClientInterface::consumeRxBuffer(uint32_t size) {
+    memmove(m_rxBuffer, m_rxBuffer + size, m_rxBufferSize - size);
+    m_rxBufferSize -= size;
+
+    if(m_pcb != nullptr)
+        tcp_recved(m_pcb, size);
+}
+
+/**
+ * @brief Reads until the provided char is found.
+ */
+void TcpClientInterface::readStringUntil(pdiutil::string &_outstr, char _delimiter, bool _keepdelimiterinstr, CallBackVoidArgFn _yield, uint32_t _maxlen) {
+
+    uint32_t len = 0;
+
+    if (_yield != nullptr) {
+        _yield();
+    }
+
+    while (1) {
+
+        bool delimiterfound = false;
+        bool blockread = false;
+
+        // The lwip thread can grow the receive buffer at any time, so the scan
+        // and the copy out of it stay inside the core lock.
+        TCP_GUARD_BEGIN
+        if (m_rxBuffer != nullptr && m_rxBufferSize > 0) {
+
+            uint32_t blocklen = m_rxBufferSize;
+            if (_maxlen > 0 && blocklen > (_maxlen - len)) {
+                blocklen = _maxlen - len;
+            }
+
+            if (_delimiter != 0) {
+                const uint8_t *delimiterat = (const uint8_t *)memchr(m_rxBuffer, _delimiter, blocklen);
+                if (delimiterat != nullptr) {
+                    blocklen = (uint32_t)(delimiterat - m_rxBuffer);
+                    delimiterfound = true;
+                }
+            }
+
+            _outstr.append((const char *)m_rxBuffer, blocklen);
+            consumeRxBuffer(blocklen + (delimiterfound ? 1 : 0));
+            len += blocklen;
+            blockread = true;
+        }
+        TCP_GUARD_END
+
+        if (!blockread) {
+            break;
+        }
+
+        if (delimiterfound) {
+            if (_keepdelimiterinstr) {
+                _outstr += _delimiter;
+            }
+            break;
+        }
+
+        if (_maxlen > 0 && len >= _maxlen) {
+            break; // Stop reading if max length is reached
+        }
+
+        if (_yield != nullptr) {
+            _yield();
+        }
+    }
 }
 
 /**

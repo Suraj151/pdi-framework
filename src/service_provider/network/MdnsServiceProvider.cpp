@@ -71,6 +71,9 @@ static bool labelEqualsCI(const uint8_t *label, uint8_t n, const char *str) {
 MdnsServiceProvider::MdnsServiceProvider() : ServiceProvider(SERVICE_MDNS, "MDNS"),
   m_udp(nullptr),
   m_service_count(0)
+#ifdef ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME
+  , m_cert_task_pending(false)
+#endif
 {
 }
 
@@ -103,12 +106,14 @@ bool MdnsServiceProvider::initService(void *arg) {
   __utl_event.add_event_listener(EVENT_WIFI_STA_GOT_IP, [](void *a) {
     __mdns_service.m_ip = __i_wifi.localIP();
     __mdns_service.startResponder();
+    __mdns_service.ensureServerCertificate();
   });
 
   // already connected at boot — start now
   if (__i_wifi.localIP().isSet()) {
     m_ip = __i_wifi.localIP();
     startResponder();
+    ensureServerCertificate();
   }
 
   return ServiceProvider::initService(arg);
@@ -121,6 +126,10 @@ bool MdnsServiceProvider::stopService() {
     pdiutil::safe_delete(m_udp);
     m_udp = nullptr;
   }
+#ifdef ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME
+  // the base impl drops every tracked task, including a queued cert generation
+  m_cert_task_pending = false;
+#endif
   return ServiceProvider::stopService();
 }
 
@@ -174,6 +183,49 @@ void MdnsServiceProvider::buildHostname() {
   pdiutil::string content = m_hostname + "\n";
   pdiutil::string hostname_path = CHARPTR_WRAP(HOSTNAME_FILE_PATH);
   __i_fs.writeFile(hostname_path.c_str(), content.c_str(), content.length(), false);
+#endif
+}
+
+void MdnsServiceProvider::ensureServerCertificate() {
+
+#ifdef ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME
+  if (!m_ip.isSet() || m_hostname.empty() || m_cert_task_pending) {
+    return;
+  }
+
+  // key generation needs several kB of stack and runs for seconds, so it is
+  // handed to the scheduler instead of running in the caller context
+  m_cert_task_pending = true;
+  serviceSetTimeout([]() {
+    __mdns_service.m_cert_task_pending = false;
+    __mdns_service.provisionServerCertificate();
+  }, 1, __i_dvc_ctrl.millis_now());
+#endif
+}
+
+void MdnsServiceProvider::provisionServerCertificate() {
+
+#ifdef ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME
+  if (!m_ip.isSet() || m_hostname.empty()) {
+    return;
+  }
+
+  // the responder answers on <hostname>.local, so the cert carries it as a
+  // subject alt name alongside the address
+  pdiutil::string dnsname = m_hostname + "." + MDNS_LOCAL_LABEL;
+
+  if (!__i_fs.isDirExist(TLS_DEFAULT_HTTP_DIR)) {
+      __i_fs.createDirectory(TLS_DEFAULT_HTTP_DIR);
+  }
+  if (!__i_fs.isDirExist(TLS_DEFAULT_SSL_DIR)) {
+      __i_fs.createDirectory(TLS_DEFAULT_SSL_DIR);
+  }
+
+  TlsCertProvisioner::ensureServerCert(
+      TLS_DEFAULT_SERVER_CERT_PATH,
+      TLS_DEFAULT_SERVER_KEY_PATH,
+      (uint32_t)m_ip,
+      dnsname.c_str());
 #endif
 }
 

@@ -229,12 +229,9 @@ bool generateCert(const char* certPath, const char* keyPath, const CertParams& p
         if (rc != 0) { LogE("CertProvisioner: set_san=%d\n", rc); goto done; }
     }
 
-    certPem = static_cast<uint8_t*>(malloc(PEM_BUF_SIZE));
-    keyPem  = static_cast<uint8_t*>(malloc(PEM_BUF_SIZE));
+    certPem = pdiutil::safe_new_array<uint8_t>(PEM_BUF_SIZE);
+    keyPem  = pdiutil::safe_new_array<uint8_t>(PEM_BUF_SIZE);
     if (!certPem || !keyPem) { LogE("CertProvisioner: OOM PEM bufs\n"); goto done; }
-
-    memset(certPem, 0, PEM_BUF_SIZE);
-    memset(keyPem,  0, PEM_BUF_SIZE);
 
     rc = mbedtls_x509write_crt_pem(&crt, certPem, PEM_BUF_SIZE,
                                     mbedtls_ctr_drbg_random, &rng);
@@ -255,8 +252,8 @@ bool generateCert(const char* certPath, const char* keyPath, const CertParams& p
     LogI("CertProvisioner: generated new cert + key\n");
 
 done:
-    if (certPem) free(certPem);
-    if (keyPem)  free(keyPem);
+    pdiutil::safe_delete_array(certPem);
+    pdiutil::safe_delete_array(keyPem);
     mbedtls_x509write_crt_free(&crt);
     mbedtls_ctr_drbg_free(&rng);
     mbedtls_entropy_free(&entropy);

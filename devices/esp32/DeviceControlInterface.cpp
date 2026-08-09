@@ -12,12 +12,6 @@ created Date    : 1st Jan 2024
 #include "ExceptionsNotifier.h"
 #include "PingInterface.h"
 #include "SerialInterface.h"
-#ifdef ENABLE_TLS_CERT_GENERATION
-#include "TlsCertProvisioner.h"
-#include "WiFiInterface.h"
-#include <utility/EventUtil.h>
-#endif
-
 #ifdef ENABLE_HTTP_CLIENT
 #include <transports/http/HTTPClient.h>
 #endif
@@ -485,18 +479,6 @@ void DeviceControlInterface::initDeviceSpecificFeatures()
     if( nullptr != getTerminal(TERMINAL_TYPE_SERIAL) ){
         getTerminal(TERMINAL_TYPE_SERIAL)->open();
     }
-
-    #ifdef ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME
-    __utl_event.add_event_listener(EVENT_WIFI_STA_GOT_IP, [](void* arg) {
-        uint32_t ip = __i_wifi.localIP();
-        if (ip == 0) return;
-        TlsCertProvisioner::ensureServerCert(
-            TLS_DEFAULT_SERVER_CERT_PATH,
-            TLS_DEFAULT_SERVER_KEY_PATH,
-            ip,
-            nullptr);
-    });
-    #endif
 }
 
 /**

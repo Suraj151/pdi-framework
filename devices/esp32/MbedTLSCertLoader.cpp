@@ -40,7 +40,7 @@ static bool readFileFull(const char* path, uint8_t*& outBuf, size_t& outLen) {
     if (rc < 0 || accum.empty()) return false;
 
     size_t len = accum.size();
-    uint8_t* buf = static_cast<uint8_t*>(malloc(len + 1));
+    uint8_t* buf = pdiutil::safe_new_array<uint8_t>(len + 1);
     if (!buf) return false;
 
     for (size_t i = 0; i < len; ++i) buf[i] = accum[i];
@@ -62,7 +62,7 @@ bool loadCertChain(const char* path, mbedtls_x509_crt* chain) {
     if (!readFileFull(path, buf, len)) return false;
 
     int rc = mbedtls_x509_crt_parse(chain, buf, len);
-    free(buf);
+    pdiutil::safe_delete_array(buf);
     return rc == 0;
 }
 
@@ -83,7 +83,7 @@ bool loadPrivateKey(const char* path,
 
     int rc = mbedtls_pk_parse_key(key, buf, len, nullptr, 0,
                                   mbedtls_ctr_drbg_random, rng);
-    free(buf);
+    pdiutil::safe_delete_array(buf);
     return rc == 0;
 }
 

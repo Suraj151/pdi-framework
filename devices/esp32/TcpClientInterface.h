@@ -123,6 +123,18 @@ public:
     int32_t available() override;
 
     /**
+     * @brief Reads until the provided char is found.
+     * Scans the receive buffer and moves whole blocks at a time instead of
+     * fetching a byte per call. Behaves exactly like the base implementation.
+     * @param _outstr Reference to the string to accumulate the data into.
+     * @param _delimiter The character to read until.
+     * @param _keepdelimiterinstr Keep the delimiter in the accumulated string.
+     * @param _yield Optional callback function to yield control during reading.
+     * @param _maxlen Maximum number of bytes to accumulate, 0 for no limit.
+     */
+    void readStringUntil(pdiutil::string &_outstr, char _delimiter, bool _keepdelimiterinstr = false, CallBackVoidArgFn _yield = nullptr, uint32_t _maxlen = 0) override;
+
+    /**
      * @brief Get the local IP address.
      * @return The local IP address.
      */
@@ -184,6 +196,13 @@ private:
     uint32_t m_rxBufferSize; ///< Size of the receive buffer.
     uint32_t m_timeout;    ///< Timeout value in milliseconds.
     bool m_isLastWriteAcked;
+
+    /**
+     * @brief Drop the leading bytes of the receive buffer and open the tcp window.
+     * Must be called with the lwip core lock already held.
+     * @param size The number of bytes to drop.
+     */
+    void consumeRxBuffer(uint32_t size);
 
     // LWIP callback functions
     static err_t onConnected(void* arg, struct tcp_pcb* tpcb, err_t err);

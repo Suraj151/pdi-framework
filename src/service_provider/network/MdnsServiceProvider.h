@@ -50,6 +50,8 @@ protected:
   void sendServiceEnumeration(void);
   void sendServiceBundle(uint8_t svc_idx);
   void buildHostname(void);
+  void ensureServerCertificate(void);
+  void provisionServerCertificate(void);
 
   /* wire-format name writers — each returns bytes written */
   uint8_t writeLabels(uint8_t *out, const char *const *labels, uint8_t n);
@@ -62,6 +64,9 @@ protected:
   ipaddress_t     m_ip;
   mdns_service_t  m_services[MDNS_MAX_SERVICES];
   uint8_t         m_service_count;
+#ifdef ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME
+  bool            m_cert_task_pending;
+#endif
 };
 
 extern MdnsServiceProvider __mdns_service;

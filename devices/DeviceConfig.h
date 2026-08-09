@@ -76,7 +76,7 @@ created Date    : 1st June 2019
  * By default disabled.
  */
 #ifdef ENABLE_TLS_CERT_GENERATION
-// #define ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME
+#define ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME
 #endif
 
 #ifdef ENABLE_NETWORK_SERVICE

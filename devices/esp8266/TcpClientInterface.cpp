@@ -297,21 +297,77 @@ int32_t TcpClientInterface::read(uint8_t* buffer, uint32_t size) {
     // Copy data from the receive buffer to the provided buffer
     memcpy(buffer, m_rxBuffer, bytesToRead);
 
+    consumeRxBuffer(bytesToRead);
+
+    return bytesToRead;
+}
+
+/**
+ * @brief Drop the leading bytes of the receive buffer and open the tcp window.
+ */
+void TcpClientInterface::consumeRxBuffer(uint32_t size) {
+
     // Adjust the receive buffer
-    memmove(m_rxBuffer, m_rxBuffer + bytesToRead, m_rxBufferSize - bytesToRead);
-    m_rxBufferSize -= bytesToRead;
+    memmove(m_rxBuffer, m_rxBuffer + size, m_rxBufferSize - size);
+    m_rxBufferSize -= size;
 
     if(m_pcb != nullptr){
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
         m_mutex.critical_lock();
         #endif
-        tcp_recved(m_pcb, bytesToRead); // Notify the TCP stack that data has been read
+        tcp_recved(m_pcb, size); // Notify the TCP stack that data has been read
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
         m_mutex.critical_unlock();
         #endif
     }
+}
 
-    return bytesToRead;
+/**
+ * @brief Reads until the provided char is found.
+ */
+void TcpClientInterface::readStringUntil(pdiutil::string &_outstr, char _delimiter, bool _keepdelimiterinstr, CallBackVoidArgFn _yield, uint32_t _maxlen) {
+
+    uint32_t len = 0;
+
+    if (_yield != nullptr) {
+        _yield();
+    }
+
+    while (m_rxBuffer != nullptr && m_rxBufferSize > 0) {
+
+        uint32_t blocklen = m_rxBufferSize;
+        if (_maxlen > 0 && blocklen > (_maxlen - len)) {
+            blocklen = _maxlen - len;
+        }
+
+        bool delimiterfound = false;
+        if (_delimiter != 0) {
+            const uint8_t *delimiterat = (const uint8_t *)memchr(m_rxBuffer, _delimiter, blocklen);
+            if (delimiterat != nullptr) {
+                blocklen = (uint32_t)(delimiterat - m_rxBuffer);
+                delimiterfound = true;
+            }
+        }
+
+        _outstr.append((const char *)m_rxBuffer, blocklen);
+        consumeRxBuffer(blocklen + (delimiterfound ? 1 : 0));
+        len += blocklen;
+
+        if (delimiterfound) {
+            if (_keepdelimiterinstr) {
+                _outstr += _delimiter;
+            }
+            break;
+        }
+
+        if (_maxlen > 0 && len >= _maxlen) {
+            break; // Stop reading if max length is reached
+        }
+
+        if (_yield != nullptr) {
+            _yield();
+        }
+    }
 }
 
 /**
