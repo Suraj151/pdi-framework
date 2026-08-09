@@ -222,7 +222,7 @@ void Espnow::begin( iWiFiInterface* _wifi ){
   }else{
 
     this->closeAll();
-    LogE("espnow: init failed !\n");
+    SysLogE("espnow: init failed !\n");
   }
 
   __task_scheduler.setInterval( [&]() { this->handlePeers(); }, ESP_NOW_HANDLE_DURATION, __i_dvc_ctrl.millis_now() );

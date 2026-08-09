@@ -422,7 +422,7 @@ err_t TcpClientInterface::onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf
             #ifdef ENABLE_CONTEXTUAL_EXECUTION
             client->m_mutex.critical_unlock();
             #endif
-            LogE("TCP onReceive: alloc fail, in=%u rxQ=%u\n",
+            SysLogE("TCP onReceive: alloc fail, in=%u rxQ=%u\n",
                 (unsigned)p->tot_len, (unsigned)client->m_rxBufferSize);
             return ERR_MEM;
         }

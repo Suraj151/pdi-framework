@@ -95,7 +95,7 @@ iClientInterface* TlsServerInterface::accept() {
 
     TlsClientInterface* client = pdiutil::safe_new<TlsClientInterface>(acceptedPcb);
     if (!client) {
-        LogE("TLS accept: OOM TlsClientInterface\n");
+        SysLogE("TLS accept: OOM TlsClientInterface\n");
         tcp_abort(acceptedPcb);
         return nullptr;
     }

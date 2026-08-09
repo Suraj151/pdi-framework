@@ -776,7 +776,7 @@ void WiFiInterface::enableNAPT(bool enable)
     }
   }
   if (ret != ERR_OK) {
-    LogE("NAPT initialization failed\n");
+    SysLogE("NAPT initialization failed\n");
   }
 #endif
 #endif

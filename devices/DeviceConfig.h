@@ -73,7 +73,7 @@ created Date    : 1st June 2019
 
 /**
  * Build-time gate for on-device generation of the HTTPS server certificate.
- * By default disabled.
+ * By default enabled.
  */
 #ifdef ENABLE_TLS_CERT_GENERATION
 #define ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME

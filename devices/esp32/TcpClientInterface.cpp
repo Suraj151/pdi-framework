@@ -368,7 +368,7 @@ err_t TcpClientInterface::onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf
         uint8_t* newBuffer = pdiutil::safe_new_array<uint8_t>(newSize);
         if (!newBuffer) {
             TCP_GUARD_END
-            LogE("TCP onReceive: alloc fail, in=%u rxQ=%u\n",
+            SysLogE("TCP onReceive: alloc fail, in=%u rxQ=%u\n",
                 (unsigned)p->tot_len, (unsigned)client->m_rxBufferSize);
             return ERR_MEM;
         }

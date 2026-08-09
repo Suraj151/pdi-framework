@@ -490,7 +490,7 @@ upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *v
 
     Http_Client *http = (Http_Client *)client;
     if (nullptr == http) {
-        LogE("DEVICE_UPGRADE_NO_CLIENT\n");
+        SysLogE("DEVICE_UPGRADE_NO_CLIENT\n");
         return UPGRADE_STATUS_FAILED;
     }
 
@@ -501,7 +501,7 @@ upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *v
             LogI("OTA Size  : %u\n", sz);
             size_t begin_size = (nullptr == buf && sz > 0) ? (size_t)sz : (size_t)ESP.getFreeSketchSpace();
             if (!Update.begin(begin_size, U_FLASH)) {
-                LogE("DEVICE_UPGRADE_BEGIN_FAILED : %d\n", (int)Update.getError());
+                SysLogE("DEVICE_UPGRADE_BEGIN_FAILED : %d\n", (int)Update.getError());
                 return false;
             }
             if (nullptr == buf) return true;
@@ -509,7 +509,7 @@ upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *v
         __i_dvc_ctrl.yield();
         size_t written = Update.write((uint8_t*)buf, sz);
         if (written != sz) {
-            LogE("DEVICE_UPGRADE_WRITE_SHORT : %u/%u err=%d\n",
+            SysLogE("DEVICE_UPGRADE_WRITE_SHORT : %u/%u err=%d\n",
                     (unsigned)written, (unsigned)sz, (int)Update.getError());
             return false;
         }
@@ -517,7 +517,7 @@ upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *v
     });
 
     if (got <= 0 || !Update.end(false)) {
-        LogE("DEVICE_UPGRADE_END_FAILED : got=%d err=%d\n", (int)got, (int)Update.getError());
+        SysLogE("DEVICE_UPGRADE_END_FAILED : got=%d err=%d\n", (int)got, (int)Update.getError());
         return UPGRADE_STATUS_FAILED;
     }
 
@@ -528,7 +528,7 @@ upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *v
 
     Http_Client *http = (Http_Client *)client;
     if (nullptr == http) {
-        LogE("DEVICE_UPGRADE_NO_CLIENT\n");
+        SysLogE("DEVICE_UPGRADE_NO_CLIENT\n");
         return UPGRADE_STATUS_FAILED;
     }
 
@@ -540,13 +540,13 @@ upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *v
 
     int64_t got = http->DownloadFile(path, tmp_path.c_str());
     if (got <= 0) {
-        LogE("DEVICE_UPGRADE_DOWNLOAD_FAILED : %d\n", (int)got);
+        SysLogE("DEVICE_UPGRADE_DOWNLOAD_FAILED : %d\n", (int)got);
         __i_fs.deleteFile(tmp_path.c_str());
         return UPGRADE_STATUS_FAILED;
     }
 
     if (!Update.begin((size_t)got, U_FLASH)) {
-        LogE("DEVICE_UPGRADE_BEGIN_FAILED : %d\n", (int)Update.getError());
+        SysLogE("DEVICE_UPGRADE_BEGIN_FAILED : %d\n", (int)Update.getError());
         __i_fs.deleteFile(tmp_path.c_str());
         return UPGRADE_STATUS_FAILED;
     }
@@ -560,14 +560,14 @@ upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *v
     });
 
     if (bytes_read != got) {
-        LogE("DEVICE_UPGRADE_READ_SHORT : %d/%d\n", (int)bytes_read, (int)got);
+        SysLogE("DEVICE_UPGRADE_READ_SHORT : %d/%d\n", (int)bytes_read, (int)got);
         write_ok = false;
     }
 
     __i_fs.deleteFile(tmp_path.c_str());
 
     if (!write_ok || !Update.end(false)) {
-        LogE("DEVICE_UPGRADE_END_FAILED : %d\n", (int)Update.getError());
+        SysLogE("DEVICE_UPGRADE_END_FAILED : %d\n", (int)Update.getError());
         return UPGRADE_STATUS_FAILED;
     }
 

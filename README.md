@@ -387,6 +387,7 @@ The responder is written from scratch on raw lwIP UDP — `udp_*` plus `igmp_joi
         │
         ├─ hostname pdi-<last-3-mac-bytes> written to /etc/hostname
         ├─ join 224.0.0.251:5353
+        ├─ queue HTTPS cert provisioning        (esp32, with runtime cert generation)
         └─ answer queries as they arrive        (callback-driven, nothing to pump)
                 │
                 ├─ A                    →  hostname → address
@@ -396,6 +397,8 @@ The responder is written from scratch on raw lwIP UDP — `udp_*` plus `igmp_joi
 ```
 
 It advertises what the build is actually listening on: `_http._tcp` or `_https._tcp`, `_ssh._tcp`, `_sftp-ssh._tcp`, `_telnet._tcp`. Outbound clients such as MQTT and OTA listen for nothing, so nothing is advertised for them. `cat /etc/hostname` shows the name, `ping pdi-<xxxxxx>.local` proves it resolves, and `srvc status MDNS` lists the address and the advertised set. Service types, TTLs and the multicast group live in [src/config/MdnsConfig.h](src/config/MdnsConfig.h).
+
+With runtime certificate generation on, the responder is also what provisions the HTTPS certificate. It is the one place holding both the address and the name, so the certificate it asks for carries `<hostname>.local` as a DNS subject alt name alongside the IP, and `https://pdi-<xxxxxx>.local/` matches it. Key generation wants several kB of stack and runs for seconds, so the responder queues it on the scheduler instead of doing the work in the event callback.
 
 ### 2.5 How the ESP32 default works
 
@@ -493,7 +496,7 @@ Every flag acts as a triple gate: which interface the device exposes, which serv
 | `ENABLE_DEVICE_IOT` | with network | IoT service + `DeviceIotConfig.h` | TCP client | low |
 | `ENABLE_TLS_SERVICE` | off | TLS client and server + `TlsConfig.h`; turns on contextual execution, since TLS runs on its own cooperative task | BearSSL on esp8266, mbedTLS on esp32 | high — see [§12.3](#123-the-expensive-features) |
 | `ENABLE_TLS_CERT_GENERATION` | off, esp32 | the `tls` command and the on-device issuer | TLS service, esp32 | medium |
-| `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` | off | mints a self-signed cert on first boot once the station gets an IP | cert generation | one-shot |
+| `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` | with cert generation | the mDNS service mints a self-signed cert covering the address and `<host>.local` once the station gets an IP | cert generation, mDNS | one-shot |
 | `ENABLE_CONTEXTUAL_EXECUTION` | off | cooperative and preemptive lanes | the threading interfaces | high (per-task stacks) |
 | `ENABLE_TIMER_TASK_SCHEDULER` | off | timer-backed scheduler variant | a device timer | depends |
 
@@ -1045,8 +1048,7 @@ It is the framework's main event source:
 
 ```
   station connected ──▶ EVENT_WIFI_STA_CONNECTED
-  DHCP / static IP  ──▶ EVENT_WIFI_STA_GOT_IP     ─┬─▶ mDNS announces
-                                                   ├─▶ TLS cert provisioner mints
+  DHCP / static IP  ──▶ EVENT_WIFI_STA_GOT_IP     ─┬─▶ mDNS announces, then queues cert provisioning
                                                    └─▶ services needing a stable address
   link lost         ──▶ EVENT_WIFI_STA_DISCONNECTED ──▶ MQTT, OTA, IoT stand down
   AP client in/out  ──▶ EVENT_WIFI_AP_STA(DIS)CONNECTED
@@ -1215,7 +1217,7 @@ Handshakes need more stack than the ESP8266 main context has, so enabling TLS al
 
 The bundled outbound client is created with peer verification off so that an encrypted-but-unverified connection works immediately. For production, point it at the CA bundle path and drop that line.
 
-Certificates come from one of two places. On ESP32, the on-device provisioner issues self-signed EC or RSA certs with the SANs you ask for, and `ensureServerCert` creates one only when it is missing — wired to the got-IP event when runtime generation is enabled. Everywhere else, `scripts/GenTlsCerts.py` does the same job with OpenSSL and you upload the result over SFTP.
+Certificates come from one of two places. On ESP32, the on-device provisioner issues self-signed EC or RSA certs with the SANs you ask for, and `ensureServerCert` reissues only when the stored certificate's SANs no longer cover what was asked for. With runtime generation enabled the mDNS service drives it, so the certificate covers the address and `<hostname>.local` together ([§6.2.19](#6219-mdnsserviceprovider--__mdns_service)). Everywhere else, `scripts/GenTlsCerts.py` does the same job with OpenSSL and you upload the result over SFTP.
 
 #### 6.2.17 `UserStoreService` — `__user_store_service`
 
@@ -1255,6 +1257,8 @@ SSH attaches its session as soon as user auth succeeds, so authorisation state i
 
 The responder from [§2.4.2](#242-mdns-and-dns-sd), running as an ordinary service on raw lwIP UDP. It derives the hostname from the MAC, writes `/etc/hostname`, joins the multicast group when the station gets an IP, and advertises whichever servers this build is running. Responses bundle PTR, SRV, TXT and A so a single query gets everything it needs. `srvc status MDNS` shows what it is announcing.
 
+Holding both the address and the name also makes it the right owner of HTTPS certificate provisioning: with `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` it schedules `ensureServerCert` for `<hostname>.local` plus the IP, one queued job at a time, dropped again if the service stops ([§6.2.16](#6216-tls-no-provider-transport-hookup--cert-provisioning)).
+
 ### 6.3 Init order
 
 The orchestrator starts services in a deliberate order:
@@ -1286,7 +1290,7 @@ Direct calls are reserved for dependencies that are known to already exist. Anyt
 |---|---|---|
 | `EVENT_FACTORY_RESET` | factory reset | database clears tables, IoT drops cache, GPIO resets pins |
 | `EVENT_WIFI_STA_CONNECTED` / `_DISCONNECTED` | WiFi | MQTT reconnects, OTA and IoT stand down |
-| `EVENT_WIFI_STA_GOT_IP` | WiFi, once the address latches | mDNS, cert provisioner, anything needing a stable address |
+| `EVENT_WIFI_STA_GOT_IP` | WiFi, once the address latches | mDNS, which also queues cert provisioning; anything needing a stable address |
 | `EVENT_WIFI_AP_STACONNECTED` / `_STADISCONNECTED` | WiFi | captive-portal flows, per-client tracking |
 | `EVENT_WIFI_INTERNET_UP` / `_DOWN` | connectivity poller | OTA, IoT, email |
 | `EVENT_GPIO_TRIGGER` | GPIO event detector | email, MQTT, HTTP post |
@@ -1796,7 +1800,7 @@ The same server implementation runs in TLS mode, with responsibility split like 
 
 Upload those over SFTP after first boot and reboot; the listener picks them up on the next start. The directory is created for you.
 
-Certificates come either from the on-device `tls` command on ESP32 — optionally minted automatically the first time the device gets an IP — or from `scripts/GenTlsCerts.py` off-device.
+Certificates come either from the on-device `tls` command on ESP32 — or minted automatically by the mDNS service once the station has an address, covering both the IP and `<hostname>.local` — or from `scripts/GenTlsCerts.py` off-device.
 
 One header is worth a decision rather than a default: `Strict-Transport-Security` is sent only when its max-age is non-zero, and it ships as zero. Turn it on once you have a CA-signed certificate. With a self-signed one, the browser will pin HTTPS and refuse the click-through until the pin expires.
 
@@ -3002,6 +3006,8 @@ Set `ENABLE_TLS_SERVICE` — BearSSL on ESP8266, mbedTLS on ESP32. Add `ENABLE_H
 
 **How do I provision certificates?**
 On ESP32, `tls q=1,t=0,l=256,n=device.local,i=192.168.1.50` writes a self-signed EC pair straight to the configured paths. Anywhere else, `python3 scripts/GenTlsCerts.py --dns device.local --ip 192.168.1.50` produces them off-device for upload. Run the script once with `--gen-ca` and reuse that CA for every device, and a client that trusts it trusts your whole fleet.
+
+For a development box on ESP32 none of that is needed: with `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` the mDNS service mints one covering the address and `<hostname>.local` as soon as the station has an IP, and reissues it if either changes.
 
 **Is there a simulator?**
 The mock device lets the framework compile off-device for analysis; it does not simulate behaviour. Interactive testing means real hardware.

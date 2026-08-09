@@ -269,13 +269,13 @@ TlsClientInterface::~TlsClientInterface() {
 
 bool TlsClientInterface::beginServer(const char* certPath, const char* keyPath, const char* clientCaPath) {
     if (m_role != ROLE_SERVER || !certPath || !keyPath) {
-        LogE("TLS beginServer: bad args\n");
+        SysLogE("TLS beginServer: bad args\n");
         return false;
     }
 
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
     if (!startTlsWorker()) {
-        LogE("TLS beginServer: startTlsWorker failed (OOM stack)\n");
+        SysLogE("TLS beginServer: startTlsWorker failed (OOM stack)\n");
         return false;
     }
     #endif
@@ -283,18 +283,18 @@ bool TlsClientInterface::beginServer(const char* certPath, const char* keyPath, 
     pdiutil::safe_delete(m_bear);
     m_bear = pdiutil::safe_new<BearSSLState>();
     if (!m_bear) {
-        LogE("TLS beginServer: OOM BearSSLState\n");
+        SysLogE("TLS beginServer: OOM BearSSLState\n");
         return false;
     }
 
     if (!TlsCryptoLoader::loadCertChain(certPath, m_bear->certChain, m_bear->certChainCount, m_bear->certBacking)) {
-        LogE("TLS beginServer: loadCertChain failed: %s\n", certPath);
+        SysLogE("TLS beginServer: loadCertChain failed: %s\n", certPath);
         bearReset(0);
         return false;
     }
 
     if (!TlsCryptoLoader::loadPrivateKey(keyPath, m_bear->skey)) {
-        LogE("TLS beginServer: loadPrivateKey failed: %s\n", keyPath);
+        SysLogE("TLS beginServer: loadPrivateKey failed: %s\n", keyPath);
         bearReset(0);
         return false;
     }
@@ -311,7 +311,7 @@ bool TlsClientInterface::beginServer(const char* certPath, const char* keyPath, 
     if (keyType == BR_KEYTYPE_RSA) {
         const br_rsa_private_key* rsa = br_skey_decoder_get_rsa(&m_bear->skey);
         if (!rsa) {
-            LogE("TLS beginServer: get_rsa returned null\n");
+            SysLogE("TLS beginServer: get_rsa returned null\n");
             bearReset(0);
             return false;
         }
@@ -325,7 +325,7 @@ bool TlsClientInterface::beginServer(const char* certPath, const char* keyPath, 
     } else if (keyType == BR_KEYTYPE_EC) {
         const br_ec_private_key* ec = br_skey_decoder_get_ec(&m_bear->skey);
         if (!ec) {
-            LogE("TLS beginServer: get_ec returned null\n");
+            SysLogE("TLS beginServer: get_ec returned null\n");
             bearReset(0);
             return false;
         }
@@ -338,13 +338,13 @@ bool TlsClientInterface::beginServer(const char* certPath, const char* keyPath, 
             br_ssl_engine_get_ec(&m_bear->sc.eng),
             br_ecdsa_i15_sign_asn1);
     } else {
-        LogE("TLS beginServer: unsupported key type %d\n", keyType);
+        SysLogE("TLS beginServer: unsupported key type %d\n", keyType);
         bearReset(0);
         return false;
     }
 
     if (!m_bear->allocIoBuffers(TLS_IBUF_SIZE, TLS_OBUF_SIZE)) {
-        LogE("TLS beginServer: alloc IO buffers failed\n");
+        SysLogE("TLS beginServer: alloc IO buffers failed\n");
         bearReset(0);
         return false;
     }
@@ -356,7 +356,7 @@ bool TlsClientInterface::beginServer(const char* certPath, const char* keyPath, 
     if (clientCaPath && clientCaPath[0]) {
         if (!TlsCryptoLoader::loadTrustAnchors(clientCaPath,
                 m_bear->trustAnchors, m_bear->trustAnchorsCount)) {
-            LogE("TLS beginServer: loadTrustAnchors failed: %s\n", clientCaPath);
+            SysLogE("TLS beginServer: loadTrustAnchors failed: %s\n", clientCaPath);
             bearReset(0);
             return false;
         }
@@ -368,7 +368,7 @@ bool TlsClientInterface::beginServer(const char* certPath, const char* keyPath, 
     }
 
     if (!br_ssl_server_reset(&m_bear->sc)) {
-        LogE("TLS beginServer: br_ssl_server_reset failed\n");
+        SysLogE("TLS beginServer: br_ssl_server_reset failed\n");
         bearReset(0);
         return false;
     }
@@ -456,7 +456,7 @@ void TlsClientInterface::setTimeout(uint32_t timeout) {
 int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
     if (m_role != ROLE_CLIENT || !host) return PDI_ERR_INVALID_ARG;
     if (m_verifyPeer && m_caPath.empty()) {
-        LogE("TLS connect: verify-peer is on but no CA path set\n");
+        SysLogE("TLS connect: verify-peer is on but no CA path set\n");
         return PDI_ERR_INVALID_ARG;
     }
 
@@ -486,11 +486,11 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
                 __i_dvc_ctrl.wait(1);
             }
             if (m_dns.in_flight) {
-                LogE("TLS connect: DNS timeout for %s\n", hostname);
+                SysLogE("TLS connect: DNS timeout for %s\n", hostname);
                 return NET_ERROR_DNS_FAILED;
             }
             if (!m_dns.found) {
-                LogE("TLS connect: DNS resolution failed for %s\n", hostname);
+                SysLogE("TLS connect: DNS resolution failed for %s\n", hostname);
                 return NET_ERROR_DNS_FAILED;
             }
             serverIp = m_dns.addr;
@@ -504,7 +504,7 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
 
     m_bear = pdiutil::safe_new<BearSSLState>();
     if (!m_bear) {
-        LogE("TLS connect: OOM BearSSLState\n");
+        SysLogE("TLS connect: OOM BearSSLState\n");
         return PDI_ERR_NO_MEM;
     }
 
@@ -530,7 +530,7 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
     } else {
         m_bear->noopX509 = pdiutil::safe_new<NoopX509State>();
         if (!m_bear->noopX509) {
-            LogE("TLS connect: OOM NoopX509State\n");
+            SysLogE("TLS connect: OOM NoopX509State\n");
             return bearReset(PDI_ERR_NO_MEM);
         }
         m_bear->noopX509->vtable = &noop_x509_vtable;
@@ -614,7 +614,7 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
         unsigned engState = m_bear ? br_ssl_engine_current_state(&m_bear->cc.eng) : 0;
         int      engErr   = m_bear ? br_ssl_engine_last_error(&m_bear->cc.eng) : -1;
         uint32_t elapsed  = __i_dvc_ctrl.millis_now() - start;
-        LogE("TLS connect: timeout after %u ms (tcp.connected=%d engState=%u engErr=%d rxQ=%u)\n",
+        SysLogE("TLS connect: timeout after %u ms (tcp.connected=%d engState=%u engErr=%d rxQ=%u)\n",
             (unsigned)elapsed, (int)m_isConnected, engState, engErr, (unsigned)m_rxQueueLen);
         close();
         return PDI_ERR_TIMEOUT;
@@ -878,7 +878,7 @@ err_t TlsClientInterface::onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
         self->m_mutex.critical_unlock();
         #endif
-        LogE("TLS onReceive: alloc fail, in=%u rxQ=%u\n",
+        SysLogE("TLS onReceive: alloc fail, in=%u rxQ=%u\n",
             (unsigned)p->tot_len, (unsigned)self->m_rxQueueLen);
         return ERR_MEM;
     }
@@ -1009,7 +1009,7 @@ void TlsClientInterface::serviceRx() {
     if (state & BR_SSL_CLOSED) {
         int err = br_ssl_engine_last_error(eng);
         if (err != BR_ERR_OK) {
-            LogE("TLS serviceRx: engine closed with err=%d\n", err);
+            SysLogE("TLS serviceRx: engine closed with err=%d\n", err);
             m_bear->engineFatal = true;
         }
     }
@@ -1050,7 +1050,7 @@ void TlsClientInterface::pumpEngine() {
         if (state & BR_SSL_CLOSED) {
             int err = br_ssl_engine_last_error(eng);
             if (err != BR_ERR_OK) {
-                LogE("TLS pumpEngine: engine closed with err=%d\n", err);
+                SysLogE("TLS pumpEngine: engine closed with err=%d\n", err);
                 m_bear->engineFatal = true;
             }
             break;
@@ -1096,7 +1096,7 @@ void TlsClientInterface::pumpEngine() {
         __i_dvc_ctrl.yield();
 
         if (err != ERR_OK) {
-            LogE("TLS pumpEngine: tcp_write err=%d\n", (int)err);
+            SysLogE("TLS pumpEngine: tcp_write err=%d\n", (int)err);
             if (err != ERR_MEM && m_bear) m_bear->engineFatal = true;
             break;
         }
