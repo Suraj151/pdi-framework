@@ -25,7 +25,7 @@ struct WcFSCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_WC, [](void *arg)->void *{
-			return new WcFSCommand();
+			return pdiutil::safe_new<WcFSCommand>();
 		});
 	}
 

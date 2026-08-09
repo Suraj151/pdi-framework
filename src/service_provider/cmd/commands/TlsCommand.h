@@ -49,7 +49,7 @@ struct TlsCommand : public CommandBase {
      */
     static void RegisterCommand() {
         CommandBase::RegisterCommand(CMD_NAME_TLS, [](void* arg) -> void* {
-            return new TlsCommand();
+            return pdiutil::safe_new<TlsCommand>();
         });
     }
 

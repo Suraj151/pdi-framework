@@ -32,7 +32,7 @@ struct ChmodCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_CHMOD, [](void *arg)->void *{
-			return new ChmodCommand();
+			return pdiutil::safe_new<ChmodCommand>();
 		});
 	}
 

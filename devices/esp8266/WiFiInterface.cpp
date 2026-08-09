@@ -634,7 +634,7 @@ bool WiFiInterface::get_bssid_within_scanned_nw_ignoring_connected_stations(char
   // }
   struct station_info * stat_info = wifi_softap_get_station_info();
   struct station_info * stat_info_copy = stat_info;
-  char* _ssid_buff = new char[30];
+  char* _ssid_buff = pdiutil::safe_new_array<char>(30);
 
   if( nullptr == _ssid_buff ){
     wifi_softap_free_station_info();
@@ -670,7 +670,7 @@ bool WiFiInterface::get_bssid_within_scanned_nw_ignoring_connected_stations(char
 
         if( !__are_arrays_equal( (char*)ignorebssid, (char*)this->BSSID(i), 6 ) ){
           memcpy(bssid, this->BSSID(i), 6);
-          delete[] _ssid_buff;
+          pdiutil::safe_delete_array(_ssid_buff);
           wifi_softap_free_station_info();
           return true;
         }
@@ -678,7 +678,7 @@ bool WiFiInterface::get_bssid_within_scanned_nw_ignoring_connected_stations(char
     }
   }
 
-  delete[] _ssid_buff;
+  pdiutil::safe_delete_array(_ssid_buff);
   wifi_softap_free_station_info();
   return false;
 }

@@ -178,8 +178,11 @@ void esp_now_recv_cb(uint8_t *macaddr, uint8_t *data, uint8_t len){
            esp_now_peers[i].state = ESP_NOW_STATE_RECV_AVAILABLE;
            esp_now_peers[i].last_receive = __i_dvc_ctrl.millis_now();
            memcpy( esp_now_peers[i].mac, macaddr, 6 );
-           esp_now_peers[i].buffer = new uint8_t[ESP_NOW_MAX_BUFF_SIZE];
-           memset(esp_now_peers[i].buffer, 0, ESP_NOW_MAX_BUFF_SIZE);
+           esp_now_peers[i].buffer = pdiutil::safe_new_array<uint8_t>(ESP_NOW_MAX_BUFF_SIZE);
+           if( nullptr == esp_now_peers[i].buffer ){
+             esp_now_peers[i].state = ESP_NOW_STATE_EMPTY;
+             break;
+           }
            memcpy( esp_now_peers[i].buffer, data, len<ESP_NOW_MAX_BUFF_SIZE?len:ESP_NOW_MAX_BUFF_SIZE );
            esp_now_peers[i].data_length = len;
            break;
@@ -296,7 +299,7 @@ void Espnow::handlePeers(void) {
 
 void Espnow::broadcastConfigData(void){
 
-  esp_now_payload_t* payload = new esp_now_payload_t;
+  esp_now_payload_t* payload = pdiutil::safe_new<esp_now_payload_t>();
 
   if( nullptr != this->m_wifi && nullptr != payload ){
 
@@ -328,7 +331,7 @@ void Espnow::broadcastConfigData(void){
 
     esp_now_encrypt_payload((uint8_t*)payload,sizeof(esp_now_payload_t));
     this->broadcastToAll((uint8_t*)payload,sizeof(esp_now_payload_t));
-    delete payload;
+    pdiutil::safe_delete(payload);
   }
 }
 
@@ -549,8 +552,11 @@ bool Espnow::addInPeers(uint8_t *mac_addr, uint8_t role, uint8_t channel) {
           esp_now_peers[i].state=ESP_NOW_STATE_INIT;
           esp_now_peers[i].role=(esp_now_role)role;
           esp_now_peers[i].channel=channel;
-          esp_now_peers[i].buffer = new uint8_t[ESP_NOW_MAX_BUFF_SIZE];
-          memset(esp_now_peers[i].buffer, 0, ESP_NOW_MAX_BUFF_SIZE);
+          esp_now_peers[i].buffer = pdiutil::safe_new_array<uint8_t>(ESP_NOW_MAX_BUFF_SIZE);
+          if( nullptr == esp_now_peers[i].buffer ){
+            esp_now_peers[i].state = ESP_NOW_STATE_EMPTY;
+            return false;
+          }
           esp_now_peers[i].data_length = 0;
           esp_now_peers[i].last_receive = __i_dvc_ctrl.millis_now();
 
@@ -611,7 +617,7 @@ void Espnow::setPeerToDefaults(uint8_t _peer_index) {
       // esp_now_peers[_peer_index].channel=ESP_NOW_CHANNEL;
       esp_now_peers[_peer_index].state=ESP_NOW_STATE_EMPTY;
 
-      if( esp_now_peers[_peer_index].buffer ) delete[] esp_now_peers[_peer_index].buffer;
+      pdiutil::safe_delete_array(esp_now_peers[_peer_index].buffer);
       esp_now_peers[_peer_index].buffer=NULL;
       esp_now_peers[_peer_index].data_length = 0;
       esp_now_peers[_peer_index].last_receive = 0;

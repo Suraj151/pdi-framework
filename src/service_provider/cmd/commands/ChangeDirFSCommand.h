@@ -34,7 +34,7 @@ struct ChangeDirFSCommand : public CommandBase {
      */
     static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_CD, [](void *arg)->void *{
-			return new ChangeDirFSCommand();
+			return pdiutil::safe_new<ChangeDirFSCommand>();
 		});
 	}
 

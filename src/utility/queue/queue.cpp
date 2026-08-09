@@ -41,8 +41,10 @@
  */
 void QUEUE_Init(QUEUE *queue, int bufferSize)
 {
-    queue->buf = new uint8_t[bufferSize];
-    RINGBUF_Init(&queue->rb, queue->buf, bufferSize);
+    queue->buf = pdiutil::safe_new_array<uint8_t>(bufferSize);
+    if (nullptr != queue->buf) {
+        RINGBUF_Init(&queue->rb, queue->buf, bufferSize);
+    }
 }
 
 /**

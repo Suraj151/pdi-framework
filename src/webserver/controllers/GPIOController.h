@@ -110,7 +110,7 @@ public:
 
 		y2 = GPIO_MAX_GRAPH_HEIGHT - y2;
 
-		pdiutil::string *_response = new pdiutil::string();
+		pdiutil::string *_response = pdiutil::safe_new<pdiutil::string>();
 
 		if (nullptr != _response)
 		{
@@ -134,7 +134,7 @@ public:
 			this->m_web_resource->m_server->addHeader(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_CACHE_CONTROL), CHARPTR_WRAP_RO(HTTP_HEADER_VALUE_NO_CACHE));
 			this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _response->c_str());
 
-			delete _response;
+			pdiutil::safe_delete(_response);
 		}
 	}
 
@@ -151,8 +151,8 @@ public:
 			return;
 		}
 
-		char *_page = new char[PAGE_HTML_MAX_SIZE];
-		memset(_page, 0, PAGE_HTML_MAX_SIZE);
+		char *_page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
+		if (nullptr == _page) return;
 
 		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
 		strcat_ro(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_TOP);
@@ -171,7 +171,7 @@ public:
 
 		END_SENDING_CHUNK();
 		// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
-		delete[] _page;
+		pdiutil::safe_delete_array(_page);
 	}
 
 	/**
@@ -252,8 +252,8 @@ public:
 			return;
 		}
 
-		char *_page = new char[PAGE_HTML_MAX_SIZE];
-		memset(_page, 0, PAGE_HTML_MAX_SIZE);
+		char *_page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
+		if (nullptr == _page) return;
 
 		BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 		this->build_gpio_monitor_html(_page);
@@ -262,7 +262,7 @@ public:
 		this->_last_monitor_point.x = 0;
 		this->_last_monitor_point.y = GPIO_MAX_GRAPH_HEIGHT - GPIO_GRAPH_BOTTOM_MARGIN;
 		// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
-		delete[] _page;
+		pdiutil::safe_delete_array(_page);
 	}
 
 	/**
@@ -334,15 +334,15 @@ public:
 			_is_posted = true;
 		}
 
-		char *_page = new char[PAGE_HTML_MAX_SIZE];
-		memset(_page, 0, PAGE_HTML_MAX_SIZE);
+		char *_page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
+		if (nullptr == _page) return;
 
 		BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 		this->build_gpio_server_config_html(_page, _is_posted);
 		END_SENDING_CHUNK();
 
 		// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
-		delete[] _page;
+		pdiutil::safe_delete_array(_page);
 		if (_is_posted)
 		{
 			__gpio_service.handleGpioModes(GPIO_SERVER_CONFIG);
@@ -467,15 +467,15 @@ public:
 			_is_posted = true;
 		}
 
-		char *_page = new char[PAGE_HTML_MAX_SIZE];
-		memset(_page, 0, PAGE_HTML_MAX_SIZE);
+		char *_page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
+		if (nullptr == _page) return;
 
 		BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 		this->build_gpio_mode_config_html(_page, _is_posted);
 		END_SENDING_CHUNK();
 
 		// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
-		delete[] _page;
+		pdiutil::safe_delete_array(_page);
 		if (_is_posted)
 		{
 			__gpio_service.handleGpioModes(GPIO_MODE_CONFIG);
@@ -595,15 +595,15 @@ public:
 			}
 		}
 
-		char *_page = new char[PAGE_HTML_MAX_SIZE];
-		memset(_page, 0, PAGE_HTML_MAX_SIZE);
+		char *_page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
+		if (nullptr == _page) return;
 
 		BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 		this->build_gpio_write_config_html(_page, _is_posted);
 		END_SENDING_CHUNK();
 
 		// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
-		delete[] _page;
+		pdiutil::safe_delete_array(_page);
 		if (_is_posted)
 		{
 			__gpio_service.handleGpioModes(GPIO_WRITE_CONFIG);
@@ -877,15 +877,15 @@ public:
 			}
 		}
 
-		char *_page = new char[PAGE_HTML_MAX_SIZE];
-		memset(_page, 0, PAGE_HTML_MAX_SIZE);
+		char *_page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
+		if (nullptr == _page) return;
 
 		BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 		this->build_gpio_event_config_html(_page, _is_posted);
 		END_SENDING_CHUNK();
 
 		// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
-		delete[] _page;
+		pdiutil::safe_delete_array(_page);
 		if (_is_posted)
 		{
 			__gpio_service.handleGpioModes(GPIO_EVENT_CONFIG);

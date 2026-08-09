@@ -34,7 +34,7 @@ struct MoveFSCommand : public CommandBase {
      */
     static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_MOVE, [](void *arg)->void *{
-			return new MoveFSCommand();
+			return pdiutil::safe_new<MoveFSCommand>();
 		});
 	}
 

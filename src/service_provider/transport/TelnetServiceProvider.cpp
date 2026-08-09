@@ -35,7 +35,7 @@ TelnetServiceProvider::TelnetServiceProvider() :
 TelnetServiceProvider::~TelnetServiceProvider() {
     stop();
     if(m_server) {
-        delete m_server;
+        pdiutil::safe_delete(m_server);
     }
 }
 
@@ -44,7 +44,11 @@ TelnetServiceProvider::~TelnetServiceProvider() {
  */
 bool TelnetServiceProvider::start(uint16_t port) {
     if (!m_server) {
-        m_server = new TcpServerInterface();
+        m_server = pdiutil::safe_new<TcpServerInterface>();
+    }
+
+    if (!m_server) {
+        return false;
     }
 
     if (m_server->begin(port) == 0) {
@@ -103,7 +107,7 @@ void TelnetServiceProvider::closeClient() {
         }
         #endif
         m_client->close();
-        delete m_client;
+        pdiutil::safe_delete(m_client);
         m_client = nullptr;
     }
 }

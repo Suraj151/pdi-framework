@@ -117,8 +117,8 @@ class DashboardController : public Controller {
 
 			bool _is_posted = false;
 
-			char *_page = new char[PAGE_HTML_MAX_SIZE];
-			memset(_page, 0, PAGE_HTML_MAX_SIZE);
+			char *_page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
+			if (nullptr == _page) return;
 
 			strcat_ro(_page, WEB_SERVER_HEADER_HTML);
 			BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
@@ -132,7 +132,7 @@ class DashboardController : public Controller {
 			END_SENDING_CHUNK();
 
 			// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
-			delete[] _page;
+			pdiutil::safe_delete_array(_page);
 		}
 };
 

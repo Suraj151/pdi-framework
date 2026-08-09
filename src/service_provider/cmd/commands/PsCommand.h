@@ -31,7 +31,7 @@ struct PsCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_PS, [](void *arg)->void *{
-			return new PsCommand();
+			return pdiutil::safe_new<PsCommand>();
 		});
 	}
 

@@ -265,7 +265,7 @@ int16_t SMTPClient::sendCommandAndGetCode( char *command, uint16_t _timeOut ){
 bool SMTPClient::sendHello( char *domain ){
 
   int16_t respcode = SMTP_STATUS_MAX;
-  char *cmd = new char[100];
+  char *cmd = pdiutil::safe_new_array<char>(100);
 
   if( nullptr != cmd ){
 
@@ -276,7 +276,7 @@ bool SMTPClient::sendHello( char *domain ){
     strcat( cmd, domain );
     respcode = this->sendCommandAndGetCode( cmd );
 
-    delete[] cmd;
+    pdiutil::safe_delete_array(cmd);
   }
 	return ( SMTP_STATUS_ACTION_COMPLETED == respcode );
 }
@@ -315,7 +315,7 @@ bool SMTPClient::sendAuthLogin( char *username, char *password ){
 bool SMTPClient::sendFrom( char *sender ){
 
   int16_t respcode = SMTP_STATUS_MAX;
-  char *cmd = new char[128];
+  char *cmd = pdiutil::safe_new_array<char>(128);
 
   if( nullptr != cmd ){
 
@@ -328,7 +328,7 @@ bool SMTPClient::sendFrom( char *sender ){
     strcat( cmd, SMTP_COMMAND_CLOSING_ANG_BRACKET );
     respcode = this->sendCommandAndGetCode( cmd );
 
-    delete[] cmd;
+    pdiutil::safe_delete_array(cmd);
   }
 	return ( SMTP_STATUS_ACTION_COMPLETED == respcode );
 }
@@ -336,7 +336,7 @@ bool SMTPClient::sendFrom( char *sender ){
 bool SMTPClient::sendTo( char *recipient ){
 
   int16_t respcode = SMTP_STATUS_MAX;
-  char *cmd = new char[128];
+  char *cmd = pdiutil::safe_new_array<char>(128);
 
   if( nullptr != cmd ){
 
@@ -349,7 +349,7 @@ bool SMTPClient::sendTo( char *recipient ){
     strcat( cmd, SMTP_COMMAND_CLOSING_ANG_BRACKET );
     respcode = this->sendCommandAndGetCode( cmd );
 
-    delete[] cmd;
+    pdiutil::safe_delete_array(cmd);
   }
 	return ( SMTP_STATUS_ACTION_COMPLETED == respcode );
 }

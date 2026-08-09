@@ -230,8 +230,7 @@ int LittleFSWrapper::readFile(const char* path, uint64_t size, pdiutil::function
 
         if( matchstrlen > 0 ){
             
-            matchstrtempbuffer = new char[matchstrlen + 1];
-            memset(matchstrtempbuffer, 0, matchstrlen + 1);
+            matchstrtempbuffer = pdiutil::safe_new_array<char>(matchstrlen + 1);
         }
     }    
 
@@ -305,10 +304,7 @@ int LittleFSWrapper::readFile(const char* path, uint64_t size, pdiutil::function
         }
     }
 
-    if( nullptr != matchstrtempbuffer ){
-        delete[] matchstrtempbuffer;
-        matchstrtempbuffer = nullptr;
-    }
+    pdiutil::safe_delete_array(matchstrtempbuffer);
 
     lfs_file_close(&m_lfs, &file);
     return lfsToPdiErr(bytesReadOrErr);
@@ -968,14 +964,16 @@ int LittleFSWrapper::getDirFileList(const char *path, pdiutil::vector<file_info_
 
     while (lfs_dir_read(&m_lfs, &dir, &info) > 0) {
 
-        char *name = new char[strlen(info.name) + 1];
-        memset(name, 0, strlen(info.name) + 1);
+        char *name = pdiutil::safe_new_array<char>(strlen(info.name) + 1);
+        if( nullptr == name ){
+            continue; // not enough heap for this entry
+        }
         strcpy(name, info.name);
 
         if( nullptr != pattern && strlen(pattern) > 0 ){
             if( strlen(pattern) > strlen(name) ||
                 __are_arrays_equal(name, (char*)pattern, strlen(pattern)) == false ){
-                delete[] name;
+                pdiutil::safe_delete_array(name);
                 continue; // pattern not matched, skip this file
             }
         }

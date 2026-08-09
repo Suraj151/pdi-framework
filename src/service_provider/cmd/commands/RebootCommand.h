@@ -31,7 +31,7 @@ struct RebootCommand : public CommandBase {
      */
     static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_REBOOT, [](void *arg)->void *{
-			return new RebootCommand();
+			return pdiutil::safe_new<RebootCommand>();
 		});
 	}
 

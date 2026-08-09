@@ -33,7 +33,7 @@ struct PWDFSCommand  : public CommandBase {
      */
     static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_PWD, [](void *arg)->void *{
-			return new PWDFSCommand();
+			return pdiutil::safe_new<PWDFSCommand>();
 		});
 	}
 

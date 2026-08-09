@@ -33,7 +33,7 @@ struct ChownCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_CHOWN, [](void *arg)->void *{
-			return new ChownCommand();
+			return pdiutil::safe_new<ChownCommand>();
 		});
 	}
 

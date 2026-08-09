@@ -49,10 +49,15 @@ void EW_EEPROMClass::begin(size_t size) {
 
   //In case begin() is called a 2nd+ time, don't reallocate if size is the same
   if( nullptr != m_data && size != m_size) {
-    delete[] m_data;
-    m_data = new uint8_t[size];
+    pdiutil::safe_delete_array(m_data);
+    m_data = pdiutil::safe_new_array<uint8_t>(size);
   } else if( nullptr == m_data ) {
-    m_data = new uint8_t[size];
+    m_data = pdiutil::safe_new_array<uint8_t>(size);
+  }
+
+  if( nullptr == m_data ) {
+    m_size = 0;
+    return;
   }
 
   m_size = size;
@@ -93,7 +98,7 @@ void EW_EEPROMClass::end() {
 
   commit();
   if( nullptr != m_data ) {
-    delete[] m_data;
+    pdiutil::safe_delete_array(m_data);
     m_data = nullptr;
   }
   m_size = 0;

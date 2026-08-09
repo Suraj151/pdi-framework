@@ -347,7 +347,8 @@ int TmpFs::getDirFileList(const char* path, pdiutil::vector<file_info_t>& items,
         info.m_mtime = node.m_mtime;
         // Callers (ls) delete[] m_name — hand them a heap copy.
         uint32_t nlen = (uint32_t)base.length();
-        info.m_name = new char[nlen + 1];
+        info.m_name = pdiutil::safe_new_array<char>(nlen + 1);
+        if (nullptr == info.m_name) continue;
         memcpy(info.m_name, base.c_str(), nlen);
         info.m_name[nlen] = '\0';
         items.push_back(info);

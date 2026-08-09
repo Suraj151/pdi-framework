@@ -35,7 +35,7 @@ struct LoginCommand : public CommandBase {
      */
     static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_LOGIN, [](void *arg)->void *{
-			return new LoginCommand();
+			return pdiutil::safe_new<LoginCommand>();
 		});
 	}
 
@@ -127,7 +127,7 @@ struct LogoutCommand : public CommandBase {
      */
     static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_LOGOUT, [](void *arg)->void *{
-			return new LogoutCommand();
+			return pdiutil::safe_new<LogoutCommand>();
 		});
 	}
 

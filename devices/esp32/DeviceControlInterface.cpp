@@ -455,7 +455,7 @@ bool DeviceControlInterface::isExceptionalGpio(gpio_id_t pin)
  */
 iGpioBlinkerInterface *DeviceControlInterface::createGpioBlinkerInstance(gpio_id_t pin, gpio_val_t duration)
 {
-    return new GpioBlinkerInterface(pin, duration);
+    return pdiutil::safe_new<GpioBlinkerInterface>(pin, duration);
 }
 
 /**
@@ -463,10 +463,7 @@ iGpioBlinkerInterface *DeviceControlInterface::createGpioBlinkerInstance(gpio_id
  */
 void DeviceControlInterface::releaseGpioBlinkerInstance(iGpioBlinkerInterface *instance)
 {
-    if (nullptr != instance)
-    {
-        delete instance;
-    }
+    pdiutil::safe_delete(instance);
 }
 
 /**

@@ -39,7 +39,7 @@ struct ElfLoadCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_ELFLOAD, [](void *arg)->void *{
-			return new ElfLoadCommand();
+			return pdiutil::safe_new<ElfLoadCommand>();
 		});
 	}
 

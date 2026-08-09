@@ -54,7 +54,7 @@ struct ServiceCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_SERVICE, [](void *arg)->void *{
-			return new ServiceCommand();
+			return pdiutil::safe_new<ServiceCommand>();
 		});
 	}
 

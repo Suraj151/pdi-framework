@@ -67,7 +67,7 @@ bool SyslogServiceProvider::stopService() {
 #ifdef ENABLE_SYSLOG_FORWARD
   if (nullptr != m_udp) {
     m_udp->close();
-    delete m_udp;
+    pdiutil::safe_delete(m_udp);
     m_udp = nullptr;
   }
   m_resolved = false;
@@ -172,7 +172,7 @@ bool SyslogServiceProvider::ensureSocket() {
   if (nullptr == m_udp) return false; // port without a UDP impl yet
 
   if (!m_udp->begin(0)) {             // ephemeral local port, send only
-    delete m_udp;
+    pdiutil::safe_delete(m_udp);
     m_udp = nullptr;
     return false;
   }

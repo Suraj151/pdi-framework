@@ -57,7 +57,7 @@ void EmailServiceProvider::handleEmail()
       {
         LogI("Handling email\n");
 
-        pdiutil::string *_payload = new pdiutil::string();
+        pdiutil::string *_payload = pdiutil::safe_new<pdiutil::string>();
 
         if (nullptr != _payload)
         {
@@ -76,7 +76,7 @@ void EmailServiceProvider::handleEmail()
             this->m_mail_handler_cb_id = 0;
           }
 
-          delete _payload;
+          pdiutil::safe_delete(_payload);
         }
       },
       180000, DEFAULT_TASK_PRIORITY, 0, -1);

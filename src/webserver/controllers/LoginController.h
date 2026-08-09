@@ -160,8 +160,8 @@ class LoginController : public Controller {
         _is_posted = true;
       }
 
-      char* _page = new char[PAGE_HTML_MAX_SIZE];
-      memset(_page, 0, PAGE_HTML_MAX_SIZE);
+      char* _page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
+      if (nullptr == _page) return;
 
       if( _is_posted && !_is_error ){
         this->m_route_handler->send_inactive_session_headers();
@@ -172,7 +172,7 @@ class LoginController : public Controller {
       END_SENDING_CHUNK();
 
       // this->m_web_resource->m_server->send( HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page );
-      delete[] _page;
+      pdiutil::safe_delete_array(_page);
     }
 
 		/**
@@ -190,15 +190,15 @@ class LoginController : public Controller {
 
       this->m_route_handler->send_inactive_session_headers();
 
-      char* _page = new char[PAGE_HTML_MAX_SIZE];
-      memset(_page, 0, PAGE_HTML_MAX_SIZE);
+      char* _page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
+      if (nullptr == _page) return;
 
       BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
       this->build_html( _page, WEB_SERVER_LOGOUT_PAGE );
       END_SENDING_CHUNK();
 
       // this->m_web_resource->m_server->send( HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page );
-      delete[] _page;
+      pdiutil::safe_delete_array(_page);
     }
 
 		/**
@@ -234,8 +234,8 @@ class LoginController : public Controller {
         return;
       }
 
-      char* _page = new char[PAGE_HTML_MAX_SIZE];
-      memset(_page, 0, PAGE_HTML_MAX_SIZE);
+      char* _page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
+      if (nullptr == _page) return;
 
       BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
       pdiutil::string msg = CHARPTR_WRAP("Wrong Credentials.");
@@ -243,7 +243,7 @@ class LoginController : public Controller {
       END_SENDING_CHUNK();
 
       // this->m_web_resource->m_server->send( HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page );
-      delete[] _page;
+      pdiutil::safe_delete_array(_page);
     }
 
 };

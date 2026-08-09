@@ -28,7 +28,7 @@ struct MkdirCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_MKDIR, [](void *arg)->void *{
-			return new MkdirCommand();
+			return pdiutil::safe_new<MkdirCommand>();
 		});
 	}
 

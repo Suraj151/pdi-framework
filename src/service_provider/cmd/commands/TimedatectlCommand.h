@@ -34,7 +34,7 @@ struct TimedatectlCommand : public CommandBase {
      */
     static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_TIMEDATECTL, [](void *arg)->void *{
-			return new TimedatectlCommand();
+			return pdiutil::safe_new<TimedatectlCommand>();
 		});
 	}
 

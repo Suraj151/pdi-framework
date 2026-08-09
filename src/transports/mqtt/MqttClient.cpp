@@ -61,7 +61,7 @@ void mqttUnsubscribedCb(uint32_t *args)
 
 void mqttDataCb(uint32_t *args, const char *topic, uint32_t topic_len, const char *data, uint32_t data_len)
 {
-  char *topicBuf = new char[topic_len + 1], *dataBuf = new char[data_len + 1];
+  char *topicBuf = pdiutil::safe_new_array<char>(topic_len + 1), *dataBuf = pdiutil::safe_new_array<char>(data_len + 1);
 
   if (nullptr != topicBuf)
   {
@@ -79,14 +79,8 @@ void mqttDataCb(uint32_t *args, const char *topic, uint32_t topic_len, const cha
     LogI("MQTT: data cb\nMQTT: Receive topic: %s, data: %s \r\n", topicBuf, dataBuf);
   }
 
-  if (nullptr != topicBuf)
-  {
-    delete[] topicBuf;
-  }
-  if (nullptr != dataBuf)
-  {
-    delete[] dataBuf;
-  }
+  pdiutil::safe_delete_array(topicBuf);
+  pdiutil::safe_delete_array(dataBuf);
 }
 
 bool MQTTClient::is_mqtt_connected()
@@ -120,11 +114,7 @@ void MQTTClient::clear_all_subscribed_topics()
 {
   for (uint16_t i = 0; i < this->m_mqttClient.subscribed_topics.size(); i++)
   {
-    if (nullptr != this->m_mqttClient.subscribed_topics[i].topic)
-    {
-      delete[] this->m_mqttClient.subscribed_topics[i].topic;
-      this->m_mqttClient.subscribed_topics[i].topic = nullptr;
-    }
+    pdiutil::safe_delete_array(this->m_mqttClient.subscribed_topics[i].topic);
   }
   this->m_mqttClient.subscribed_topics.clear();
 }
@@ -133,10 +123,9 @@ void MQTTClient::add_to_subscribed_topics(char *_topic, uint8_t _qos)
 {
   int _len = strlen(_topic);
   mqtt_subscribed_topics_t _subscribe_topic;
-  _subscribe_topic.topic = new char[_len + 1];
+  _subscribe_topic.topic = pdiutil::safe_new_array<char>(_len + 1);
   if (nullptr != _subscribe_topic.topic)
   {
-    memset(_subscribe_topic.topic, 0, _len + 1);
     strcpy(_subscribe_topic.topic, _topic);
     _subscribe_topic.topic[_len] = 0;
     _subscribe_topic.qos = _qos;
@@ -153,7 +142,7 @@ bool MQTTClient::remove_from_subscribed_topics(char *_topic)
     {
       if (__are_str_equals(this->m_mqttClient.subscribed_topics[i].topic, _topic, strlen(this->m_mqttClient.subscribed_topics[i].topic)))
       {
-        delete[] this->m_mqttClient.subscribed_topics[i].topic;
+        pdiutil::safe_delete_array(this->m_mqttClient.subscribed_topics[i].topic);
         this->m_mqttClient.subscribed_topics[i].topic = nullptr;
         this->m_mqttClient.subscribed_topics.erase(this->m_mqttClient.subscribed_topics.begin() + i);
         return true;
@@ -574,59 +563,23 @@ void MQTTClient::mqtt_client_delete()
   //   delete this->m_mqttClient.user_data;
   //   this->m_mqttClient.user_data = nullptr;
   // }
-  if (nullptr != this->m_host)
-  {
-    delete[] this->m_host;
-    this->m_host = nullptr;
-  }
+  pdiutil::safe_delete_array(this->m_host);
 
-  if (nullptr != this->m_mqttClient.connect_info.client_id)
-  {
-    delete[] this->m_mqttClient.connect_info.client_id;
-    this->m_mqttClient.connect_info.client_id = nullptr;
-  }
+  pdiutil::safe_delete_array(this->m_mqttClient.connect_info.client_id);
 
-  if (nullptr != this->m_mqttClient.connect_info.username)
-  {
-    delete[] this->m_mqttClient.connect_info.username;
-    this->m_mqttClient.connect_info.username = nullptr;
-  }
+  pdiutil::safe_delete_array(this->m_mqttClient.connect_info.username);
 
-  if (nullptr != this->m_mqttClient.connect_info.password)
-  {
-    delete[] this->m_mqttClient.connect_info.password;
-    this->m_mqttClient.connect_info.password = nullptr;
-  }
+  pdiutil::safe_delete_array(this->m_mqttClient.connect_info.password);
 
-  if (nullptr != this->m_mqttClient.connect_info.will_topic)
-  {
-    delete[] this->m_mqttClient.connect_info.will_topic;
-    this->m_mqttClient.connect_info.will_topic = nullptr;
-  }
+  pdiutil::safe_delete_array(this->m_mqttClient.connect_info.will_topic);
 
-  if (nullptr != this->m_mqttClient.connect_info.will_message)
-  {
-    delete[] this->m_mqttClient.connect_info.will_message;
-    this->m_mqttClient.connect_info.will_message = nullptr;
-  }
+  pdiutil::safe_delete_array(this->m_mqttClient.connect_info.will_message);
 
-  if (nullptr != this->m_mqttClient.mqtt_state.in_buffer)
-  {
-    delete[] this->m_mqttClient.mqtt_state.in_buffer;
-    this->m_mqttClient.mqtt_state.in_buffer = nullptr;
-  }
+  pdiutil::safe_delete_array(this->m_mqttClient.mqtt_state.in_buffer);
 
-  if (nullptr != this->m_mqttClient.mqtt_state.out_buffer)
-  {
-    delete[] this->m_mqttClient.mqtt_state.out_buffer;
-    this->m_mqttClient.mqtt_state.out_buffer = nullptr;
-  }
+  pdiutil::safe_delete_array(this->m_mqttClient.mqtt_state.out_buffer);
 
-  if (nullptr != this->m_mqttClient.msgQueue.buf)
-  {
-    delete[] this->m_mqttClient.msgQueue.buf;
-    this->m_mqttClient.msgQueue.buf = nullptr;
-  }
+  pdiutil::safe_delete_array(this->m_mqttClient.msgQueue.buf);
 
   if (nullptr != this->m_client)
   {
@@ -824,7 +777,7 @@ void MQTTClient::InitConnection(char *host, pdiutil::net_port_t port, uint8_t se
 
   int _host_len = strlen(host);
   memset(&this->m_mqttClient, 0, sizeof(MQTT_Client));
-  this->m_host = new char[_host_len + 1];
+  this->m_host = pdiutil::safe_new_array<char>(_host_len + 1);
 
   if (nullptr != this->m_host)
   {
@@ -850,10 +803,9 @@ void MQTTClient::InitClient(char *client_id, char *client_user, char *client_pas
   if (nullptr != client_id)
   {
     _len = strlen(client_id);
-    this->m_mqttClient.connect_info.client_id = new char[_len + 1];
+    this->m_mqttClient.connect_info.client_id = pdiutil::safe_new_array<char>(_len + 1);
     if (nullptr != this->m_mqttClient.connect_info.client_id)
     {
-      memset(this->m_mqttClient.connect_info.client_id, 0, _len + 1);
       strcpy(this->m_mqttClient.connect_info.client_id, client_id);
       this->m_mqttClient.connect_info.client_id[_len] = 0;
     }
@@ -862,10 +814,9 @@ void MQTTClient::InitClient(char *client_id, char *client_user, char *client_pas
   if (nullptr != client_user)
   {
     _len = strlen(client_user);
-    this->m_mqttClient.connect_info.username = new char[_len + 1];
+    this->m_mqttClient.connect_info.username = pdiutil::safe_new_array<char>(_len + 1);
     if (nullptr != this->m_mqttClient.connect_info.username)
     {
-      memset(this->m_mqttClient.connect_info.username, 0, _len + 1);
       strcpy(this->m_mqttClient.connect_info.username, client_user);
       this->m_mqttClient.connect_info.username[_len] = 0;
     }
@@ -874,10 +825,9 @@ void MQTTClient::InitClient(char *client_id, char *client_user, char *client_pas
   if (nullptr != client_pass)
   {
     _len = strlen(client_pass);
-    this->m_mqttClient.connect_info.password = new char[_len + 1];
+    this->m_mqttClient.connect_info.password = pdiutil::safe_new_array<char>(_len + 1);
     if (nullptr != this->m_mqttClient.connect_info.password)
     {
-      memset(this->m_mqttClient.connect_info.password, 0, _len + 1);
       strcpy(this->m_mqttClient.connect_info.password, client_pass);
       this->m_mqttClient.connect_info.password[_len] = 0;
     }
@@ -886,16 +836,14 @@ void MQTTClient::InitClient(char *client_id, char *client_user, char *client_pas
   this->m_mqttClient.connect_info.keepalive = keepAliveTime > 5 ? keepAliveTime : MQTT_DEFAULT_KEEPALIVE;
   this->m_mqttClient.connect_info.clean_session = cleanSession;
 
-  this->m_mqttClient.mqtt_state.in_buffer = new uint8_t[MQTT_BUF_SIZE];
+  this->m_mqttClient.mqtt_state.in_buffer = pdiutil::safe_new_array<uint8_t>(MQTT_BUF_SIZE);
   if (nullptr != this->m_mqttClient.mqtt_state.in_buffer)
   {
-    memset(this->m_mqttClient.mqtt_state.in_buffer, 0, MQTT_BUF_SIZE);
     this->m_mqttClient.mqtt_state.in_buffer_length = MQTT_BUF_SIZE;
   }
-  this->m_mqttClient.mqtt_state.out_buffer = new uint8_t[MQTT_BUF_SIZE];
+  this->m_mqttClient.mqtt_state.out_buffer = pdiutil::safe_new_array<uint8_t>(MQTT_BUF_SIZE);
   if (nullptr != this->m_mqttClient.mqtt_state.out_buffer)
   {
-    memset(this->m_mqttClient.mqtt_state.out_buffer, 0, MQTT_BUF_SIZE);
     this->m_mqttClient.mqtt_state.out_buffer_length = MQTT_BUF_SIZE;
   }
   this->m_mqttClient.mqtt_state.connect_info = &this->m_mqttClient.connect_info;
@@ -917,10 +865,9 @@ void MQTTClient::InitLWT(char *will_topic, char *will_msg, uint8_t will_qos, uin
   if (nullptr != will_topic)
   {
     _len = strlen(will_topic);
-    this->m_mqttClient.connect_info.will_topic = new char[_len + 1];
+    this->m_mqttClient.connect_info.will_topic = pdiutil::safe_new_array<char>(_len + 1);
     if (nullptr != this->m_mqttClient.connect_info.will_topic)
     {
-      memset(this->m_mqttClient.connect_info.will_topic, 0, _len + 1);
       strcpy(this->m_mqttClient.connect_info.will_topic, will_topic);
       this->m_mqttClient.connect_info.will_topic[_len] = 0;
     }
@@ -929,10 +876,9 @@ void MQTTClient::InitLWT(char *will_topic, char *will_msg, uint8_t will_qos, uin
   if (nullptr != will_topic)
   {
     _len = strlen(will_msg);
-    this->m_mqttClient.connect_info.will_message = new char[_len + 1];
+    this->m_mqttClient.connect_info.will_message = pdiutil::safe_new_array<char>(_len + 1);
     if (nullptr != this->m_mqttClient.connect_info.will_message)
     {
-      memset(this->m_mqttClient.connect_info.will_message, 0, _len + 1);
       strcpy(this->m_mqttClient.connect_info.will_message, will_msg);
       this->m_mqttClient.connect_info.will_message[_len] = 0;
     }

@@ -45,7 +45,7 @@ struct PingCommand : public CommandBase {
      */
     static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_PING, [](void *arg)->void *{
-			return new PingCommand();
+			return pdiutil::safe_new<PingCommand>();
 		});
 	}
 

@@ -42,7 +42,7 @@ struct TopCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_TOP, [](void *arg)->void *{
-			return new TopCommand();
+			return pdiutil::safe_new<TopCommand>();
 		});
 	}
 

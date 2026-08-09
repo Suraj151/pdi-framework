@@ -121,8 +121,8 @@ typedef struct CommandBase {
          * @param deep If true, clears the option name as well.
          */
         void Clear(bool deep = false){
-            if(holdingoptn && nullptr != optionval && optionvalsize){
-                delete[] optionval;
+            if(holdingoptn && optionvalsize){
+                pdiutil::safe_delete_array(optionval);
             }
             optionval = nullptr;
             optionvalsize = 0;
@@ -426,11 +426,12 @@ typedef struct CommandBase {
             if( !m_options[optindx].holdingoptn &&
                 nullptr != m_options[optindx].optionval &&
                 m_options[optindx].optionvalsize ){
-                char *val = new char[m_options[optindx].optionvalsize+2]();
-                memset(val, 0, m_options[optindx].optionvalsize+2);
-                memcpy(val, m_options[optindx].optionval, m_options[optindx].optionvalsize);
-                m_options[optindx].optionval = val;
-                m_options[optindx].holdingoptn = true;
+                char *val = pdiutil::safe_new_array<char>(m_options[optindx].optionvalsize+2);
+                if( nullptr != val ){
+                    memcpy(val, m_options[optindx].optionval, m_options[optindx].optionvalsize);
+                    m_options[optindx].optionval = val;
+                    m_options[optindx].holdingoptn = true;
+                }
             }
             return m_options[optindx].holdingoptn;
         }

@@ -51,6 +51,35 @@ int __strstr(const char *str, const char *substr, int _len)
     return -1;
 }
 
+int32_t __strstr(const char *str, uint32_t _strlen, const char *substr, uint32_t _substrlen, uint32_t _from)
+{
+    if (nullptr == str || nullptr == substr || 0 == _substrlen || _substrlen > _strlen)
+    {
+        return -1;
+    }
+
+    uint32_t last = _strlen - _substrlen;
+
+    for (uint32_t n = _from; n <= last; n++)
+    {
+        const char *hit = (const char *)memchr(str + n, substr[0], (last - n) + 1);
+
+        if (nullptr == hit)
+        {
+            break;
+        }
+
+        n = (uint32_t)(hit - str);
+
+        if (0 == memcmp(hit, substr, _substrlen))
+        {
+            return (int32_t)n;
+        }
+    }
+
+    return -1;
+}
+
 /**
  * @brief Trims a specific character from both ends of a string.
  * 
@@ -497,14 +526,12 @@ void __find_and_replace(char *_str, const char *_find_str, const char *_replace_
 
     int _total_len = _str_len + (_replace_str_len * _occurence) - (_occurence * _find_str_len) + 1;
     _total_len = pdistd::max(_str_len, _total_len) + 1;
-    char *_buf = new char[_total_len];
+    char *_buf = pdiutil::safe_new_array<char>(_total_len);
 
     if (nullptr == _buf)
     {
         return;
     }
-
-    memset(_buf, 0, _total_len);
 
     int j = 0, o = 0;
     for (; j < _str_len && o < _occurence;)
@@ -532,7 +559,7 @@ void __find_and_replace(char *_str, const char *_find_str, const char *_replace_
         memset(_str, 0, _str_len);
         memcpy(_str, _buf, _fin_len + 1);
     }
-    delete[] _buf;
+    pdiutil::safe_delete_array(_buf);
 }
 
 /**

@@ -26,7 +26,7 @@ struct TailFSCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_TAIL, [](void *arg)->void *{
-			return new TailFSCommand();
+			return pdiutil::safe_new<TailFSCommand>();
 		});
 	}
 

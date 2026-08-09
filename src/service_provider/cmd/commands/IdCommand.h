@@ -27,7 +27,7 @@ struct IdCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_ID, [](void *arg)->void *{
-			return new IdCommand();
+			return pdiutil::safe_new<IdCommand>();
 		});
 	}
 

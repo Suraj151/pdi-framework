@@ -123,7 +123,7 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isEventPost ){
     }
 #endif
 
-    pdiutil::string *_payload = new pdiutil::string();
+    pdiutil::string *_payload = pdiutil::safe_new<pdiutil::string>();
 
     if( nullptr != _payload ){
 
@@ -154,7 +154,7 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isEventPost ){
       status = ( HTTP_RESP_OK == this->m_http_client->Post( posturl.c_str(), _payload->c_str() ) );
       
       this->m_http_client->End(true);
-      delete _payload;
+      pdiutil::safe_delete(_payload);
     }
   }else{
     LogI("GPIO Http Request not initializing or failed or Not Configured Correctly\n");
@@ -520,7 +520,7 @@ bool GpioServiceProvider::handleGpioEventOverEmail(){
 
   LogI("Handling GPIO email event\n");
 
-  pdiutil::string *_payload = new pdiutil::string();
+  pdiutil::string *_payload = pdiutil::safe_new<pdiutil::string>();
 
   if( nullptr != _payload ){
 
@@ -535,7 +535,7 @@ bool GpioServiceProvider::handleGpioEventOverEmail(){
 
     status = __email_service.sendMail( *_payload );
 
-    delete _payload;
+    pdiutil::safe_delete(_payload);
   }
 
   return status;

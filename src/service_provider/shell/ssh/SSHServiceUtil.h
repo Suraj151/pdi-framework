@@ -175,23 +175,23 @@ struct LWSSHSession {
         memset(derived_mac_key_stoc, 0, sizeof(derived_mac_key_stoc));
 
         // Create ssh client for channel data exchange
-        m_sshclient = new SSHClientInterface(
+        m_sshclient = pdiutil::safe_new<SSHClientInterface>(
             static_cast<iTcpClientInterface*>(client)
         );
-        m_sshclient->setSSHSession(this);
+        if (m_sshclient) {
+            m_sshclient->setSSHSession(this);
+        }
     }
     // Destructor
     ~LWSSHSession() {
         if (m_sshclient) {
             m_sshclient->close();
-            delete m_sshclient;
-            m_sshclient = nullptr;
         }
+        pdiutil::safe_delete(m_sshclient);
         if (m_client) {
             m_client->close();
-            delete m_client;
-            m_client = nullptr;
         }
+        pdiutil::safe_delete(m_client);
     }
 
     // Check if the session is in a valid state

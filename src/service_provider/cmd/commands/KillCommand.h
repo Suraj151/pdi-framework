@@ -41,7 +41,7 @@ struct KillCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_KILL, [](void *arg)->void *{
-			return new KillCommand();
+			return pdiutil::safe_new<KillCommand>();
 		});
 	}
 

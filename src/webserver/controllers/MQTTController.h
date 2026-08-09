@@ -76,8 +76,8 @@ public:
       return;
     }
 
-    char *_page = new char[PAGE_HTML_MAX_SIZE];
-    memset(_page, 0, PAGE_HTML_MAX_SIZE);
+    char *_page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
+    if (nullptr == _page) return;
 
     strcat_ro(_page, WEB_SERVER_HEADER_HTML);
     strcat_ro(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_TOP);
@@ -94,7 +94,7 @@ public:
 
     END_SENDING_CHUNK();
     // this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
-    delete[] _page;
+    pdiutil::safe_delete_array(_page);
   }
 
   /**
@@ -197,37 +197,39 @@ public:
       LogI("clean session : %s\n\n", _clean_session.c_str());
       __i_dvc_ctrl.yield();
 
-      mqtt_general_config_table *_mqtt_general_configs = new mqtt_general_config_table;
-      memset((void *)_mqtt_general_configs, 0, sizeof(mqtt_general_config_table));
-      // mqtt_general_config_table _mqtt_general_configs;
-      // this->m_db_conn->get_mqtt_general_config_table(&_mqtt_general_configs);
+      mqtt_general_config_table *_mqtt_general_configs = pdiutil::safe_new<mqtt_general_config_table>();
+      if (nullptr != _mqtt_general_configs)
+      {
+        // mqtt_general_config_table _mqtt_general_configs;
+        // this->m_db_conn->get_mqtt_general_config_table(&_mqtt_general_configs);
 
-      strncpy(_mqtt_general_configs->host, _mqtt_host.c_str(), _mqtt_host.size());
-      _mqtt_general_configs->port = StringToUint16(_mqtt_port.c_str());
-      strncpy(_mqtt_general_configs->client_id, _client_id.c_str(), _client_id.size());
-      strncpy(_mqtt_general_configs->username, _username.c_str(), _username.size());
-      strncpy(_mqtt_general_configs->password, _password.c_str(), _password.size());
-      _mqtt_general_configs->keepalive = StringToUint16(_keep_alive.c_str());
-      pdiutil::string clean_flag = CHARPTR_WRAP("clean");
-      _mqtt_general_configs->clean_session = (int)(_clean_session == clean_flag);
+        strncpy(_mqtt_general_configs->host, _mqtt_host.c_str(), _mqtt_host.size());
+        _mqtt_general_configs->port = StringToUint16(_mqtt_port.c_str());
+        strncpy(_mqtt_general_configs->client_id, _client_id.c_str(), _client_id.size());
+        strncpy(_mqtt_general_configs->username, _username.c_str(), _username.size());
+        strncpy(_mqtt_general_configs->password, _password.c_str(), _password.size());
+        _mqtt_general_configs->keepalive = StringToUint16(_keep_alive.c_str());
+        pdiutil::string clean_flag = CHARPTR_WRAP("clean");
+        _mqtt_general_configs->clean_session = (int)(_clean_session == clean_flag);
 
-      this->m_web_resource->m_db_conn->set_mqtt_general_config_table(_mqtt_general_configs);
-      delete _mqtt_general_configs;
-      __i_dvc_ctrl.yield();
+        this->m_web_resource->m_db_conn->set_mqtt_general_config_table(_mqtt_general_configs);
+        pdiutil::safe_delete(_mqtt_general_configs);
+        __i_dvc_ctrl.yield();
 
-      _is_posted = true;
+        _is_posted = true;
+      }
     }
 #endif
 
-    char *_page = new char[PAGE_HTML_MAX_SIZE];
-    memset(_page, 0, PAGE_HTML_MAX_SIZE);
+    char *_page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
+    if (nullptr == _page) return;
 
     BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
     this->build_mqtt_general_config_html(_page, _is_posted);
     END_SENDING_CHUNK();
 
     // this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
-    delete[] _page;
+    pdiutil::safe_delete_array(_page);
     if (_is_posted)
     {
       __mqtt_service.handleMqttConfigChange(MQTT_GENERAL_CONFIG);
@@ -317,31 +319,33 @@ public:
       LogI("will retain : %s\n\n", _will_retain.c_str());
       __i_dvc_ctrl.yield();
 
-      mqtt_lwt_config_table *_mqtt_lwt_configs = new mqtt_lwt_config_table;
-      memset((void *)_mqtt_lwt_configs, 0, sizeof(mqtt_lwt_config_table));
+      mqtt_lwt_config_table *_mqtt_lwt_configs = pdiutil::safe_new<mqtt_lwt_config_table>();
+      if (nullptr != _mqtt_lwt_configs)
+      {
 
-      strncpy(_mqtt_lwt_configs->will_topic, _will_topic.c_str(), _will_topic.size());
-      strncpy(_mqtt_lwt_configs->will_message, _will_message.c_str(), _will_message.size());
-      _mqtt_lwt_configs->will_qos = StringToUint16(_will_qos.c_str());
-      pdiutil::string retain_flag = CHARPTR_WRAP("retain");
-      _mqtt_lwt_configs->will_retain = (int)(_will_retain == retain_flag);
+        strncpy(_mqtt_lwt_configs->will_topic, _will_topic.c_str(), _will_topic.size());
+        strncpy(_mqtt_lwt_configs->will_message, _will_message.c_str(), _will_message.size());
+        _mqtt_lwt_configs->will_qos = StringToUint16(_will_qos.c_str());
+        pdiutil::string retain_flag = CHARPTR_WRAP("retain");
+        _mqtt_lwt_configs->will_retain = (int)(_will_retain == retain_flag);
 
-      this->m_web_resource->m_db_conn->set_mqtt_lwt_config_table(_mqtt_lwt_configs);
-      delete _mqtt_lwt_configs;
-      _is_posted = true;
-      __i_dvc_ctrl.yield();
+        this->m_web_resource->m_db_conn->set_mqtt_lwt_config_table(_mqtt_lwt_configs);
+        pdiutil::safe_delete(_mqtt_lwt_configs);
+        _is_posted = true;
+        __i_dvc_ctrl.yield();
+      }
     }
 #endif
 
-    char *_page = new char[PAGE_HTML_MAX_SIZE];
-    memset(_page, 0, PAGE_HTML_MAX_SIZE);
+    char *_page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
+    if (nullptr == _page) return;
 
     BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
     this->build_mqtt_lwt_config_html(_page, _is_posted);
     END_SENDING_CHUNK();
 
     // this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
-    delete[] _page;
+    pdiutil::safe_delete_array(_page);
     if (_is_posted)
     {
       __mqtt_service.handleMqttConfigChange(MQTT_LWT_CONFIG);
@@ -485,79 +489,81 @@ public:
     if (this->m_web_resource->m_server->hasArg("ptpc0") && this->m_web_resource->m_server->hasArg("pqos0"))
     {
 
-      mqtt_pubsub_config_table *_mqtt_pubsub_configs = new mqtt_pubsub_config_table;
-      memset((void *)_mqtt_pubsub_configs, 0, sizeof(mqtt_pubsub_config_table));
-
-      LogI("\nSubmitted info :\n\nPublish Topics\n");
-
-      char _topic_name[10];
-      memset(_topic_name, 0, 10);
-      strcpy(_topic_name, "ptpc0");
-      char _qos_name[10];
-      memset(_qos_name, 0, 10);
-      strcpy(_qos_name, "pqos0");
-      char _retain_name[10];
-      memset(_retain_name, 0, 10);
-      strcpy(_retain_name, "prtn0");
-
-      pdiutil::string retain_flag = CHARPTR_WRAP("retain");
-
-      for (uint8_t i = 0; i < MQTT_MAX_PUBLISH_TOPIC; i++)
+      mqtt_pubsub_config_table *_mqtt_pubsub_configs = pdiutil::safe_new<mqtt_pubsub_config_table>();
+      if (nullptr != _mqtt_pubsub_configs)
       {
 
-        _topic_name[4] = (0x30 + i);
-        _qos_name[4] = (0x30 + i);
-        _retain_name[4] = (0x30 + i);
+        LogI("\nSubmitted info :\n\nPublish Topics\n");
 
-        pdiutil::string _topic = this->m_web_resource->m_server->arg(_topic_name);
-        pdiutil::string _qos = this->m_web_resource->m_server->arg(_qos_name);
-        pdiutil::string _retain = this->m_web_resource->m_server->arg(_retain_name);
+        char _topic_name[10];
+        memset(_topic_name, 0, 10);
+        strcpy(_topic_name, "ptpc0");
+        char _qos_name[10];
+        memset(_qos_name, 0, 10);
+        strcpy(_qos_name, "pqos0");
+        char _retain_name[10];
+        memset(_retain_name, 0, 10);
+        strcpy(_retain_name, "prtn0");
 
-        strncpy(_mqtt_pubsub_configs->publish_topics[i].topic, _topic.c_str(), _topic.size());
-        _mqtt_pubsub_configs->publish_topics[i].qos = StringToUint8(_qos.c_str());
-        _mqtt_pubsub_configs->publish_topics[i].retain = (int)(_retain == retain_flag);
+        pdiutil::string retain_flag = CHARPTR_WRAP("retain");
 
-        LogI("%d : Topic(%s), Qos(%s), Retain(%s)\n", i, _topic.c_str(),_qos.c_str(),_retain.c_str());
+        for (uint8_t i = 0; i < MQTT_MAX_PUBLISH_TOPIC; i++)
+        {
+
+          _topic_name[4] = (0x30 + i);
+          _qos_name[4] = (0x30 + i);
+          _retain_name[4] = (0x30 + i);
+
+          pdiutil::string _topic = this->m_web_resource->m_server->arg(_topic_name);
+          pdiutil::string _qos = this->m_web_resource->m_server->arg(_qos_name);
+          pdiutil::string _retain = this->m_web_resource->m_server->arg(_retain_name);
+
+          strncpy(_mqtt_pubsub_configs->publish_topics[i].topic, _topic.c_str(), _topic.size());
+          _mqtt_pubsub_configs->publish_topics[i].qos = StringToUint8(_qos.c_str());
+          _mqtt_pubsub_configs->publish_topics[i].retain = (int)(_retain == retain_flag);
+
+          LogI("%d : Topic(%s), Qos(%s), Retain(%s)\n", i, _topic.c_str(),_qos.c_str(),_retain.c_str());
+        }
+        __i_dvc_ctrl.yield();
+
+        LogI("\nSubscribe Topics\n");
+
+        _topic_name[0] = 's';
+        _qos_name[0] = 's';
+        for (uint8_t i = 0; i < MQTT_MAX_SUBSCRIBE_TOPIC; i++)
+        {
+
+          _topic_name[4] = (0x30 + i);
+          _qos_name[4] = (0x30 + i);
+
+          pdiutil::string _topic = this->m_web_resource->m_server->arg(_topic_name);
+          pdiutil::string _qos = this->m_web_resource->m_server->arg(_qos_name);
+
+          strncpy(_mqtt_pubsub_configs->subscribe_topics[i].topic, _topic.c_str(), _topic.size());
+          _mqtt_pubsub_configs->subscribe_topics[i].qos = StringToUint8(_qos.c_str());
+
+          LogI("%d : Topic(%s), Qos(%s), Retain(%s)\n", i, _topic.c_str(),_qos.c_str());
+        }
+        _mqtt_pubsub_configs->publish_frequency = StringToUint16(this->m_web_resource->m_server->arg("pfrq").c_str());
+
+        this->m_web_resource->m_db_conn->set_mqtt_pubsub_config_table(_mqtt_pubsub_configs);
+
+        pdiutil::safe_delete(_mqtt_pubsub_configs);
+        _is_posted = true;
+        __i_dvc_ctrl.yield();
       }
-      __i_dvc_ctrl.yield();
-
-      LogI("\nSubscribe Topics\n");
-
-      _topic_name[0] = 's';
-      _qos_name[0] = 's';
-      for (uint8_t i = 0; i < MQTT_MAX_SUBSCRIBE_TOPIC; i++)
-      {
-
-        _topic_name[4] = (0x30 + i);
-        _qos_name[4] = (0x30 + i);
-
-        pdiutil::string _topic = this->m_web_resource->m_server->arg(_topic_name);
-        pdiutil::string _qos = this->m_web_resource->m_server->arg(_qos_name);
-
-        strncpy(_mqtt_pubsub_configs->subscribe_topics[i].topic, _topic.c_str(), _topic.size());
-        _mqtt_pubsub_configs->subscribe_topics[i].qos = StringToUint8(_qos.c_str());
-
-        LogI("%d : Topic(%s), Qos(%s), Retain(%s)\n", i, _topic.c_str(),_qos.c_str());
-      }
-      _mqtt_pubsub_configs->publish_frequency = StringToUint16(this->m_web_resource->m_server->arg("pfrq").c_str());
-
-      this->m_web_resource->m_db_conn->set_mqtt_pubsub_config_table(_mqtt_pubsub_configs);
-
-      delete _mqtt_pubsub_configs;
-      _is_posted = true;
-      __i_dvc_ctrl.yield();
     }
 #endif
 
-    char *_page = new char[PAGE_HTML_MAX_SIZE];
-    memset(_page, 0, PAGE_HTML_MAX_SIZE);
+    char *_page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
+    if (nullptr == _page) return;
 
     BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
     this->build_mqtt_pubsub_config_html(_page, _is_posted);
     END_SENDING_CHUNK();
 
     // this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
-    delete[] _page;
+    pdiutil::safe_delete_array(_page);
     if (_is_posted)
     {
       __mqtt_service.handleMqttConfigChange(MQTT_PUBSUB_CONFIG);

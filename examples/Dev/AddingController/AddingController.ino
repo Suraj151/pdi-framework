@@ -46,8 +46,8 @@ class TestController : public Controller {
        * take new dynamic array to build html response page
        * PAGE_HTML_MAX_SIZE defined in framework as 5000
        */
-      char* _page = new char[PAGE_HTML_MAX_SIZE];
-			memset( _page, 0, PAGE_HTML_MAX_SIZE );
+      char* _page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
+      if( nullptr == _page ) return;
 
       /**
        * first append header part of html to reponse
@@ -71,7 +71,7 @@ class TestController : public Controller {
        * finally send response and deallocate page
   		 */
       this->m_web_resource->m_server->send( HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page );
-      delete[] _page;
+      pdiutil::safe_delete_array(_page);
     }
 };
 

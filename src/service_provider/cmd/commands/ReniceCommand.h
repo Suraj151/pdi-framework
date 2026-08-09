@@ -44,7 +44,7 @@ struct ReniceCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_RENICE, [](void *arg)->void *{
-			return new ReniceCommand();
+			return pdiutil::safe_new<ReniceCommand>();
 		});
 	}
 

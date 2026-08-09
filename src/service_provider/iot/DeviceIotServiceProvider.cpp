@@ -323,7 +323,13 @@ void DeviceIotServiceProvider::configureMQTT(){
  */
 void DeviceIotServiceProvider::handleSubscribeCallback( uint32_t *args, const char* topic, uint32_t topic_len, const char *data, uint32_t data_len ){
 
-  char *topicBuf = new char[topic_len+1], *dataBuf = new char[data_len+1];
+  char *topicBuf = pdiutil::safe_new_array<char>(topic_len+1), *dataBuf = pdiutil::safe_new_array<char>(data_len+1);
+
+  if( nullptr == topicBuf || nullptr == dataBuf ){
+    pdiutil::safe_delete_array(topicBuf);
+    pdiutil::safe_delete_array(dataBuf);
+    return;
+  }
 
   memcpy(topicBuf, topic, topic_len);
   topicBuf[topic_len] = 0;
@@ -347,17 +353,18 @@ void DeviceIotServiceProvider::handleSubscribeCallback( uint32_t *args, const ch
   __task_scheduler.setTimeout( [&]() { __device_iot_service.handleSensorData(); }, 1, __i_dvc_ctrl.millis_now() );
 
   // handle reconfiguration request
-  char *_value_buff = new char[50];
-  memset( _value_buff, 0, 50 );
-  pdiutil::string reconfigure_key = CHARPTR_WRAP(DEVICE_IOT_CONFIG_RECONFIGURE_KEY);
-  bool _json_result = __get_from_json( dataBuf, reconfigure_key.c_str(), _value_buff, 6 );
-  uint16_t reconfigure = StringToUint16( _value_buff, 6 );
-  if( _json_result && reconfigure == 1 ){
-    LogI("Reconfiguring...\n");
-    __task_scheduler.setTimeout( [&]() { __mqtt_service.stop(); }, 1, __i_dvc_ctrl.millis_now() );
+  char *_value_buff = pdiutil::safe_new_array<char>(50);
+  if( nullptr != _value_buff ){
+    pdiutil::string reconfigure_key = CHARPTR_WRAP(DEVICE_IOT_CONFIG_RECONFIGURE_KEY);
+    bool _json_result = __get_from_json( dataBuf, reconfigure_key.c_str(), _value_buff, 6 );
+    uint16_t reconfigure = StringToUint16( _value_buff, 6 );
+    if( _json_result && reconfigure == 1 ){
+      LogI("Reconfiguring...\n");
+      __task_scheduler.setTimeout( [&]() { __mqtt_service.stop(); }, 1, __i_dvc_ctrl.millis_now() );
+    }
   }
 
-  delete[] topicBuf; delete[] dataBuf; delete[] _value_buff;
+  pdiutil::safe_delete_array(topicBuf); pdiutil::safe_delete_array(dataBuf); pdiutil::safe_delete_array(_value_buff);
 }
 
 #endif
@@ -367,9 +374,11 @@ void DeviceIotServiceProvider::handleSubscribeCallback( uint32_t *args, const ch
  */
 void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_resp){
 
-  char *_value_buff = new char[100];
+  char *_value_buff = pdiutil::safe_new_array<char>(100);
+  if( nullptr == _value_buff ){
+    return;
+  }
 
-  memset( _value_buff, 0, 100 );
   pdiutil::string deviceid_key = CHARPTR_WRAP(DEVICE_IOT_CONFIG_DEVICEID_KEY);
   bool _json_result = __get_from_json( json_resp, deviceid_key.c_str(), _value_buff, 31 );
   uint64_t device_id = StringToUint64( _value_buff, 31 );
@@ -577,7 +586,7 @@ void DeviceIotServiceProvider::handleServerConfigurableParameters(char* json_res
     ( __i_dvc_ctrl.millis_now() + MQTT_INITIALIZE_DURATION)
   );
 
-  delete[] _value_buff;
+  pdiutil::safe_delete_array(_value_buff);
 }
 
 

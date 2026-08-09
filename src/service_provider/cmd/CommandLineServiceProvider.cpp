@@ -152,7 +152,7 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
 CommandLineServiceProvider::~CommandLineServiceProvider()
 {
   for (auto cmd : m_cmdlist) {
-    if(cmd) delete cmd;
+    pdiutil::safe_delete(cmd);
   }
   m_cmdlist.clear();
 }
@@ -638,7 +638,7 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
             }
 
             for (file_info_t &item : itemlist) {
-              if(item.m_name) delete[] item.m_name;
+              pdiutil::safe_delete_array(item.m_name);
             }
             itemlist.clear();
             #else
@@ -820,7 +820,7 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
 
     if(nullptr != m_cmdlist[i] && !m_cmdlist[i]->isWaitingForOption() && !m_cmdlist[i]->isRunningInBackground()){
 
-      delete m_cmdlist[i];
+      pdiutil::safe_delete(m_cmdlist[i]);
       m_cmdlist.erase(m_cmdlist.begin() + i);
     }
   }

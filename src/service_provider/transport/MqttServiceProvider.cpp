@@ -35,7 +35,7 @@ MqttServiceProvider::MqttServiceProvider():
 MqttServiceProvider::~MqttServiceProvider(){
   this->stop();
   if( nullptr != this->m_mqtt_payload ){
-    delete[] this->m_mqtt_payload;
+    pdiutil::safe_delete_array(this->m_mqtt_payload);
     this->m_mqtt_payload = nullptr;
   }
   this->m_mqtt_publish_data_cb = nullptr;
@@ -52,11 +52,13 @@ bool MqttServiceProvider::initService( void *arg ){
   }
 
   // m_client = reinterpret_cast<iClientInterface*>(arg);
-  m_client = new TcpClientInterface; // Prefer new client instance for mqtt
+  m_client = pdiutil::safe_new<TcpClientInterface>(); // Prefer new client instance for mqtt
+  this->m_mqtt_payload = pdiutil::safe_new_array<char>( MQTT_PAYLOAD_BUF_SIZE );
 
-  this->m_mqtt_payload = new char[ MQTT_PAYLOAD_BUF_SIZE ];
-  if( nullptr != this->m_mqtt_payload ){
-    memset( this->m_mqtt_payload, 0, MQTT_PAYLOAD_BUF_SIZE );
+  if ( nullptr == m_client || nullptr == this->m_mqtt_payload ) {
+    pdiutil::safe_delete(m_client);
+    pdiutil::safe_delete_array(this->m_mqtt_payload);
+    return false;
   }
 
   this->m_mqtt_client.m_mqttDataCallbackArgs = reinterpret_cast<uint32_t*>(this);
@@ -89,7 +91,7 @@ void MqttServiceProvider::handleMqttPublish(bool sync){
 
       #ifdef ENABLE_MQTT_DEFAULT_PAYLOAD
 
-        pdiutil::string *_payload = new pdiutil::string();
+        pdiutil::string *_payload = pdiutil::safe_new<pdiutil::string>();
 
         if( nullptr != _payload ){
 
@@ -106,7 +108,7 @@ void MqttServiceProvider::handleMqttPublish(bool sync){
           // _payload->toCharArray( this->m_mqtt_payload, MQTT_PAYLOAD_BUF_SIZE );
           strncpy(this->m_mqtt_payload, _payload->c_str(), _payload->size());
 
-          delete _payload;
+          pdiutil::safe_delete(_payload);
         }
 
       #else
@@ -290,12 +292,12 @@ void MqttServiceProvider::handleMqttDataCb( uint32_t *args, const char* topic, u
       args, topic, topic_len, data, data_len
     );
 
-    char *topicBuf = new char[topic_len+1], *dataBuf = new char[data_len+1];
+    char *topicBuf = pdiutil::safe_new_array<char>(topic_len+1), *dataBuf = pdiutil::safe_new_array<char>(data_len+1);
 
     if( nullptr != topicBuf ){
       memcpy(topicBuf, topic, topic_len);
       topicBuf[topic_len] = 0;
-      delete[] topicBuf;
+      pdiutil::safe_delete_array(topicBuf);
     }
 
     if( nullptr != dataBuf ){
@@ -306,7 +308,7 @@ void MqttServiceProvider::handleMqttDataCb( uint32_t *args, const char* topic, u
       __gpio_service.applyGpioJsonPayload( dataBuf, data_len );
       #endif
 
-      delete[] dataBuf;
+      pdiutil::safe_delete_array(dataBuf);
     }
 }
 

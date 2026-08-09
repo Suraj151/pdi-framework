@@ -104,15 +104,15 @@ public:
 		}
 	  }
 
-	  char *_page = new char[PAGE_HTML_MAX_SIZE];
-	  memset(_page, 0, PAGE_HTML_MAX_SIZE);
+	  char *_page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
+	  if (nullptr == _page) return;
 
 	  BEGIN_SEND_IN_CHUNK(HTTP_RESP_NOT_FOUND, MIME_TYPE_TEXT_HTML, _page);
 	  this->build_html(_page, WEB_SERVER_404_PAGE);
 	  END_SENDING_CHUNK();
 
 	//   this->m_web_resource->m_server->send(HTTP_RESP_NOT_FOUND, MIME_TYPE_TEXT_HTML, _page);
-	  delete[] _page;
+	  pdiutil::safe_delete_array(_page);
 	}
 
 	/**
@@ -129,8 +129,8 @@ public:
 			return;
 		}
 
-		char *_page = new char[PAGE_HTML_MAX_SIZE];
-		memset(_page, 0, PAGE_HTML_MAX_SIZE);
+		char *_page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
+		if (nullptr == _page) return;
 		
 		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
 		BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
@@ -178,7 +178,7 @@ public:
 		END_SENDING_CHUNK();
 
 		// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
-		delete[] _page;
+		pdiutil::safe_delete_array(_page);
 	}
 };
 

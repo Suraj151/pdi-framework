@@ -38,7 +38,11 @@ char* rofn::to_charptr(const void *rostr){
     PGM_P p = reinterpret_cast<PGM_P>(rostr);
     auto len = strlen_P(p);
 
-    char *buff = new char[len + 1]; // +1 for null terminator
+    char *buff = pdiutil::safe_new_array<char>(len + 1); // +1 for null terminator
+    if( nullptr == buff ){
+        return nullptr;
+    }
+
     memcpy_P(buff, p, len);
     buff[len] = '\0'; // Null terminate the string
 

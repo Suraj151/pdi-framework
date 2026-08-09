@@ -22,7 +22,7 @@ struct UptimeCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_UPTIME, [](void *arg)->void *{
-			return new UptimeCommand();
+			return pdiutil::safe_new<UptimeCommand>();
 		});
 	}
 

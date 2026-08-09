@@ -27,7 +27,7 @@ struct GrepFSCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_GREP, [](void *arg)->void *{
-			return new GrepFSCommand();
+			return pdiutil::safe_new<GrepFSCommand>();
 		});
 	}
 
@@ -87,7 +87,7 @@ struct GrepFSCommand : public CommandBase {
 				if(nullptr == item.m_name) continue;
 
 				int namelen = (int)strlen(item.m_name);
-				char *childpath = new char[dirpath_len + namelen + 2]();
+				char *childpath = pdiutil::safe_new_array<char>(dirpath_len + namelen + 2);
 
 				if(nullptr != childpath){
 					memcpy(childpath, dirpath, dirpath_len);
@@ -101,13 +101,13 @@ struct GrepFSCommand : public CommandBase {
 						grepFile(childpath, childpath_len, pattern);
 					}
 
-					delete[] childpath;
+					pdiutil::safe_delete_array(childpath);
 				}
 			}
 		}
 
 		for(file_info_t &item : items){
-			if(item.m_name) delete[] item.m_name;
+			pdiutil::safe_delete_array(item.m_name);
 		}
 		items.clear();
 	}
@@ -131,7 +131,7 @@ struct GrepFSCommand : public CommandBase {
 
 			if(isPatternProvided && isFileProvided){
 
-				char *pattern = new char[patternoptn->optionvalsize + 1]();
+				char *pattern = pdiutil::safe_new_array<char>(patternoptn->optionvalsize + 1);
 				pdiutil::string filepath = resolveArgPath(fileoptn);
 
 				if(nullptr != pattern && !filepath.empty()){
@@ -153,7 +153,7 @@ struct GrepFSCommand : public CommandBase {
 					}
 				}
 
-				if(nullptr != pattern) delete[] pattern;
+				pdiutil::safe_delete_array(pattern);
 			}else{
 				result = CMD_RESULT_ARGS_MISSING;
 			}

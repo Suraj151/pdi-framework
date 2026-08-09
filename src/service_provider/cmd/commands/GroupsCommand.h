@@ -27,7 +27,7 @@ struct GroupsCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_GROUPS, [](void *arg)->void *{
-			return new GroupsCommand();
+			return pdiutil::safe_new<GroupsCommand>();
 		});
 	}
 

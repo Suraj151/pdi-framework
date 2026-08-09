@@ -32,7 +32,7 @@ struct SuCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_SU, [](void *arg)->void *{
-			return new SuCommand();
+			return pdiutil::safe_new<SuCommand>();
 		});
 	}
 

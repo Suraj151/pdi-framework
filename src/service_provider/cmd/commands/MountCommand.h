@@ -31,7 +31,7 @@ struct MountCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_MOUNT, [](void *arg)->void *{
-			return new MountCommand();
+			return pdiutil::safe_new<MountCommand>();
 		});
 	}
 

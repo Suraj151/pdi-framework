@@ -23,7 +23,7 @@ struct WhoAmICommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_WHOAMI, [](void *arg)->void *{
-			return new WhoAmICommand();
+			return pdiutil::safe_new<WhoAmICommand>();
 		});
 	}
 

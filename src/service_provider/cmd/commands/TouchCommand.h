@@ -28,7 +28,7 @@ struct TouchCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_TOUCH, [](void *arg)->void *{
-			return new TouchCommand();
+			return pdiutil::safe_new<TouchCommand>();
 		});
 	}
 

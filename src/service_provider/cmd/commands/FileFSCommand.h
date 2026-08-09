@@ -35,7 +35,7 @@ struct FileReadCommand : public CommandBase {
      */
     static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_FILE_READ, [](void *arg)->void *{
-			return new FileReadCommand();
+			return pdiutil::safe_new<FileReadCommand>();
 		});
 	}
 
@@ -120,7 +120,7 @@ struct FileEditCommand : public CommandBase {
      */
     static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_FILE_EDIT, [](void *arg)->void *{
-			return new FileEditCommand();
+			return pdiutil::safe_new<FileEditCommand>();
 		});
 	}
 

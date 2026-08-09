@@ -216,7 +216,8 @@ int SysFs::getDirFileList(const char* path, pdiutil::vector<file_info_t>& items,
         // Callers (ls) delete[] m_name — allocate a heap copy so the free path
         // is safe.
         uint32_t nlen = strlen(name);
-        info.m_name = new char[nlen + 1];
+        info.m_name = pdiutil::safe_new_array<char>(nlen + 1);
+        if (nullptr == info.m_name) return;
         memcpy(info.m_name, name, nlen);
         info.m_name[nlen] = '\0';
         items.push_back(info);

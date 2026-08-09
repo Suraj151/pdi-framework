@@ -37,7 +37,7 @@ struct HostCommand : public CommandBase {
      */
     static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_HOST, [](void *arg)->void *{
-			return new HostCommand();
+			return pdiutil::safe_new<HostCommand>();
 		});
 	}
 

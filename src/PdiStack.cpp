@@ -71,7 +71,7 @@ PDIStack::PDIStack()
  */
 PDIStack::~PDIStack(){
 #ifdef ENABLE_WIFI_SERVICE
-  delete this->m_client;
+  pdiutil::safe_delete(this->m_client);
   this->m_client = nullptr;
   this->m_server = nullptr;
 #endif
@@ -84,6 +84,8 @@ PDIStack::~PDIStack(){
  * email, device IoT, authentication, and command-line services based on the enabled preprocessor directives.
  */
 void PDIStack::initialize(){
+
+  pdiutil::enable_heap_check();
 
   __log_manager.init(__i_dvc_ctrl.getTerminal());
   // LogI("\n________________________\n\nInitializing PDI Stack\nRelease : %s\nConfig  : %s\n________________________\n", RELEASE, CONFIG_VERSION);

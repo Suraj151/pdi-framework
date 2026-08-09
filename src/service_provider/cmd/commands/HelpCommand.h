@@ -24,7 +24,7 @@ struct HelpCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_HELP, [](void *arg)->void *{
-			return new HelpCommand();
+			return pdiutil::safe_new<HelpCommand>();
 		});
 	}
 
@@ -68,7 +68,7 @@ struct HelpCommand : public CommandBase {
 				if (nullptr != usage) {
 					m_terminal->write_ro(usage);
 				}
-				if (nullptr != inst) delete inst;
+				pdiutil::safe_delete(inst);
 				m_terminal->writeln();
 			}
 		}

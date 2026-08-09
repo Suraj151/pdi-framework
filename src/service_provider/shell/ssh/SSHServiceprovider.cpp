@@ -174,7 +174,7 @@ void SSHServer::closeSession() {
     __i_dvc_ctrl.wait(5);
     __i_dvc_ctrl.yield();
     if (m_session) {
-        delete m_session;
+        pdiutil::safe_delete(m_session);
         m_session = nullptr;
     }
 }
@@ -208,7 +208,20 @@ void SSHServer::handle() {
             break; // pool full
         }
 
-        m_sessions[slot] = new LWSSHSession(m_server->accept());
+        iClientInterface* client = m_server->accept();
+        m_sessions[slot] = pdiutil::safe_new<LWSSHSession>(client);
+        if (m_sessions[slot] == nullptr) {
+            // Not enough heap for another session, drop the accepted client.
+            if (client) {
+                client->close();
+                pdiutil::safe_delete(client);
+            }
+            break;
+        }
+        if (m_sessions[slot]->m_sshclient == nullptr) {
+            pdiutil::safe_delete(m_sessions[slot]);
+            break;
+        }
 
         #ifdef ENABLE_CMD_SERVICE
         m_sessions[slot]->m_sshclient->set_terminal_type(TERMINAL_TYPE_SSH);
@@ -1397,7 +1410,7 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
 
                             if (rc < 0) {
                                 errcode = SSH_FX_FAILURE;
-                                for (file_info_t item : itemlist) { if (item.m_name) delete[] item.m_name; }
+                                for (file_info_t item : itemlist) { pdiutil::safe_delete_array(item.m_name); }
                                 itemlist.clear();
                             } else {
                                 auto &sftp = m_session->current_channel.subsystem_req.sftp;
@@ -1417,7 +1430,7 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                                     e.ctime = item.m_ctime;
                                     e.mtime = item.m_mtime;
                                     sftp.dir_entries.push_back(e);
-                                    if (item.m_name) delete[] item.m_name;
+                                    pdiutil::safe_delete_array(item.m_name);
                                 }
                                 itemlist.clear();
 

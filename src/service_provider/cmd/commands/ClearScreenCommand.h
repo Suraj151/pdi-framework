@@ -32,7 +32,7 @@ struct ClearScreenCommand : public CommandBase {
      */
     static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_CLS, [](void *arg)->void *{
-			return new ClearScreenCommand();
+			return pdiutil::safe_new<ClearScreenCommand>();
 		});
 	}
 

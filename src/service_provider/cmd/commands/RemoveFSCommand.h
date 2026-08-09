@@ -33,7 +33,7 @@ struct RemoveFSCommand : public CommandBase {
      */
     static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_RM, [](void *arg)->void *{
-			return new RemoveFSCommand();
+			return pdiutil::safe_new<RemoveFSCommand>();
 		});
 	}
 

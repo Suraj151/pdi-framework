@@ -115,7 +115,7 @@ void readCrashFileToBuffer(String &_filepath, String &_filedata, uint16_t &_size
 	if (_file)
 	{
 		_size = _file.size();
-		char *_buffer = new char[_size + 1];
+		char *_buffer = pdiutil::safe_new_array<char>(_size + 1);
 
 		if (nullptr != _buffer)
 		{
@@ -124,7 +124,7 @@ void readCrashFileToBuffer(String &_filepath, String &_filedata, uint16_t &_size
 			_buffer[_size] = 0;
 
 			_filedata = String(_buffer);
-			delete[] _buffer;
+			pdiutil::safe_delete_array(_buffer);
 		}
 	}
 }

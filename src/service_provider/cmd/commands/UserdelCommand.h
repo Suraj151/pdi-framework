@@ -26,7 +26,7 @@ struct UserdelCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_USERDEL, [](void *arg)->void *{
-			return new UserdelCommand();
+			return pdiutil::safe_new<UserdelCommand>();
 		});
 	}
 

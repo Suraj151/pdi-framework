@@ -140,7 +140,7 @@ http_ota_status OtaServiceProvider::handle()
     {
       // int _rsponse_len = (httl_resp_len + 1) > OTA_VERSION_API_RESP_LENGTH ? OTA_VERSION_API_RESP_LENGTH : (httl_resp_len + 1);
       uint32_t _firm_version = 0;
-      char *_version_buf = new char[OTA_VERSION_LENGTH];
+      char *_version_buf = pdiutil::safe_new_array<char>(OTA_VERSION_LENGTH);
 
       if (nullptr != _version_buf)
       {
@@ -159,7 +159,7 @@ http_ota_status OtaServiceProvider::handle()
           _status = VERSION_NOT_FOUND;
         }
 
-        delete[] _version_buf;
+        pdiutil::safe_delete_array(_version_buf);
       }
 
       this->m_http_client->End(true);

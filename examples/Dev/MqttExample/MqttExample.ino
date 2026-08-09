@@ -44,7 +44,13 @@ void publish_callback( char* _payload, uint16_t _length ){
 // mqtt service will call this function whenever it receive data on subscribed topic
 void subscribe_callback( uint32_t *args, const char* topic, uint32_t topic_len, const char *data, uint32_t data_len ){
 
-  char *topicBuf = new char[topic_len+1], *dataBuf = new char[data_len+1];
+  char *topicBuf = pdiutil::safe_new_array<char>(topic_len+1), *dataBuf = pdiutil::safe_new_array<char>(data_len+1);
+
+  if( nullptr == topicBuf || nullptr == dataBuf ){
+    pdiutil::safe_delete_array(topicBuf);
+    pdiutil::safe_delete_array(dataBuf);
+    return;
+  }
 
   memcpy(topicBuf, topic, topic_len);
   topicBuf[topic_len] = 0;
@@ -55,7 +61,7 @@ void subscribe_callback( uint32_t *args, const char* topic, uint32_t topic_len, 
   Serial.println(F("\n\nMQTT: user data callback"));
   Serial.printf("MQTT: user Receive topic: %s, data: %s \n\n", topicBuf, dataBuf);
 
-  delete[] topicBuf; delete[] dataBuf;
+  pdiutil::safe_delete_array(topicBuf); pdiutil::safe_delete_array(dataBuf);
 }
 
 void configure_mqtt(){

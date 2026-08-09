@@ -223,15 +223,15 @@ public:
 			return;
 		}
 
-		char *_page = new char[PAGE_HTML_MAX_SIZE];
-		memset(_page, 0, PAGE_HTML_MAX_SIZE);
+		char *_page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
+		if (nullptr == _page) return;
 
 		BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 		this->build_storage_html(_page);
 		END_SENDING_CHUNK();
 
 		// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
-		delete[] _page;
+		pdiutil::safe_delete_array(_page);
 	}
 
 	/**
@@ -336,7 +336,14 @@ public:
 
 		// Prepare temporary buffers
 		uint32_t tempbufferlen = max(strlen(SVG_ICON48_1616_PATH_TRASH),max(strlen(SVG_ICON48_1416_PATH_FOLDER), strlen(SVG_ICON48_1216_PATH_FILE))) + 100;
-		char *tempbuffer = new char[tempbufferlen]; 
+		char *tempbuffer = pdiutil::safe_new_array<char>(tempbufferlen);
+		if (nullptr == tempbuffer) {
+			for (file_info_t &item : itemlist) {
+				pdiutil::safe_delete_array(item.m_name);
+			}
+			itemlist.clear();
+			return;
+		}
 
 		pdiutil::string jsonresp = "{";
 		jsonresp += CHARPTR_WRAP("\"dsvg\":\"");
@@ -386,7 +393,7 @@ public:
 
 				// avoid current directory
 				if( strcmp((const char*)item.m_name, ".") == 0 ){
-					delete[] item.m_name;
+					pdiutil::safe_delete_array(item.m_name);
 					continue;
 				}
 
@@ -410,14 +417,14 @@ public:
 				jsonresp += CHARPTR_WRAP("\"},");
 
 				// deallocates memory for items
-				delete[] item.m_name;
+				pdiutil::safe_delete_array(item.m_name);
 			}
 
 			jsonresp.pop_back(); // remove last comma
 			itemlist.clear();
 		}
 
-		delete[] tempbuffer;
+		pdiutil::safe_delete_array(tempbuffer);
 		jsonresp += CHARPTR_WRAP("]}");
 
 		this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_APPLICATION_JSON, jsonresp.c_str());

@@ -42,7 +42,7 @@ struct NetworkCommand : public CommandBase {
      */
     static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_NETWORK, [](void *arg)->void *{
-			return new NetworkCommand();
+			return pdiutil::safe_new<NetworkCommand>();
 		});
 	}
 

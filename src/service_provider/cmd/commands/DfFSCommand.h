@@ -27,7 +27,7 @@ struct DfFSCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_DF, [](void *arg)->void *{
-			return new DfFSCommand();
+			return pdiutil::safe_new<DfFSCommand>();
 		});
 	}
 

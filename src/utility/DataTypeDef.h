@@ -17,6 +17,7 @@ Created Date    : 1st June 2019
 
 #include "../../devices/DeviceConfig.h"
 #include "pdi_types.h"
+#include "SafeAlloc.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdarg.h>
@@ -167,8 +168,7 @@ namespace rofn{
         ROPTR& operator=(const ROPTR &obj) {
             if (this != &obj) {
 
-                if( nullptr != ptr )
-                    delete[] ptr;
+                pdiutil::safe_delete_array(ptr);
 
                 autodelete = obj.autodelete;
                 if( nullptr != obj.ptr ){
@@ -180,8 +180,8 @@ namespace rofn{
         }
 
         ~ROPTR() {
-            if (ptr && autodelete) {
-                delete[] ptr; // Free the memory allocated for the non read-only string
+            if (autodelete) {
+                pdiutil::safe_delete_array(ptr); // Free the memory allocated for the non read-only string
             }
             ptr = nullptr;
         }

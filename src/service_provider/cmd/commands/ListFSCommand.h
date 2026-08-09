@@ -40,7 +40,7 @@ struct ListFSCommand : public CommandBase {
      */
     static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_LS, [](void *arg)->void *{
-			return new ListFSCommand();
+			return pdiutil::safe_new<ListFSCommand>();
 		});
 	}
 
@@ -191,7 +191,7 @@ struct ListFSCommand : public CommandBase {
 
 				m_terminal->writeln(item.m_name);
 				// deallocates memory for items
-				delete[] item.m_name;
+				pdiutil::safe_delete_array(item.m_name);
 			}
 
 			itemlist.clear();

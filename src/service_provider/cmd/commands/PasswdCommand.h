@@ -28,7 +28,7 @@ struct PasswdCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_PASSWD, [](void *arg)->void *{
-			return new PasswdCommand();
+			return pdiutil::safe_new<PasswdCommand>();
 		});
 	}
 

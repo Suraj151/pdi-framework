@@ -128,7 +128,7 @@ iClientInterface* TcpServerInterface::accept() {
         tcp_poll(pcb, nullptr, 0);
 
         TCP_GUARD_END
-        return new TcpClientInterface(pcb);
+        return pdiutil::safe_new<TcpClientInterface>(pcb);
     }
     TCP_GUARD_END
     return nullptr;

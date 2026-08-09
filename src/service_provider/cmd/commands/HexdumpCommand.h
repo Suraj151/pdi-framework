@@ -25,7 +25,7 @@ struct HexdumpCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_HEXDUMP, [](void *arg)->void *{
-			return new HexdumpCommand();
+			return pdiutil::safe_new<HexdumpCommand>();
 		});
 	}
 

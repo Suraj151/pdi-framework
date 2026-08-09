@@ -26,7 +26,7 @@ struct HeadFSCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_HEAD, [](void *arg)->void *{
-			return new HeadFSCommand();
+			return pdiutil::safe_new<HeadFSCommand>();
 		});
 	}
 

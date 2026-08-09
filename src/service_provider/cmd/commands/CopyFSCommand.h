@@ -34,7 +34,7 @@ struct CopyFSCommand : public CommandBase {
      */
     static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_COPY, [](void *arg)->void *{
-			return new CopyFSCommand();
+			return pdiutil::safe_new<CopyFSCommand>();
 		});
 	}
 

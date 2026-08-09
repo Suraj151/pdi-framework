@@ -46,7 +46,7 @@ struct SSHKeygenCommand : public CommandBase {
      */
     static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_SSHKEYGEN, [](void *arg)->void *{
-			return new SSHKeygenCommand();
+			return pdiutil::safe_new<SSHKeygenCommand>();
 		});
 	}
 

@@ -36,7 +36,7 @@ struct WhoCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_WHO, [](void *arg)->void *{
-			return new WhoCommand();
+			return pdiutil::safe_new<WhoCommand>();
 		});
 	}
 

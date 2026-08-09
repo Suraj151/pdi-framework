@@ -40,7 +40,7 @@ struct PkillCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_PKILL, [](void *arg)->void *{
-			return new PkillCommand();
+			return pdiutil::safe_new<PkillCommand>();
 		});
 	}
 
@@ -140,7 +140,7 @@ struct KillallCommand : public PkillCommand {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_KILLALL, [](void *arg)->void *{
-			return new KillallCommand();
+			return pdiutil::safe_new<KillallCommand>();
 		});
 	}
 

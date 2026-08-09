@@ -42,7 +42,7 @@ HttpServerInterfaceImpl::HttpServerInterfaceImpl() :
  */
 HttpServerInterfaceImpl::~HttpServerInterfaceImpl(){
     if( nullptr != m_server ){
-        delete m_server;
+        pdiutil::safe_delete(m_server);
         m_server = nullptr;
     }
 }
@@ -450,9 +450,8 @@ void HttpServerInterfaceImpl::parseRequest(){
     // read body if content length is specified
     if(!isForm && contentLength > 0) {
 
-        char* body = new char[contentLength + 1];
+        char* body = pdiutil::safe_new_array<char>(contentLength + 1);
         if( body ){
-            memset(body, 0, contentLength + 1);
             uint16_t readlen = readPacket(  m_client,
                                             (uint8_t *)body,
                                             contentLength,
@@ -465,7 +464,7 @@ void HttpServerInterfaceImpl::parseRequest(){
             } else {
                 m_clientRequest.body.clear(); // Clear body if read failed
             }
-            delete[] body;
+            pdiutil::safe_delete_array(body);
         }
     }
 
@@ -610,7 +609,7 @@ void HttpServerInterfaceImpl::parseRequest(){
                         argvalue.clear();
                         pdiutil::string lastread;
                         pdiutil::string held;
-                        uint32_t maxreadinonecall = 256;
+                        uint32_t maxreadinonecall = HTTP_UPLOAD_READ_BLOCK_SIZE;
                         while (1) {
 
                             m_client->readStringUntil(part, '\r', true, readLineYield, maxreadinonecall);
@@ -832,7 +831,7 @@ bool HttpServerInterfaceImpl::handleStaticFileRequest(){
 void HttpServerInterfaceImpl::closeClient() {
     if (m_client) {
         m_client->close();
-        delete m_client;
+        pdiutil::safe_delete(m_client);
         m_client = nullptr;
     }
 }

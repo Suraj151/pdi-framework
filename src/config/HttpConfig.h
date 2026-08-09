@@ -88,6 +88,12 @@ typedef enum http_method http_method_t;
 #define HTTP_CLIENT_READINTERVAL_MS 10
 #define HTTP_CLIENT_MAX_READ_MS 1500
 
+// Bytes read in one pass while receiving a multipart body. Also drives the file
+// write granularity as a chunk is flushed every second pass.
+#ifndef HTTP_UPLOAD_READ_BLOCK_SIZE
+#define HTTP_UPLOAD_READ_BLOCK_SIZE 2048
+#endif
+
 #define HTTP_HEADER_KEY_HOST            "Host"
 #define HTTP_HEADER_KEY_USER_AGENT      "User-Agent"
 #define HTTP_HEADER_KEY_ACCEPT_ENCODING "Accept-Encoding"
@@ -196,9 +202,8 @@ struct http_param_t{
         if (nullptr != _key){
 
             uint16_t _len = strlen(_key);
-            key = new char[_len + 1];
+            key = pdiutil::safe_new_array<char>(_len + 1);
             if (nullptr != key){
-                memset(key, 0, _len + 1);
                 memcpy(key, _key, _len);
             }
         }
@@ -206,9 +211,8 @@ struct http_param_t{
         if (nullptr != _value){
 
             uint16_t _len = strlen(_value);
-            value = new char[_len + 1];
+            value = pdiutil::safe_new_array<char>(_len + 1);
             if (nullptr != value){
-                memset(value, 0, _len + 1);
                 memcpy(value, _value, _len);
             }
         }
@@ -237,18 +241,13 @@ struct http_param_t{
         )
             return false;
         
-        if (nullptr != value)
-        {
-            delete[] value;
-            value = nullptr;
-        }
+        pdiutil::safe_delete_array(value);
 
         if (nullptr != _value){
 
             uint16_t _len = strlen(_value);
-            value = new char[_len + 1];
+            value = pdiutil::safe_new_array<char>(_len + 1);
             if (nullptr != value){
-                memset(value, 0, _len + 1);
                 memcpy(value, _value, _len);
             }
         }
@@ -259,16 +258,8 @@ struct http_param_t{
     // clear request resources and set to defaults
     void clear(){
 
-        if (nullptr != key)
-        {
-            delete[] key;
-            key = nullptr;
-        }
-        if (nullptr != value)
-        {
-            delete[] value;
-            value = nullptr;
-        }
+        pdiutil::safe_delete_array(key);
+        pdiutil::safe_delete_array(value);
     }
 };
 

@@ -27,7 +27,7 @@ struct UseraddCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_USERADD, [](void *arg)->void *{
-			return new UseraddCommand();
+			return pdiutil::safe_new<UseraddCommand>();
 		});
 	}
 

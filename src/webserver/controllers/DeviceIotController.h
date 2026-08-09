@@ -119,15 +119,15 @@ public:
 		}
 		else
 		{
-			char *_page = new char[PAGE_HTML_MAX_SIZE];
-			memset(_page, 0, PAGE_HTML_MAX_SIZE);
+			char *_page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
+			if (nullptr == _page) return;
 			
 			BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 			this->build_device_register_config_html(_page);
 			END_SENDING_CHUNK();
 
 			// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
-			delete[] _page;
+			pdiutil::safe_delete_array(_page);
 		}
 	}
 };

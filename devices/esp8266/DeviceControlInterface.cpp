@@ -200,7 +200,7 @@ iGpioBlinkerInterface *DeviceControlInterface::createGpioBlinkerInstance(gpio_id
     m_mutex.lock();
     #endif
 
-    iGpioBlinkerInterface * p = new GpioBlinkerInterface(pin, duration);
+    iGpioBlinkerInterface * p = pdiutil::safe_new<GpioBlinkerInterface>(pin, duration);
 
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
     m_mutex.unlock();
@@ -218,10 +218,7 @@ void DeviceControlInterface::releaseGpioBlinkerInstance(iGpioBlinkerInterface *i
     m_mutex.lock();
     #endif
 
-    if (nullptr != instance)
-    {
-        delete instance;
-    }
+    pdiutil::safe_delete(instance);
 
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
     m_mutex.unlock();

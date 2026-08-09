@@ -39,16 +39,8 @@ http_req_t::~http_req_t()
 // clear request resources and set to defaults
 void http_req_t::clear(bool keep_headers)
 {
-    if (nullptr != host)
-    {
-        delete[] host;
-        host = nullptr;
-    }
-    if (nullptr != uri)
-    {
-        delete[] uri;
-        uri = nullptr;
-    }
+    pdiutil::safe_delete_array(host);
+    pdiutil::safe_delete_array(uri);
     port = HTTP_DEFAULT_PORT;
     reuse = false;
     timeout = HTTP_HOST_CONNECT_TIMEOUT;
@@ -99,7 +91,7 @@ bool http_req_t::init(const char *url)
             if (bStatus && _url_len)
             {
                 uint16_t _host_len = ((uri_index != -1) ? uri_index : _url_len) - host_index;
-                host = new char[_host_len + 1];
+                host = pdiutil::safe_new_array<char>(_host_len + 1);
                 bStatus = (nullptr != host);
                 if (bStatus)
                 {
@@ -126,7 +118,7 @@ bool http_req_t::init(const char *url)
             if (bStatus && host_index < uri_index)
             {
                 int _uri_len = strlen(_url) - uri_index;
-                uri = new char[_uri_len + 1];
+                uri = pdiutil::safe_new_array<char>(_uri_len + 1);
                 bStatus = (nullptr != uri);
                 if (bStatus)
                 {
@@ -169,11 +161,7 @@ http_resp_t::~http_resp_t()
 // clear request resources and set to defaults
 void http_resp_t::clear()
 {
-    if (nullptr != response)
-    {
-        delete[] response;
-        response = nullptr;
-    }
+    pdiutil::safe_delete_array(response);
     status_code = HTTP_RESP_MAX;
     resp_length = 0;
     max_resp_length = HTTP_CLIENT_BUF_SIZE;
@@ -370,13 +358,13 @@ bool Http_Client::SetBasicAuthorization(const char *user, const char *pass)
 
     if (nullptr != user && nullptr != pass)
     {
-        char *base64_encoded_auth = new char[300];
+        char *base64_encoded_auth = pdiutil::safe_new_array<char>(300);
         if(nullptr != base64_encoded_auth)
         {
             Http_Client::BuildBasicAuthorization(user, pass, base64_encoded_auth, 300);
             pdiutil::string authorization_key = CHARPTR_WRAP(HTTP_HEADER_KEY_AUTHORIZATION);
             bStatus = AddReqHeader(authorization_key.c_str(), base64_encoded_auth);
-            delete []base64_encoded_auth;
+            pdiutil::safe_delete_array(base64_encoded_auth);
         }
     }
 
@@ -388,7 +376,7 @@ void Http_Client::BuildBasicAuthorization(const char *user, const char *pass, ch
     if (nullptr != user && nullptr != pass)
     {
         uint16_t _len = strlen(user) + strlen(pass) + 3;
-        char *auth = new char[_len];
+        char *auth = pdiutil::safe_new_array<char>(_len);
         if (nullptr != auth)
         {
             memset(auth, 0, _len);
@@ -400,7 +388,7 @@ void Http_Client::BuildBasicAuthorization(const char *user, const char *pass, ch
             strcpy(auth_value, RODT_ATTR("device@"));
             base64Encode(auth, strlen(auth), auth_value + 7);
 
-            delete []auth;
+            pdiutil::safe_delete_array(auth);
         }
     }
 }
@@ -755,7 +743,7 @@ int16_t Http_Client::handleResponse()
     // Have a response buffer if not already
     if (nullptr == m_response.response)
     {
-        m_response.response = new char[m_response.max_resp_length + 1];
+        m_response.response = pdiutil::safe_new_array<char>(m_response.max_resp_length + 1);
     }
 
     // clear the previous response headers and status code
@@ -896,7 +884,7 @@ int64_t Http_Client::DownloadStream(const char *url, CallBackBytesArgBoolRetFn w
 bool Http_Client::streamBodyTo(int32_t &max_timeout)
 {
     const uint16_t scratch_size = 1024;
-    uint8_t *scratch = new uint8_t[scratch_size];
+    uint8_t *scratch = pdiutil::safe_new_array<uint8_t>(scratch_size);
     if (nullptr == scratch || !m_stream_writer) return false;
 
     char *content_length_hdr = nullptr;
@@ -916,7 +904,7 @@ bool Http_Client::streamBodyTo(int32_t &max_timeout)
 
     uint32_t size_hint = (content_length > 0) ? (uint32_t)content_length : 0;
     if (!m_stream_writer(nullptr, size_hint)) {
-        delete[] scratch;
+        pdiutil::safe_delete_array(scratch);
         return false;
     }
 
@@ -1003,7 +991,7 @@ bool Http_Client::streamBodyTo(int32_t &max_timeout)
         }
     }
 
-    delete[] scratch;
+    pdiutil::safe_delete_array(scratch);
 
     if (ok && content_length >= 0 && m_stream_bytes_written < content_length) ok = false;
 

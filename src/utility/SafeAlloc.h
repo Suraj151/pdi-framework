@@ -25,8 +25,17 @@ Created Date    : 6th June 2026
 namespace pdiutil {
 
 /**
+ * @brief Arms the heap check. Must be called once the device instances are
+ *        constructed; PDIStack::initialize() does this.
+ */
+void enable_heap_check();
+
+/**
  * @brief Returns true if the device's free heap can safely satisfy a
  *        request for `bytes` plus PDI_SAFE_ALLOC_HEAP_MARGIN.
+ *
+ * Always true before enable_heap_check(), because global constructors run
+ * before the device instances they would query exist.
  */
 bool has_heap_for(size_t bytes);
 
@@ -48,13 +57,13 @@ inline T* safe_new(Args&&... args) {
 /**
  * @brief Heap-checked `new T[count]`. Returns nullptr if count is zero or
  *        the heap cannot safely satisfy the allocation, otherwise returns
- *        a default-initialized array.
+ *        a value-initialized (zeroed for scalars) array.
  */
 template <typename T>
 inline T* safe_new_array(size_t count) {
     if (count == 0) return nullptr;
     if (!has_heap_for(count * sizeof(T))) return nullptr;
-    return new T[count];
+    return new T[count]();
 }
 
 /**

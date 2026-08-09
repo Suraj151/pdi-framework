@@ -38,7 +38,7 @@ struct DateCommand : public CommandBase {
      */
     static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_DATE, [](void *arg)->void *{
-			return new DateCommand();
+			return pdiutil::safe_new<DateCommand>();
 		});
 	}
 

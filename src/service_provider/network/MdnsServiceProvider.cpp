@@ -118,7 +118,7 @@ bool MdnsServiceProvider::stopService() {
 
   if (nullptr != m_udp) {
     m_udp->close();
-    delete m_udp;
+    pdiutil::safe_delete(m_udp);
     m_udp = nullptr;
   }
   return ServiceProvider::stopService();
@@ -140,7 +140,7 @@ bool MdnsServiceProvider::startResponder() {
 
   if (nullptr != m_udp) {
     m_udp->close();
-    delete m_udp;
+    pdiutil::safe_delete(m_udp);
     m_udp = nullptr;
   }
 
@@ -148,7 +148,7 @@ bool MdnsServiceProvider::startResponder() {
   if (nullptr == m_udp) return false; // port without a UDP impl yet
 
   if (!m_udp->begin(MDNS_PORT)) {
-    delete m_udp;
+    pdiutil::safe_delete(m_udp);
     m_udp = nullptr;
     return false;
   }
@@ -210,7 +210,7 @@ uint8_t MdnsServiceProvider::writeInstanceName(uint8_t *out, uint8_t idx) {
 void MdnsServiceProvider::sendAResponse() {
 
   if (nullptr == m_udp) return;
-  uint8_t *resp = new uint8_t[MDNS_TX_BUFFER_SIZE];
+  uint8_t *resp = pdiutil::safe_new_array<uint8_t>(MDNS_TX_BUFFER_SIZE);
   if (nullptr == resp) return;
 
   uint16_t p = 0;
@@ -227,13 +227,13 @@ void MdnsServiceProvider::sendAResponse() {
 
   ipaddress_t mcast(MDNS_MULTICAST_ADDR_0, MDNS_MULTICAST_ADDR_1, MDNS_MULTICAST_ADDR_2, MDNS_MULTICAST_ADDR_3);
   m_udp->send(resp, p, mcast, MDNS_PORT);
-  delete[] resp;
+  pdiutil::safe_delete_array(resp);
 }
 
 void MdnsServiceProvider::sendServiceEnumeration() {
 
   if (nullptr == m_udp || 0 == m_service_count) return;
-  uint8_t *resp = new uint8_t[MDNS_TX_BUFFER_SIZE];
+  uint8_t *resp = pdiutil::safe_new_array<uint8_t>(MDNS_TX_BUFFER_SIZE);
   if (nullptr == resp) return;
 
   uint16_t p = 0;
@@ -252,13 +252,13 @@ void MdnsServiceProvider::sendServiceEnumeration() {
 
   ipaddress_t mcast(MDNS_MULTICAST_ADDR_0, MDNS_MULTICAST_ADDR_1, MDNS_MULTICAST_ADDR_2, MDNS_MULTICAST_ADDR_3);
   m_udp->send(resp, p, mcast, MDNS_PORT);
-  delete[] resp;
+  pdiutil::safe_delete_array(resp);
 }
 
 void MdnsServiceProvider::sendServiceBundle(uint8_t idx) {
 
   if (nullptr == m_udp || idx >= m_service_count) return;
-  uint8_t *resp = new uint8_t[MDNS_TX_BUFFER_SIZE];
+  uint8_t *resp = pdiutil::safe_new_array<uint8_t>(MDNS_TX_BUFFER_SIZE);
   if (nullptr == resp) return;
 
   uint16_t p = 0;
@@ -312,7 +312,7 @@ void MdnsServiceProvider::sendServiceBundle(uint8_t idx) {
 
   ipaddress_t mcast(MDNS_MULTICAST_ADDR_0, MDNS_MULTICAST_ADDR_1, MDNS_MULTICAST_ADDR_2, MDNS_MULTICAST_ADDR_3);
   m_udp->send(resp, p, mcast, MDNS_PORT);
-  delete[] resp;
+  pdiutil::safe_delete_array(resp);
 }
 
 void MdnsServiceProvider::announce() {

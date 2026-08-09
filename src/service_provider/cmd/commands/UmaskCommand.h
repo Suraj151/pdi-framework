@@ -33,7 +33,7 @@ struct UmaskCommand : public CommandBase {
 
 	static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_UMASK, [](void *arg)->void *{
-			return new UmaskCommand();
+			return pdiutil::safe_new<UmaskCommand>();
 		});
 	}
 

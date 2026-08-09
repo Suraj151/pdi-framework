@@ -43,7 +43,7 @@ struct DeviceIotCommand : public CommandBase {
      */
     static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_IOT, [](void *arg)->void *{
-			return new DeviceIotCommand();
+			return pdiutil::safe_new<DeviceIotCommand>();
 		});
 	}
 

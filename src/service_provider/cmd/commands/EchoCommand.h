@@ -34,7 +34,7 @@ struct EchoCommand : public CommandBase {
      */
     static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_ECHO, [](void *arg)->void *{
-			return new EchoCommand();
+			return pdiutil::safe_new<EchoCommand>();
 		});
 	}
 

@@ -43,29 +43,29 @@ iUtilityInterface &InstanceInterface::getUtilityInstance()
 #ifdef ENABLE_NETWORK_SERVICE
 iTcpServerInterface *InstanceInterface::getNewTcpServerInstance()
 {
-    return new TcpServerInterface();
+    return pdiutil::safe_new<TcpServerInterface>();
 }
 
 iTcpClientInterface *InstanceInterface::getNewTcpClientInstance()
 {
-    return new TcpClientInterface();
+    return pdiutil::safe_new<TcpClientInterface>();
 }
 
 iUdpInterface *InstanceInterface::getNewUdpInstance()
 {
-    return new UdpInterface();
+    return pdiutil::safe_new<UdpInterface>();
 }
 #endif
 
 #ifdef ENABLE_TLS_SERVICE
 iTlsServerInterface *InstanceInterface::getNewTlsServerInstance()
 {
-    return new TlsServerInterface();
+    return pdiutil::safe_new<TlsServerInterface>();
 }
 
 iTlsClientInterface *InstanceInterface::getNewTlsClientInstance()
 {
-    return new TlsClientInterface();
+    return pdiutil::safe_new<TlsClientInterface>();
 }
 #endif
 

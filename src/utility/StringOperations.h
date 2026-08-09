@@ -29,6 +29,19 @@ Created Date    : 1st June 2019
 int __strstr(const char *str, const char *substr, int _len = 300);
 
 /**
+ * @brief Finds the first occurrence of a substring in a length delimited buffer.
+ * Unlike the null terminated variant this one is binary safe, it never stops
+ * on a null byte and searches the whole given length.
+ * @param str The main buffer to search in.
+ * @param _strlen The number of valid bytes in the buffer.
+ * @param substr The substring to search for.
+ * @param _substrlen The length of the substring.
+ * @param _from The buffer offset to start searching from.
+ * @return The index of the first occurrence of the substring, or -1 if not found.
+ */
+int32_t __strstr(const char *str, uint32_t _strlen, const char *substr, uint32_t _substrlen, uint32_t _from = 0);
+
+/**
  * @brief Trims leading and trailing whitespace from a string.
  * @param str The string to trim.
  * @param _overflow_limit The maximum length of the string (default is 300).

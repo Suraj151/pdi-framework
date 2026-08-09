@@ -107,7 +107,7 @@ iClientInterface* TcpServerInterface::accept() {
     tcp_err (pcb, nullptr);
     tcp_poll(pcb, nullptr, 0);
 
-    return new TcpClientInterface(pcb);
+    return pdiutil::safe_new<TcpClientInterface>(pcb);
 }
 
 /**

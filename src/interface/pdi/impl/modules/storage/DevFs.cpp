@@ -146,7 +146,8 @@ int DevFs::getDirFileList(const char* path, pdiutil::vector<file_info_t>& items,
         info.m_size = 0;
         // Callers (ls) delete[] m_name — allocate a heap copy of the literal.
         uint32_t nlen = strlen(s_dev_files[i]);
-        info.m_name = new char[nlen + 1];
+        info.m_name = pdiutil::safe_new_array<char>(nlen + 1);
+        if (nullptr == info.m_name) continue;
         memcpy(info.m_name, s_dev_files[i], nlen);
         info.m_name[nlen] = '\0';
         info.m_perms = 0666;

@@ -44,7 +44,7 @@ struct WatchCommand : public CommandBase {
      */
     static void RegisterCommand(){
 		CommandBase::RegisterCommand(CMD_NAME_WATCH, [](void *arg)->void *{
-			return new WatchCommand();
+			return pdiutil::safe_new<WatchCommand>();
 		});
 	}
 

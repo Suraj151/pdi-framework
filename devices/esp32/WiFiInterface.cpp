@@ -659,7 +659,7 @@ bool WiFiInterface::get_bssid_within_scanned_nw_ignoring_connected_stations(char
   memset(&wifi_sta_list, 0, sizeof(wifi_sta_list_t));
   esp_wifi_ap_get_sta_list(&wifi_sta_list);
   
-  char* _ssid_buff = new char[30];
+  char* _ssid_buff = pdiutil::safe_new_array<char>(30);
   if( nullptr == _ssid_buff ){
     return false;
   }
@@ -693,14 +693,14 @@ bool WiFiInterface::get_bssid_within_scanned_nw_ignoring_connected_stations(char
 
         if( !__are_arrays_equal( (char*)ignorebssid, (char*)this->BSSID(i), 6 ) ){
           memcpy(bssid, this->BSSID(i), 6);
-          delete[] _ssid_buff;
+          pdiutil::safe_delete_array(_ssid_buff);
           return true;
         }
       }
     }
   }
 
-  delete[] _ssid_buff;
+  pdiutil::safe_delete_array(_ssid_buff);
   return false;
 }
 
