@@ -70,6 +70,15 @@ namespace pdiutil {
 #define CRITICAL_SECTION_EXIT
 #endif
 
+// Attribute to be redefined while entering nestable critical section
+#ifndef NESTED_CRITICAL_SECTION_ENTER
+#define NESTED_CRITICAL_SECTION_ENTER
+#endif
+
+#ifndef NESTED_CRITICAL_SECTION_EXIT
+#define NESTED_CRITICAL_SECTION_EXIT
+#endif
+
 // String operations api for read-write-modify string data (can be redefined in derived interfaces)
 // _ro for each of api referes to read-only data region specific api
 #ifndef strcat

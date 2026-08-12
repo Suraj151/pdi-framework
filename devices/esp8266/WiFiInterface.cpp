@@ -790,16 +790,12 @@ void WiFiInterface::wifi_event_handler_cb(System_Event_t *_event)
 {
   if( nullptr != _event ){
 
-    #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        if (__i_preemptive_scheduler.is_task_context() || !__i_preemptive_scheduler.is_sched_active()) {
-          LogI("\nwifi event : %d\n", (int)_event->event);
-        } else if (__serial_uart.m_mutex.try_lock()) {
-          LogI("\nwifi event : %d\n", (int)_event->event);
-          __serial_uart.m_mutex.unlock();
-        }
-        // else: serial mutex held by another task — skip this log to avoid deadlock.
-    #else
-        LogI("\nwifi event : %d\n", (int)_event->event);
+    #if ( defined(ENABLE_CONSOLE_LOG_INFO) || defined(ENABLE_CONSOLE_LOG_ALL) )
+    // sdk callback context, write straight to the uart under a guard so no
+    // task owned lock is taken and no ownership is attributed to this context
+    NESTED_CRITICAL_SECTION_ENTER
+    __serial_uart.hw().printf_P(PSTR("\nwifi event : %d\n"), (int)_event->event);
+    NESTED_CRITICAL_SECTION_EXIT
     #endif
 
     event_name_t e = EVENT_NAME_MAX;

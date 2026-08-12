@@ -394,17 +394,15 @@ void TcpClientInterface::onError(void* arg, err_t err) {
     TcpClientInterface* client = static_cast<TcpClientInterface*>(arg);
     if (client) {
 
-        if (client->m_pcb) {
+        // lwip has already freed the pcb by the time it reports the error, so
+        // drop it before anything else and never call tcp_* on it here
+        bool haspcb = (nullptr != client->m_pcb);
+        client->m_pcb = nullptr;
+        client->m_isConnected = false;
 
-            tcp_err(client->m_pcb, NULL);
-            tcp_arg(client->m_pcb, NULL);
-            tcp_sent(client->m_pcb, NULL);
-            tcp_recv(client->m_pcb, NULL);
-            
-            client->m_pcb = nullptr;
+        if (haspcb) {
             client->flush();
         }
-        client->m_isConnected = false;
     }
 }
 

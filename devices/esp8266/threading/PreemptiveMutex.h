@@ -17,7 +17,7 @@ Created Date    : 1st June 2025
 
 class PreemptiveMutex : public iMutex {
     bool m_locked = false;
-    pdiutil::vector<Preemptive*> m_waiters; 
+    pdiutil::vector<Preemptive*> m_waiters;
     Preemptive* m_owner = nullptr;
 public:
     PreemptiveMutex();
@@ -31,5 +31,10 @@ public:
     bool try_lock() override;
 };
 
+/**
+ * Shared lock for the lwip core. lwip is not reentrant, so every context that
+ * calls into it from our own code takes this one instead of a per object lock.
+ */
+extern PreemptiveMutex __lwip_mutex;
 
 #endif

@@ -30,9 +30,13 @@ created Date    : 1st Jan 2026
 extern portMUX_TYPE __pdi_critical_mux;
 #define CRITICAL_SECTION_ENTER portENTER_CRITICAL(&__pdi_critical_mux);
 #define CRITICAL_SECTION_EXIT  portEXIT_CRITICAL(&__pdi_critical_mux);
+#define NESTED_CRITICAL_SECTION_ENTER portENTER_CRITICAL(&__pdi_critical_mux);
+#define NESTED_CRITICAL_SECTION_EXIT  portEXIT_CRITICAL(&__pdi_critical_mux);
 #else
 #define CRITICAL_SECTION_ENTER noInterrupts();
 #define CRITICAL_SECTION_EXIT  interrupts();
+#define NESTED_CRITICAL_SECTION_ENTER noInterrupts();
+#define NESTED_CRITICAL_SECTION_EXIT  interrupts();
 #endif
 
 #define CMD_SIZE_MAX                8   ///< Maximum size of a command.
@@ -84,6 +88,8 @@ extern portMUX_TYPE __pdi_critical_mux;
 #define DEVICE_SUPPORTS_CONTEXTUAL_EXECUTION
 #define DEVICE_SUPPORTS_TLS_CERT_GENERATION
 #define DEVICE_SUPPORTS_PROGRAM_EXEC
+// device yield is valid from any task, so blocking network calls may run off the main loop
+#define DEVICE_SUPPORTS_OFFLOOP_NETWORK_TASK
 
 /**
  * enable/disable ota upgrade strategies

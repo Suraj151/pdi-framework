@@ -214,14 +214,21 @@ public:
     /**
      * @brief Number of registered tasks (live or zombie).
      */
-    uint16_t getTaskCount() const { return (uint16_t)m_tasks.size(); }
+    uint16_t getTaskCount() const {
+      uint16_t _count = 0;
+      for (uint16_t i = 0; i < m_tasks.size(); i++) {
+        if (m_tasks[i].m_task_id >= 0) _count++;
+      }
+      return _count;
+    }
 
     /**
      * @brief Get task by index in the registration order. Read-only enumeration
      *        for observability tools (procfs, ps). Returns nullptr if out of range.
      */
     task_t* getTaskByIndex(uint16_t idx) {
-      return (idx < m_tasks.size()) ? &m_tasks[idx] : nullptr;
+      if (idx >= m_tasks.size()) return nullptr;
+      return (m_tasks[idx].m_task_id >= 0) ? &m_tasks[idx] : nullptr;
     }
 
     /**
@@ -309,7 +316,7 @@ protected:
      * @brief Sort the task indices according to their priority and score.
      *
      */
-    void getSortedTaskList(uint16_t* _priority_indices, uint16_t _task_count);
+    uint16_t getSortedTaskList(uint16_t* _priority_indices, uint16_t _task_count);
 
     /**
      * @brief Return the computed score for task.

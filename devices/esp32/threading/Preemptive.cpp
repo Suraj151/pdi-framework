@@ -94,10 +94,16 @@ int PreemptiveScheduler::schedule_task(task_t* task, uint32_t stacksize){
 Preemptive* PreemptiveScheduler::current_from_handle(TaskHandle_t h){
 
     if (!h) return nullptr;
+
+    Preemptive* found = nullptr;
+
+    CRITICAL_SECTION_ENTER
     for (auto* f : tasks) {
-        if (f && f->handle == h) return f;
+        if (f && f->handle == h) { found = f; break; }
     }
-    return nullptr;
+    CRITICAL_SECTION_EXIT
+
+    return found;
 }
 
 void Preemptive::suspend(){

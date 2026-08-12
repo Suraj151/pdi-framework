@@ -163,6 +163,12 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
     return;
   }
 
+  // one request at a time, the client is released once its response is handled
+  if( nullptr != this->m_http_client &&
+      HTTP_ASYNC_IDLE != this->m_http_client->GetAsyncState() ){
+    return;
+  }
+
   __database_service.get_device_iot_config_table(&this->m_device_iot_configs);
 
   pdiutil::string http_scheme = CHARPTR_WRAP("http");
@@ -194,65 +200,79 @@ void DeviceIotServiceProvider::handleDeviceIotConfigRequest(){
     this->m_http_client->SetUserAgent(user_agent.c_str());
     this->m_http_client->SetBasicAuthorization(auth_user.c_str(), __i_dvc_ctrl.getDeviceMac().c_str());
     this->m_http_client->SetTimeout(2*MILLISECOND_DURATION_1000);
-    int _httpCode = this->m_http_client->Get(configurl.c_str());
+    this->m_http_client->GetAsync(configurl.c_str(), [](void *arg){
+      __device_iot_service.handleDeviceIotConfigResponse(reinterpret_cast<Http_Client*>(arg));
+    });
 
-    char *http_resp = nullptr;
-    int16_t httl_resp_len = 0;
-    this->m_http_client->GetResponse( http_resp, httl_resp_len );
+  }else{
 
-    if ( _httpCode == HTTP_RESP_OK && nullptr != http_resp ) {
+    SysLogE("Device iot config request not initializing or failed or Not Configured Correctly\n");
+  }
+}
 
-      if( httl_resp_len < DEVICE_IOT_CONFIG_RESP_MAX_SIZE ){
+/**
+ * handle config response
+ */
+void DeviceIotServiceProvider::handleDeviceIotConfigResponse( Http_Client *client ){
 
-        pdiutil::string channel_token_key = CHARPTR_WRAP(DEVICE_IOT_CONFIG_CHANNEL_TOKEN_KEY);
-        pdiutil::string channel_write_key = CHARPTR_WRAP(DEVICE_IOT_CONFIG_CHANNEL_WRITE_KEY);
-        pdiutil::string channel_read_key = CHARPTR_WRAP(DEVICE_IOT_CONFIG_CHANNEL_READ_KEY);
+  if( nullptr == client ){
+    return;
+  }
 
-        if( 0 <= __strstr( http_resp, channel_token_key.c_str(), DEVICE_IOT_CONFIG_RESP_MAX_SIZE - strlen(channel_token_key.c_str()) ) ){
+  int16_t _httpCode = client->GetRespStatusCode();
+  char *http_resp = nullptr;
+  int16_t httl_resp_len = 0;
+  client->GetResponse( http_resp, httl_resp_len );
 
-          bool _json_result = __get_from_json( http_resp, channel_token_key.c_str(), this->m_server_configurable_channel_token, DEVICE_IOT_CONFIG_CHANNEL_TOKEN_MAX_SIZE-1 ) &&
-            __get_from_json( http_resp, channel_write_key.c_str(), this->m_server_configurable_channel_write, DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE-1 ) &&
-            __get_from_json( http_resp, channel_read_key.c_str(), this->m_server_configurable_channel_read, DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE-1 );
-          
-          if(  _json_result && strlen( this->m_server_configurable_channel_token ) && strlen( this->m_server_configurable_channel_write ) && strlen( this->m_server_configurable_channel_read ) ){
+  if ( _httpCode == HTTP_RESP_OK && nullptr != http_resp ) {
 
-            LogI("Got Token : %s\n", this->m_server_configurable_channel_token );
-            LogI("Got Write Channel : %s\n", this->m_server_configurable_channel_write );
-            LogI("Got Read Channel : %s\n", this->m_server_configurable_channel_read );
+    if( httl_resp_len < DEVICE_IOT_CONFIG_RESP_MAX_SIZE ){
 
-            this->handleServerConfigurableParameters( http_resp );
+      pdiutil::string channel_token_key = CHARPTR_WRAP(DEVICE_IOT_CONFIG_CHANNEL_TOKEN_KEY);
+      pdiutil::string channel_write_key = CHARPTR_WRAP(DEVICE_IOT_CONFIG_CHANNEL_WRITE_KEY);
+      pdiutil::string channel_read_key = CHARPTR_WRAP(DEVICE_IOT_CONFIG_CHANNEL_READ_KEY);
 
-            this->m_mqtt_connection_check_cb_id = this->serviceUpdateInterval(
-              this->m_mqtt_connection_check_cb_id,
-              [&]() {
-                this->handleConnectivityCheck();
-              },
-              this->m_server_configurable_mqtt_keep_alive*MILLISECOND_DURATION_1000, DEFAULT_TASK_PRIORITY,
-              ( __i_dvc_ctrl.millis_now() + MQTT_INITIALIZE_DURATION )
-            );
+      if( 0 <= __strstr( http_resp, channel_token_key.c_str(), DEVICE_IOT_CONFIG_RESP_MAX_SIZE - strlen(channel_token_key.c_str()) ) ){
+
+        bool _json_result = __get_from_json( http_resp, channel_token_key.c_str(), this->m_server_configurable_channel_token, DEVICE_IOT_CONFIG_CHANNEL_TOKEN_MAX_SIZE-1 ) &&
+          __get_from_json( http_resp, channel_write_key.c_str(), this->m_server_configurable_channel_write, DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE-1 ) &&
+          __get_from_json( http_resp, channel_read_key.c_str(), this->m_server_configurable_channel_read, DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE-1 );
+        
+        if(  _json_result && strlen( this->m_server_configurable_channel_token ) && strlen( this->m_server_configurable_channel_write ) && strlen( this->m_server_configurable_channel_read ) ){
+
+          LogI("Got Token : %s\n", this->m_server_configurable_channel_token );
+          LogI("Got Write Channel : %s\n", this->m_server_configurable_channel_write );
+          LogI("Got Read Channel : %s\n", this->m_server_configurable_channel_read );
+
+          this->handleServerConfigurableParameters( http_resp );
+
+          this->m_mqtt_connection_check_cb_id = this->serviceUpdateInterval(
+            this->m_mqtt_connection_check_cb_id,
+            [&]() {
+              this->handleConnectivityCheck();
+            },
+            this->m_server_configurable_mqtt_keep_alive*MILLISECOND_DURATION_1000, DEFAULT_TASK_PRIORITY,
+            ( __i_dvc_ctrl.millis_now() + MQTT_INITIALIZE_DURATION )
+          );
 #if defined(ENABLE_MQTT_SERVICE)
-            __task_scheduler.setTimeout( [&]() { this->configureMQTT(); }, 1, __i_dvc_ctrl.millis_now() );
+          __task_scheduler.setTimeout( [&]() { this->configureMQTT(); }, 1, __i_dvc_ctrl.millis_now() );
 #endif
-            this->m_token_validity = true;
+          this->m_token_validity = true;
 
-          }else{
-
-            this->m_token_validity = false;
-          }
         }else{
 
           this->m_token_validity = false;
         }
       }else{
-        LogW("Http Response : response size over !\n");
+
+        this->m_token_validity = false;
       }
+    }else{
+      LogW("Http Response : response size over !\n");
     }
-
-    this->m_http_client->End(true);
-  }else{
-
-    SysLogE("Device iot config request not initializing or failed or Not Configured Correctly\n");
   }
+
+  client->End(true);
 }
 
 /**

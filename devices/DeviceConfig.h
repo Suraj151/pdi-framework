@@ -72,6 +72,15 @@ created Date    : 1st June 2019
 #endif
 
 /**
+ * enable/disable carrying a http request on a scheduled task instead of blocking
+ * the caller. Supported only on devices that declare
+ * DEVICE_SUPPORTS_OFFLOOP_NETWORK_TASK, elsewhere the request runs inline.
+ */
+#if defined(ENABLE_CONTEXTUAL_EXECUTION) && defined(DEVICE_SUPPORTS_OFFLOOP_NETWORK_TASK)
+#define ENABLE_HTTP_ASYNC_REQUEST
+#endif
+
+/**
  * Build-time gate for on-device generation of the HTTPS server certificate.
  * By default enabled.
  */

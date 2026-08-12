@@ -203,10 +203,6 @@ private:
     // and lwIP's callback can never write into a destroyed stack frame.
     dnsFoundResult m_dns;
 
-    #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    PreemptiveMutex m_mutex;
-    #endif
-
     /**
      * @brief Drop the leading bytes of the receive buffer and open the tcp window.
      * @param size The number of bytes to drop.

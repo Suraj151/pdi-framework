@@ -56,6 +56,9 @@ public:
   // terminal api
   iTerminalInterface* with_timestamp() override;
 
+  // Direct hardware access for contexts that must not take a task owned lock.
+  HardwareSerial& hw() { return m_hwserial; }
+
   // Make mutex to be accesible for log service for now.
   // todo : make this private once log service initializd with iointerface
   #ifdef ENABLE_CONTEXTUAL_EXECUTION

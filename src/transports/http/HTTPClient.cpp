@@ -176,7 +176,10 @@ void http_resp_t::clear()
 Http_Client::Http_Client() :
     m_client(nullptr),
     m_stream_writer(nullptr),
-    m_stream_bytes_written(0)
+    m_stream_bytes_written(0),
+    m_async_state(HTTP_ASYNC_IDLE),
+    m_async_callback(nullptr),
+    m_async_watch_task_id(-1)
 {
 }
 
@@ -197,6 +200,11 @@ Http_Client::~Http_Client()
  */
 void Http_Client::Begin()
 {
+    if (HTTP_ASYNC_RUNNING == m_async_state)
+    {
+        return;
+    }
+
     End(true);
     SetKeepAlive(false);
 }
@@ -228,6 +236,7 @@ void Http_Client::End(bool preserve_client)
     }
 
     ClearAll();
+    m_async_state = HTTP_ASYNC_IDLE;
 }
 
 /**
@@ -444,6 +453,116 @@ int16_t Http_Client::Get(const char *url)
 }
 
 /**
+ * Get method without blocking the caller
+ */
+int16_t Http_Client::GetAsync(const char *url, CallBackVoidPointerArgFn on_complete)
+{
+    if (nullptr == url)
+    {
+        return PDI_ERR_INVALID_ARG;
+    }
+
+    if (HTTP_ASYNC_RUNNING == m_async_state)
+    {
+        return PDI_ERR_BUSY;
+    }
+
+    m_async_callback = on_complete;
+
+    int16_t status = 0;
+    bool scheduled = false;
+    bool watched = true;
+
+    // the watcher runs inline so the callback always lands in the loop context.
+    // it is placed first, a request handed to a task without it finishes unseen
+    if (nullptr != m_async_callback)
+    {
+        // drop any watcher left behind so only one is ever live
+        __task_scheduler.remove_task(m_async_watch_task_id);
+
+        m_async_watch_task_id = __task_scheduler.setInterval([this]() {
+            this->watchAsyncRequest();
+        }, 1, __i_dvc_ctrl.millis_now());
+
+        watched = (m_async_watch_task_id >= 0);
+
+        if (!watched)
+        {
+            SysLogE("Http_Client: async watcher unavailable\n");
+        }
+    }
+
+#ifdef ENABLE_HTTP_ASYNC_REQUEST
+
+    if (watched)
+    {
+        m_async_url = url;
+        m_async_state = HTTP_ASYNC_RUNNING;
+
+        pdiutil::task_id_t task_id = __task_scheduler.register_task([this]() {
+            this->Get(this->m_async_url.c_str());
+            this->m_async_state = HTTP_ASYNC_DONE;
+        });
+
+        if (task_id >= 0)
+        {
+            scheduled = (__task_scheduler.scheduleUnderExecSched(&__i_preemptive_scheduler, task_id, TASK_MODE_PREEMPTIVE, HTTP_ASYNC_TASK_STACK_SIZE) >= 0);
+
+            if (!scheduled)
+            {
+                __task_scheduler.remove_task(task_id);
+            }
+        }
+    }
+
+    if (!scheduled)
+    {
+        SysLogE("Http_Client: async schedule failed, running inline\n");
+    }
+
+#endif
+
+    // could not hand it to a task, fall back to a blocking request
+    if (!scheduled)
+    {
+        status = Get(url);
+        m_async_state = HTTP_ASYNC_DONE;
+    }
+
+    // nothing is watching, so the completion is handed over here instead of
+    // leaving the state parked with nothing left to bring it back to idle
+    if (!watched)
+    {
+        watchAsyncRequest();
+    }
+
+    return status;
+}
+
+/**
+ * Hand the finished async response to the registered callback
+ */
+void Http_Client::watchAsyncRequest()
+{
+    if (HTTP_ASYNC_DONE != m_async_state)
+    {
+        return;
+    }
+
+    __task_scheduler.remove_task(m_async_watch_task_id);
+    m_async_watch_task_id = -1;
+
+    // detach before the call so the callback is free to start a new request
+    CallBackVoidPointerArgFn callback = m_async_callback;
+    m_async_callback = nullptr;
+
+    if (nullptr != callback)
+    {
+        callback(this);
+    }
+}
+
+/**
  * Post method
  */
 int16_t Http_Client::Post(const char *url, const char *payload)
@@ -616,69 +735,78 @@ bool Http_Client::SendHeaders(const char *type)
         uint8_t http_v_3 = '3';
         uint8_t crlf[] = "\r\n";
 
+        // the whole header block is built first and handed to sendPacket, so the
+        // send waits for room in the lwip buffer and a short write is reported
+        pdiutil::string headers;
+
         // Send the http request method type
-        m_client->write((const uint8_t *)type);
-        m_client->write(space);
+        headers += (const char *)type;
+        headers += (char)space;
 
         // Send the uri
         if (nullptr != m_request.uri && strlen(m_request.uri))
         {
-            m_client->write((const uint8_t *)m_request.uri);
+            headers += (const char *)m_request.uri;
         }
         else
         {
-            m_client->write(slash);
+            headers += (char)slash;
         }
 
         // Send the http version
-        m_client->write(space);
-        m_client->write(http_txt);
-        m_client->write(slash);
+        headers += (char)space;
+        headers += (const char *)http_txt;
+        headers += (char)slash;
         switch (m_request.http_version)
         {
         case HTTP_VERSION_1_0:
-            m_client->write(http_v_1_0);
+            headers += (const char *)http_v_1_0;
             break;
         case HTTP_VERSION_2:
-            m_client->write(http_v_2);
+            headers += (char)http_v_2;
             break;
         case HTTP_VERSION_3:
-            m_client->write(http_v_3);
+            headers += (char)http_v_3;
             break;
         case HTTP_VERSION_1_1:
         default:
-            m_client->write(http_v_1_1);
+            headers += (const char *)http_v_1_1;
             break;
         }
-        m_client->write(crlf);
+        headers += (const char *)crlf;
 
         // Send the host
-        m_client->write(host_key);
-        m_client->write(colon);
-        m_client->write(space);
-        m_client->write((const uint8_t *)m_request.host);
+        headers += (const char *)host_key;
+        headers += (char)colon;
+        headers += (char)space;
+        headers += (const char *)m_request.host;
         if (m_request.port != 80 && m_request.port != 443)
         {
-            m_client->write(colon);
-            m_client->write((const uint8_t *)pdiutil::to_string(m_request.port).c_str());
+            headers += (char)colon;
+            headers += pdiutil::to_string(m_request.port);
         }
-        m_client->write(crlf);
+        headers += (const char *)crlf;
 
         // Send the rest headers
         for (size_t i = 0; i < m_request.headers.size(); i++)
         {
             if (nullptr != m_request.headers[i].key && nullptr != m_request.headers[i].value)
             {
-                m_client->write((const uint8_t *)m_request.headers[i].key);
-                m_client->write(colon);
-                m_client->write(space);
-                m_client->write((const uint8_t *)m_request.headers[i].value);
-                m_client->write(crlf);
+                headers += (const char *)m_request.headers[i].key;
+                headers += (char)colon;
+                headers += (char)space;
+                headers += (const char *)m_request.headers[i].value;
+                headers += (const char *)crlf;
             }
         }
-        m_client->write(crlf);
+        headers += (const char *)crlf;
 
-        bStatus = true;
+        bStatus = sendPacket(m_client, (uint8_t *)headers.c_str(), (uint16_t)headers.size());
+
+        if (!bStatus)
+        {
+            SysLogE("Http_Client: header send failed\n");
+        }
     }
 
     return bStatus;

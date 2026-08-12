@@ -50,6 +50,13 @@ enum http_version : uint8_t {
 };
 typedef enum http_version http_version_t;
 
+enum http_async_state : uint8_t {
+    HTTP_ASYNC_IDLE,
+    HTTP_ASYNC_RUNNING,
+    HTTP_ASYNC_DONE,
+};
+typedef enum http_async_state http_async_state_t;
+
 enum http_method : uint8_t {
     HTTP_METHOD_GET,
     HTTP_METHOD_POST,
@@ -87,6 +94,12 @@ typedef enum http_method http_method_t;
 #define HTTP_CLIENT_BUF_SIZE 640
 #define HTTP_CLIENT_READINTERVAL_MS 10
 #define HTTP_CLIENT_MAX_READ_MS 1500
+
+// Stack given to the task carrying an async request. A tls request needs more,
+// compare TLS_TASK_STACK_SIZE which carries a whole bearssl session.
+#ifndef HTTP_ASYNC_TASK_STACK_SIZE
+#define HTTP_ASYNC_TASK_STACK_SIZE (6*1024)
+#endif
 
 // Bytes read in one pass while receiving a multipart body. Also drives the file
 // write granularity as a chunk is flushed every second pass.

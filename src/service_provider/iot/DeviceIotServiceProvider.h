@@ -37,6 +37,7 @@ class DeviceIotServiceProvider : public ServiceProvider {
     bool initService(void *arg = nullptr) override;
     void handleRegistrationOtpRequest(  device_iot_config_table *_device_iot_configs, pdiutil::string &_response  );
     void handleDeviceIotConfigRequest( void );
+    void handleDeviceIotConfigResponse( Http_Client *client );
     void handleConnectivityCheck( void );
 #if defined(ENABLE_MQTT_SERVICE)
     void configureMQTT( void );

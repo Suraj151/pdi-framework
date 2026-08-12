@@ -66,6 +66,18 @@ public:
     // by `current` — in those contexts, calling mute() would park an
     // unrelated task and the spin in exit() would deadlock.
     bool is_task_context() const;
+
+    // Returns true if the running stack belongs to the scheduler, i.e. a task
+    // stack or the main loop cont stack. False in SDK / lwIP / ISR callback
+    // contexts, which must never be parked or switched away from.
+    bool is_scheduler_context() const;
+#ifdef DEVICE_AVOID_SDK_STACK_CONTEXT_SWITCH
+    // Returns true if the interrupted context identified by `sp` may be
+    // switched away from. Only the main loop stack and our own task stacks
+    // qualify. The sdk carries lwIP and its callbacks on a separate stack,
+    // switching away from that lets a task reenter code that is not reentrant.
+    bool IRAM_ATTR is_switchable_context(uint32_t sp) const;
+#endif
     bool is_sched_active() const {
         return current != nullptr && preemptiveisr_active;
     }

@@ -363,6 +363,14 @@ Cooperative* CooperativeScheduler::pick_next_ready() {
 /**
  * Yield other scheduler to manage pending work in this scheduler
  */
+bool CooperativeScheduler::can_yield_from_othersched() {
+    return !othersched_active && !current && !__i_preemptive_scheduler.is_task_context();
+}
+
+bool CooperativeScheduler::can_sleep_from_othersched() {
+    return !othersched_active && !current && !__i_preemptive_scheduler.is_task_context();
+}
+
 void CooperativeScheduler::yield_from_othersched() {
 
     if (!can_yield_from_othersched()) return; // reject if already active

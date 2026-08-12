@@ -24,7 +24,11 @@ TaskScheduler::TaskScheduler() : m_util(nullptr),
                                  m_max_tasks(MAX_SCHEDULABLE_TASKS),
                                  m_rebase_start_priotask(false)
 {
+    // the table is sized once and never grown or compacted after this, so a
+    // slot never moves and a running task keeps the callable it is executing.
+    // a slot with m_task_id < 0 is free, which is what task_t() leaves behind
     this->m_tasks.reserve(MAX_SCHEDULABLE_TASKS);
+    this->m_tasks.resize(MAX_SCHEDULABLE_TASKS);
 }
 
 /**
@@ -46,7 +50,7 @@ TaskScheduler::~TaskScheduler()
  * @param _task_priority The priority of the task.
  * @param _last_millis The last execution time of the task.
  */
-TaskScheduler::TaskScheduler(CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration, pdiutil::task_priority_t _task_priority, pdiutil::millis_t _last_millis)
+TaskScheduler::TaskScheduler(CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration, pdiutil::task_priority_t _task_priority, pdiutil::millis_t _last_millis) : TaskScheduler()
 {
     this->register_task(_task_fn, _duration, _task_priority, _last_millis);
 }
@@ -161,24 +165,40 @@ bool TaskScheduler::clearInterval(pdiutil::task_id_t _id)
  */
 pdiutil::task_id_t TaskScheduler::register_task(CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration, pdiutil::task_priority_t _task_priority, pdiutil::millis_t _last_millis, pdiutil::attempts_t _max_attempts, const char* _name, uint8_t _owner)
 {
-    if (this->m_tasks.size() < this->m_max_tasks)
+    // claim a free slot in place, the table is never grown so slots never move
+    uint16_t _slot = this->m_tasks.size();
+    for (uint16_t i = 0; i < this->m_tasks.size() && i < this->m_max_tasks; i++)
     {
-        task_t _new_task;
+        if (this->m_tasks[i].m_task_id < 0)
+        {
+            _slot = i;
+            break;
+        }
+    }
+
+    if (_slot < this->m_tasks.size())
+    {
+        pdiutil::task_id_t _new_id = this->get_unique_task_id();
+        if (_new_id < 0)
+        {
+            return -1;
+        }
+
+        CRITICAL_SECTION_ENTER
+        task_t &_new_task = this->m_tasks[_slot];
         _new_task.m_task = _task_fn;
         _new_task.m_duration = _duration;
         _new_task.m_task_priority = _task_priority;
         _new_task.m_last_millis = _last_millis;
         _new_task.m_max_attempts = _max_attempts;
         _new_task.m_task_exec_us = 0;
-        _new_task.m_task_id = this->get_unique_task_id();
+        _new_task.m_task_id = _new_id;
         _new_task.m_state = TASK_STATE_SLEEPING;
         _new_task.m_created_ms = (nullptr != m_util) ? m_util->millis_now() : 0;
         _new_task.m_name = _name;
         _new_task.m_owner = _owner;
-        CRITICAL_SECTION_ENTER
-        this->m_tasks.push_back(_new_task);
         CRITICAL_SECTION_EXIT
-        return _new_task.m_task_id;
+        return _new_id;
     }
     return -1;
 }
@@ -243,6 +263,7 @@ uint16_t TaskScheduler::sendSignalByName(const char* _name, signal_t _sig, uint8
     for (uint16_t i = 0; i < this->m_tasks.size(); i++)
     {
         task_t &t = this->m_tasks[i];
+        if (t.m_task_id < 0) continue; // free slot
         if (t.m_state == TASK_STATE_ZOMBIE) continue;
         if (nullptr == t.m_name) continue;
         // strncmp_ro maps to strncmp_P on AVR/ESP where the SECOND arg is the
@@ -316,13 +337,22 @@ int TaskScheduler::computeScore(const task_t& _t, uint64_t _now)
  * @brief Sort the task indices according to their priority and score.
  *
  */
-void TaskScheduler::getSortedTaskList(uint16_t* _priority_indices, uint16_t _task_count)
+uint16_t TaskScheduler::getSortedTaskList(uint16_t* _priority_indices, uint16_t _task_count)
 {
     const uint32_t tolerance = 3; // ms tolerance window
     uint64_t now = m_util->millis_now();
 
-    for (uint16_t i = 0; i < _task_count; i++)
-        _priority_indices[i] = i;
+    // only live slots enter the list. a free slot has no due time, which scores
+    // as maximally overdue and would sort above every real task
+    uint16_t _live_count = 0;
+    for (uint16_t i = 0; i < _task_count && i < this->m_tasks.size(); i++)
+    {
+        if (this->m_tasks[i].m_task_id >= 0)
+        {
+            _priority_indices[_live_count++] = i;
+        }
+    }
+    _task_count = _live_count;
 
     for (uint16_t i = 0; i < _task_count; i++)
     {
@@ -363,6 +393,8 @@ void TaskScheduler::getSortedTaskList(uint16_t* _priority_indices, uint16_t _tas
             }
         }
     }
+
+    return _task_count;
 }
 
 /**
@@ -377,10 +409,10 @@ void TaskScheduler::handle_tasks()
         return;
     }
 
-    uint16_t _task_count = this->m_tasks.size();
-    uint16_t _priority_indices[_task_count];
+    uint16_t _priority_indices[MAX_SCHEDULABLE_TASKS];
 
-    this->getSortedTaskList(_priority_indices, _task_count);
+    // free slots are left out of the list, so this is the live task count
+    uint16_t _task_count = this->getSortedTaskList(_priority_indices, this->m_tasks.size());
     this->m_rebase_start_priotask = true; // run only one task and break for next turn
 
     for (uint16_t i = 0; i < _task_count; i++)
@@ -528,10 +560,12 @@ void TaskScheduler::remove_expired_tasks()
 {
     for (uint16_t i = 0; i < this->m_tasks.size(); i++)
     {
-        if (this->m_tasks[i].m_max_attempts == 0)
+        if (this->m_tasks[i].m_task_id >= 0 && this->m_tasks[i].m_max_attempts == 0)
         {
+            // released in place. erasing would shift later entries, and that
+            // reassignment frees the callable a running task is executing
             CRITICAL_SECTION_ENTER
-            this->m_tasks.erase(this->m_tasks.begin() + i);
+            this->m_tasks[i].clear();
             CRITICAL_SECTION_EXIT
         }
     }
@@ -545,6 +579,12 @@ void TaskScheduler::remove_expired_tasks()
  */
 int16_t TaskScheduler::is_registered_task(pdiutil::task_id_t _id)
 {
+    // a free slot carries a negative id, so it must never match a lookup
+    if (_id < 0)
+    {
+        return -1;
+    }
+
     for (uint16_t i = 0; i < this->m_tasks.size(); i++)
     {
         if (this->m_tasks[i].m_task_id == _id)
@@ -563,6 +603,12 @@ int16_t TaskScheduler::is_registered_task(pdiutil::task_id_t _id)
  */
 bool TaskScheduler::remove_task(pdiutil::task_id_t _id)
 {
+    // a free slot carries a negative id, so it must never match a lookup
+    if (_id < 0)
+    {
+        return false;
+    }
+
     bool _removed = false;
     for (uint16_t i = 0; i < this->m_tasks.size(); i++)
     {
@@ -617,6 +663,12 @@ pdiutil::task_id_t TaskScheduler::get_unique_task_id()
  */
 task_t* TaskScheduler::get_task(pdiutil::task_id_t _id)
 {
+    // a free slot carries a negative id, so it must never match a lookup
+    if (_id < 0)
+    {
+        return nullptr;
+    }
+
     for (uint16_t i = 0; i < this->m_tasks.size(); i++)
     {
         if (this->m_tasks[i].m_task_id == _id)
@@ -671,6 +723,7 @@ void TaskScheduler::printPsToTerminal(iTerminalInterface *terminal, uint8_t filt
     uint16_t shown = 0;
     for (uint16_t i = 0; i < this->m_tasks.size(); i++)
     {
+        if (this->m_tasks[i].m_task_id < 0) continue; // free slot
         if (filter_owner != 0xFF && this->m_tasks[i].m_owner != filter_owner) continue;
         shown++;
     }
@@ -703,6 +756,7 @@ void TaskScheduler::printPsToTerminal(iTerminalInterface *terminal, uint8_t filt
     for (uint16_t i = 0; i < this->m_tasks.size(); i++)
     {
         task_t &t = this->m_tasks[i];
+        if (t.m_task_id < 0) continue; // free slot
         if (filter_owner != 0xFF && t.m_owner != filter_owner) continue;
 
         Int32ToString(t.m_task_id, content, 24, 5);

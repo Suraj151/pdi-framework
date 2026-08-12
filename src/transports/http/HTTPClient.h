@@ -129,6 +129,12 @@ public:
 
 	// request api's
 	int16_t Get(const char *url);
+
+	// runs on a background task where available, inline otherwise. on_complete
+	// is called with this client once the response is in, always from the loop
+	int16_t GetAsync(const char *url, CallBackVoidPointerArgFn on_complete = nullptr);
+	http_async_state_t GetAsyncState() { return m_async_state; }
+
 	int16_t Post(const char *url, const char *payload);
 	// Streams response body via writer callback. First call is a size hint:
 	// writer(nullptr, content_length) — 0 if unknown. Subsequent calls deliver
@@ -140,6 +146,7 @@ public:
 
 	// response api
 	int16_t GetResponse(char *&resp_body, int16_t &resp_len);
+	int16_t GetRespStatusCode() { return m_response.status_code; }
 
 	// static instance
 	static Http_Client *GetStaticInstance();
@@ -158,6 +165,13 @@ protected:
 
 	CallBackBytesArgBoolRetFn m_stream_writer;
 	int64_t m_stream_bytes_written;
+
+	void watchAsyncRequest();
+
+	pdiutil::string m_async_url;
+	volatile http_async_state_t m_async_state;
+	CallBackVoidPointerArgFn m_async_callback;
+	pdiutil::task_id_t m_async_watch_task_id;
 };
 
 #endif

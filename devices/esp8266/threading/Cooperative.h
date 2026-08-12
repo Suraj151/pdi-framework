@@ -59,8 +59,10 @@ public:
 
     void yield_from_othersched() override;
     void sleep_from_othersched(uint32_t ms) override;
-    bool can_yield_from_othersched() { return !othersched_active && !current; }
-    bool can_sleep_from_othersched() { return !othersched_active && !current; }    
+    // both drive run(), which captures the caller as this scheduler's base
+    // context. only the loop may do that, a task would be resumed as the loop
+    bool can_yield_from_othersched();
+    bool can_sleep_from_othersched();
 };
 
 #endif

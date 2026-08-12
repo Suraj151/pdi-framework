@@ -358,6 +358,20 @@ void DeviceControlInterface::wait(double timeoutms)
     // But if we have cooperative tasks then utilize this sleep for cooperative tasks 
     // Since preemptive tasks will get the scheduled slots soon if scheduled
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    // a preemptive task owns neither the loop nor the cooperative base context,
+    // so it sleeps on its own scheduler and leaves both of those untouched
+    if (__i_preemptive_scheduler.is_task_context()) {
+
+        if(_timeoutms > 0){
+            __i_preemptive_scheduler.sleep(_timeoutms);
+        }
+
+        if( _remainingtimeoutus > 0 )
+            delayMicroseconds(_remainingtimeoutus);
+
+        return;
+    }
+
     if(_timeoutms > 0){
         if (__i_cooperative_scheduler.can_sleep_from_othersched()) {
             __i_cooperative_scheduler.sleep_from_othersched(_timeoutms);
@@ -413,17 +427,7 @@ uint32_t DeviceControlInterface::get_free_heap()
 void DeviceControlInterface::log(logger_type_t log_type, const char *content)
 {
     #if ( defined(ENABLE_CONSOLE_LOG_ALL) || defined(ENABLE_CONSOLE_LOG_INFO) || defined(ENABLE_CONSOLE_LOG_ERROR) || defined(ENABLE_CONSOLE_LOG_WARNING) || defined(ENABLE_CONSOLE_LOG_SUCCESS) )
-    #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        if (__i_preemptive_scheduler.is_task_context() || !__i_preemptive_scheduler.is_sched_active()) {
-            __log_manager.log(log_type, RODT_ATTR("%s"), content);
-        } else if (__serial_uart.m_mutex.try_lock()) {
-            __log_manager.log(log_type, RODT_ATTR("%s"), content);
-            __serial_uart.m_mutex.unlock();
-        }
-        // else: serial mutex held by another task — skip this log to avoid deadlock.
-    #else
-        __log_manager.log(log_type, RODT_ATTR("%s"), content);
-    #endif
+    __log_manager.log(log_type, RODT_ATTR("%s"), content);
     #endif
 }
 
@@ -447,6 +451,19 @@ void DeviceControlInterface::handleEvents()
  */
 void DeviceControlInterface::yield()
 {
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    // esp_yield and friends drive the cont (loop) task, which a preemptive task
+    // does not own. Hand control to the scheduler instead, it returns to the
+    // loop where the real device yield happens.
+    if (__i_preemptive_scheduler.is_task_context()) {
+        // the sdk feeds the soft watchdog when the loop reaches it, which this
+        // context never does, so feed it for the span the task holds the cpu
+        feedWdt();
+        __i_preemptive_scheduler.sleep(1);
+        return;
+    }
+    #endif
+
     // #ifdef ENABLE_CONTEXTUAL_EXECUTION
     // __i_preemptive_scheduler.disable_sched();
     // #endif

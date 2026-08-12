@@ -51,31 +51,16 @@ static void ICACHE_FLASH_ATTR ping_recv_cb (void* arg, void *pdata){
     return;
   }
 
-#ifdef ENABLE_CONTEXTUAL_EXECUTION
-  if (
-    __i_preemptive_scheduler.is_task_context() || 
-    !__i_preemptive_scheduler.is_sched_active()
-  ) {
-    if (_host_resp) {
-      LogI("\nPing: Reply bytes=%d time=%dms\n", pingrsp->bytes, pingrsp->resp_time);
-    } else {
-      LogI("\nPing: Request timed out\n");
-    }
-  } else if (__serial_uart.m_mutex.try_lock()) {
-    if (_host_resp) {
-      LogI("\nPing: Reply bytes=%d time=%dms\n", pingrsp->bytes, pingrsp->resp_time);
-    } else {
-      LogI("\nPing: Request timed out\n");
-    }
-    __serial_uart.m_mutex.unlock();
-  }
-  // else: serial mutex held by another task — skip this log to avoid deadlock.
-#else
+#if ( defined(ENABLE_CONSOLE_LOG_INFO) || defined(ENABLE_CONSOLE_LOG_ALL) )
+  // sdk callback context, write straight to the uart under a guard so no
+  // task owned lock is taken and no ownership is attributed to this context
+  NESTED_CRITICAL_SECTION_ENTER
   if (_host_resp) {
-    LogI("\nPing: Reply bytes=%d time=%dms\n", pingrsp->bytes, pingrsp->resp_time);
+    __serial_uart.hw().printf_P(PSTR("\nPing: Reply bytes=%d time=%dms\n"), (int)pingrsp->bytes, (int)pingrsp->resp_time);
   } else {
-    LogI("\nPing: Request timed out\n");
+    __serial_uart.hw().print(F("\nPing: Request timed out\n"));
   }
+  NESTED_CRITICAL_SECTION_EXIT
 #endif
 }
 

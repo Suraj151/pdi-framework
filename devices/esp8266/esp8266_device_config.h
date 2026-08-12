@@ -21,6 +21,9 @@ created Date    : 1st Jan 2026
 #define CRITICAL_SECTION_ENTER noInterrupts();
 #define CRITICAL_SECTION_EXIT interrupts();
 
+#define NESTED_CRITICAL_SECTION_ENTER cli();
+#define NESTED_CRITICAL_SECTION_EXIT sei();
+
 #define strcat_ro strcat_P
 #define strncat_ro strncat_P
 #define strcpy_ro strcpy_P
@@ -66,6 +69,9 @@ created Date    : 1st Jan 2026
  */
 #define DEVICE_SUPPORTS_TLS
 #define DEVICE_SUPPORTS_CONTEXTUAL_EXECUTION
+// keep the preemptive scheduler off the sdk stack, which carries lwIP and other
+// non reentrant callbacks. needed only when a task touches the network layer
+#define DEVICE_AVOID_SDK_STACK_CONTEXT_SWITCH
 
 /**
  * enable/disable ota upgrade strategies
@@ -75,5 +81,7 @@ created Date    : 1st Jan 2026
 // #define MAKE_STORAGE_DEPENDENT_OTA_UPGRADE
 // #endif
 
+// devices/esp8266/esp8266_device_config.h
+#define DEVICE_SUPPORTS_OFFLOOP_NETWORK_TASK
 
 #endif // _ESP8266_DEVICE_CONFIG_H_

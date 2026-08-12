@@ -94,6 +94,7 @@ int32_t SSHClientInterface::write(const uint8_t* c_str, uint32_t size){
             // Schedule commiting written data task in queue
             m_writeCommitTaskId = __task_scheduler.updateTimeout( m_writeCommitTaskId, [&]() {
                 this->commit();
+                m_writeCommitTaskId = -1;
             }, 1, __i_dvc_ctrl.millis_now() );
 
             return size;

@@ -118,9 +118,18 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
         }
     }
 
+    // the pcb allocation, its callbacks and the connect belong to one section
+    // so a callback cannot fire on a half set up pcb
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    __lwip_mutex.critical_lock();
+    #endif
+
     // Allocate a new TCP protocol control block
     m_pcb = tcp_new();
     if (!m_pcb) {
+        #ifdef ENABLE_CONTEXTUAL_EXECUTION
+        __lwip_mutex.critical_unlock();
+        #endif
         return PDI_ERR_NO_MEM;
     }
 
@@ -129,13 +138,11 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
     tcp_err(m_pcb, &TcpClientInterface::onError);
     tcp_sent(m_pcb, &TcpClientInterface::onSent);
 
-    #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.critical_lock();
-    #endif
-    // Connect to the server    
+    // Connect to the server
     err_t err = tcp_connect(m_pcb, &serverIp, port, &TcpClientInterface::onConnected);
+
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.critical_unlock();
+    __lwip_mutex.critical_unlock();
     #endif
     if (err != ERR_OK) {
         close();
@@ -159,10 +166,12 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
  * @brief Disconnect from the remote server.
  */
 int16_t TcpClientInterface::disconnect() {
+
+    // the pcb check and its release belong to one section, and our reference is
+    // cleared before leaving it so nothing can reach a closed pcb
+    NESTED_CRITICAL_SECTION_ENTER
     if (m_pcb) {
-        #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        m_mutex.critical_lock();
-        #endif
+
         tcp_arg(m_pcb, NULL);
         tcp_sent(m_pcb, NULL);
         tcp_recv(m_pcb, NULL);
@@ -172,11 +181,9 @@ int16_t TcpClientInterface::disconnect() {
             tcp_abort(m_pcb); // Forcefully abort if close fails
         }
         m_pcb = nullptr;
-        #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        m_mutex.critical_unlock();
-        #endif
     }
     m_isConnected = false;
+    NESTED_CRITICAL_SECTION_EXIT
     return 0;
 }
 
@@ -223,12 +230,14 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
         if (chunk < remaining)
             flags |= TCP_WRITE_FLAG_MORE; // do not tcp-PuSH (yet)
 
+        // the pcb is rechecked inside the section, a lwip callback may drop it
+        // between chunks otherwise
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        m_mutex.critical_lock();
+        __lwip_mutex.critical_lock();
         #endif
-        err = tcp_write(m_pcb, c_str + total_sent, chunk, flags);
+        err = m_pcb ? tcp_write(m_pcb, c_str + total_sent, chunk, flags) : ERR_CLSD;
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        m_mutex.critical_unlock();
+        __lwip_mutex.critical_unlock();
         #endif
         if (err != ERR_OK) {
             return PDI_ERR_FROM_LWIP(err); // Return error code if write fails
@@ -241,12 +250,12 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
     if (m_isLastWriteAcked){
 
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        m_mutex.critical_lock();
+        __lwip_mutex.critical_lock();
         #endif
         m_isLastWriteAcked = false;
-        err = tcp_output(m_pcb); // Ensure the data is sent
+        err = m_pcb ? tcp_output(m_pcb) : ERR_CLSD; // Ensure the data is sent
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        m_mutex.critical_unlock();
+        __lwip_mutex.critical_unlock();
         #endif
         if (err != ERR_OK) {
             return PDI_ERR_FROM_LWIP(err); // Return error code if write fails
@@ -288,7 +297,13 @@ int32_t TcpClientInterface::write_ro(const char *c_str)
  * @brief Read data from the server.
  */
 int32_t TcpClientInterface::read(uint8_t* buffer, uint32_t size) {
+
+    // the buffer is checked, copied out and consumed in one section, a receive
+    // callback may replace it between those otherwise
+    NESTED_CRITICAL_SECTION_ENTER
+
     if (!m_rxBuffer || m_rxBufferSize == 0) {
+        NESTED_CRITICAL_SECTION_EXIT
         return PDI_ERR_STATE;
     }
 
@@ -298,6 +313,8 @@ int32_t TcpClientInterface::read(uint8_t* buffer, uint32_t size) {
     memcpy(buffer, m_rxBuffer, bytesToRead);
 
     consumeRxBuffer(bytesToRead);
+
+    NESTED_CRITICAL_SECTION_EXIT
 
     return bytesToRead;
 }
@@ -312,13 +329,9 @@ void TcpClientInterface::consumeRxBuffer(uint32_t size) {
     m_rxBufferSize -= size;
 
     if(m_pcb != nullptr){
-        #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        m_mutex.critical_lock();
-        #endif
+        NESTED_CRITICAL_SECTION_ENTER
         tcp_recved(m_pcb, size); // Notify the TCP stack that data has been read
-        #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        m_mutex.critical_unlock();
-        #endif
+        NESTED_CRITICAL_SECTION_EXIT
     }
 }
 
@@ -385,8 +398,10 @@ err_t TcpClientInterface::onConnected(void* arg, struct tcp_pcb* tpcb, err_t err
 
     if( client ){
         if (err == ERR_OK) {
+            NESTED_CRITICAL_SECTION_ENTER
             client->m_isConnected = true;
             tcp_recv(tpcb, &TcpClientInterface::onReceive); // Set the receive callback
+            NESTED_CRITICAL_SECTION_EXIT
         } else {
             client->close();
         }
@@ -411,19 +426,19 @@ err_t TcpClientInterface::onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf
             return err;
         }
 
+        // the buffer length is read and grown in one section, a reader taking
+        // bytes out in between would leave the copy sized against a stale length
+        NESTED_CRITICAL_SECTION_ENTER
         // Append the received data to the receive buffer
         uint32_t newSize = client->m_rxBufferSize + p->tot_len;
-
-        #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        client->m_mutex.critical_lock();
-        #endif
         uint8_t* newBuffer = pdiutil::safe_new_array<uint8_t>(newSize);
         if (!newBuffer) {
-            #ifdef ENABLE_CONTEXTUAL_EXECUTION
-            client->m_mutex.critical_unlock();
-            #endif
+            NESTED_CRITICAL_SECTION_EXIT
+#ifndef ENABLE_CONTEXTUAL_EXECUTION
+            // lwip callback context, kept off the logger when scheduling is enabled
             SysLogE("TCP onReceive: alloc fail, in=%u rxQ=%u\n",
                 (unsigned)p->tot_len, (unsigned)client->m_rxBufferSize);
+#endif
             return ERR_MEM;
         }
         if (client->m_rxBuffer) {
@@ -433,9 +448,7 @@ err_t TcpClientInterface::onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf
         pbuf_copy_partial(p, newBuffer + client->m_rxBufferSize, p->tot_len, 0);
         client->m_rxBuffer = newBuffer;
         client->m_rxBufferSize = newSize;
-        #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        client->m_mutex.critical_unlock();
-        #endif
+        NESTED_CRITICAL_SECTION_EXIT
 
         pbuf_free(p);
     }
@@ -450,23 +463,19 @@ void TcpClientInterface::onError(void* arg, err_t err) {
     TcpClientInterface* client = static_cast<TcpClientInterface*>(arg);
     if (client) {
 
-        if (client->m_pcb) {
+        bool haspcb = false;
 
-            #ifdef ENABLE_CONTEXTUAL_EXECUTION
-            client->m_mutex.critical_lock();
-            #endif
-            tcp_err(client->m_pcb, NULL);
-            tcp_arg(client->m_pcb, NULL);
-            tcp_sent(client->m_pcb, NULL);
-            tcp_recv(client->m_pcb, NULL);
-            #ifdef ENABLE_CONTEXTUAL_EXECUTION
-            client->m_mutex.critical_unlock();
-            #endif
-            
-            client->m_pcb = nullptr;
+        // lwip has already freed the pcb before raising this callback, so only
+        // drop our reference to it, never call tcp_* on it here
+        NESTED_CRITICAL_SECTION_ENTER
+        haspcb = (nullptr != client->m_pcb);
+        client->m_pcb = nullptr;
+        client->m_isConnected = false;
+        NESTED_CRITICAL_SECTION_EXIT
+
+        if (haspcb) {
             client->flush();
         }
-        client->m_isConnected = false;
     }
 }
 
@@ -588,6 +597,11 @@ bool TcpClientInterface::availableforwrite(uint32_t size) {
     // err_t err = tcp_write_checks(m_pcb, size);
     err_t err = ERR_OK;
 
+    // every pcb field read and the output call belong to one section
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    __lwip_mutex.critical_lock();
+    #endif
+
     if ( m_pcb &&
         (m_pcb->state != ESTABLISHED) &&
         (m_pcb->state != CLOSE_WAIT) &&
@@ -600,13 +614,7 @@ bool TcpClientInterface::availableforwrite(uint32_t size) {
 
     if(m_pcb && err == ERR_OK) {
 
-        #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        m_mutex.critical_lock();
-        #endif
         err_t tcpout_err = tcp_output(m_pcb);  // Ensure the data is sent
-        #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        m_mutex.critical_unlock();
-        #endif
 
         uint32_t availablebuff = tcp_sndbuf(m_pcb);
         uint32_t queuelen = tcp_sndqueuelen(m_pcb);
@@ -617,10 +625,14 @@ bool TcpClientInterface::availableforwrite(uint32_t size) {
         }
 
         // if(!m_isLastWriteAcked && err == ERR_OK && tcpout_err == ERR_OK){
-            
+
         //     m_isLastWriteAcked = true;
         // }
     }
+
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    __lwip_mutex.critical_unlock();
+    #endif
 
     __i_dvc_ctrl.yield();
 
@@ -632,17 +644,15 @@ bool TcpClientInterface::availableforwrite(uint32_t size) {
  */
 void TcpClientInterface::flush() {
 
+    // the window is reopened and the buffer released in one section so a
+    // receive callback cannot grow it in between
+    NESTED_CRITICAL_SECTION_ENTER
+
     if (m_rxBuffer) {
 
         if(nullptr != m_pcb && m_rxBufferSize > 0){
 
-            #ifdef ENABLE_CONTEXTUAL_EXECUTION
-            m_mutex.critical_lock();
-            #endif
             tcp_recved(m_pcb, m_rxBufferSize); // Notify the TCP stack that data has been read
-            #ifdef ENABLE_CONTEXTUAL_EXECUTION
-            m_mutex.critical_unlock();
-            #endif
         }
 
         pdiutil::safe_delete_array(m_rxBuffer);
@@ -653,6 +663,8 @@ void TcpClientInterface::flush() {
 
         tcp_output(m_pcb);
     }
+
+    NESTED_CRITICAL_SECTION_EXIT
 
     m_isLastWriteAcked = true;
 }

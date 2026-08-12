@@ -657,6 +657,11 @@ int16_t TlsClientInterface::close() {
         m_rxQueueLen = 0;
     }
 
+    // the pcb check and its release belong to one section, a callback may drop
+    // the pcb between them otherwise
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.critical_lock();
+    #endif
     if (m_pcb != nullptr) {
         tcp_arg(m_pcb, nullptr);
         tcp_err(m_pcb, nullptr);
@@ -665,6 +670,9 @@ int16_t TlsClientInterface::close() {
         tcp_close(m_pcb);
         m_pcb = nullptr;
     }
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.critical_unlock();
+    #endif
 
     m_pumpPending = false;
     m_isConnected = false;
@@ -776,9 +784,16 @@ bool TlsClientInterface::setKeepAlive(uint16_t /*idleTime*/, uint16_t /*interval
     return false;
 }
 void TlsClientInterface::setNoDelay(bool noDelay) {
-    if (!m_pcb) return;
-    if (noDelay) tcp_nagle_disable(m_pcb);
-    else         tcp_nagle_enable(m_pcb);
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.critical_lock();
+    #endif
+    if (m_pcb) {
+        if (noDelay) tcp_nagle_disable(m_pcb);
+        else         tcp_nagle_enable(m_pcb);
+    }
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.critical_unlock();
+    #endif
 }
 bool TlsClientInterface::availableforwrite(uint32_t size) {
 
@@ -833,7 +848,14 @@ void TlsClientInterface::flush() {
         pumpEngine();
     }
 
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.critical_lock();
+    #endif
     if (m_pcb) tcp_output(m_pcb);
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    m_mutex.critical_unlock();
+    #endif
+
     m_isLastWriteAcked = true;
 }
 
@@ -845,8 +867,10 @@ err_t TlsClientInterface::onConnected(void* arg, struct tcp_pcb* /*tpcb*/, err_t
         if (self->m_bear) self->m_bear->engineFatal = true;
         return err;
     }
+    NESTED_CRITICAL_SECTION_ENTER
     self->m_isConnected = true;
     self->m_pumpPending = true;
+    NESTED_CRITICAL_SECTION_EXIT
     return ERR_OK;
 }
 
@@ -863,23 +887,26 @@ err_t TlsClientInterface::onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf
         return ERR_OK;
     }
 
+    // the queue length is read and grown in one section, a reader taking bytes
+    // out in between would leave the copy sized against a stale length
+    NESTED_CRITICAL_SECTION_ENTER
+
     uint32_t newSize = self->m_rxQueueLen + p->tot_len;
     if((newSize+self->m_rxQueueLen) > (0.90*TLS_IBUF_SIZE)){
+        NESTED_CRITICAL_SECTION_EXIT
         // LogE("TLS onReceive: rxQ cap, in=%u rxQ=%u\n",
         //     (unsigned)p->tot_len, (unsigned)self->m_rxQueueLen);
         return ERR_MEM;
     }
 
-    #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    self->m_mutex.critical_lock();
-    #endif
     uint8_t* newBuf = pdiutil::safe_new_array<uint8_t>(newSize);
     if (!newBuf) {
-        #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        self->m_mutex.critical_unlock();
-        #endif
+        NESTED_CRITICAL_SECTION_EXIT
+#ifndef ENABLE_CONTEXTUAL_EXECUTION
+        // lwip callback context, kept off the logger when scheduling is enabled
         SysLogE("TLS onReceive: alloc fail, in=%u rxQ=%u\n",
             (unsigned)p->tot_len, (unsigned)self->m_rxQueueLen);
+#endif
         return ERR_MEM;
     }
     if (self->m_rxQueue) {
@@ -889,9 +916,7 @@ err_t TlsClientInterface::onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf
     pbuf_copy_partial(p, newBuf + self->m_rxQueueLen, p->tot_len, 0);
     self->m_rxQueue = newBuf;
     self->m_rxQueueLen = newSize;
-    #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    self->m_mutex.critical_unlock();
-    #endif
+    NESTED_CRITICAL_SECTION_EXIT
 
     pbuf_free(p);
     return ERR_OK;
@@ -901,17 +926,23 @@ void TlsClientInterface::onError(void* arg, err_t err) {
     TlsClientInterface* self = static_cast<TlsClientInterface*>(arg);
     if (!self) return;
     // LogE("TLS onError: lwIP err=%d\n", (int)err);
+    NESTED_CRITICAL_SECTION_ENTER
     self->m_pcb = nullptr;
+    NESTED_CRITICAL_SECTION_EXIT
     self->flush();
+    NESTED_CRITICAL_SECTION_ENTER
     self->m_isConnected = false;
     if (self->m_bear) self->m_bear->engineFatal = true;
+    NESTED_CRITICAL_SECTION_EXIT
 }
 
 err_t TlsClientInterface::onSent(void* arg, struct tcp_pcb* /*tpcb*/, u16_t /*len*/) {
     TlsClientInterface* self = static_cast<TlsClientInterface*>(arg);
     if (!self) return ERR_VAL;
+    NESTED_CRITICAL_SECTION_ENTER
     self->m_isLastWriteAcked = true;
     self->m_pumpPending = true;
+    NESTED_CRITICAL_SECTION_EXIT
     return ERR_OK;
 }
 

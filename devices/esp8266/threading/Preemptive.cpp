@@ -10,12 +10,20 @@ Created Date    : 1st June 2025
 
 #include "Preemptive.h"
 #include "../DeviceControlInterface.h"
+#ifdef DEVICE_AVOID_SDK_STACK_CONTEXT_SWITCH
+#include <cont.h>
+#endif
 
 static XtensaContext* __isr_ctx; 
 static Preemptive __non_preemptive;
 static volatile bool __non_preemptive_saved = false;
 static volatile bool __preemptive_sched_active = true;
 static volatile uint32_t __last_time_spent_in_isr = 0; // in microseconds
+#ifdef DEVICE_AVOID_SDK_STACK_CONTEXT_SWITCH
+// A task waiting in exit() owns no context the isr can recognise, so it asks
+// for the switch directly. Held only while that spin runs, nothing else runs.
+static volatile bool __switch_requested = false;
+#endif
 
 // Context switch period required to set in timer
 // Real time tuning requires period < 1ms - ISR context switch period/cycles in microseconds
@@ -34,6 +42,14 @@ void IRAM_ATTR __attribute__((naked)) timer1_isr_coroutine(XtensaContext* ctx){
 
     // Capture microseconds
     uint32_t entry_us = micros();
+
+#ifdef DEVICE_AVOID_SDK_STACK_CONTEXT_SWITCH
+    // Leave the sdk stack alone, it carries lwIP and other non reentrant
+    // callbacks. The next tick catches the loop once control returns to it.
+    bool switch_requested = __switch_requested;
+    __switch_requested = false;
+    if (!switch_requested && !__i_preemptive_scheduler.is_switchable_context(ctx->sp)) return;
+#endif
 
     // Keep copy of interrupted context
     __isr_ctx = ctx;
@@ -69,10 +85,13 @@ void preemptive_trampoline(void *arg) {
     if (f){
 
         f->entry(f->arg);
-        // Only mark finished if entry actually returns 
-        if (f->state == PreemptiveState::Running) { 
-            f->state = PreemptiveState::Finished; 
-        }        
+
+        // Only mark finished if entry actually returns
+        CRITICAL_SECTION_ENTER
+        if (f->state == PreemptiveState::Running) {
+            f->state = PreemptiveState::Finished;
+        }
+        CRITICAL_SECTION_EXIT
     }
 
     PreemptiveScheduler::exit(); // never returns
@@ -194,7 +213,11 @@ int PreemptiveScheduler::schedule_task(task_t* task, uint32_t stacksize){
  */
 void PreemptiveScheduler::mute(){
 
-    CRITICAL_SECTION_ENTER 
+    // the spin in exit() forces a switch off whatever stack it runs on. from
+    // an sdk stack that abandons a half finished sdk callback, so refuse it.
+    if (!is_scheduler_context()) return;
+
+    CRITICAL_SECTION_ENTER
 
     Preemptive* f = current;
     if (!f) {
@@ -219,7 +242,9 @@ void PreemptiveScheduler::mute(){
  */
 void PreemptiveScheduler::yield(){
 
-    CRITICAL_SECTION_ENTER 
+    if (!is_scheduler_context()) return;
+
+    CRITICAL_SECTION_ENTER
 
     Preemptive* f = current;
     if (!f) {
@@ -243,7 +268,9 @@ void PreemptiveScheduler::yield(){
  */
 void PreemptiveScheduler::sleep(uint32_t ms){
 
-    CRITICAL_SECTION_ENTER 
+    if (!is_scheduler_context()) return;
+
+    CRITICAL_SECTION_ENTER
 
     Preemptive* f = current;
     if (!f) {
@@ -304,7 +331,11 @@ void PreemptiveScheduler::run(){
                 current->state = PreemptiveState::Running;
                 return; // continue same task
             }
-            
+
+        }else if(current->state == PreemptiveState::Finished){ // tearing down
+
+            return; // no branch below re-queues it, it would be lost
+
         // }else if(current->state == PreemptiveState::Sleeping){
 
         // }else if(current->state == PreemptiveState::Mute){
@@ -404,9 +435,16 @@ void PreemptiveScheduler::exit(){
 
     while(1) // wait for context switch by ISR
     {
+        #ifdef DEVICE_AVOID_SDK_STACK_CONTEXT_SWITCH
+        __switch_requested = true;
+        #endif
         if(f && f->state == PreemptiveState::Running)
             break;
     }
+
+    #ifdef DEVICE_AVOID_SDK_STACK_CONTEXT_SWITCH
+    __switch_requested = false;
+    #endif
 }
 
 /**
@@ -416,10 +454,12 @@ void PreemptiveScheduler::destroy_preemptive(Preemptive* f) {
 
     if (f){
 
-        CRITICAL_SECTION_ENTER 
+        CRITICAL_SECTION_ENTER
         remove_from_sleepers(f);
         remove_from_ready(f);
-    
+
+        if (current == f) current = nullptr;
+
         __task_scheduler.remove_task(f->task_id);
         pdiutil::safe_delete(f);
         CRITICAL_SECTION_EXIT
@@ -545,15 +585,58 @@ bool PreemptiveScheduler::is_task_context() const {
         if (sp_now >= lo && sp_now < hi) return true;
     }
     // __non_preemptive has no `stack_raw` of its own — it lives on the
-    // cont/main-loop stack. We can't bound-check it reliably from here, so
-    // accept it only if no other Preemptive's range matches. This means SDK
-    // callbacks running on the cont stack will still be (mis)accepted as
-    // task context — caller-side audit (don't log from SDK callbacks) is
-    // still required for those, but this guard catches the case where SDK
-    // callbacks fire while `current` is a different preemptive task on its
-    // own stack (the most common deadlock we've observed).
+    // cont/main-loop stack, which is not a preemptive task. Callers that only
+    // need "may this context be parked" want is_scheduler_context() instead.
     return false;
 }
+
+/**
+ * Tell whether the running stack is one the scheduler owns, either a task
+ * stack or the main loop cont stack. Anything else is the sdk, which must
+ * never be parked because the spin in exit() would abandon its callback.
+ */
+bool PreemptiveScheduler::is_scheduler_context() const {
+
+    if (is_task_context()) return true;
+
+#ifdef DEVICE_AVOID_SDK_STACK_CONTEXT_SWITCH
+    uint32_t sp_now;
+    asm volatile("mov %0, a1" : "=a"(sp_now));
+
+    cont_t *loopctx = g_pcont;
+    if (loopctx) {
+        uintptr_t lo = reinterpret_cast<uintptr_t>(loopctx->stack);
+        uintptr_t hi = reinterpret_cast<uintptr_t>(loopctx->stack_end);
+        if (sp_now >= lo && sp_now < hi) return true;
+    }
+#endif
+
+    return false;
+}
+
+#ifdef DEVICE_AVOID_SDK_STACK_CONTEXT_SWITCH
+/**
+ * Tell whether the interrupted stack belongs to us. The loop owns the cont
+ * stack and every task owns its allocated block, anything else is the sdk.
+ */
+bool PreemptiveScheduler::is_switchable_context(uint32_t sp) const {
+
+    if (current && current->stack_raw && current->stack) {
+        uintptr_t lo = reinterpret_cast<uintptr_t>(current->stack_raw);
+        uintptr_t hi = reinterpret_cast<uintptr_t>(current->stack);
+        if (sp >= lo && sp < hi) return true;
+    }
+
+    cont_t *loopctx = g_pcont;
+    if (loopctx) {
+        uintptr_t lo = reinterpret_cast<uintptr_t>(loopctx->stack);
+        uintptr_t hi = reinterpret_cast<uintptr_t>(loopctx->stack_end);
+        if (sp >= lo && sp < hi) return true;
+    }
+
+    return false;
+}
+#endif
 
 void Preemptive::suspend(){
     if (state == PreemptiveState::Mute) return;

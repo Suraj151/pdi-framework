@@ -38,6 +38,10 @@ PreemptiveMutex::~PreemptiveMutex() {
  */
 void PreemptiveMutex::lock(){
 
+    // sdk and lwip callbacks are not the task `current` points at, so they can
+    // neither be parked nor own this. they proceed without holding it.
+    if (!__i_preemptive_scheduler.is_scheduler_context()) return;
+
     CRITICAL_SECTION_ENTER
 
     if(!__i_preemptive_scheduler.current) {
@@ -74,7 +78,9 @@ void PreemptiveMutex::unlock(){
 
     // if(!__i_preemptive_scheduler.current) return;
 
-    CRITICAL_SECTION_ENTER 
+    if (!__i_preemptive_scheduler.is_scheduler_context()) return;
+
+    CRITICAL_SECTION_ENTER
 
     // Only owner can unlock
     if (__i_preemptive_scheduler.current != m_owner) {
@@ -124,6 +130,8 @@ void PreemptiveMutex::critical_unlock(){
  */
 bool PreemptiveMutex::try_lock(){
 
+    if (!__i_preemptive_scheduler.is_scheduler_context()) return false;
+
     CRITICAL_SECTION_ENTER
 
     if(!__i_preemptive_scheduler.current) {
@@ -148,3 +156,5 @@ bool PreemptiveMutex::try_lock(){
     CRITICAL_SECTION_EXIT
     return false;
 }
+
+PreemptiveMutex __lwip_mutex;

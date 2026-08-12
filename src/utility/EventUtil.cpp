@@ -76,6 +76,9 @@ bool EventUtil::add_event_listener(event_name_t _event, CallBackVoidPointerArgFn
  */
 void EventUtil::execute_event(event_name_t _event, void *_arg)
 {
+#ifndef ENABLE_CONTEXTUAL_EXECUTION
+  // events are dispatched from sdk callbacks, so this log path is left out
+  // when scheduling is enabled to keep those contexts off the logger
   if (nullptr != m_util)
   {
     char content[25];
@@ -83,6 +86,7 @@ void EventUtil::execute_event(event_name_t _event, void *_arg)
     __sprintf(content, "\ne:%d\n", (int)_event);
     m_util->log(INFO_LOG, content);
   }
+#endif
 
   for (uint16_t i = 0; i < this->m_event_listeners.size(); i++)
   {
