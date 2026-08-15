@@ -56,6 +56,9 @@ if(t)document.documentElement.setAttribute('data-theme',t);\
 --pr:#0062af;\
 --bt:#337ab7;\
 --mt:#6b7280;\
+--ok:#1a7f37;\
+--er:#b32d4a;\
+--wn:#8a6100;\
 --rd:8px;\
 }\
 @media(prefers-color-scheme:dark){\
@@ -67,6 +70,9 @@ if(t)document.documentElement.setAttribute('data-theme',t);\
 --pr:#4da3e8;\
 --bt:#3d8fd0;\
 --mt:#9aa3ad;\
+--ok:#6fdd8b;\
+--er:#ff8098;\
+--wn:#f0c674;\
 }\
 }\
 :root[data-theme='dark']{\
@@ -77,6 +83,9 @@ if(t)document.documentElement.setAttribute('data-theme',t);\
 --pr:#4da3e8;\
 --bt:#3d8fd0;\
 --mt:#9aa3ad;\
+--ok:#6fdd8b;\
+--er:#ff8098;\
+--wn:#f0c674;\
 }\
 </style>";
 
@@ -174,7 +183,10 @@ background:none;\
 color:var(--fg);\
 text-align:center;\
 }\
-.msg{padding:9px;border-radius:var(--rd);margin:10px 0;font-size:14px;}\
+.msg{padding:9px;border:1px solid transparent;border-radius:var(--rd);margin:10px 0;font-size:14px;}\
+.ok{background:#2ea04324;border-color:#2ea04361;color:var(--ok);}\
+.er{background:#d93c5a24;border-color:#d93c5a61;color:var(--er);}\
+.wn{background:#e0a80029;border-color:#e0a80066;color:var(--wn);}\
 .mnwdth125{min-width:125px;}\
 </style>";
 

@@ -97,33 +97,48 @@ rq.send();\
 
 static const char WEB_SERVER_STORAGE_LIST_PAGE_BOTTOM_FORMS1[] PROG_RODT_ATTR = "\
 <style>\
-form{\
-text-align:left;\
-margin:0px 0px 3px 15px;\
+.frow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0 0;}\
+.frow input{flex:1 1 150px;min-width:0;}\
+.frow .btn{flex:none;min-width:125px;margin:0;}\
+input[type=file]{padding:4px;}\
+input[type=file]::file-selector-button{\
+font:inherit;\
+font-size:13px;\
+margin-right:8px;\
+padding:4px 10px;\
+border:1px solid var(--ln);\
+border-radius:var(--rd);\
+background:var(--bg);\
+color:var(--mt);\
+cursor:pointer;\
 }\
-input{max-width:185px;}\
-.btn{min-width:100px;}\
+input[type=file]::file-selector-button:hover{border-color:var(--bt);color:var(--bt);}\
+#pBr{width:100%;height:6px;margin-top:8px;accent-color:var(--bt);}\
 </style>\
 <form id='frm1' action='/storage-fileupload' enctype='multipart/form-data' method='POST'>\
 ";
 
 static const char WEB_SERVER_STORAGE_LIST_PAGE_BOTTOM_FORMS2[] PROG_RODT_ATTR = "\
-<input name='nf' type='file'>\
-<input id='nfl' name='loc' type='text' style='display:none'>\
+<input id='nfl' name='loc' type='hidden'>\
+<div class='frow'>\
+<input name='nf' type='file' required>\
 <button class='btn' type='submit'>\
 Upload File\
 </button>\
+</div>\
 <progress id='pBr' value='0' max='100' style='display:none'></progress>\
 </form>\
 <form action='/storage-fileupload' enctype='multipart/form-data' method='POST'>\
 ";
 
 static const char WEB_SERVER_STORAGE_LIST_PAGE_BOTTOM_FORMS3[] PROG_RODT_ATTR = "\
-<input name='nd' type='text' placeholder='Enter folder name'>\
-<input id='ndl' name='loc' type='text' style='display:none'>\
+<input id='ndl' name='loc' type='hidden'>\
+<div class='frow'>\
+<input name='nd' type='text' placeholder='New folder name' required>\
 <button class='btn' type='submit'>\
 Create Folder\
 </button>\
+</div>\
 </form>\
 ";
 

@@ -65,7 +65,7 @@ Flash\
 static const char WEB_SERVER_OTA_NO_LOCAL_IMAGE[] PROG_RODT_ATTR = "\
 </table>\
 </form>\
-<h4>No firmware image on storage. Upload a .bin file first.</h4>";
+<h4>No firmware image on storage. Upload a .bin file first from storage menu.</h4>";
 
 #endif
 

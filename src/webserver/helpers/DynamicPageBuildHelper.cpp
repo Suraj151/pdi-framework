@@ -600,11 +600,9 @@ void concat_flash_message_div( char *_page, const char *_message, int _status ){
 
   strcat_ro( _page, HTML_DIV_OPEN_TAG );
   strcat_ro( _page, HTML_CLASS_ATTR );
-  strcat_ro( _page, RODT_ATTR("'msg'") );
-  strcat_ro( _page, HTML_STYLE_ATTR );
-  strcat_ro( _page, RODT_ATTR("'background:") );
-  strcat_ro( _page, _status==ALERT_DANGER ? RODT_ATTR("#ffb2c7"): _status==ALERT_SUCCESS ? RODT_ATTR("#a6eaa8") : RODT_ATTR("#f9dc87") );
-  strcat_ro( _page, RODT_ATTR(";'>") );
+  strcat_ro( _page, RODT_ATTR("'msg ") );
+  strcat_ro( _page, _status==ALERT_DANGER ? RODT_ATTR("er"): _status==ALERT_SUCCESS ? RODT_ATTR("ok") : RODT_ATTR("wn") );
+  strcat_ro( _page, RODT_ATTR("'>") );
   strcat_ro( _page, _message );
   strcat_ro( _page, HTML_DIV_CLOSE_TAG );
 }
@@ -613,11 +611,9 @@ void concat_flash_message_div( char *_page, char *_message, int _status ){
 
   strcat_ro( _page, HTML_DIV_OPEN_TAG );
   strcat_ro( _page, HTML_CLASS_ATTR );
-  strcat_ro( _page, RODT_ATTR("'msg'") );
-  strcat_ro( _page, HTML_STYLE_ATTR );
-  strcat_ro( _page, RODT_ATTR("'background:") );
-  strcat_ro( _page, _status==ALERT_DANGER ? RODT_ATTR("#ffb2c7"): _status==ALERT_SUCCESS ? RODT_ATTR("#a6eaa8") : RODT_ATTR("#f9dc87") );
-  strcat_ro( _page, RODT_ATTR(";'>") );
+  strcat_ro( _page, RODT_ATTR("'msg ") );
+  strcat_ro( _page, _status==ALERT_DANGER ? RODT_ATTR("er"): _status==ALERT_SUCCESS ? RODT_ATTR("ok") : RODT_ATTR("wn") );
+  strcat_ro( _page, RODT_ATTR("'>") );
   strcat( _page, _message );
   strcat_ro( _page, HTML_DIV_CLOSE_TAG );
 }

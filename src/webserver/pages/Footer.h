@@ -176,8 +176,7 @@ function rql(){\
 var r=JSON.parse(this.responseText);\
 console.log('r',r);\
 if(r){\
-eldr.setAttribute('class','msg');\
-eldr.style.background=r.status?'#a6eaa8':'#f9dc87';\
+eldr.setAttribute('class',r.status?'msg ok':'msg wn');\
 eldr.innerHTML=r.status?'OTP is <strong>'+r.otp+'</strong> : '+r.remark:r.remark;\
 isldr=0;\
 }\
@@ -186,7 +185,6 @@ function gotp(){\
 if(!isldr){\
 eldr.setAttribute('class','ldr');\
 eldr.innerHTML='';\
-eldr.style.background='';\
 el.appendChild(eldr);\
 }\
 rq.addEventListener('load',rql);\
