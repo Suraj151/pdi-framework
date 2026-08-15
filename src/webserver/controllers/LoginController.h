@@ -225,16 +225,8 @@ class LoginController : public Controller {
 
       if( nullptr != _token && nullptr != this->m_route_handler ){
 
-        login_credential_table _creds;
-        uint32_t _max_age = SERVER_COOKIE_MAX_AGE;
-
-        if( nullptr != this->m_web_resource->m_db_conn &&
-            this->m_web_resource->m_db_conn->get_login_credential_table( &_creds ) ){
-          _max_age = _creds.cookie_max_age;
-        }
-
         char _session_cookie[EW_COOKIE_BUFF_MAX_SIZE];
-        this->m_route_handler->build_session_cookie( _session_cookie, _token, EW_COOKIE_BUFF_MAX_SIZE, true, _max_age );
+        this->m_route_handler->build_session_cookie( _session_cookie, _token, EW_COOKIE_BUFF_MAX_SIZE, true, __web_session_manager.idleMaxAge() );
         this->m_web_resource->m_server->addHeader(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_SET_COOKIE), _session_cookie);
       }
 

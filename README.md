@@ -22,7 +22,7 @@ What comes out of the box is closer to a small system than to a sketch template:
 
 **Found on the network without help.** A from-scratch mDNS/DNS-SD responder built straight on lwIP UDP advertises `pdi-<mac>.local` and the services it is listening on, so the device answers to a name and shows up in `avahi-browse -a`. Name lookups walk IP literal, then `/etc/hosts`, then DNS.
 
-**Configured from a browser.** Any account in the user store can sign in and change its own password; server-side sessions, `HttpOnly` cookies and CSRF-guarded forms back one settings page per service, GPIO control, a storage browser, MQTT and email testers, and firmware flashing from an image already on the device — all served from flash-resident page fragments that follow the browser's light or dark preference and scale from a phone upward. The portal browses the filesystem as the signed-in user, so it obeys the same permissions the shell does.
+**Configured from a browser.** Any account in the user store can sign in and change its own password; server-side sessions, `HttpOnly` cookies and CSRF-guarded forms back a live dashboard, one settings page per service, GPIO control, a storage browser, MQTT and email testers, and firmware flashing from an image already on the device — all served from flash-resident page fragments that follow the browser's light or dark preference and scale from a phone upward. The portal browses the filesystem as the signed-in user, so it obeys the same permissions the shell does.
 
 ## Quick Start
 
@@ -88,6 +88,9 @@ Details in [§6.2.11 Storage](#6211-storage-interface-init-no-provider).
   <tr>
     <td width="50%"><img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/mqtt-submenu.png" width="100%"></td>
     <td width="50%"><img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/storage-home.png" width="100%"></td>
+  </tr>
+  <tr>
+    <td ><img src="https://github.com/Suraj151/esp8266-framework/blob/master/doc/dashboard.png" width="100%"></td>
   </tr>
 </table>
 
@@ -1715,7 +1718,7 @@ URIs are constants in one header, so a typo is a compile error rather than a dea
 | `/logout` | drop the session | — |
 | `/login-config` | change your own password | auth |
 | `/dashboard` | live device summary | auth |
-| `/listen-dashboard` | dashboard updates | api |
+| `/listen-dashboard` | one aggregated dashboard payload | api |
 | `/wifi-config` | station and AP form | auth |
 | `/ota-config` | host, port, version, and flashing an image from storage | auth |
 | `/email-config` | SMTP credentials | auth |
@@ -1727,6 +1730,10 @@ URIs are constants in one header, so a typo is a compile error rather than a dea
 | `/storage`, `/storage-fileupload`, `/storage-filelist`, `/storage-filedel` | file browser, upload and delete | auth |
 
 The file browser lists each entry the way `ls -l` does — a permission string such as `drwxr-xr-x`, then owner and group resolved to names through the user store, then size. Every operation runs as the signed-in user, so a listing, a delete or an upload succeeds exactly where the same account would succeed from the shell, and an upload lands owned by whoever uploaded it. A refusal is reported as a denied permission rather than a generic failure.
+
+The dashboard gathers what the other subsystems already know into one card grid, refreshed from a single `/listen-dashboard` payload every three seconds. Link state sits in the page heading as symbols: wifi arcs lit by signal strength with the RSSI beside them, and a globe that dims when the internet probe last failed. Storage and heap are rings — the storage ring is the used share of the root filesystem, the memory ring is how much of the free heap is one contiguous block, which is the number that matters when an allocation fails on a device still reporting plenty free. Below them sit uptime with the four busiest tasks in the columns of `ps` — pid, name, state letter, lifetime CPU share — then every authenticated session with the transport it arrived on, so a serial login, an SSH session and a portal login appear side by side with their login and idle times. Configured pins render as tiles carrying mode and current state (`DOUT · HIGH`, `DIN · LOW`, `AOUT · 180`), and an analog pin adds a rolling trace against a labelled axis, held on the client so the device only ever sends the present reading. Each card is fed by its own feature flag, so a build without storage, GPIO or the auth service simply serves fewer of them.
+
+Rows that repeat are arrays rather than objects, which keeps a full payload — radio, filesystem, heap, tasks, sessions, pins and attached stations — around 400 bytes, and the response string is reserved up front so it never grows in steps while being built.
 
 Registering one takes a URI, a callback, an optional middleware level and an optional redirect target. There is also a hook for the not-found handler, which the home controller owns.
 
@@ -1775,7 +1782,11 @@ Logging in verifies the credentials through the auth service, takes a slot, and 
 Set-Cookie: pdi_session=<32 hex>; Max-Age=300; Path=/; HttpOnly; SameSite=Strict[; Secure]
 ```
 
-The cookie name and max age come from the credential table — `pdi_session` and five minutes. `Secure` is appended when the portal is built for TLS. Each guarded request parses the `Cookie` header by exact name, matches the token with a constant-time compare, and enforces both an idle timeout (the cookie max age) and an absolute cap (`WEB_SESSION_ABSOLUTE_MAX_AGE`, eight hours). Logging out, or changing a password, releases the slot, so a captured cookie stops working at that moment rather than at expiry.
+The cookie name and max age come from the credential table — `pdi_session` and five minutes. `Secure` is appended when the request itself arrived over TLS, rather than when the build has TLS compiled in, because a browser silently drops a `Secure` cookie delivered over plain HTTP. Each guarded request parses the `Cookie` header by exact name, matches the token with a constant-time compare, and enforces both an idle timeout (the cookie max age) and an absolute cap (`WEB_SESSION_ABSOLUTE_MAX_AGE`, eight hours). Logging out, or changing a password, releases the slot, so a captured cookie stops working at that moment rather than at expiry.
+
+Both ends of that window have to slide together. The server refreshes its idle stamp on every request, but the cookie carries a fixed expiry from the moment it was written, so a session that is still in use is handed a fresh cookie once it passes half its life — otherwise the browser drops it mid-session and the user is bounced to the login form while the session is still live. The reissue is rate-limited to the half-life rather than sent on every response, so a page polling every few seconds does not pay for the header each time.
+
+A slot is reclaimed when its session expires, and any request sweeps the whole table rather than only the slot whose token matched. Without that, a client that simply walks away leaves its slot held until the next login happens to notice — which on the default two-slot table costs half the capacity.
 
 A web session *is* a `session_t` — the same structure the terminals use, extended with the two tokens. That means a validated request can be published through `SessionManager` for the life of the handler, which is what makes the VFS resolve file operations as the logged-in web user: uid, gid and umask are the session's, not root's. The route wrapper detaches it again once the handler returns, so a web session is never current while terminal work runs.
 
@@ -1797,7 +1808,7 @@ The header and footer are shared by every page; the middle is whichever page is 
 
 Three helpers carry the dynamic markup: a page builder that turns C structs into form inputs, tables and option lists; a set of tag and attribute constants that keep allocations down; and an inline SVG icon set.
 
-The shared header carries the styling for every page, so the look is defined once. Colours are CSS custom properties with a light and a dark set: the dark set applies through `prefers-color-scheme` until the visitor picks a side with the toggle in the top corner, after which a `data-theme` attribute on the root element wins and the choice is remembered in `localStorage`. Layout is sized for a phone first and widens with the viewport, with controls given larger hit targets on coarse pointers; pages that need the room, such as the file browser, open a wider container. Because the header is larger than one chunk, it is emitted as several flash-resident fragments, each under the single-send buffer.
+The shared header carries the styling for every page, so the look is defined once. Colours are CSS custom properties with a light and a dark set: the dark set applies through `prefers-color-scheme` until the visitor picks a side with the toggle in the top corner, after which a `data-theme` attribute on the root element wins and the choice is remembered in `localStorage`. Success, error and warning share that treatment — a flash message names a status class and takes its text colour from a token, over a translucent tint that composites against whichever card colour is in force, so one rule reads correctly in both schemes. Layout is sized for a phone first and widens with the viewport, with controls given larger hit targets on coarse pointers; pages that need the room, such as the file browser, open a wider container. Because the header is larger than one chunk, it is emitted as several flash-resident fragments, each under the single-send buffer.
 
 #### 8.7.1 HTTPS wiring and certificates
 

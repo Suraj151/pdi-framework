@@ -31,7 +31,9 @@ created Date    : 1st June 2019
 #define INVALID_GPIO_NUMBER       UINT8_MAX
 
 #define GPIO_HOST_BUF_SIZE            60
+#ifndef ANALOG_GPIO_RESOLUTION
 #define ANALOG_GPIO_RESOLUTION        1024
+#endif
 
 #define GPIO_PAYLOAD_DATA_KEY     "data"
 #define GPIO_PAYLOAD_MODE_KEY     "mode"

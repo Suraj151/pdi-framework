@@ -223,6 +223,15 @@ public:
     }
 
     /**
+     * @brief Number of slots the table holds, live or free.
+     *
+     * Upper bound for a getTaskByIndex() enumeration.
+     */
+    uint16_t getTaskSlots() const {
+      return m_tasks.size();
+    }
+
+    /**
      * @brief Get task by index in the registration order. Read-only enumeration
      *        for observability tools (procfs, ps). Returns nullptr if out of range.
      */

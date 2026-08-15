@@ -84,11 +84,44 @@ public:
    */
   bool isLoginBlocked();
 
+  /**
+   * @brief Number of slots in the session table.
+   */
+  static uint8_t maxSessions() { return WEB_MAX_SESSIONS; }
+
+  /**
+   * @brief Read only enumeration of the session table for observability tools.
+   *
+   * @param idx The slot index to read.
+   * @return Pointer to the occupied session, or nullptr for a free slot.
+   */
+  web_session_t *getByIndex(uint8_t idx);
+
+  /**
+   * @brief The idle window a session is allowed, in seconds.
+   *
+   * Also the lifetime given to the client cookie, so both ends of the session
+   * agree on when it lapses.
+   */
+  uint32_t idleMaxAge();
+
+  /**
+   * @brief Reports whether the client cookie is old enough to be reissued.
+   *
+   * The cookie carries a fixed expiry, so a session that is still being used
+   * needs a fresh one before the browser drops it.
+   */
+  bool needsCookieRefresh(const web_session_t *session);
+
+  /**
+   * @brief Records that a fresh cookie has been handed to the client.
+   */
+  void markCookieIssued(web_session_t *session);
+
 private:
 
   bool isExpired(const web_session_t &session, uint32_t now);
   void generateToken(char *out);
-  uint32_t idleMaxAge();
 
   web_session_t m_sessions[WEB_MAX_SESSIONS];
   uint8_t m_loginFailures;

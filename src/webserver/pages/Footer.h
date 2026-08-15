@@ -88,38 +88,6 @@ rq.send();\
 ";
 
 /**
- * @brief Footer HTML template with dashboard monitoring.
- *
- * This template includes JavaScript code to dynamically update dashboard data,
- * such as network status, IP address, RSSI, and connected devices.
- */
-static const char WEB_SERVER_FOOTER_WITH_DASHBOARD_MONITOR_HTML[] PROG_RODT_ATTR = "\
-</div>\
-<script>\
-var rq=new XMLHttpRequest();\
-function rql(){\
-if(this.status!=200){location.href='/';return;}\
-var r=JSON.parse(this.responseText);\
-document.getElementById('stnm').innerHTML=r.nm;\
-document.getElementById('stip').innerHTML=r.ip;\
-document.getElementById('strs').innerHTML=r.rs;\
-document.getElementById('stst').innerHTML=r.st;\
-document.getElementById('stmc').innerHTML=r.mc;\
-document.getElementById('inet').innerHTML=r.nt;\
-document.getElementById('nwt').innerHTML=r.nwt;\
-document.getElementById('cndl').innerHTML=r.dl;\
-}\
-rq.addEventListener('load',rql);\
-setInterval(function(){\
-rq.open('GET','/listen-dashboard');\
-rq.send();\
-},3000);\
-</script>\
-</body>\
-</html>\
-";
-
-/**
  * @brief Footer HTML template with client listening.
  *
  * This template includes JavaScript code to dynamically update client-related

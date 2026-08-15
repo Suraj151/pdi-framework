@@ -92,13 +92,14 @@ using login_credential_table = login_credential;
 
 struct web_session_t : public session_t {
 
-  web_session_t(){
+  web_session_t() : m_cookieIssuedAt(0) {
     clearToken();
   }
 
   void clear() override {
     session_t::clear();
     clearToken();
+    m_cookieIssuedAt = 0;
   }
 
   void clearToken(){
@@ -108,6 +109,10 @@ struct web_session_t : public session_t {
 
   char m_token[WEB_SESSION_TOKEN_HEX_LEN + 1];
   char m_csrf[WEB_SESSION_TOKEN_HEX_LEN + 1];
+
+  // when the client cookie was last handed out. the browser expiry is fixed at
+  // the moment it is issued, so it has to be reissued to follow the session
+  uint32_t m_cookieIssuedAt;
 };
 
 #endif

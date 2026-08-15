@@ -155,8 +155,36 @@ public:
     }
 
     publish_request_session();
+    refresh_session_cookie();
     LogI("active session found\n");
     return true;
+  }
+
+  /**
+   * @brief Reissues the session cookie once it is halfway through its life.
+   *
+   * The server side window slides with every request, but the cookie handed to
+   * the browser carries a fixed expiry from the moment it was written. Without
+   * a fresh one the client drops the cookie mid session and the user is sent
+   * back to the login form while the session is still live.
+   */
+  void refresh_session_cookie(void)
+  {
+    if (nullptr == m_active_session || nullptr == __web_resource.m_server)
+    {
+      return;
+    }
+
+    if (!__web_session_manager.needsCookieRefresh(m_active_session))
+    {
+      return;
+    }
+
+    char _session_cookie[EW_COOKIE_BUFF_MAX_SIZE];
+    this->build_session_cookie(_session_cookie, m_active_session->m_token, EW_COOKIE_BUFF_MAX_SIZE, true, __web_session_manager.idleMaxAge());
+
+    __web_resource.m_server->addHeader(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_SET_COOKIE), _session_cookie);
+    __web_session_manager.markCookieIssued(m_active_session);
   }
 
   /**

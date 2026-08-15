@@ -55,6 +55,7 @@ extern portMUX_TYPE __pdi_critical_mux;
 #define MAX_DIGITAL_GPIO_PINS         12
 #define MAX_ANALOG_GPIO_PINS          4
 #endif
+#define ANALOG_GPIO_RESOLUTION        4096
 
 /**
  * define max number of tables in database

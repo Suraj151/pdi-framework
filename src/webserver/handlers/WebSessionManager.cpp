@@ -116,6 +116,7 @@ web_session_t *WebSessionManager::create(const char *username, uint16_t uid, uin
   slot->m_username = username;
   slot->m_loginAt = (uint32_t)__i_dvc_ctrl.millis_now();
   slot->m_lastActivityAt = slot->m_loginAt;
+  slot->m_cookieIssuedAt = slot->m_loginAt;
 #ifdef ENABLE_AUTH_SERVICE
   slot->m_isAuthorized = true;
   slot->m_uid = uid;
@@ -144,6 +145,10 @@ web_session_t *WebSessionManager::validate(const char *token)
     return nullptr;
   }
 
+  // every request sweeps the table, so a session the client walked away from
+  // releases its slot instead of waiting for the next login to notice
+  collectExpired();
+
   uint32_t now = (uint32_t)__i_dvc_ctrl.millis_now();
 
   for (uint8_t i = 0; i < WEB_MAX_SESSIONS; i++)
@@ -164,17 +169,31 @@ web_session_t *WebSessionManager::validate(const char *token)
       continue;
     }
 
-    if (isExpired(m_sessions[i], now))
-    {
-      m_sessions[i].clear();
-      return nullptr;
-    }
-
     m_sessions[i].m_lastActivityAt = now;
     return &m_sessions[i];
   }
 
   return nullptr;
+}
+
+bool WebSessionManager::needsCookieRefresh(const web_session_t *session)
+{
+  if (nullptr == session)
+  {
+    return false;
+  }
+
+  uint32_t issuedseconds = (uint32_t)((uint32_t)__i_dvc_ctrl.millis_now() - session->m_cookieIssuedAt) / 1000;
+
+  return (issuedseconds > (idleMaxAge() / 2));
+}
+
+void WebSessionManager::markCookieIssued(web_session_t *session)
+{
+  if (nullptr != session)
+  {
+    session->m_cookieIssuedAt = (uint32_t)__i_dvc_ctrl.millis_now();
+  }
 }
 
 void WebSessionManager::destroy(web_session_t *session)
@@ -256,6 +275,16 @@ bool WebSessionManager::isLoginBlocked()
   }
 
   return true;
+}
+
+web_session_t *WebSessionManager::getByIndex(uint8_t idx)
+{
+  if (idx >= WEB_MAX_SESSIONS)
+  {
+    return nullptr;
+  }
+
+  return (SESSION_STATE_FREE != m_sessions[idx].m_state) ? &m_sessions[idx] : nullptr;
 }
 
 WebSessionManager __web_session_manager;
