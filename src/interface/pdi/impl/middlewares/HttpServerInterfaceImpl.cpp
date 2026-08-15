@@ -127,11 +127,16 @@ void HttpServerInterfaceImpl::handleClient(){
         return;
     }
 
-    // Client acceptance now happens in the lwIP onAccept callback only.
-    // if (!m_client && m_server->hasClient()) {
-    //     m_client = m_server->accept();
-    //     m_currentclient_lastactivity_timestamp = __i_instance.getUtilityInstance().millis_now();
-    // }
+    // A connection that arrived while the previous client was still being served
+    // stays waiting in the server, the accept callback only runs for a new one.
+    // Picking it up here is what keeps it from being reset by the next accept.
+    if (!m_client && m_server->hasClient()) {
+
+        m_handlingclientfromcb = true;
+        m_client = m_server->accept();
+        m_currentclient_lastactivity_timestamp = __i_instance.getUtilityInstance().millis_now();
+        m_handlingclientfromcb = false;
+    }
 
     if (m_client && m_client->connected()) {
 
@@ -170,6 +175,16 @@ void HttpServerInterfaceImpl::handleClient(){
 
             // Update current client liast activity timestamp
             m_currentclient_lastactivity_timestamp = __i_instance.getUtilityInstance().millis_now();
+        }
+
+        // Only one client is served at a time, so an idle keep-alive connection
+        // is given up as soon as another one is waiting. Holding it would leave
+        // the waiting connection to be reset by the accept that follows it.
+        else if( !m_clientRequest.isPending && m_server->hasClient() ){
+
+            closeClient();
+            m_currentclient_lastactivity_timestamp = 0;
+            return;
         }
 
         // Check for keep-alive timeout
@@ -238,6 +253,15 @@ pdiutil::string HttpServerInterfaceImpl::arg(const pdiutil::string &name) const 
  */
 bool HttpServerInterfaceImpl::hasArg(const pdiutil::string &name) const{
     return !arg(name).empty();
+}
+
+/**
+ * isPostRequest
+ * check if the request method is POST
+ */
+bool HttpServerInterfaceImpl::isPostRequest() const{
+    pdiutil::string method_post = CHARPTR_WRAP("POST");
+    return (m_clientRequest.method == method_post);
 }
 
 /**
@@ -522,12 +546,29 @@ void HttpServerInterfaceImpl::parseRequest(){
         pdiutil::string part;
         bool parthaslastread = false;
         bool found_end = false;
+        bool upload_aborted = false;
 
         // Read until the end boundary is found
+        uint32_t partprogressat = __i_instance.getUtilityInstance().millis_now();
         while (1) {
 
             pdiutil::string line;
             m_client->readLine(line, readLineYield);
+
+            // The same rule as the body reader: a socket that yields nothing is
+            // only worth waiting on while the peer is still there and the wait
+            // is short, otherwise this loop would never end.
+            if( line.empty() ){
+                if( !m_client->connected() ||
+                    (__i_instance.getUtilityInstance().millis_now() - partprogressat) > HTTP_UPLOAD_STALL_TIMEOUT_MS ){
+                    LogE("HTTP upload: part stalled, connected=%d\n", (int)m_client->connected());
+                    upload_aborted = true;
+                    break;
+                }
+            }else{
+                partprogressat = __i_instance.getUtilityInstance().millis_now();
+            }
+
             if(parthaslastread){
                 part += line;
                 parthaslastread = false;
@@ -594,6 +635,9 @@ void HttpServerInterfaceImpl::parseRequest(){
                         // Read the file content
                         #ifdef ENABLE_STORAGE_SERVICE
                         const char *tempdir = __i_instance.getFileSystemInstance().getTempDirectory();
+                        if(!__i_instance.getFileSystemInstance().isDirExist(tempdir)){
+                            __i_instance.getFileSystemInstance().createDirectory(tempdir);
+                        }
                         pdiutil::string tempFilePath = pdiutil::string(tempdir) + argfilename;
                         if(__i_instance.getFileSystemInstance().isFileExist(tempFilePath.c_str())){
                             // If the file already exists, delete it
@@ -610,12 +654,55 @@ void HttpServerInterfaceImpl::parseRequest(){
                         pdiutil::string lastread;
                         pdiutil::string held;
                         uint32_t maxreadinonecall = HTTP_UPLOAD_READ_BLOCK_SIZE;
+                        uint32_t lastprogressat = __i_instance.getUtilityInstance().millis_now();
+                        uint32_t uploadedbytes = 0;
+                        uint32_t loopcount = 0;
+
+                        LogI("HTTP upload: begin, heap=%u\n",
+                            (unsigned)__i_instance.getUtilityInstance().get_free_heap());
+
                         while (1) {
 
                             m_client->readStringUntil(part, '\r', true, readLineYield, maxreadinonecall);
                             m_client->readStringUntil(part, '\n', true, readLineYield, maxreadinonecall);
 
+                            uint32_t heldbefore = lastread.length();
                             lastread += part;
+                            uploadedbytes += part.length();
+
+                            // rxQ is what lwip has handed over and not yet been
+                            // drained, so a backlog pinned at its cap alongside a
+                            // falling heap tells the two apart
+                            if( (++loopcount % HTTP_UPLOAD_LOG_EVERY_N_BLOCKS) == 0 ){
+                                LogI("HTTP upload: %u bytes, rxQ=%u, heap=%u\n",
+                                    (unsigned)uploadedbytes,
+                                    (unsigned)m_client->available(),
+                                    (unsigned)__i_instance.getUtilityInstance().get_free_heap());
+                            }
+
+                            // A short append means the heap could not hold the
+                            // block. Carrying on would spin without ever meeting
+                            // the boundary, so the transfer is given up instead.
+                            if( lastread.length() != heldbefore + part.length() ){
+                                SysLogE("HTTP upload: out of memory at %u bytes, heap=%u\n",
+                                    (unsigned)uploadedbytes,
+                                    (unsigned)__i_instance.getUtilityInstance().get_free_heap());
+                                upload_aborted = true;
+                                break;
+                            }
+
+                            if( part.length() > 0 ){
+                                lastprogressat = __i_instance.getUtilityInstance().millis_now();
+                            }else if( !m_client->connected() ||
+                                      (__i_instance.getUtilityInstance().millis_now() - lastprogressat) > HTTP_UPLOAD_STALL_TIMEOUT_MS ){
+                                SysLogE("HTTP upload: stalled at %u bytes, connected=%d, rxQ=%u, heap=%u\n",
+                                    (unsigned)uploadedbytes,
+                                    (int)m_client->connected(),
+                                    (unsigned)m_client->available(),
+                                    (unsigned)__i_instance.getUtilityInstance().get_free_heap());
+                                upload_aborted = true;
+                                break;
+                            }
 
                             pdiutil::string::size_type _endboundaryfound = lastread.find(end_boundary);
                             if(_endboundaryfound != pdiutil::string::npos){
@@ -631,7 +718,14 @@ void HttpServerInterfaceImpl::parseRequest(){
                             
                             pdiutil::string::size_type _boundaryfound = lastread.find(boundary);
                             if(_boundaryfound != pdiutil::string::npos){
-                                part = lastread.substr(_boundaryfound + boundary.length() + 2);
+                                // the two bytes skipped past the boundary are its
+                                // trailing CRLF, which may not have arrived yet
+                                // when the boundary ends the block
+                                pdiutil::string::size_type _partat = _boundaryfound + boundary.length() + 2;
+                                if( _partat > lastread.length() ){
+                                    _partat = lastread.length();
+                                }
+                                part = lastread.substr(_partat);
                                 lastread = lastread.substr(0, _boundaryfound);
                                 found_boundary = true;
                                 parthaslastread = true;
@@ -673,19 +767,40 @@ void HttpServerInterfaceImpl::parseRequest(){
 
                             lastread = part; // Store the last read part
                             part.clear();
+
+                            __i_instance.getUtilityInstance().yield();
                         }
 
-                        // Store the file data in the request
+                        LogI("HTTP upload: end, %u bytes, aborted=%d, heap=%u\n",
+                            (unsigned)uploadedbytes, (int)upload_aborted,
+                            (unsigned)__i_instance.getUtilityInstance().get_free_heap());
+
+                        // An abandoned transfer leaves a partial file, which must
+                        // not be handed on as if it were the uploaded one.
                         #ifdef ENABLE_STORAGE_SERVICE
-                        m_clientRequest.files.push_back({argname.c_str(), tempFilePath.c_str()});
+                        if( upload_aborted ){
+                            __i_instance.getFileSystemInstance().deleteFile(tempFilePath.c_str());
+                        }else{
+                            m_clientRequest.files.push_back({argname.c_str(), tempFilePath.c_str()});
+                        }
                         #else
-                        argvalue = argfilename + ':' + argvalue;
-                        m_clientRequest.files.push_back({argname.c_str(), argvalue.c_str()});
+                        if( !upload_aborted ){
+                            argvalue = argfilename + ':' + argvalue;
+                            m_clientRequest.files.push_back({argname.c_str(), argvalue.c_str()});
+                        }
                         #endif
 
                     }
                 }
             }
+
+            // Giving up on a part means the body can no longer be trusted, and
+            // the peer has nothing more to send, so the part loop stops too
+            // rather than reading an empty socket forever.
+            if( upload_aborted ){
+                break;
+            }
+
             __i_instance.getUtilityInstance().wait(1);
         }
 

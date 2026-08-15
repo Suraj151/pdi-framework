@@ -400,6 +400,20 @@ void BytesToHexString(const uint8_t *bytes, uint8_t bytelen, char *out)
 }
 
 /**
+ * @brief Renders a permission bitmask in the ten character `ls -l` form.
+ */
+void FilePermsToString(uint16_t perms, bool isdir, char *out)
+{
+    if (nullptr == out) return;
+    static const char kRwx[3] = { 'r', 'w', 'x' };
+    out[0] = isdir ? 'd' : '-';
+    for (uint8_t b = 0; b < 9; b++) {
+        out[1 + b] = (perms & (1 << (8 - b))) ? kRwx[b % 3] : '-';
+    }
+    out[10] = '\0';
+}
+
+/**
  * @brief Parses a hex string into a byte array.
  * @param hex Source hex string (2*bytelen characters, upper or lower case).
  * @param bytelen Number of bytes to decode.

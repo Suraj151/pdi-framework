@@ -121,7 +121,7 @@ public:
 
     /**
      * @brief Reads until the provided char is found.
-     * Scans the receive buffer and moves whole blocks at a time instead of
+     * Scans the receive chain and appends whole blocks at a time instead of
      * fetching a byte per call. Behaves exactly like the base implementation.
      * @param _outstr Reference to the string to accumulate the data into.
      * @param _delimiter The character to read until.
@@ -129,7 +129,7 @@ public:
      * @param _yield Optional callback function to yield control during reading.
      * @param _maxlen Maximum number of bytes to accumulate, 0 for no limit.
      */
-    void readStringUntil(pdiutil::string &_outstr, char _delimiter, bool _keepdelimiterinstr = false, CallBackVoidArgFn _yield = nullptr, uint32_t _maxlen = 0) override;
+    void readStringUntil(pdiutil::string &_outstr, char _delimiter, bool _keepdelimiterinstr = false, const CallBackVoidArgFn &_yield = nullptr, uint32_t _maxlen = 0) override;
 
     /**
      * @brief Get the local IP address.
@@ -194,8 +194,8 @@ private:
 
     struct tcp_pcb* m_pcb; ///< The TCP protocol control block.
     bool m_isConnected;    ///< Connection status.
-    uint8_t* m_rxBuffer;   ///< Receive buffer.
-    uint32_t m_rxBufferSize; ///< Size of the receive buffer.
+    struct pbuf* m_rxBuf;  ///< Chain of received buffers still held by lwip.
+    uint32_t m_rxBufOffset; ///< Bytes already taken from the head of the chain.
     uint32_t m_timeout;    ///< Timeout value in milliseconds.
     bool m_isLastWriteAcked;
 
@@ -204,7 +204,8 @@ private:
     dnsFoundResult m_dns;
 
     /**
-     * @brief Drop the leading bytes of the receive buffer and open the tcp window.
+     * @brief Drop the leading bytes of the receive chain and open the tcp window.
+     * Releases each buffer as it is emptied, so nothing is copied or moved.
      * @param size The number of bytes to drop.
      */
     void consumeRxBuffer(uint32_t size);

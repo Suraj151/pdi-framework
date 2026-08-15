@@ -73,7 +73,7 @@ public:
 
     // memset(_page, 0, _max_size);
     char _ip_address[20];
-    strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+    concat_header_html( _page );
     strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_TOP);
     CONTINUE_SEND_IN_CHUNK(_page);
 
@@ -100,6 +100,7 @@ public:
     __int_ip_to_str(_ip_address, this->wifi_configs.ap_subnet, 20);
     concat_tr_input_html_tags(_page, RODT_ATTR("Access Subnet:"), RODT_ATTR("ap_sip"), _ip_address);
 
+    concat_csrf_input_html_tag( _page );
     strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
     CONTINUE_SEND_IN_CHUNK(_page);
 #else
@@ -136,6 +137,7 @@ public:
 
 #ifdef ALLOW_WIFI_SSID_PASSKEY_CONFIG_MODIFICATION_ONLY
 
+    concat_csrf_input_html_tag( _page );
     strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
     CONTINUE_SEND_IN_CHUNK(_page);
 

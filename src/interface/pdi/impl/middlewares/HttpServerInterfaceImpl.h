@@ -34,6 +34,10 @@ public:
   virtual void close() override;
 
   #ifdef ENABLE_TLS_SERVICE
+  virtual bool isSecure() const override { return m_secure; }
+  #endif
+
+  #ifdef ENABLE_TLS_SERVICE
   virtual void setServerCertificatePath(const char* path) override;
   virtual void setServerPrivateKeyPath(const char* path) override;
   virtual void setClientCertificateAuthorityPath(const char* path) override;
@@ -44,6 +48,7 @@ public:
 
   virtual pdiutil::string arg(const pdiutil::string &name) const override;                        // get request argument value by name
   virtual bool hasArg(const pdiutil::string &name) const override;                                // check if argument exists
+  virtual bool isPostRequest() const override;                                                    // check if request method is POST
 
   virtual void collectHeaders(const char *headerKeys[], const size_t headerKeysCount) override;   // set the request headers to collect
   virtual pdiutil::string header(const pdiutil::string &name) const override;                     // get request header value by name

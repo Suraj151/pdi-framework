@@ -24,8 +24,8 @@ created Date    : 1st May 2025
 TcpClientInterface::TcpClientInterface() : 
     m_pcb(nullptr), 
     m_isConnected(false), 
-    m_rxBuffer(nullptr),
-    m_rxBufferSize(0),
+    m_rxBuf(nullptr),
+    m_rxBufOffset(0),
     m_timeout(3000),
     m_isLastWriteAcked(true) {}
 
@@ -38,8 +38,8 @@ TcpClientInterface::TcpClientInterface() :
 TcpClientInterface::TcpClientInterface(struct tcp_pcb* pcb):
     m_pcb(pcb),
     m_isConnected(true),
-    m_rxBuffer(nullptr),
-    m_rxBufferSize(0),
+    m_rxBuf(nullptr),
+    m_rxBufOffset(0),
     m_timeout(3000),
     m_isLastWriteAcked(true) {
 
@@ -232,36 +232,75 @@ int32_t TcpClientInterface::write_ro(const char *c_str)
  */
 int32_t TcpClientInterface::read(uint8_t* buffer, uint32_t size) {
     TCP_GUARD_BEGIN
-    if (!m_rxBuffer || m_rxBufferSize == 0) {
+    if (!m_rxBuf || size == 0) {
         TCP_GUARD_END
         return PDI_ERR_STATE;
     }
 
-    int32_t bytesToRead = (size < m_rxBufferSize) ? size : m_rxBufferSize;
     memset(buffer, 0, size);
-    memcpy(buffer, m_rxBuffer, bytesToRead);
 
-    consumeRxBuffer(bytesToRead);
+    uint32_t copied = 0;
+
+    while (copied < size && m_rxBuf != nullptr) {
+
+        uint32_t headleft = m_rxBuf->len - m_rxBufOffset;
+        if (headleft == 0) {
+            break;
+        }
+
+        uint32_t toread = (size - copied) < headleft ? (size - copied) : headleft;
+
+        // Copy data from the head of the receive chain to the provided buffer
+        memcpy(buffer + copied, (const uint8_t*)m_rxBuf->payload + m_rxBufOffset, toread);
+
+        consumeRxBuffer(toread);
+        copied += toread;
+    }
     TCP_GUARD_END
 
-    return bytesToRead;
+    return copied;
 }
 
 /**
- * @brief Drop the leading bytes of the receive buffer and open the tcp window.
+ * @brief Drop the leading bytes of the receive chain and open the tcp window.
+ * Releases each buffer as it is emptied, so nothing is copied or moved.
+ * @note The caller holds the lwip core lock.
  */
 void TcpClientInterface::consumeRxBuffer(uint32_t size) {
-    memmove(m_rxBuffer, m_rxBuffer + size, m_rxBufferSize - size);
-    m_rxBufferSize -= size;
 
-    if(m_pcb != nullptr)
-        tcp_recved(m_pcb, size);
+    uint32_t consumed = 0;
+
+    while (size > 0 && m_rxBuf != nullptr) {
+
+        uint32_t headleft = m_rxBuf->len - m_rxBufOffset;
+        uint32_t taken = size < headleft ? size : headleft;
+
+        if (taken < headleft) {
+
+            m_rxBufOffset += taken;
+        } else {
+
+            struct pbuf *released = m_rxBuf;
+            m_rxBuf = m_rxBuf->next;
+            m_rxBufOffset = 0;
+            if (m_rxBuf != nullptr) {
+                pbuf_ref(m_rxBuf);
+            }
+            pbuf_free(released);
+        }
+
+        size -= taken;
+        consumed += taken;
+    }
+
+    if(m_pcb != nullptr && consumed > 0)
+        tcp_recved(m_pcb, consumed);
 }
 
 /**
  * @brief Reads until the provided char is found.
  */
-void TcpClientInterface::readStringUntil(pdiutil::string &_outstr, char _delimiter, bool _keepdelimiterinstr, CallBackVoidArgFn _yield, uint32_t _maxlen) {
+void TcpClientInterface::readStringUntil(pdiutil::string &_outstr, char _delimiter, bool _keepdelimiterinstr, const CallBackVoidArgFn &_yield, uint32_t _maxlen) {
 
     uint32_t len = 0;
 
@@ -277,22 +316,23 @@ void TcpClientInterface::readStringUntil(pdiutil::string &_outstr, char _delimit
         // The lwip thread can grow the receive buffer at any time, so the scan
         // and the copy out of it stay inside the core lock.
         TCP_GUARD_BEGIN
-        if (m_rxBuffer != nullptr && m_rxBufferSize > 0) {
+        if (m_rxBuf != nullptr && (m_rxBuf->len - m_rxBufOffset) > 0) {
 
-            uint32_t blocklen = m_rxBufferSize;
+            const uint8_t *head = (const uint8_t *)m_rxBuf->payload + m_rxBufOffset;
+            uint32_t blocklen = m_rxBuf->len - m_rxBufOffset;
             if (_maxlen > 0 && blocklen > (_maxlen - len)) {
                 blocklen = _maxlen - len;
             }
 
             if (_delimiter != 0) {
-                const uint8_t *delimiterat = (const uint8_t *)memchr(m_rxBuffer, _delimiter, blocklen);
+                const uint8_t *delimiterat = (const uint8_t *)memchr(head, _delimiter, blocklen);
                 if (delimiterat != nullptr) {
-                    blocklen = (uint32_t)(delimiterat - m_rxBuffer);
+                    blocklen = (uint32_t)(delimiterat - head);
                     delimiterfound = true;
                 }
             }
 
-            _outstr.append((const char *)m_rxBuffer, blocklen);
+            _outstr.append((const char *)head, blocklen);
             consumeRxBuffer(blocklen + (delimiterfound ? 1 : 0));
             len += blocklen;
             blockread = true;
@@ -325,7 +365,7 @@ void TcpClientInterface::readStringUntil(pdiutil::string &_outstr, char _delimit
  */
 int32_t TcpClientInterface::available() {
     TCP_GUARD_BEGIN
-    int32_t v = m_rxBufferSize;
+    int32_t v = m_rxBuf != nullptr ? (int32_t)(m_rxBuf->tot_len - m_rxBufOffset) : 0;
     TCP_GUARD_END
     return v;
 }
@@ -362,26 +402,19 @@ err_t TcpClientInterface::onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf
             return err;
         }
 
-        uint32_t newSize = client->m_rxBufferSize + p->tot_len;
-
+        // The chain is kept as delivered, so nothing is copied and no heap is
+        // taken. The tcp window stays closed until the reader consumes it, which
+        // is what holds the sender back.
         TCP_GUARD_BEGIN
-        uint8_t* newBuffer = pdiutil::safe_new_array<uint8_t>(newSize);
-        if (!newBuffer) {
-            TCP_GUARD_END
-            SysLogE("TCP onReceive: alloc fail, in=%u rxQ=%u\n",
-                (unsigned)p->tot_len, (unsigned)client->m_rxBufferSize);
-            return ERR_MEM;
-        }
-        if (client->m_rxBuffer) {
-            memcpy(newBuffer, client->m_rxBuffer, client->m_rxBufferSize);
-            pdiutil::safe_delete_array(client->m_rxBuffer);
-        }
-        pbuf_copy_partial(p, newBuffer + client->m_rxBufferSize, p->tot_len, 0);
-        client->m_rxBuffer = newBuffer;
-        client->m_rxBufferSize = newSize;
-        TCP_GUARD_END
+        if (client->m_rxBuf != nullptr) {
 
-        pbuf_free(p);
+            pbuf_cat(client->m_rxBuf, p);
+        } else {
+
+            client->m_rxBuf = p;
+            client->m_rxBufOffset = 0;
+        }
+        TCP_GUARD_END
     }
 
     return ERR_OK;
@@ -548,13 +581,16 @@ bool TcpClientInterface::availableforwrite(uint32_t size) {
  */
 void TcpClientInterface::flush() {
     TCP_GUARD_BEGIN
-    if (m_rxBuffer) {
+    if (m_rxBuf) {
 
-        if(nullptr != m_pcb && m_rxBufferSize > 0)
-            tcp_recved(m_pcb, m_rxBufferSize);
+        uint32_t pending = m_rxBuf->tot_len - m_rxBufOffset;
 
-        pdiutil::safe_delete_array(m_rxBuffer);
-        m_rxBufferSize = 0;
+        if(nullptr != m_pcb && pending > 0)
+            tcp_recved(m_pcb, pending);
+
+        pbuf_free(m_rxBuf);
+        m_rxBuf = nullptr;
+        m_rxBufOffset = 0;
     }
 
     if(nullptr != m_pcb){

@@ -293,6 +293,53 @@ void OtaServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
   }
 }
 
+#ifdef ENABLE_STORAGE_SERVICE
+/**
+ * collect the firmware images available on the filesystem
+ */
+void OtaServiceProvider::collectLocalImages(const char *_dir, pdiutil::vector<pdiutil::string> &_images)
+{
+  if (nullptr == _dir) return;
+
+  pdiutil::vector<file_info_t> items;
+  if (__i_fs.getDirFileList(_dir, items) < 0) return;
+
+  pdiutil::string ext = CHARPTR_WRAP(OTA_IMAGE_FILE_EXTENSION);
+
+  for (file_info_t &item : items) {
+
+    if (nullptr != item.m_name && FILE_TYPE_DIR != item.m_type) {
+
+      const char *name = (const char *)item.m_name;
+      size_t namelen = strlen(name);
+
+      if (namelen > ext.size() &&
+          0 == strcmp(name + namelen - ext.size(), ext.c_str())) {
+        _images.push_back(pdiutil::string(name));
+      }
+    }
+
+    pdiutil::safe_delete_array(item.m_name);
+  }
+
+  items.clear();
+}
+
+/**
+ * flash a firmware image already present on the filesystem
+ */
+upgrade_status_t OtaServiceProvider::flashFromFile(const char *_path)
+{
+  if (nullptr == _path || 0 == _path[0]) {
+    return UPGRADE_STATUS_FAILED;
+  }
+
+  SysLogI("OTA local flash : %s\n", _path);
+
+  return __i_dvc_ctrl.UpgradeFromFile(_path);
+}
+#endif
+
 OtaServiceProvider __ota_service;
 
 #endif

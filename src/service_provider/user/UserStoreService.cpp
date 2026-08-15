@@ -368,6 +368,32 @@ bool UserStoreService::readShadowRecord(const char *username, uint8_t hashOut[32
   return found;
 }
 
+void UserStoreService::resolveNameByUid(uint16_t uid, pdiutil::string &out)
+{
+  user_record_t rec;
+  if (findUserByUid(uid, rec)) {
+    out = rec.m_username;
+    return;
+  }
+
+  char idbuf[8];
+  memset(idbuf, 0, sizeof(idbuf));
+  Uint32ToString((uint32_t)uid, idbuf, sizeof(idbuf) - 1, 0);
+  out = idbuf;
+}
+
+void UserStoreService::resolveOwnerNames(uint16_t uid, uint16_t gid, pdiutil::string &owner, pdiutil::string &group)
+{
+  resolveNameByUid(uid, owner);
+
+  if (gid == uid) {
+    group = owner;
+    return;
+  }
+
+  resolveNameByUid(gid, group);
+}
+
 void UserStoreService::generateSalt(uint8_t *salt, uint8_t saltlen)
 {
   static bool s_seeded = false;

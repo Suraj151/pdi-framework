@@ -96,8 +96,8 @@ TlsClientInterface::TlsClientInterface() :
     m_timeout(3000),
     m_isLastWriteAcked(true),
     m_tls(nullptr),
-    m_rxQueue(nullptr),
-    m_rxQueueLen(0),
+    m_rxBuf(nullptr),
+    m_rxBufOffset(0),
     m_workerHandle(nullptr),
     m_workerRunning(false),
     m_verifyPeer(true),
@@ -111,8 +111,8 @@ TlsClientInterface::TlsClientInterface(struct tcp_pcb* pcb) :
     m_timeout(3000),
     m_isLastWriteAcked(true),
     m_tls(nullptr),
-    m_rxQueue(nullptr),
-    m_rxQueueLen(0),
+    m_rxBuf(nullptr),
+    m_rxBufOffset(0),
     m_workerHandle(nullptr),
     m_workerRunning(false),
     m_verifyPeer(true),
@@ -137,8 +137,40 @@ int16_t TlsClientInterface::tlsReset(int16_t rc) {
 TlsClientInterface::~TlsClientInterface() {
     close();
     pdiutil::safe_delete(m_tls);
-    pdiutil::safe_delete_array(m_rxQueue);
-    m_rxQueueLen = 0;
+    if (m_rxBuf != nullptr) {
+        pbuf_free(m_rxBuf);
+        m_rxBuf = nullptr;
+        m_rxBufOffset = 0;
+    }
+}
+
+uint32_t TlsClientInterface::rxAvailable() const {
+    return m_rxBuf != nullptr ? (uint32_t)(m_rxBuf->tot_len - m_rxBufOffset) : 0;
+}
+
+void TlsClientInterface::consumeRxQueue(uint32_t size) {
+
+    while (size > 0 && m_rxBuf != nullptr) {
+
+        uint32_t headleft = m_rxBuf->len - m_rxBufOffset;
+        uint32_t taken = size < headleft ? size : headleft;
+
+        if (taken < headleft) {
+
+            m_rxBufOffset += taken;
+        } else {
+
+            struct pbuf *released = m_rxBuf;
+            m_rxBuf = m_rxBuf->next;
+            m_rxBufOffset = 0;
+            if (m_rxBuf != nullptr) {
+                pbuf_ref(m_rxBuf);
+            }
+            pbuf_free(released);
+        }
+
+        size -= taken;
+    }
 }
 
 
@@ -454,7 +486,7 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
     if (!connected()) {
         uint32_t elapsed = __i_dvc_ctrl.millis_now() - start;
         SysLogE("TLS connect: timeout after %u ms (tcp.connected=%d rxQ=%u)\n",
-            (unsigned)elapsed, (int)m_isConnected, (unsigned)m_rxQueueLen);
+            (unsigned)elapsed, (int)m_isConnected, (unsigned)rxAvailable());
         close();
         return PDI_ERR_TIMEOUT;
     }
@@ -474,17 +506,21 @@ int16_t TlsClientInterface::close() {
         mbedtls_ssl_close_notify(&m_tls->ssl);
     }
 
-    if (m_rxQueue) {
-        TCP_GUARD_BEGIN
-        if (m_pcb && m_rxQueueLen > 0) {
-            tcp_recved(m_pcb, m_rxQueueLen);
+    // the close notify has to reach the peer while the pcb is still alive, so
+    // the buffers are released first and the pcb only after
+    TCP_GUARD_BEGIN
+    if (m_rxBuf != nullptr) {
+
+        uint32_t pending = m_rxBuf->tot_len - m_rxBufOffset;
+        if (m_pcb && pending > 0) {
+            tcp_recved(m_pcb, pending);
         }
-        TCP_GUARD_END
-        pdiutil::safe_delete_array(m_rxQueue);
-        m_rxQueueLen = 0;
+
+        pbuf_free(m_rxBuf);
+        m_rxBuf = nullptr;
+        m_rxBufOffset = 0;
     }
 
-    TCP_GUARD_BEGIN
     struct tcp_pcb* _p = m_pcb;
     m_pcb = nullptr;
     if (_p) {
@@ -546,22 +582,29 @@ int TlsClientInterface::bioRecv(void* ctx, unsigned char* buf, size_t len) {
     if (!self) return MBEDTLS_ERR_SSL_CONN_EOF;
 
     TCP_GUARD_BEGIN
-    if (self->m_rxQueueLen == 0) {
+    uint32_t headleft = self->m_rxBuf != nullptr ? (self->m_rxBuf->len - self->m_rxBufOffset) : 0;
+
+    if (headleft == 0) {
         TCP_GUARD_END
         if (!self->m_isConnected) return MBEDTLS_ERR_SSL_CONN_EOF;
         return MBEDTLS_ERR_SSL_WANT_READ;
     }
 
-    uint32_t chunk = (self->m_rxQueueLen < len) ? self->m_rxQueueLen : (uint32_t)len;
-    memcpy(buf, self->m_rxQueue, chunk);
+    const uint8_t *head = (const uint8_t*)self->m_rxBuf->payload + self->m_rxBufOffset;
 
-    if (chunk < self->m_rxQueueLen) {
-        memmove(self->m_rxQueue, self->m_rxQueue + chunk, self->m_rxQueueLen - chunk);
-        self->m_rxQueueLen -= chunk;
-    } else {
-        pdiutil::safe_delete_array(self->m_rxQueue);
-        self->m_rxQueueLen = 0;
+    // a handshake stage alert is not encrypted, so the level and description
+    // can be read straight off the record and named in the log
+    if (headleft >= 7 && head[0] == 0x15) {
+        LogE("TLS alert from peer: level=%u desc=%u\n",
+            (unsigned)head[5], (unsigned)head[6]);
     }
+
+    // one buffer of the chain is handed over per call, mbedtls asks again until
+    // it has the whole record
+    uint32_t chunk = (headleft < len) ? headleft : (uint32_t)len;
+    memcpy(buf, head, chunk);
+
+    self->consumeRxQueue(chunk);
 
     if (self->m_pcb) {
         tcp_recved(self->m_pcb, chunk);
@@ -637,7 +680,7 @@ int32_t TlsClientInterface::available() {
     size_t avail = mbedtls_ssl_get_bytes_avail(&m_tls->ssl);
     if (avail > 0) return (int32_t)avail;
 
-    if (m_rxQueueLen == 0) return 0;
+    if (rxAvailable() == 0) return 0;
 
     uint8_t p = 0;
     int rc = mbedtls_ssl_read(&m_tls->ssl, &p, 1);
@@ -756,26 +799,20 @@ err_t TlsClientInterface::onReceive(void* arg, struct tcp_pcb*, struct pbuf* p, 
         return ERR_OK;
     }
 
-    uint32_t newSize = self->m_rxQueueLen + p->tot_len;
-    if((newSize+self->m_rxQueueLen) > (0.90*TLS_IBUF_SIZE)){
-        return ERR_MEM;
-    }
+    // The chain is kept as delivered, so nothing is copied and no heap is taken.
+    // The tcp window stays closed until the engine consumes it, which is what
+    // holds the sender back.
+    TCP_GUARD_BEGIN
+    if (self->m_rxBuf != nullptr) {
 
-    uint8_t* newBuf = pdiutil::safe_new_array<uint8_t>(newSize);
-    if (!newBuf) {
-        SysLogE("TLS onReceive: alloc fail, in=%u rxQ=%u\n",
-            (unsigned)p->tot_len, (unsigned)self->m_rxQueueLen);
-        return ERR_MEM;
-    }
-    if (self->m_rxQueue) {
-        memcpy(newBuf, self->m_rxQueue, self->m_rxQueueLen);
-        pdiutil::safe_delete_array(self->m_rxQueue);
-    }
-    pbuf_copy_partial(p, newBuf + self->m_rxQueueLen, p->tot_len, 0);
-    self->m_rxQueue = newBuf;
-    self->m_rxQueueLen = newSize;
+        pbuf_cat(self->m_rxBuf, p);
+    } else {
 
-    pbuf_free(p);
+        self->m_rxBuf = p;
+        self->m_rxBufOffset = 0;
+    }
+    TCP_GUARD_END
+
     return ERR_OK;
 }
 

@@ -15,18 +15,15 @@ created Date    : 1st June 2019
 #include <webserver/pages/LoginPage.h>
 #include <webserver/pages/LogoutPage.h>
 #include <webserver/pages/LoginConfigPage.h>
+#include <service_provider/auth/AuthServiceProvider.h>
+#ifdef ENABLE_STORAGE_SERVICE
+#include <service_provider/user/UserStoreService.h>
+#endif
 
 /**
  * LoginController class
  */
 class LoginController : public Controller {
-
-	protected:
-
-		/**
-		 * @var	login_credential_table	login_credentials
-		 */
-    login_credential_table login_credentials;
 
 	public:
 
@@ -48,9 +45,6 @@ class LoginController : public Controller {
 		 */
 		void boot( void ){
 
-			if( nullptr != this->m_web_resource && nullptr != this->m_web_resource->m_db_conn ){
-				this->m_web_resource->m_db_conn->get_login_credential_table(&this->login_credentials);
-			}
 			if( nullptr != this->m_route_handler ){
 				this->m_route_handler->register_route( WEB_SERVER_LOGIN_ROUTE, [&]() { this->handleLoginRoute(); } );
 				this->m_route_handler->register_route( WEB_SERVER_LOGOUT_ROUTE, [&]() { this->handleLogoutRoute(); } );
@@ -81,7 +75,7 @@ class LoginController : public Controller {
 
       // memset( _page, 0, _max_size );
 
-      if( _enable_header_footer ) strcat_ro( _page, WEB_SERVER_HEADER_HTML );
+      if( _enable_header_footer ) concat_header_html( _page );
       CONTINUE_SEND_IN_CHUNK(_page);
       strcat_ro( _page, _pgm_page );
       if( _enable_flash )
@@ -91,40 +85,44 @@ class LoginController : public Controller {
     }
 
 		/**
-		 * build login config html.
+		 * build change password html. never renders an existing password.
 		 *
 		 * @param	char*	_page
 		 * @param	bool|false	_is_error
 		 * @param	bool|false	_enable_flash
+		 * @param	const char*	_message
 		 * @param	int|PAGE_HTML_MAX_SIZE	_max_size
 		 */
-		void build_login_config_html( char* _page, bool _is_error=false, bool _enable_flash=false, int _max_size=PAGE_HTML_MAX_SIZE ){
+		void build_login_config_html( char* _page, bool _is_error=false, bool _enable_flash=false, const char* _message=nullptr, const char* _username=nullptr, int _max_size=PAGE_HTML_MAX_SIZE ){
 
-      // memset( _page, 0, _max_size );
-      strcat_ro( _page, WEB_SERVER_HEADER_HTML );
+      char _empty[1] = {0};
+
+      concat_header_html( _page );
       strcat_ro( _page, WEB_SERVER_LOGIN_CONFIG_PAGE_TOP );
       CONTINUE_SEND_IN_CHUNK(_page);
 
-      concat_tr_input_html_tags( _page, RODT_ATTR("Username:"), RODT_ATTR("usrnm"), this->login_credentials.username, LOGIN_CONFIGS_BUF_SIZE-1 );
-      concat_tr_input_html_tags( _page, RODT_ATTR("Password:"), RODT_ATTR("pswd"), this->login_credentials.password, LOGIN_CONFIGS_BUF_SIZE-1, (char*)"password" );
+      concat_tr_input_html_tags( _page, RODT_ATTR("User:"), RODT_ATTR("usrnm"), (char*)( nullptr != _username ? _username : __auth_service.getUsername() ), LOGIN_CONFIGS_BUF_SIZE-1, (char*)"text", false, true );
+      concat_tr_input_html_tags( _page, RODT_ATTR("Current Password:"), RODT_ATTR("cpswd"), _empty, LOGIN_CONFIGS_BUF_SIZE-1, (char*)"password" );
+      concat_tr_input_html_tags( _page, RODT_ATTR("New Password:"), RODT_ATTR("npswd"), _empty, LOGIN_CONFIGS_BUF_SIZE-1, (char*)"password" );
+      concat_tr_input_html_tags( _page, RODT_ATTR("Confirm Password:"), RODT_ATTR("rpswd"), _empty, LOGIN_CONFIGS_BUF_SIZE-1, (char*)"password" );
+      concat_csrf_input_html_tag( _page );
 
       strcat_ro( _page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM );
       if( _enable_flash )
-      concat_flash_message_div( _page, _is_error ? RODT_ATTR("Invalid length error(3-20)"): HTML_SUCCESS_FLASH, _is_error ? ALERT_DANGER:ALERT_SUCCESS );
+      concat_flash_message_div( _page, _is_error ? (char*)_message : HTML_SUCCESS_FLASH, _is_error ? ALERT_DANGER:ALERT_SUCCESS );
       strcat_ro( _page, WEB_SERVER_FOOTER_HTML );
       CONTINUE_SEND_IN_CHUNK(_page);
     }
 
 		/**
-		 * build and send logind config page.
-		 * when posted, get login configs from client and set them in database.
+		 * build and send change password page.
+		 * when posted, verify current password and update the user store.
 		 */
     void handleLoginConfigRoute( void ) {
 
       LogI("Handling Login Config route\n");
 
 			if( nullptr == this->m_web_resource ||
-					nullptr == this->m_web_resource->m_db_conn ||
 					nullptr == this->m_web_resource->m_server ||
 					nullptr == this->m_route_handler ){
 				return;
@@ -132,46 +130,55 @@ class LoginController : public Controller {
 
       bool _is_posted = false;
       bool _is_error = true;
+      bool _is_changed = false;
+      pdiutil::string _message = CHARPTR_WRAP("Invalid length error(4-24)");
+      pdiutil::string _username = __auth_service.getUsername();
 
-      this->m_web_resource->m_db_conn->get_login_credential_table(&this->login_credentials);
+      if ( this->m_web_resource->m_server->hasArg("cpswd") &&
+           this->m_web_resource->m_server->hasArg("npswd") &&
+           this->m_web_resource->m_server->hasArg("rpswd") ) {
 
-      if ( this->m_web_resource->m_server->hasArg("usrnm") && this->m_web_resource->m_server->hasArg("pswd") ) {
-
-        pdiutil::string _username = this->m_web_resource->m_server->arg("usrnm");
-        pdiutil::string _password = this->m_web_resource->m_server->arg("pswd");
-
-        LogI("\nSubmitted info :\n");
-        LogI("Username : %s\n", _username.c_str());
-        LogI("Password : %s\n\n", _password.c_str());
-
-        if( _username.size() <= LOGIN_CONFIGS_BUF_SIZE && _password.size() <= LOGIN_CONFIGS_BUF_SIZE &&
-          _username.size() > MIN_ACCEPTED_ARG_SIZE && _password.size() > MIN_ACCEPTED_ARG_SIZE
-        ){
-
-          memset( this->login_credentials.username, 0, LOGIN_CONFIGS_BUF_SIZE );
-          memset( this->login_credentials.password, 0, LOGIN_CONFIGS_BUF_SIZE );
-          strncpy( this->login_credentials.username, _username.c_str(), _username.size() );
-          strncpy( this->login_credentials.password, _password.c_str(), _password.size() );
-          this->m_web_resource->m_db_conn->set_login_credential_table( &this->login_credentials );
-          // this->set_login_credential_table( &this->login_credentials );
-
-          _is_error = false;
-        }
         _is_posted = true;
+
+        pdiutil::string _current = this->m_web_resource->m_server->arg("cpswd");
+        pdiutil::string _new = this->m_web_resource->m_server->arg("npswd");
+        pdiutil::string _repeat = this->m_web_resource->m_server->arg("rpswd");
+
+        if( _new.size() >= LOGIN_CONFIGS_BUF_SIZE || _new.size() <= MIN_ACCEPTED_ARG_SIZE ){
+
+          _message = CHARPTR_WRAP("Invalid length error(4-24)");
+
+        }else if( _new != _repeat ){
+
+          _message = CHARPTR_WRAP("Passwords do not match.");
+
+        }else if( !__auth_service.isAuthorized( _username.c_str(), _current.c_str() ) ){
+
+          _message = CHARPTR_WRAP("Current password is wrong.");
+
+        }else{
+
+          _is_error = !this->updatePassword( _username.c_str(), _new.c_str() );
+          _is_changed = !_is_error;
+
+          if( _is_error ){
+            _message = CHARPTR_WRAP("Could not update password.");
+          }
+        }
       }
 
       char* _page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
       if (nullptr == _page) return;
 
-      if( _is_posted && !_is_error ){
+      if( _is_changed ){
+        __web_session_manager.destroyByUsername( _username.c_str() );
         this->m_route_handler->send_inactive_session_headers();
       }
 
       BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
-      this->build_login_config_html( _page, _is_error, _is_posted );
+      this->build_login_config_html( _page, _is_error, _is_posted, _message.c_str(), _username.c_str() );
       END_SENDING_CHUNK();
 
-      // this->m_web_resource->m_server->send( HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page );
       pdiutil::safe_delete_array(_page);
     }
 
@@ -188,6 +195,7 @@ class LoginController : public Controller {
 				return;
 			}
 
+      this->m_route_handler->has_active_session();
       this->m_route_handler->send_inactive_session_headers();
 
       char* _page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
@@ -202,44 +210,139 @@ class LoginController : public Controller {
     }
 
 		/**
+		 * redirect the client to home, optionally issuing a session cookie.
+		 *
+		 * @param	const char*	_token
+		 */
+		void redirectToHome( const char* _token ){
+
+      if( nullptr == this->m_web_resource || nullptr == this->m_web_resource->m_server ){
+        return;
+      }
+
+      this->m_web_resource->m_server->addHeader(CHARPTR_WRAP(HTTP_HEADER_KEY_LOCATION), WEB_SERVER_HOME_ROUTE);
+      this->m_web_resource->m_server->addHeader(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_CACHE_CONTROL), CHARPTR_WRAP_RO(HTTP_HEADER_VALUE_NO_CACHE));
+
+      if( nullptr != _token && nullptr != this->m_route_handler ){
+
+        login_credential_table _creds;
+        uint32_t _max_age = SERVER_COOKIE_MAX_AGE;
+
+        if( nullptr != this->m_web_resource->m_db_conn &&
+            this->m_web_resource->m_db_conn->get_login_credential_table( &_creds ) ){
+          _max_age = _creds.cookie_max_age;
+        }
+
+        char _session_cookie[EW_COOKIE_BUFF_MAX_SIZE];
+        this->m_route_handler->build_session_cookie( _session_cookie, _token, EW_COOKIE_BUFF_MAX_SIZE, true, _max_age );
+        this->m_web_resource->m_server->addHeader(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_SET_COOKIE), _session_cookie);
+      }
+
+      this->m_web_resource->m_server->send(HTTP_RESP_MOVED_PERMANENTLY);
+    }
+
+		/**
+		 * update the password of a user in the user store, falling back to the
+		 * database table when the store is not provisioned yet.
+		 *
+		 * @param	const char*	_username
+		 * @param	const char*	_password
+		 * @return	bool
+		 */
+		bool updatePassword( const char* _username, const char* _password ){
+
+#ifdef ENABLE_STORAGE_SERVICE
+      pdiutil::string _shadow = CHARPTR_WRAP(USER_STORE_SHADOW_PATH);
+      if( __i_fs.isFileExist( _shadow.c_str() ) ){
+        return __user_store_service.setPassword( _username, _password );
+      }
+#endif
+
+      if( nullptr == this->m_web_resource || nullptr == this->m_web_resource->m_db_conn ){
+        return false;
+      }
+
+      login_credential_table _creds;
+      if( !this->m_web_resource->m_db_conn->get_login_credential_table( &_creds ) ){
+        return false;
+      }
+
+      memset( _creds.password, 0, LOGIN_CONFIGS_BUF_SIZE );
+      memcpy( _creds.password, _password, strlen(_password) );
+      this->m_web_resource->m_db_conn->set_login_credential_table( &_creds );
+
+      return true;
+    }
+
+		/**
 		 * check login details and authenticate client to access all configs.
 		 */
     void handleLoginRoute( void ) {
 
 			if( nullptr == this->m_web_resource ||
-					nullptr == this->m_web_resource->m_server || 
+					nullptr == this->m_web_resource->m_server ||
 					nullptr == this->m_route_handler ){
 				return;
 			}
 
-      bool _is_posted = false;
-
-      if( this->m_web_resource->m_server->hasArg("username") && this->m_web_resource->m_server->hasArg("password") ){
-        _is_posted = true;
+      if( this->m_route_handler->has_active_session() ){
+        this->redirectToHome( nullptr );
+        return;
       }
 
-      if ( this->m_route_handler->has_active_session() || ( _is_posted && this->m_web_resource->m_server->arg("username") == this->login_credentials.username &&
-        this->m_web_resource->m_server->arg("password") == this->login_credentials.password
-      ) ) {
+      bool _is_posted = ( this->m_web_resource->m_server->hasArg("username") &&
+                          this->m_web_resource->m_server->hasArg("password") );
+      pdiutil::string _message = CHARPTR_WRAP("Wrong Credentials.");
 
-        char _session_cookie[EW_COOKIE_BUFF_MAX_SIZE];
-        this->m_route_handler->build_session_cookie( _session_cookie, true, EW_COOKIE_BUFF_MAX_SIZE, true, this->login_credentials.cookie_max_age );
+      if( _is_posted ){
 
-        this->m_web_resource->m_server->addHeader(CHARPTR_WRAP(HTTP_HEADER_KEY_LOCATION), WEB_SERVER_HOME_ROUTE);
-        this->m_web_resource->m_server->addHeader(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_CACHE_CONTROL), CHARPTR_WRAP_RO(HTTP_HEADER_VALUE_NO_CACHE));
-        this->m_web_resource->m_server->addHeader(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_SET_COOKIE), _session_cookie);
-        this->m_web_resource->m_server->send(HTTP_RESP_MOVED_PERMANENTLY);
+        if( __web_session_manager.isLoginBlocked() ){
 
-        LogS("Log in Successful\n");
-        return;
+          _message = CHARPTR_WRAP("Too many attempts. Try later.");
+
+        }else{
+
+          pdiutil::string _username = this->m_web_resource->m_server->arg("username");
+          pdiutil::string _password = this->m_web_resource->m_server->arg("password");
+
+          if( __auth_service.isAuthorized( _username.c_str(), _password.c_str() ) ){
+
+            uint16_t _uid = 0;
+            uint16_t _gid = 0;
+#ifdef ENABLE_STORAGE_SERVICE
+            user_record_t _record;
+            if( __user_store_service.findUserByName( _username.c_str(), _record ) ){
+              _uid = _record.m_uid;
+              _gid = _record.m_gid;
+            }
+#endif
+
+            web_session_t *_session = __web_session_manager.create( _username.c_str(), _uid, _gid );
+
+            if( nullptr != _session ){
+
+              __web_session_manager.clearLoginFailures();
+              this->m_route_handler->adopt_session( _session );
+              this->redirectToHome( _session->m_token );
+
+              LogS("Log in Successful\n");
+              return;
+            }
+
+            _message = CHARPTR_WRAP("No session slot free.");
+
+          }else{
+
+            __web_session_manager.registerLoginFailure();
+          }
+        }
       }
 
       char* _page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
       if (nullptr == _page) return;
 
       BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
-      pdiutil::string msg = CHARPTR_WRAP("Wrong Credentials.");
-      this->build_html( _page, WEB_SERVER_LOGIN_PAGE, _is_posted, (char*)msg.c_str(), ALERT_DANGER );
+      this->build_html( _page, WEB_SERVER_LOGIN_PAGE, _is_posted, (char*)_message.c_str(), ALERT_DANGER );
       END_SENDING_CHUNK();
 
       // this->m_web_resource->m_server->send( HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page );

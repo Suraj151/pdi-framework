@@ -50,6 +50,27 @@ class OtaServiceProvider : public ServiceProvider{
     void setHttpHost(const char* _host);
     void printConfigToTerminal(iTerminalInterface *terminal) override;
 
+#ifdef ENABLE_STORAGE_SERVICE
+    /**
+     * @brief Flashes a firmware image already present on the filesystem.
+     *
+     * The caller is expected to have answered the client before restarting,
+     * so the restart is left to the caller rather than done here.
+     *
+     * @param _path Absolute path of the image to flash.
+     * @return upgrade_status_t result of the attempt.
+     */
+    upgrade_status_t flashFromFile(const char *_path);
+
+    /**
+     * @brief Collects the firmware images available on the filesystem.
+     *
+     * @param _dir Directory to scan.
+     * @param _images Receives the name of every matching image.
+     */
+    void collectLocalImages(const char *_dir, pdiutil::vector<pdiutil::string> &_images);
+#endif
+
     /**
      * @var	Http_Client*|nullptr	m_http_client
      */

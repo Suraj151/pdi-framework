@@ -15,8 +15,9 @@ Created Date    : 6th June 2026
 #include <stdint.h>
 
 /**
- * Safety margin (in bytes) retained on the heap beyond the requested
- * allocation.
+ * Headroom (in bytes) the rest of the system keeps on the total heap once the
+ * requested allocation is taken. Not applied to the largest free block, which
+ * only has to hold the request itself.
  */
 #ifndef PDI_SAFE_ALLOC_HEAP_MARGIN
 #define PDI_SAFE_ALLOC_HEAP_MARGIN 2048
@@ -31,8 +32,11 @@ namespace pdiutil {
 void enable_heap_check();
 
 /**
- * @brief Returns true if the device's free heap can safely satisfy a
- *        request for `bytes` plus PDI_SAFE_ALLOC_HEAP_MARGIN.
+ * @brief Returns true if the device's heap can safely satisfy a request for
+ *        `bytes`. Two conditions, measured separately: the largest free block
+ *        has to hold `bytes`, and the total free heap has to keep
+ *        PDI_SAFE_ALLOC_HEAP_MARGIN once `bytes` is taken. A port that cannot
+ *        report either figure answers zero and that check is skipped.
  *
  * Always true before enable_heap_check(), because global constructors run
  * before the device instances they would query exist.

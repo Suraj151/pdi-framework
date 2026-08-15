@@ -785,7 +785,9 @@ struct session_t {
 #endif
                   m_autoCompleteIdx(-1), m_prevCmdSize(0) {}
 
-    void clear() {
+    virtual ~session_t() {}
+
+    virtual void clear() {
         m_sid = 0;
         m_state = SESSION_STATE_FREE;
         m_terminal = nullptr;

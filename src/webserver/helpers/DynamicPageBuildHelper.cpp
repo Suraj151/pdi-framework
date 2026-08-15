@@ -13,6 +13,7 @@ created Date    : 1st June 2019
 #if defined(ENABLE_HTTP_SERVER)
 
 #include "DynamicPageBuildHelper.h"
+#include <webserver/handlers/RouteHandler.h>
 
 /**
  * @brief Appends a style attribute to the provided buffer.
@@ -819,6 +820,72 @@ void concat_link_element(char *_page, const char *_href, const char *_innerhtml,
   strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
   strcat( _page, _innerhtml );
   strcat_ro( _page, HTML_LINK_CLOSE_TAG );
+}
+
+/**
+ * @brief Appends the page header and opens the content container.
+ */
+void concat_header_html( char *_page, bool _wide ){
+
+  strcat_ro( _page, WEB_SERVER_HEADER_HTML );
+  CONTINUE_SEND_IN_CHUNK(_page);
+
+  strcat_ro( _page, WEB_SERVER_HEADER_HTML_LAYOUT );
+  CONTINUE_SEND_IN_CHUNK(_page);
+
+  strcat_ro( _page, WEB_SERVER_HEADER_HTML_CONTROLS );
+  CONTINUE_SEND_IN_CHUNK(_page);
+
+  strcat_ro( _page, WEB_SERVER_HEADER_HTML_MENU );
+  CONTINUE_SEND_IN_CHUNK(_page);
+
+  strcat_ro( _page, WEB_SERVER_HEADER_CNTNR_OPEN );
+
+  if( _wide ){
+    strcat_ro( _page, WEB_SERVER_HEADER_CNTNR_WIDE );
+  }
+
+  strcat_ro( _page, WEB_SERVER_HEADER_TITLE );
+  CONTINUE_SEND_IN_CHUNK(_page);
+}
+
+/**
+ * @brief Returns the csrf token of the active session, or an empty string.
+ */
+const char* get_csrf_token( void ){
+
+  web_session_t *_session = __web_route_handler.active_session();
+  return ( nullptr != _session ? _session->m_csrf : "" );
+}
+
+/**
+ * @brief Appends the csrf hidden input of the active session to a form.
+ */
+void concat_csrf_input_html_tag( char *_page ){
+
+  const char *_token = get_csrf_token();
+
+  if( 0 == _token[0] ){
+    return;
+  }
+
+  strcat_ro( _page, HTML_INPUT_OPEN );
+  strcat_ro( _page, HTML_TYPE_ATTR );
+  strcat( _page, "'" );
+  strcat_ro( _page, RODT_ATTR(HTML_INPUT_HIDDEN_TAG_TYPE) );
+  strcat( _page, "'" );
+
+  strcat_ro( _page, HTML_NAME_ATTR );
+  strcat( _page, "'" );
+  strcat_ro( _page, RODT_ATTR(WEB_CSRF_FIELD_NAME) );
+  strcat( _page, "'" );
+
+  strcat_ro( _page, HTML_VALUE_ATTR );
+  strcat( _page, "'" );
+  strcat( _page, _token );
+  strcat( _page, "'" );
+
+  strcat_ro( _page, HTML_TAG_CLOSE_BRACKET );
 }
 
 #endif

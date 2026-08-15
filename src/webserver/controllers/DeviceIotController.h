@@ -66,7 +66,7 @@ public:
 		}
 
 		memset(_page, 0, _max_size);
-		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+		concat_header_html( _page );
 		strcat_ro(_page, WEB_SERVER_DEVICE_REGISTER_CONFIG_PAGE_TOP);
 		CONTINUE_SEND_IN_CHUNK(_page);
 
@@ -75,6 +75,7 @@ public:
 
 		concat_tr_input_html_tags(_page, RODT_ATTR("Device Id:"), RODT_ATTR("duid"), _device_iot_configs.device_iot_duid, DEVICE_IOT_DUID_MAX_LENGTH - 1);
 		concat_tr_input_html_tags(_page, RODT_ATTR("Registry Host:"), RODT_ATTR("dhst"), _device_iot_configs.device_iot_host, DEVICE_IOT_HOST_BUF_SIZE - 1);
+		concat_csrf_input_html_tag(_page);
 		CONTINUE_SEND_IN_CHUNK(_page);
 
 		strcat_ro(_page, WEB_SERVER_FOOTER_WITH_OTP_MONITOR_HTML);

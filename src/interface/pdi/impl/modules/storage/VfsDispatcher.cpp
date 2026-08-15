@@ -332,6 +332,7 @@ int VfsDispatcher::crossCopy(iFileSystemInterface* sb, const char* srel, iFileSy
 }
 
 pdi_err_t VfsDispatcher::rename(const char* oldPath, const char* newPath) {
+    if (!checkAccess(newPath, VFS_ACCESS_W)) return PDI_ERR_PERM;
     const char *orel = nullptr, *nrel = nullptr;
     iFileSystemInterface* ob = resolve(oldPath, &orel);
     iFileSystemInterface* nb = resolve(newPath, &nrel);
@@ -343,6 +344,8 @@ pdi_err_t VfsDispatcher::rename(const char* oldPath, const char* newPath) {
     return ob->deleteFile(orel);
 }
 pdi_err_t VfsDispatcher::copyFile(const char* sourcePath, const char* destPath) {
+    if (!checkAccess(sourcePath, VFS_ACCESS_R)) return PDI_ERR_PERM;
+    if (!checkAccess(destPath, VFS_ACCESS_W)) return PDI_ERR_PERM;
     const char *srel = nullptr, *drel = nullptr;
     iFileSystemInterface* sb = resolve(sourcePath, &srel);
     iFileSystemInterface* db = resolve(destPath, &drel);
@@ -351,6 +354,7 @@ pdi_err_t VfsDispatcher::copyFile(const char* sourcePath, const char* destPath) 
     return crossCopy(sb, srel, db, drel);
 }
 pdi_err_t VfsDispatcher::moveFile(const char* oldPath, const char* newPath) {
+    if (!checkAccess(newPath, VFS_ACCESS_W)) return PDI_ERR_PERM;
     const char *orel = nullptr, *nrel = nullptr;
     iFileSystemInterface* ob = resolve(oldPath, &orel);
     iFileSystemInterface* nb = resolve(newPath, &nrel);

@@ -132,7 +132,7 @@ public:
      * @param _yield Optional callback function to yield control during reading.
      * @param _maxlen Maximum number of bytes to accumulate, 0 for no limit.
      */
-    void readStringUntil(pdiutil::string &_outstr, char _delimiter, bool _keepdelimiterinstr = false, CallBackVoidArgFn _yield = nullptr, uint32_t _maxlen = 0) override;
+    void readStringUntil(pdiutil::string &_outstr, char _delimiter, bool _keepdelimiterinstr = false, const CallBackVoidArgFn &_yield = nullptr, uint32_t _maxlen = 0) override;
 
     /**
      * @brief Get the local IP address.
@@ -192,8 +192,8 @@ public:
 private:
     struct tcp_pcb* m_pcb; ///< The TCP protocol control block.
     bool m_isConnected;    ///< Connection status.
-    uint8_t* m_rxBuffer;   ///< Receive buffer.
-    uint32_t m_rxBufferSize; ///< Size of the receive buffer.
+    struct pbuf* m_rxBuf;  ///< Chain of received buffers still held by lwip.
+    uint32_t m_rxBufOffset; ///< Bytes already taken from the head of the chain.
     uint32_t m_timeout;    ///< Timeout value in milliseconds.
     bool m_isLastWriteAcked;
 

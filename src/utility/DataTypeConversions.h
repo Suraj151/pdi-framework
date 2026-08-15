@@ -126,6 +126,18 @@ void Uint32ToHexString(uint32_t val, char *pString, uint8_t _maxlen, bool cap = 
 void BytesToHexString(const uint8_t *bytes, uint8_t bytelen, char *out);
 
 /**
+ * @brief Renders a permission bitmask in the ten character `ls -l` form.
+ *
+ * Produces a leading type flag followed by the owner, group and other triads,
+ * for example `drwxr-xr-x`.
+ *
+ * @param perms Permission bits, the low nine of which are used.
+ * @param isdir Whether the entry is a directory.
+ * @param out Destination buffer, must hold at least 11 bytes.
+ */
+void FilePermsToString(uint16_t perms, bool isdir, char *out);
+
+/**
  * @brief Parses a hex string into a byte array.
  * @param hex Source hex string (2*bytelen characters, upper or lower case).
  * @param bytelen Number of bytes to decode.

@@ -55,6 +55,7 @@ void RouteHandler::register_route(const char* _uri, CallBackVoidArgFn _fn, middl
       if (this->handle_middleware(_middleware_level, _redirect_uri)) {
         _fn();
       }
+      this->release_request_session();
     });
   }
 }

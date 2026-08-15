@@ -103,6 +103,23 @@ typedef enum http_method http_method_t;
 
 // Bytes read in one pass while receiving a multipart body. Also drives the file
 // write granularity as a chunk is flushed every second pass.
+/**
+ * How long a multipart body may make no progress before the transfer is
+ * abandoned. Reached when the peer stops sending mid-upload, or when memory is
+ * too low to keep buffering, either of which would otherwise spin the read loop.
+ */
+#ifndef HTTP_UPLOAD_STALL_TIMEOUT_MS
+#define HTTP_UPLOAD_STALL_TIMEOUT_MS 10000
+#endif
+
+/**
+ * How often the multipart reader reports its progress, counted in read blocks.
+ * Raise it to keep the log quieter on a fast link.
+ */
+#ifndef HTTP_UPLOAD_LOG_EVERY_N_BLOCKS
+#define HTTP_UPLOAD_LOG_EVERY_N_BLOCKS 64
+#endif
+
 #ifndef HTTP_UPLOAD_READ_BLOCK_SIZE
 #define HTTP_UPLOAD_READ_BLOCK_SIZE 2048
 #endif

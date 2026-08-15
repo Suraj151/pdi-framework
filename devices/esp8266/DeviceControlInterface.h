@@ -75,12 +75,18 @@ public:
   uint64_t micros_now() override;
   uint32_t random_now() override;
   uint32_t get_free_heap() override;
+  uint32_t get_max_free_block() override;
   void log(logger_type_t log_type, const char *content) override;
   void yield() override;
   void handleEvents() override;
 
   // upgrade api
+#ifdef ENABLE_OTA_SERVICE
   upgrade_status_t Upgrade(const char *path, const char *version, void *client = nullptr) override;
+#ifdef ENABLE_STORAGE_SERVICE
+  upgrade_status_t UpgradeFromFile(const char *path) override;
+#endif
+#endif
 };
 
 /**

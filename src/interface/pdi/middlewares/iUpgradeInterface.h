@@ -29,9 +29,15 @@ public:
    */
   virtual ~iUpgradeInterface() {}
 
+#ifdef ENABLE_OTA_SERVICE
   // upgrade api. Optional client is an opaque pointer the device port may cast
   // to a framework Http_Client when it needs to fetch bytes over HTTP.
   virtual upgrade_status_t Upgrade(const char *path, const char *version, void *client = nullptr) = 0;
+
+  // flash a firmware image already present on the filesystem. ports without a
+  // local update path leave the default, which reports the attempt as failed.
+  virtual upgrade_status_t UpgradeFromFile(const char *path) { (void)path; return UPGRADE_STATUS_FAILED; }
+#endif
 };
 
 #endif

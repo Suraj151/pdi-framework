@@ -790,13 +790,13 @@ void WiFiInterface::wifi_event_handler_cb(System_Event_t *_event)
 {
   if( nullptr != _event ){
 
-    #if ( defined(ENABLE_CONSOLE_LOG_INFO) || defined(ENABLE_CONSOLE_LOG_ALL) )
-    // sdk callback context, write straight to the uart under a guard so no
-    // task owned lock is taken and no ownership is attributed to this context
-    NESTED_CRITICAL_SECTION_ENTER
-    __serial_uart.hw().printf_P(PSTR("\nwifi event : %d\n"), (int)_event->event);
-    NESTED_CRITICAL_SECTION_EXIT
-    #endif
+    // #if ( defined(ENABLE_CONSOLE_LOG_INFO) || defined(ENABLE_CONSOLE_LOG_ALL) )
+    // // sdk callback context, write straight to the uart under a guard so no
+    // // task owned lock is taken and no ownership is attributed to this context
+    // NESTED_CRITICAL_SECTION_ENTER
+    // __serial_uart.hw().printf_P(PSTR("\nwifi event : %d\n"), (int)_event->event);
+    // NESTED_CRITICAL_SECTION_EXIT
+    // #endif
 
     event_name_t e = EVENT_NAME_MAX;
 

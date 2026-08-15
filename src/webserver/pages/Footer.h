@@ -50,6 +50,7 @@ static const char WEB_SERVER_FOOTER_WITH_ANALOG_MONITOR_HTML[] PROG_RODT_ATTR = 
 <script>\
 var rq=new XMLHttpRequest();\
 function rql(){\
+if(this.status!=200){location.href='/';return;}\
 var r=JSON.parse(this.responseText);\
 var sv=document.getElementById('svga0');\
 var ln=document.createElementNS('http://www.w3.org/2000/svg','line');\
@@ -60,7 +61,6 @@ document.getElementsByTagName('table')[0].rows[i+1].innerHTML=\
 `<td class='btnd'>${ks[i]}</td><td class='btnd'>${r.md[r.d.data[ks[i]].mode]}</td><td class='btnd'>${r.d.data[ks[i]].val}</td>`;\
 }\
 }\
-if(r.r)location.href='/';\
 ln.setAttribute('x1',r.x1);\
 ln.setAttribute('y1',r.y1);\
 ln.setAttribute('x2',r.x2);\
@@ -98,6 +98,7 @@ static const char WEB_SERVER_FOOTER_WITH_DASHBOARD_MONITOR_HTML[] PROG_RODT_ATTR
 <script>\
 var rq=new XMLHttpRequest();\
 function rql(){\
+if(this.status!=200){location.href='/';return;}\
 var r=JSON.parse(this.responseText);\
 document.getElementById('stnm').innerHTML=r.nm;\
 document.getElementById('stip').innerHTML=r.ip;\
@@ -107,7 +108,6 @@ document.getElementById('stmc').innerHTML=r.mc;\
 document.getElementById('inet').innerHTML=r.nt;\
 document.getElementById('nwt').innerHTML=r.nwt;\
 document.getElementById('cndl').innerHTML=r.dl;\
-if(r.r)location.href='/';\
 }\
 rq.addEventListener('load',rql);\
 setInterval(function(){\

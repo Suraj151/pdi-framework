@@ -22,7 +22,7 @@ What comes out of the box is closer to a small system than to a sketch template:
 
 **Found on the network without help.** A from-scratch mDNS/DNS-SD responder built straight on lwIP UDP advertises `pdi-<mac>.local` and the services it is listening on, so the device answers to a name and shows up in `avahi-browse -a`. Name lookups walk IP literal, then `/etc/hosts`, then DNS.
 
-**Configured from a browser.** Session-based login, one settings page per service, GPIO control, a storage browser, and MQTT and email testers — all served from flash-resident page fragments.
+**Configured from a browser.** Any account in the user store can sign in and change its own password; server-side sessions, `HttpOnly` cookies and CSRF-guarded forms back one settings page per service, GPIO control, a storage browser, MQTT and email testers, and firmware flashing from an image already on the device — all served from flash-resident page fragments that follow the browser's light or dark preference and scale from a phone upward. The portal browses the filesystem as the signed-in user, so it obeys the same permissions the shell does.
 
 ## Quick Start
 
@@ -562,10 +562,10 @@ The `+ 5` is the per-table framing on NVM — table id and checksum. Boot sums t
 | Common | — | `USER`, `PASSPHRASE`, task count, time durations, HTTP request budget |
 | GlobalConfig | `global_config_table` | config version, firmware version, release, launch time |
 | WifiConfig | `wifi_config_table` | buffer sizes, default IPs, modification policy |
-| ServerConfig | `login_credential_table` | session name, cookie max age |
+| ServerConfig | `login_credential_table` | session name, cookie max age, web session slots and token size, absolute session cap, login attempt limit and lockout |
 | HttpConfig | — | client buffer size, request limits, HTTPS port, HSTS age |
 | TlsConfig | — | per-session record buffers, TLS task stack and poll interval, default cert/key paths |
-| OtaConfig | `ota_config_table` | host, port, version, check cadence |
+| OtaConfig | `ota_config_table` | host, port, version, check cadence, local image extension and magic byte |
 | MqttConfig | general / LWT / pub-sub tables | broker, last will, publish and subscribe slots |
 | GpioConfig | `gpio_config_table` | pin map, modes, event conditions and channels |
 | EmailConfig | `email_config_table` | SMTP host, port, auth, default subject |
@@ -1071,6 +1071,8 @@ Polls for a firmware update on the interval stored in the OTA table:
 ```
 
 Requests carry HTTP basic auth and a `pdistack` user agent, and run over TLS when the TLS service is on. Which of the three upgrade strategies applies is a compile-time choice.
+
+A build can also be flashed without any update server. `collectLocalImages()` lists the firmware images sitting on the filesystem and `flashFromFile()` writes one of them, checking the image magic byte before it commits and reporting through the same `upgrade_status_t` as a server-driven update. That is what backs the **Flash From Storage** form on the OTA page: upload a binary through the storage browser, pick it from the list, confirm, and the device flashes and restarts. Both entry points need the storage service.
 
 #### 6.2.6 `GpioServiceProvider` — `__gpio_service`
 
@@ -1667,7 +1669,9 @@ Start reading at [src/webserver/](src/webserver/).
         │                                                       │
         │                                                   Middleware
         │                                                    ├─ none
-        │                                                    └─ auth ─▶ session cookie check
+        │                                                    ├─ auth ─▶ session lookup, else 301
+        │                                                    └─ api  ─▶ session lookup, else 401
+        │                                                       └─ POST ─▶ CSRF token check
         │
         └─ build the response ──▶ WebResourceProvider
                                     ├─ the page buffer and the server pointer
@@ -1708,17 +1712,21 @@ URIs are constants in one header, so a typo is a compile error rather than a dea
 |---|---|---|
 | `/` | menu landing | — |
 | `/login` | form and its POST | — |
-| `/logout` | drop the session | auth |
-| `/login-config` | change username and password | auth |
-| `/dashboard`, `/listen-dashboard` | live device summary and its updates | auth |
+| `/logout` | drop the session | — |
+| `/login-config` | change your own password | auth |
+| `/dashboard` | live device summary | auth |
+| `/listen-dashboard` | dashboard updates | api |
 | `/wifi-config` | station and AP form | auth |
-| `/ota-config` | host, port, version | auth |
+| `/ota-config` | host, port, version, and flashing an image from storage | auth |
 | `/email-config` | SMTP credentials | auth |
 | `/gpio-manage`, `/gpio-server`, `/gpio-config`, `/gpio-write`, `/gpio-event` | GPIO panel and its subforms | auth |
-| `/gpio-monitor`, `/listen-monitor` | live analog graphs | auth |
+| `/gpio-monitor` | live analog graphs | auth |
+| `/listen-monitor` | graph and pin updates | api |
 | `/mqtt-manage`, `/mqtt-general-config`, `/mqtt-lwt-config`, `/mqtt-pubsub-config` | MQTT forms | auth |
 | `/device-register-config` | IoT registration | auth |
-| `/storage`, `/storage-fileupload`, `/storage-filelist`, `/storage-filedel` | file browser and upload | auth |
+| `/storage`, `/storage-fileupload`, `/storage-filelist`, `/storage-filedel` | file browser, upload and delete | auth |
+
+The file browser lists each entry the way `ls -l` does — a permission string such as `drwxr-xr-x`, then owner and group resolved to names through the user store, then size. Every operation runs as the signed-in user, so a listing, a delete or an upload succeeds exactly where the same account would succeed from the shell, and an upload lands owned by whoever uploaded it. A refusal is reported as a denied permission rather than a generic failure.
 
 Registering one takes a URI, a callback, an optional middleware level and an optional redirect target. There is also a hook for the not-found handler, which the home controller owns.
 
@@ -1749,21 +1757,35 @@ Since every route ends up in one global registry, URI constants have to be uniqu
 
 ### 8.5 Middleware
 
-The auth level asks the session handler whether the request carries a live session; if it doesn't, the request gets a redirect to the configured target and the route never runs. A route registered without a level is public.
+Three levels. A route registered without one is public. The auth level asks the session handler whether the request carries a live session and, if not, redirects to the configured target so the route never runs. The API level makes the same check but answers `401`, which is what the polling endpoints want — they are consumed by script, not navigated to.
+
+Both guarded levels then apply one more rule: a POST must carry the CSRF token of its own session, or it is refused — `403` on an API route, a redirect on a page. Keeping that check in the middleware rather than in each handler means a newly added form is covered by default; it only has to render the field.
+
+Forms get the field from a single shared helper, `concat_csrf_input_html_tag()`, which sits with the other markup builders and writes its markup from flash-resident constants. Pages that submit through script read the same value with `get_csrf_token()`.
 
 Middleware lives on the session handler rather than as a separate chain, so a new level means extending the enum and adding a branch — routes then opt in by naming it.
 
 ### 8.6 Sessions
 
-Sessions are cookie-based. The cookie name and its max age come from the credential table — `pdi_session` and five minutes by default. Logging in derives a token and sets the cookie; each guarded request parses the incoming `Cookie` header against the stored credentials; logging out and every redirect send an expired cookie back.
+Sessions live on the server. `WebSessionManager` owns a small fixed table of slots — two by default, `WEB_MAX_SESSIONS` — and the browser only ever holds an opaque token.
 
-There is no server-side session table. The token is derived at login rather than rotated, and logout invalidates it on the client.
+Logging in verifies the credentials through the auth service, takes a slot, and draws two independent random values from the hardware RNG: the session token that goes into the cookie, and a CSRF token handed to every form that session renders.
+
+```
+Set-Cookie: pdi_session=<32 hex>; Max-Age=300; Path=/; HttpOnly; SameSite=Strict[; Secure]
+```
+
+The cookie name and max age come from the credential table — `pdi_session` and five minutes. `Secure` is appended when the portal is built for TLS. Each guarded request parses the `Cookie` header by exact name, matches the token with a constant-time compare, and enforces both an idle timeout (the cookie max age) and an absolute cap (`WEB_SESSION_ABSOLUTE_MAX_AGE`, eight hours). Logging out, or changing a password, releases the slot, so a captured cookie stops working at that moment rather than at expiry.
+
+A web session *is* a `session_t` — the same structure the terminals use, extended with the two tokens. That means a validated request can be published through `SessionManager` for the life of the handler, which is what makes the VFS resolve file operations as the logged-in web user: uid, gid and umask are the session's, not root's. The route wrapper detaches it again once the handler returns, so a web session is never current while terminal work runs.
+
+Failed logins are counted; past `WEB_LOGIN_MAX_ATTEMPTS` the login route refuses attempts for `WEB_LOGIN_LOCKOUT_DURATION`. The counter is device-wide rather than per-client, because the server interface exposes no client address.
 
 ### 8.7 Composing a response
 
 The resource provider holds the server pointer for the current request, the page buffer, and shortcuts into the database service so controllers never include database headers.
 
-Pages are raw HTML strings kept in program memory and sent in three chunks:
+Pages are raw HTML strings kept in program memory and sent as header, body and footer:
 
 ```cpp
 m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_HTML, headerHtml, /*chunked=*/true);
@@ -1774,6 +1796,8 @@ m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_HTML, footerHtml, /*chunk
 The header and footer are shared by every page; the middle is whichever page is being served. Sending in chunks is what lets a page exceed the 1800-byte single-send buffer, which is why every composed page uses it.
 
 Three helpers carry the dynamic markup: a page builder that turns C structs into form inputs, tables and option lists; a set of tag and attribute constants that keep allocations down; and an inline SVG icon set.
+
+The shared header carries the styling for every page, so the look is defined once. Colours are CSS custom properties with a light and a dark set: the dark set applies through `prefers-color-scheme` until the visitor picks a side with the toggle in the top corner, after which a `data-theme` attribute on the root element wins and the choice is remembered in `localStorage`. Layout is sized for a phone first and widens with the viewport, with controls given larger hit targets on coarse pointers; pages that need the room, such as the file browser, open a wider container. Because the header is larger than one chunk, it is emitted as several flash-resident fragments, each under the single-send buffer.
 
 #### 8.7.1 HTTPS wiring and certificates
 
@@ -1814,9 +1838,13 @@ One header is worth a decision rather than a default: `Strict-Transport-Security
   route lambda                  the one Controller::boot() registered for this URI
       │
   middleware                    auth? no live session → 301 to /login, stop here
+      │                         POST? no matching CSRF token → refused, stop here
+      │                         on a pass the session becomes current
       │
   controller method             read args, load config, on POST validate and persist,
       │                         then send header + page + footer
+      │
+  release                       the session stops being current
       ▼
   send(code, mime, body, chunked)  ──▶  bytes back to the client
 ```
@@ -1825,9 +1853,9 @@ One header is worth a decision rather than a default: `Strict-Transport-Security
 
 **`/wifi-config` POST.** Auth passes, the controller reads the station and AP arguments, loads the current WiFi table so untouched fields survive, applies the new values, saves, and renders the success page. The actual reconnect is scheduled a tick later — the response has to flush before the radio drops out from under it.
 
-**`/listen-monitor`.** The browser polls; each request reads the analog pin and returns a small JSON object with the pin and its value. That is the whole live-graph mechanism.
+**`/listen-monitor`.** The browser polls; each request reads the analog pin and returns a small JSON object with the pin and its value. It carries the API gate, so an expired session gets a `401` and the page sends the browser back to the login form. That is the whole live-graph mechanism.
 
-**`/storage-fileupload`.** The controller reads the multipart body through the server's chunked API and writes it to the filesystem as it arrives, so upload size is bounded by flash rather than by RAM.
+**`/storage-fileupload`.** The body is streamed to a staging file under `/temp` as it arrives, so upload size is bounded by flash rather than by RAM; the directory is created on demand if it is missing. Parsing finishes before the handler runs, so the staged file is written before the session is known and lands owned by root. Once the CSRF check passes, the controller moves it to the requested directory — picking a free name rather than overwriting — and assigns it to the logged-in user, which is what lets that user manage the file afterwards. A move or delete that the user's permissions do not allow is reported back on the page rather than silently dropped.
 
 ### 8.10 Adding a page
 
@@ -1855,6 +1883,8 @@ For a `/metrics` page:
    ```
 4. Add it as a value member of `HttpServer`, behind a flag if it is optional, and include its header. Nothing else — the base constructor registers it.
 5. Add a menu entry so people can reach it.
+
+If the page carries a form that posts back, call `concat_csrf_input_html_tag()` while composing it. The middleware refuses an authenticated POST without a valid token, so a form that omits the field will submit and be turned away.
 
 Two habits keep the portal responsive. Pass page strings straight to `send()` rather than copying them into RAM; it reads flash directly. And keep controller methods short — `handle_clients()` runs on every pass of the main loop, so a route that needs real work should schedule it and return immediately rather than blocking the loop while it runs.
 
@@ -2709,7 +2739,7 @@ Integer, hex and BCD conversions in both directions with no `stdio` dependency. 
 
 ### 15.4 Base64
 
-Encode and decode, plus a unique-key generator that the web session handler uses for cookie tokens and the SSH keygen uses for seeds.
+Encode and decode, plus a unique-key generator used for curve25519 private keys, SSH keygen seeds and SFTP file handles. Web session and CSRF tokens do not come from here — they are drawn from the platform random source behind `random_now()`, which is the hardware RNG on both ESP ports.
 
 ### 15.5 Queues
 
@@ -2931,7 +2961,10 @@ The password is `pdiStack@123`, case-sensitive. Confirm the radio is up with `sr
 With dynamic subnetting on, the access point may have chosen a different subnet — use the `.1` of whatever your client was given.
 
 **The login form keeps bouncing back to itself.**
-The cookie is being rejected or the five-minute session expired. Private browsing windows often refuse cookies for a bare IP.
+The cookie is being rejected or the five-minute idle window expired. Private browsing windows often refuse cookies for a bare IP. After several wrong passwords the login route also holds attempts off for a lockout period — `passwd` over serial or SSH still works meanwhile.
+
+**A form submits and lands back on the login page without saving.**
+Its CSRF token no longer matches the session, which is what happens when a page is left open across a logout, a password change or a session expiry. Reload the page and submit it again. A form that does this every time is missing `concat_csrf_input_html_tag()` ([§8.10](#810-adding-a-page)).
 
 **A page arrives truncated mid-HTML.**
 A `send()` went out without chunking and exceeded the per-send buffer. Compose in header, body and footer ([§8.7](#87-composing-a-response)).

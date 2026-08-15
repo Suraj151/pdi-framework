@@ -42,7 +42,7 @@ class DashboardController : public Controller {
 			if( nullptr != this->m_route_handler ){
 				this->m_route_handler->register_route( WEB_SERVER_DASHBOARD_ROUTE, [&]() { this->handleDashboardRoute(); }, AUTH_MIDDLEWARE );
 				#ifdef ENABLE_WIFI_SERVICE
-	      		this->m_route_handler->register_route( WEB_SERVER_DASHBOARD_MONITOR_ROUTE, [&]() { this->handleDashboardMonitor(); } );
+	      		this->m_route_handler->register_route( WEB_SERVER_DASHBOARD_MONITOR_ROUTE, [&]() { this->handleDashboardMonitor(); }, API_MIDDLEWARE );
 				#endif
 			}
 		}
@@ -99,8 +99,7 @@ class DashboardController : public Controller {
 				_response += pdiutil::to_string((uint8_t)(stations[sta_indx].ip4 >> 24));
 				_response += CHARPTR_WRAP("</td></tr>");
 			}
-			_response += CHARPTR_WRAP("\",\"r\":");
-			_response += pdiutil::to_string(!this->m_route_handler->has_active_session());
+			_response += CHARPTR_WRAP("\"");
 			_response += "}";
 
 			this->m_web_resource->m_server->addHeader(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_CACHE_CONTROL), CHARPTR_WRAP_RO(HTTP_HEADER_VALUE_NO_CACHE));
@@ -120,8 +119,8 @@ class DashboardController : public Controller {
 			char *_page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
 			if (nullptr == _page) return;
 
-			strcat_ro(_page, WEB_SERVER_HEADER_HTML);
 			BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+			concat_header_html( _page, true );
 
 			strcat_ro(_page, WEB_SERVER_DASHBOARD_PAGE);
 			CONTINUE_SEND_IN_CHUNK(_page);

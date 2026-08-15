@@ -99,73 +99,20 @@ struct ListFSCommand : public CommandBase {
 			char nowYear[5];
 			EpochToDateTimeString(nowLocal, nowYear, sizeof(nowYear), "%Y");
 
-#if defined(ENABLE_AUTH_SERVICE) && defined(ENABLE_STORAGE_SERVICE)
-			// Per-ls uid->name cache so we don't rescan /etc/passwd per row.
-			static constexpr uint8_t NAME_CACHE_MAX = 4;
-			uint16_t cachedUid[NAME_CACHE_MAX];
-			pdiutil::string cachedName[NAME_CACHE_MAX];
-			uint8_t cachedCount = 0;
-#endif
-
-			const char rwx[3] = { 'r', 'w', 'x' };
 			for (file_info_t item : itemlist) {
 				char permbuf[12];
-				permbuf[0] = (item.m_type == FILE_TYPE_DIR) ? 'd' : '-';
-				for (int b = 0; b < 9; b++) {
-					permbuf[1 + b] = (item.m_perms & (1 << (8 - b))) ? rwx[b % 3] : '-';
-				}
+				FilePermsToString(item.m_perms, item.m_type == FILE_TYPE_DIR, permbuf);
 				permbuf[10] = ' ';
 				permbuf[11] = '\0';
 				m_terminal->write(permbuf);
 
-				char fallbackId[8];
 #if defined(ENABLE_AUTH_SERVICE) && defined(ENABLE_STORAGE_SERVICE)
-				const char *unameStr = nullptr;
-				for (uint8_t ci = 0; ci < cachedCount; ci++) {
-					if (cachedUid[ci] == item.m_uid) {
-						unameStr = cachedName[ci].c_str();
-						break;
-					}
-				}
-				user_record_t urec;
-				if (nullptr == unameStr && __user_store_service.findUserByUid(item.m_uid, urec)) {
-					if (cachedCount < NAME_CACHE_MAX) {
-						cachedUid[cachedCount] = item.m_uid;
-						cachedName[cachedCount] = urec.m_username;
-						unameStr = cachedName[cachedCount].c_str();
-						cachedCount++;
-					} else {
-						unameStr = urec.m_username.c_str();
-					}
-				}
-				if (nullptr == unameStr) {
-					Uint32ToString((uint32_t)item.m_uid, fallbackId, sizeof(fallbackId) - 1, 0);
-					unameStr = fallbackId;
-				}
-				m_terminal->write_pad(unameStr, 10);
-
-				const char *gnameStr = nullptr;
-				if (item.m_gid == item.m_uid) {
-					// gid == uid convention: reuse the resolved user name.
-					gnameStr = unameStr;
-				} else {
-					for (uint8_t ci = 0; ci < cachedCount; ci++) {
-						if (cachedUid[ci] == item.m_gid) {
-							gnameStr = cachedName[ci].c_str();
-							break;
-						}
-					}
-					user_record_t grec;
-					if (nullptr == gnameStr && __user_store_service.findUserByUid(item.m_gid, grec)) {
-						gnameStr = grec.m_username.c_str();
-					}
-					if (nullptr == gnameStr) {
-						Uint32ToString((uint32_t)item.m_gid, fallbackId, sizeof(fallbackId) - 1, 0);
-						gnameStr = fallbackId;
-					}
-				}
-				m_terminal->write_pad(gnameStr, 10);
+				pdiutil::string unameStr, gnameStr;
+				__user_store_service.resolveOwnerNames(item.m_uid, item.m_gid, unameStr, gnameStr);
+				m_terminal->write_pad(unameStr.c_str(), 10);
+				m_terminal->write_pad(gnameStr.c_str(), 10);
 #else
+				char fallbackId[8];
 				Uint32ToString((uint32_t)item.m_uid, fallbackId, sizeof(fallbackId) - 1, 0);
 				m_terminal->write_pad(fallbackId, 6);
 				Uint32ToString((uint32_t)item.m_gid, fallbackId, sizeof(fallbackId) - 1, 0);

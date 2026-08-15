@@ -81,7 +81,8 @@ public:
 				AUTH_MIDDLEWARE);
 			this->m_route_handler->register_route(
 				WEB_SERVER_GPIO_ANALOG_MONITOR_ROUTE, [&]()
-				{ this->handleAnalogMonitor(); });
+				{ this->handleAnalogMonitor(); },
+				API_MIDDLEWARE);
 		}
 		// this->m_web_resource->m_db_conn->get_gpio_config_table(&this->gpio_configs);
 	}
@@ -122,8 +123,6 @@ public:
 			*_response += pdiutil::to_string(x2);
 			*_response += ",\"y2\":";
 			*_response += pdiutil::to_string(y2);
-			*_response += ",\"r\":";
-			*_response += pdiutil::to_string(!this->m_route_handler->has_active_session());
 			*_response += ",\"d\":";
 			__gpio_service.appendGpioJsonPayload(*_response);
 			*_response += ",\"md\":[\"OFF\", \"DOUT\", \"DIN\", \"BLINK\", \"AOUT\", \"AIN\"]";
@@ -154,9 +153,9 @@ public:
 		char *_page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
 		if (nullptr == _page) return;
 
-		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
-		strcat_ro(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_TOP);
 		BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+		concat_header_html( _page );
+		strcat_ro(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_TOP);
 
 		concat_svg_menu_card(_page, WEB_SERVER_GPIO_MENU_TITLE_MODES, SVG_ICON48_PATH_TUNE, WEB_SERVER_GPIO_MODE_CONFIG_ROUTE);
 		concat_svg_menu_card(_page, WEB_SERVER_GPIO_MENU_TITLE_CONTROL, SVG_ICON48_PATH_GAME_ASSET, WEB_SERVER_GPIO_WRITE_CONFIG_ROUTE);
@@ -183,7 +182,7 @@ public:
 	void build_gpio_monitor_html(char *_page, int _max_size = PAGE_HTML_MAX_SIZE)
 	{
 		// memset(_page, 0, _max_size);
-		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+		concat_header_html( _page );
 		strcat_ro(_page, WEB_SERVER_GPIO_MONITOR_PAGE_TOP);
 		CONTINUE_SEND_IN_CHUNK(_page);
 
@@ -275,7 +274,7 @@ public:
 	void build_gpio_server_config_html(char *_page, bool _enable_flash = false, int _max_size = PAGE_HTML_MAX_SIZE)
 	{
 		// memset(_page, 0, _max_size);
-		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+		concat_header_html( _page );
 		strcat_ro(_page, WEB_SERVER_GPIO_SERVER_PAGE_TOP);
 		CONTINUE_SEND_IN_CHUNK(_page);
 
@@ -290,6 +289,7 @@ public:
 		concat_tr_input_html_tags(_page, RODT_ATTR("Post Frequency:"), RODT_ATTR("frq"), _freq);
 		CONTINUE_SEND_IN_CHUNK(_page);
 
+		concat_csrf_input_html_tag( _page );
 		strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 		if (_enable_flash)
 			concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
@@ -359,7 +359,7 @@ public:
 	void build_gpio_mode_config_html(char *_page, bool _enable_flash = false, int _max_size = PAGE_HTML_MAX_SIZE)
 	{
 		// memset(_page, 0, _max_size);
-		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+		concat_header_html( _page );
 		strcat_ro(_page, WEB_SERVER_GPIO_CONFIG_PAGE_TOP);
 		CONTINUE_SEND_IN_CHUNK(_page);
 
@@ -398,6 +398,7 @@ public:
 			}
 		}
 
+		concat_csrf_input_html_tag( _page );
 		strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 		if (_enable_flash)
 			concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
@@ -493,7 +494,7 @@ public:
 	{
 
 		// memset(_page, 0, _max_size);
-		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+		concat_header_html( _page );
 		strcat_ro(_page, WEB_SERVER_GPIO_WRITE_PAGE_TOP);
 		CONTINUE_SEND_IN_CHUNK(_page);
 
@@ -539,6 +540,7 @@ public:
 
 		if (_added_options)
 		{
+			concat_csrf_input_html_tag( _page );
 			strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 		}
 		else
@@ -646,7 +648,7 @@ public:
 	void build_gpio_event_config_html(char *_page, bool _enable_flash = false, int _max_size = PAGE_HTML_MAX_SIZE)
 	{
 		// memset(_page, 0, _max_size);
-		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+		concat_header_html( _page );
 		strcat_ro(_page, WEB_SERVER_GPIO_EVENT_PAGE_TOP);
 		CONTINUE_SEND_IN_CHUNK(_page);
 
@@ -745,6 +747,7 @@ public:
 				strcat_ro(_page, HTML_TR_CLOSE_TAG);
 			}
 
+			concat_csrf_input_html_tag( _page );
 			strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 		}
 		else

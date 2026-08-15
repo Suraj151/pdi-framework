@@ -87,15 +87,62 @@ class Middleware : public EwSessionHandler {
           }
           return false;
         }
-        return true;
+        return this->guard_state_change(_redirect_uri, false);
       } else if (_middleware_level == API_MIDDLEWARE) {
 
-        return true;
+        if (!this->has_active_session()) {
+
+          if (nullptr != __web_resource.m_server) {
+            __web_resource.m_server->addHeader(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_CACHE_CONTROL), CHARPTR_WRAP_RO(HTTP_HEADER_VALUE_NO_CACHE));
+            __web_resource.m_server->send(HTTP_RESP_UNAUTHORIZED);
+          }
+          return false;
+        }
+        return this->guard_state_change(_redirect_uri, true);
 
       } else {
 
         return true;
       }
+    }
+
+    /**
+     * @brief Rejects a state changing request that carries no valid csrf token.
+     *
+     * Every POST behind an authenticated route must present the csrf token of
+     * its session, so a third party page cannot drive the portal on behalf of
+     * a logged in browser.
+     *
+     * @param _redirect_uri The URI to redirect to when the token is missing.
+     * @param _is_api Whether to answer with a status code instead of a redirect.
+     * @return `true` if the request may proceed, `false` otherwise.
+     */
+    bool guard_state_change(const char* _redirect_uri, bool _is_api) {
+
+      if (nullptr == __web_resource.m_server) {
+        return false;
+      }
+
+      if (!__web_resource.m_server->isPostRequest()) {
+        return true;
+      }
+
+      if (this->has_valid_csrf_token()) {
+        return true;
+      }
+
+      LogW("csrf token rejected\n");
+
+      __web_resource.m_server->addHeader(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_CACHE_CONTROL), CHARPTR_WRAP_RO(HTTP_HEADER_VALUE_NO_CACHE));
+
+      if (_is_api) {
+        __web_resource.m_server->send(HTTP_RESP_FORBIDDEN);
+      } else {
+        __web_resource.m_server->addHeader(CHARPTR_WRAP(HTTP_HEADER_KEY_LOCATION), _redirect_uri);
+        __web_resource.m_server->send(HTTP_RESP_MOVED_PERMANENTLY);
+      }
+
+      return false;
     }
 };
 

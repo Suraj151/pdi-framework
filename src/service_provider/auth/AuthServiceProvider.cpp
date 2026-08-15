@@ -161,8 +161,7 @@ void AuthServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
 
     terminal->writeln();
     terminal->writeln_ro(RODT_ATTR("Login Configs :"));
-    terminal->write(m_login_credentials.username); terminal->write_ro(RODT_ATTR("\t"));
-    terminal->writeln(m_login_credentials.password);
+    terminal->writeln(m_login_credentials.username);
   }
 }
 

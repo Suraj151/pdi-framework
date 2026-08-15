@@ -62,4 +62,54 @@ const size_t login_credential_size = sizeof(login_credential) + 5;
 
 using login_credential_table = login_credential;
 
+#ifdef ENABLE_HTTP_SERVER
+
+#ifndef WEB_MAX_SESSIONS
+#define WEB_MAX_SESSIONS 2
+#endif
+
+#ifndef WEB_SESSION_TOKEN_BYTES
+#define WEB_SESSION_TOKEN_BYTES 16
+#endif
+
+#define WEB_SESSION_TOKEN_HEX_LEN (WEB_SESSION_TOKEN_BYTES * 2)
+
+#ifndef WEB_SESSION_ABSOLUTE_MAX_AGE
+#define WEB_SESSION_ABSOLUTE_MAX_AGE 28800
+#endif
+
+#ifndef WEB_LOGIN_MAX_ATTEMPTS
+#define WEB_LOGIN_MAX_ATTEMPTS 5
+#endif
+
+#ifndef WEB_LOGIN_LOCKOUT_DURATION
+#define WEB_LOGIN_LOCKOUT_DURATION 300
+#endif
+
+#ifndef WEB_CSRF_FIELD_NAME
+#define WEB_CSRF_FIELD_NAME "csrf"
+#endif
+
+struct web_session_t : public session_t {
+
+  web_session_t(){
+    clearToken();
+  }
+
+  void clear() override {
+    session_t::clear();
+    clearToken();
+  }
+
+  void clearToken(){
+    memset(m_token, 0, sizeof(m_token));
+    memset(m_csrf, 0, sizeof(m_csrf));
+  }
+
+  char m_token[WEB_SESSION_TOKEN_HEX_LEN + 1];
+  char m_csrf[WEB_SESSION_TOKEN_HEX_LEN + 1];
+};
+
+#endif
+
 #endif

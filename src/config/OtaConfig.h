@@ -26,6 +26,20 @@ created Date    : 1st June 2019
  */
 #define ALLOW_OTA_CONFIG_MODIFICATION
 
+// leading byte every esp firmware image carries, checked before a local image
+// is written so a wrong file cannot brick the device
+#ifndef OTA_IMAGE_MAGIC_BYTE
+#define OTA_IMAGE_MAGIC_BYTE        0xE9
+#endif
+
+#ifndef OTA_FILE_READ_CHUNK_SIZE
+#define OTA_FILE_READ_CHUNK_SIZE    1024
+#endif
+
+#ifndef OTA_IMAGE_FILE_EXTENSION
+#define OTA_IMAGE_FILE_EXTENSION    ".bin"
+#endif
+
 struct ota_configs {
 
   // Default Constructor

@@ -79,9 +79,9 @@ public:
     char *_page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
     if (nullptr == _page) return;
 
-    strcat_ro(_page, WEB_SERVER_HEADER_HTML);
-    strcat_ro(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_TOP);
     BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+    concat_header_html( _page );
+    strcat_ro(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_TOP);
 
     concat_svg_menu_card(_page, WEB_SERVER_MQTT_MENU_TITLE_GENERAL, SVG_ICON48_PATH_SETTINGS, WEB_SERVER_MQTT_GENERAL_CONFIG_ROUTE);
     concat_svg_menu_card(_page, WEB_SERVER_MQTT_MENU_TITLE_LWT, SVG_ICON48_PATH_BEENHERE, WEB_SERVER_MQTT_LWT_CONFIG_ROUTE);
@@ -113,7 +113,7 @@ public:
     }
 
     // memset(_page, 0, _max_size);
-    strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+    concat_header_html( _page );
     strcat_ro(_page, WEB_SERVER_MQTT_GENERAL_PAGE_TOP);
     CONTINUE_SEND_IN_CHUNK(_page);
 
@@ -137,6 +137,7 @@ public:
     concat_tr_input_html_tags(_page, RODT_ATTR("Keep Alive:"), RODT_ATTR("kpalv"), _keepalive);
     concat_tr_input_html_tags(_page, RODT_ATTR("Clean Session:"), RODT_ATTR("cln"), "clean", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_general_configs.clean_session != 0);
 
+    concat_csrf_input_html_tag( _page );
     strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
     CONTINUE_SEND_IN_CHUNK(_page);
 #else
@@ -254,7 +255,7 @@ public:
 
     // memset(_page, 0, _max_size);
     char _ip_address[20];
-    strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+    concat_header_html( _page );
     strcat_ro(_page, WEB_SERVER_MQTT_LWT_PAGE_TOP);
     CONTINUE_SEND_IN_CHUNK(_page);
 
@@ -270,6 +271,7 @@ public:
     concat_tr_select_html_tags(_page, RODT_ATTR("Will QoS:"), RODT_ATTR("wqos"), _qos_options, 3, _mqtt_lwt_configs.will_qos);
     concat_tr_input_html_tags(_page, RODT_ATTR("Will Retain:"), RODT_ATTR("wrtn"), "retain", HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_lwt_configs.will_retain != 0);
 
+    concat_csrf_input_html_tag( _page );
     strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
     CONTINUE_SEND_IN_CHUNK(_page);
 #else
@@ -370,7 +372,7 @@ public:
 
     // memset(_page, 0, _max_size);
     char _ip_address[20];
-    strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+    concat_header_html( _page );
     strcat_ro(_page, WEB_SERVER_MQTT_PUBSUB_PAGE_TOP);
     CONTINUE_SEND_IN_CHUNK(_page);
 
@@ -459,6 +461,7 @@ public:
     }
 
 #ifdef ALLOW_MQTT_CONFIG_MODIFICATION
+    concat_csrf_input_html_tag( _page );
     strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 #endif
 

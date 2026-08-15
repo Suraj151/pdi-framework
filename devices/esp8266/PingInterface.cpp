@@ -51,17 +51,17 @@ static void ICACHE_FLASH_ATTR ping_recv_cb (void* arg, void *pdata){
     return;
   }
 
-#if ( defined(ENABLE_CONSOLE_LOG_INFO) || defined(ENABLE_CONSOLE_LOG_ALL) )
-  // sdk callback context, write straight to the uart under a guard so no
-  // task owned lock is taken and no ownership is attributed to this context
-  NESTED_CRITICAL_SECTION_ENTER
-  if (_host_resp) {
-    __serial_uart.hw().printf_P(PSTR("\nPing: Reply bytes=%d time=%dms\n"), (int)pingrsp->bytes, (int)pingrsp->resp_time);
-  } else {
-    __serial_uart.hw().print(F("\nPing: Request timed out\n"));
-  }
-  NESTED_CRITICAL_SECTION_EXIT
-#endif
+// #if ( defined(ENABLE_CONSOLE_LOG_INFO) || defined(ENABLE_CONSOLE_LOG_ALL) )
+//   // sdk callback context, write straight to the uart under a guard so no
+//   // task owned lock is taken and no ownership is attributed to this context
+//   NESTED_CRITICAL_SECTION_ENTER
+//   if (_host_resp) {
+//     __serial_uart.hw().printf_P(PSTR("\nPing: Reply bytes=%d time=%dms\n"), (int)pingrsp->bytes, (int)pingrsp->resp_time);
+//   } else {
+//     __serial_uart.hw().print(F("\nPing: Request timed out\n"));
+//   }
+//   NESTED_CRITICAL_SECTION_EXIT
+// #endif
 }
 
 // End-of-run callback. Fires ~coarse_time after the last send, which can be

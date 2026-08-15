@@ -30,4 +30,43 @@ static const char WEB_SERVER_OTA_CONFIG_PAGE_TOP[] PROG_RODT_ATTR = "\
 <form action='/ota-config' method='POST'>\
 <table>";
 
+#ifdef ENABLE_STORAGE_SERVICE
+
+/**
+ * @brief Opening of the local image flashing form.
+ *
+ * Offers the firmware images already present on the filesystem, so a build can
+ * be uploaded through the storage page and flashed without an update server.
+ */
+static const char WEB_SERVER_OTA_LOCAL_FLASH_TOP[] PROG_RODT_ATTR = "\
+<hr style='border:0;border-top:1px solid var(--ln);margin:18px 0;'>\
+<h2>Flash From Storage</h2>\
+<form action='/ota-config' method='POST'>\
+<table>";
+
+/**
+ * @brief Submit row of the local image flashing form.
+ */
+static const char WEB_SERVER_OTA_LOCAL_FLASH_BOTTOM[] PROG_RODT_ATTR = "\
+<tr>\
+<td></td>\
+<td>\
+<button class='btn' type='submit' onclick='return confirm(\"Flash this image and restart?\")'>\
+Flash\
+</button>\
+</td>\
+</tr>\
+</table>\
+</form>";
+
+/**
+ * @brief Shown when the filesystem holds no firmware image.
+ */
+static const char WEB_SERVER_OTA_NO_LOCAL_IMAGE[] PROG_RODT_ATTR = "\
+</table>\
+</form>\
+<h4>No firmware image on storage. Upload a .bin file first.</h4>";
+
+#endif
+
 #endif

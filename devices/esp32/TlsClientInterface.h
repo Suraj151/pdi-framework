@@ -79,8 +79,8 @@ private:
 
     MbedTLSState* m_tls;
 
-    uint8_t* m_rxQueue;
-    uint32_t m_rxQueueLen;
+    struct pbuf* m_rxBuf;
+    uint32_t m_rxBufOffset;
 
     TaskHandle_t  m_workerHandle;
     volatile bool m_workerRunning;
@@ -101,6 +101,18 @@ private:
 
     static int bioSend(void* ctx, const unsigned char* buf, size_t len);
     static int bioRecv(void* ctx, unsigned char* buf, size_t len);
+
+    /**
+     * @brief Bytes still held in the receive chain.
+     */
+    uint32_t rxAvailable() const;
+
+    /**
+     * @brief Drop the leading bytes of the receive chain, releasing each buffer
+     * as it is emptied. The caller holds the lwip core lock.
+     * @param size The number of bytes to drop.
+     */
+    void consumeRxQueue(uint32_t size);
 
     static void workerThunk(void* arg);
     bool  startTlsWorker();

@@ -26,6 +26,7 @@ static const char HTML_TAG_OPEN_BRACKET   []PROG_RODT_ATTR = "<";
 static const char HTML_TAG_CLOSE_BRACKET  []PROG_RODT_ATTR = ">";
 static const char HTML_TABLE_OPEN_TAG     []PROG_RODT_ATTR = "<table ";
 static const char HTML_TABLE_CLOSE_TAG    []PROG_RODT_ATTR = "</table>";
+static const char HTML_FORM_CLOSE_TAG     []PROG_RODT_ATTR = "</form>";
 static const char HTML_TH_OPEN_TAG        []PROG_RODT_ATTR = "<th ";
 static const char HTML_TH_CLOSE_TAG       []PROG_RODT_ATTR = "</th>";
 static const char HTML_TR_OPEN_TAG        []PROG_RODT_ATTR = "<tr ";
@@ -90,6 +91,7 @@ static const char HTML_EMAIL_SUCCESS_FLASH[]PROG_RODT_ATTR = "Config saved & tes
  * Defines constants for input tag types and default configurations.
  */
 #define HTML_INPUT_TEXT_TAG_TYPE              "text"
+#define HTML_INPUT_HIDDEN_TAG_TYPE            "hidden"
 #define HTML_INPUT_FILE_TAG_TYPE              "file"
 #define HTML_INPUT_RANGE_TAG_TYPE             "range"
 #define HTML_INPUT_CHECKBOX_TAG_TYPE          "checkbox"

@@ -128,6 +128,12 @@ public:
   virtual void handleClient() = 0;
   virtual void close() = 0;
 
+  /**
+   * @brief Whether this instance serves over an encrypted transport.
+   * @return true when begin() was called with secure set, false otherwise.
+   */
+  virtual bool isSecure() const { return false; }
+
   #ifdef ENABLE_TLS_SERVICE
   /**
    * @brief Set the path to the server certificate used for HTTPS. Must be called before begin(port, true).
@@ -153,6 +159,7 @@ public:
 
   virtual pdiutil::string arg(const pdiutil::string &name) const = 0;                       // get request argument value by name
   virtual bool hasArg(const pdiutil::string &name) const = 0;                               // check if argument exists
+  virtual bool isPostRequest() const { return false; }                                      // check if request method is POST
 
   virtual void collectHeaders(const char *headerKeys[], const size_t headerKeysCount) = 0;  // set the request headers to collect
   virtual pdiutil::string header(const pdiutil::string &name) const = 0;                    // get request header value by name

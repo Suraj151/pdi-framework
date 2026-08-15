@@ -215,8 +215,8 @@ TlsClientInterface::TlsClientInterface() :
     m_timeout(3000),
     m_isLastWriteAcked(true),
     m_bear(nullptr),
-    m_rxQueue(nullptr),
-    m_rxQueueLen(0),
+    m_rxBuf(nullptr),
+    m_rxBufOffset(0),
     m_pumpPending(false),
     m_inPump(false),
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
@@ -234,8 +234,8 @@ TlsClientInterface::TlsClientInterface(struct tcp_pcb* pcb) :
     m_timeout(3000),
     m_isLastWriteAcked(true),
     m_bear(nullptr),
-    m_rxQueue(nullptr),
-    m_rxQueueLen(0),
+    m_rxBuf(nullptr),
+    m_rxBufOffset(0),
     m_pumpPending(false),
     m_inPump(false),
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
@@ -262,8 +262,60 @@ int16_t TlsClientInterface::bearReset(int16_t rc) {
 TlsClientInterface::~TlsClientInterface() {
     close();
     pdiutil::safe_delete(m_bear);
-    pdiutil::safe_delete_array(m_rxQueue);
-    m_rxQueueLen = 0;
+    if (m_rxBuf != nullptr) {
+        pbuf_free(m_rxBuf);
+        m_rxBuf = nullptr;
+        m_rxBufOffset = 0;
+    }
+}
+
+uint32_t TlsClientInterface::rxAvailable() const {
+    return m_rxBuf != nullptr ? (uint32_t)(m_rxBuf->tot_len - m_rxBufOffset) : 0;
+}
+
+void TlsClientInterface::consumeRxQueue(uint32_t size) {
+
+    while (size > 0) {
+
+        struct pbuf *released = nullptr;
+        uint32_t taken = 0;
+
+        NESTED_CRITICAL_SECTION_ENTER
+        if (m_rxBuf != nullptr) {
+
+            uint32_t headleft = m_rxBuf->len - m_rxBufOffset;
+            taken = size < headleft ? size : headleft;
+
+            if (taken < headleft) {
+
+                m_rxBufOffset += taken;
+            } else if (m_rxBuf->next == nullptr) {
+
+                released = m_rxBuf;
+                m_rxBuf = nullptr;
+                m_rxBufOffset = 0;
+            } else {
+
+                released = m_rxBuf;
+                m_rxBuf = m_rxBuf->next;
+                m_rxBufOffset = 0;
+                pbuf_ref(m_rxBuf);
+            }
+        }
+        NESTED_CRITICAL_SECTION_EXIT
+
+        // kept out of the section, releasing a buffer can reach back into the
+        // driver that owns its payload
+        if (released != nullptr) {
+            pbuf_free(released);
+        }
+
+        if (taken == 0 && released == nullptr) {
+            break;
+        }
+
+        size -= taken;
+    }
 }
 
 
@@ -594,11 +646,11 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
     #endif
 
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.critical_lock();
+    __lwip_mutex.critical_lock();
     #endif
     err_t terr = tcp_connect(m_pcb, &serverIp, port, &TlsClientInterface::onConnected);
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.critical_unlock();
+    __lwip_mutex.critical_unlock();
     #endif
     if (terr != ERR_OK) {
         close();
@@ -615,7 +667,7 @@ int16_t TlsClientInterface::connect(const uint8_t* host, uint16_t port) {
         int      engErr   = m_bear ? br_ssl_engine_last_error(&m_bear->cc.eng) : -1;
         uint32_t elapsed  = __i_dvc_ctrl.millis_now() - start;
         SysLogE("TLS connect: timeout after %u ms (tcp.connected=%d engState=%u engErr=%d rxQ=%u)\n",
-            (unsigned)elapsed, (int)m_isConnected, engState, engErr, (unsigned)m_rxQueueLen);
+            (unsigned)elapsed, (int)m_isConnected, engState, engErr, (unsigned)rxAvailable());
         close();
         return PDI_ERR_TIMEOUT;
     }
@@ -640,39 +692,48 @@ int16_t TlsClientInterface::close() {
         pumpEngine();
     }
 
-    if (m_rxQueue) {
+    // the close notify has to reach the peer while the pcb is still alive, so
+    // the buffers are released first and the pcb only after
+    struct pbuf *released = nullptr;
+    uint32_t pending = 0;
 
-        if(nullptr != m_pcb && m_rxQueueLen > 0){
+    NESTED_CRITICAL_SECTION_ENTER
+    if (m_rxBuf != nullptr) {
 
-            #ifdef ENABLE_CONTEXTUAL_EXECUTION
-            m_mutex.critical_lock();
-            #endif
-            tcp_recved(m_pcb, m_rxQueueLen); // Notify the TCP stack that data has been read
-            #ifdef ENABLE_CONTEXTUAL_EXECUTION
-            m_mutex.critical_unlock();
-            #endif
+        released = m_rxBuf;
+        pending = m_rxBuf->tot_len - m_rxBufOffset;
+        m_rxBuf = nullptr;
+        m_rxBufOffset = 0;
+    }
+    NESTED_CRITICAL_SECTION_EXIT
+
+    if (released != nullptr) {
+
+        if (m_pcb != nullptr && pending > 0) {
+
+            tcp_recved(m_pcb, pending); // Notify the TCP stack that data has been read
         }
 
-        pdiutil::safe_delete_array(m_rxQueue);
-        m_rxQueueLen = 0;
+        pbuf_free(released);
     }
 
-    // the pcb check and its release belong to one section, a callback may drop
-    // the pcb between them otherwise
-    #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.critical_lock();
-    #endif
-    if (m_pcb != nullptr) {
-        tcp_arg(m_pcb, nullptr);
-        tcp_err(m_pcb, nullptr);
-        tcp_recv(m_pcb, nullptr);
-        tcp_sent(m_pcb, nullptr);
-        tcp_close(m_pcb);
-        m_pcb = nullptr;
+    struct tcp_pcb* pcb = nullptr;
+
+    // our reference is dropped inside the section so nothing can reach the pcb
+    // once it is being released, the release itself reaches the driver and is
+    // kept outside
+    NESTED_CRITICAL_SECTION_ENTER
+    pcb = m_pcb;
+    m_pcb = nullptr;
+    NESTED_CRITICAL_SECTION_EXIT
+
+    if (pcb != nullptr) {
+        tcp_arg(pcb, nullptr);
+        tcp_err(pcb, nullptr);
+        tcp_recv(pcb, nullptr);
+        tcp_sent(pcb, nullptr);
+        tcp_close(pcb);
     }
-    #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.critical_unlock();
-    #endif
 
     m_pumpPending = false;
     m_isConnected = false;
@@ -785,14 +846,14 @@ bool TlsClientInterface::setKeepAlive(uint16_t /*idleTime*/, uint16_t /*interval
 }
 void TlsClientInterface::setNoDelay(bool noDelay) {
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.critical_lock();
+    __lwip_mutex.critical_lock();
     #endif
     if (m_pcb) {
         if (noDelay) tcp_nagle_disable(m_pcb);
         else         tcp_nagle_enable(m_pcb);
     }
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.critical_unlock();
+    __lwip_mutex.critical_unlock();
     #endif
 }
 bool TlsClientInterface::availableforwrite(uint32_t size) {
@@ -809,11 +870,11 @@ bool TlsClientInterface::availableforwrite(uint32_t size) {
     }
 
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.critical_lock();
+    __lwip_mutex.critical_lock();
     #endif
     tcp_output(m_pcb);
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.critical_unlock();
+    __lwip_mutex.critical_unlock();
     #endif
 
     uint32_t availablebuff = tcp_sndbuf(m_pcb);
@@ -848,13 +909,10 @@ void TlsClientInterface::flush() {
         pumpEngine();
     }
 
-    #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.critical_lock();
-    #endif
+    // the receive chain is not touched here, flush runs between requests on a
+    // live connection and the chain holds transport bytes the engine has not
+    // consumed yet
     if (m_pcb) tcp_output(m_pcb);
-    #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    m_mutex.critical_unlock();
-    #endif
 
     m_isLastWriteAcked = true;
 }
@@ -887,38 +945,20 @@ err_t TlsClientInterface::onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf
         return ERR_OK;
     }
 
-    // the queue length is read and grown in one section, a reader taking bytes
-    // out in between would leave the copy sized against a stale length
+    // The chain is kept as delivered, so nothing is copied and no heap is taken.
+    // The tcp window stays closed until the engine consumes it, which is what
+    // holds the sender back.
     NESTED_CRITICAL_SECTION_ENTER
+    if (self->m_rxBuf != nullptr) {
 
-    uint32_t newSize = self->m_rxQueueLen + p->tot_len;
-    if((newSize+self->m_rxQueueLen) > (0.90*TLS_IBUF_SIZE)){
-        NESTED_CRITICAL_SECTION_EXIT
-        // LogE("TLS onReceive: rxQ cap, in=%u rxQ=%u\n",
-        //     (unsigned)p->tot_len, (unsigned)self->m_rxQueueLen);
-        return ERR_MEM;
-    }
+        pbuf_cat(self->m_rxBuf, p);
+    } else {
 
-    uint8_t* newBuf = pdiutil::safe_new_array<uint8_t>(newSize);
-    if (!newBuf) {
-        NESTED_CRITICAL_SECTION_EXIT
-#ifndef ENABLE_CONTEXTUAL_EXECUTION
-        // lwip callback context, kept off the logger when scheduling is enabled
-        SysLogE("TLS onReceive: alloc fail, in=%u rxQ=%u\n",
-            (unsigned)p->tot_len, (unsigned)self->m_rxQueueLen);
-#endif
-        return ERR_MEM;
+        self->m_rxBuf = p;
+        self->m_rxBufOffset = 0;
     }
-    if (self->m_rxQueue) {
-        memcpy(newBuf, self->m_rxQueue, self->m_rxQueueLen);
-        pdiutil::safe_delete_array(self->m_rxQueue);
-    }
-    pbuf_copy_partial(p, newBuf + self->m_rxQueueLen, p->tot_len, 0);
-    self->m_rxQueue = newBuf;
-    self->m_rxQueueLen = newSize;
     NESTED_CRITICAL_SECTION_EXIT
 
-    pbuf_free(p);
     return ERR_OK;
 }
 
@@ -953,47 +993,39 @@ void TlsClientInterface::serviceRx() {
     uint16_t reclaimed = 0;
 
     while (true) {
-        #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        m_mutex.critical_lock();
-        #endif
-        if (m_rxQueueLen == 0) {
-            #ifdef ENABLE_CONTEXTUAL_EXECUTION
-            m_mutex.critical_unlock();
-            #endif
+
+        const uint8_t *head = nullptr;
+        uint32_t headleft = 0;
+
+        // only the chain pointers belong in the section, the payload of the head
+        // is never touched by the receive callback
+        NESTED_CRITICAL_SECTION_ENTER
+        if (m_rxBuf != nullptr) {
+
+            head = (const uint8_t *)m_rxBuf->payload + m_rxBufOffset;
+            headleft = m_rxBuf->len - m_rxBufOffset;
+        }
+        NESTED_CRITICAL_SECTION_EXIT
+
+        if (headleft == 0) {
             break;
         }
 
         unsigned state = br_ssl_engine_current_state(eng);
         if ((state & BR_SSL_CLOSED) || !(state & BR_SSL_RECVREC)) {
-            #ifdef ENABLE_CONTEXTUAL_EXECUTION
-            m_mutex.critical_unlock();
-            #endif
             break;
         }
 
         size_t bufLen = 0;
         unsigned char* recvBuf = br_ssl_engine_recvrec_buf(eng, &bufLen);
         if (!recvBuf || bufLen == 0) {
-            #ifdef ENABLE_CONTEXTUAL_EXECUTION
-            m_mutex.critical_unlock();
-            #endif
             break;
         }
         __i_dvc_ctrl.yield();
 
-        uint32_t chunk = (m_rxQueueLen < bufLen) ? m_rxQueueLen : (uint32_t)bufLen;
-        memcpy(recvBuf, m_rxQueue, chunk);
-
-        if (chunk < m_rxQueueLen) {
-            memmove(m_rxQueue, m_rxQueue + chunk, m_rxQueueLen - chunk);
-            m_rxQueueLen -= chunk;
-        } else {
-            pdiutil::safe_delete_array(m_rxQueue);
-            m_rxQueueLen = 0;
-        }
-        #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        m_mutex.critical_unlock();
-        #endif
+        uint32_t chunk = (headleft < bufLen) ? headleft : (uint32_t)bufLen;
+        memcpy(recvBuf, head, chunk);
+        consumeRxQueue(chunk);
 
         br_ssl_engine_recvrec_ack(eng, chunk);
         reclaimed += chunk;
@@ -1002,14 +1034,8 @@ void TlsClientInterface::serviceRx() {
         __i_dvc_ctrl.yield();
     }
 
-    if (m_pcb) {
-        #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        m_mutex.critical_lock();
-        #endif
-        tcp_recved(m_pcb, reclaimed);
-        #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        m_mutex.critical_unlock();
-        #endif
+    if (m_pcb && reclaimed > 0) {
+        tcp_recved(m_pcb, reclaimed); // Notify the TCP stack that data has been read
     }
 
     unsigned state = br_ssl_engine_current_state(eng);
@@ -1105,21 +1131,21 @@ void TlsClientInterface::pumpEngine() {
         }
 
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        m_mutex.critical_lock();
+        __lwip_mutex.critical_lock();
         #endif
         err_t err = tcp_write(m_pcb, buf, toSend, flags);
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
-        m_mutex.critical_unlock();
+        __lwip_mutex.critical_unlock();
         #endif
 
         if (m_isLastWriteAcked) {
             #ifdef ENABLE_CONTEXTUAL_EXECUTION
-            m_mutex.critical_lock();
+            __lwip_mutex.critical_lock();
             #endif
             m_isLastWriteAcked = false;
             err = tcp_output(m_pcb);
             #ifdef ENABLE_CONTEXTUAL_EXECUTION
-            m_mutex.critical_unlock();
+            __lwip_mutex.critical_unlock();
             #endif
         }
 

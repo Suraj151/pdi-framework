@@ -73,7 +73,7 @@ public:
 		// memset(_page, 0, _max_size);
 
 		if (_enable_header_footer)
-			strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+			concat_header_html( _page );
 		strcat_ro(_page, _pgm_page);
 		CONTINUE_SEND_IN_CHUNK(_page);
 		if (_enable_flash)
@@ -132,8 +132,8 @@ public:
 		char *_page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
 		if (nullptr == _page) return;
 		
-		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
 		BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
+		concat_header_html( _page );
 
 		if (this->m_route_handler->has_active_session())
 		{
@@ -142,7 +142,9 @@ public:
 
 			concat_svg_menu_card(_page, WEB_SERVER_HOME_MENU_TITLE_LOGIN, SVG_ICON48_PATH_ACCOUNT_CIRCLE, WEB_SERVER_LOGIN_CONFIG_ROUTE);
 			concat_svg_menu_card(_page, WEB_SERVER_HOME_MENU_TITLE_WIFI, SVG_ICON48_PATH_WIFI, WEB_SERVER_WIFI_CONFIG_ROUTE);
+#ifdef ENABLE_OTA_SERVICE
 			concat_svg_menu_card(_page, WEB_SERVER_HOME_MENU_TITLE_OTA, SVG_ICON48_PATH_CLOUD_DOWNLOAD, WEB_SERVER_OTA_CONFIG_ROUTE);
+#endif
 			CONTINUE_SEND_IN_CHUNK(_page);
 #ifdef ENABLE_MQTT_SERVICE
 			concat_svg_menu_card(_page, WEB_SERVER_HOME_MENU_TITLE_MQTT, SVG_ICON48_PATH_SEND, WEB_SERVER_MQTT_MANAGE_CONFIG_ROUTE);

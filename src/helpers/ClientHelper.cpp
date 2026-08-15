@@ -81,6 +81,14 @@ bool sendPacket(iClientInterface *client, uint8_t *buffer, uint16_t len, uint16_
       
       uint8_t *_buff_pointer = buffer + sentBytes;
       int32_t _sent = client->write(_buff_pointer, sendlen);
+
+      if (_sent < 0)
+      {
+        SysLogE("Client: send packet - write error %d\n", _sent);
+        status = false;
+        break;
+      }
+
       sentBytes += _sent;
       len -= _sent;
 

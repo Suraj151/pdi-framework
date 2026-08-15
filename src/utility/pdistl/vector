@@ -379,8 +379,16 @@ namespace pdistd{
 			T * temp_ptr = data_;
 			size_type temp_size = data_size;
 
+			//	A failed allocation leaves the container exactly as it was, so a
+			//	caller that ignores the result keeps a usable buffer instead of
+			//	storing through a null pointer.
+			T * new_ptr = a.allocate(n);
+			if(new_ptr == 0){
+				return;
+			}
+
+			data_ = new_ptr;
 			data_size = n;
-			data_ = a.allocate(data_size);
 
 			for(size_type i = 0; i<elements; ++i){
 				a.construct(data_+i, temp_ptr[i]);
@@ -394,6 +402,12 @@ namespace pdistd{
 		if(sz > elements){      //Need to actually call constructor
 			if(sz > data_size){
 				reserve(sz + __UCLIBCXX_STL_BUFFER_SIZE__);
+
+				//	Growing failed, so leave the container at its current size
+				//	rather than constructing past the end of the buffer.
+				if(sz > data_size){
+					return;
+				}
 			}
 
 			for(size_type i = elements; i<sz ; ++i){

@@ -27,8 +27,8 @@ void TcpClientInterface::onDnsFound(const char *name, const ip_addr_t *ipaddr, v
 TcpClientInterface::TcpClientInterface() :
     m_pcb(nullptr),
     m_isConnected(false),
-    m_rxBuffer(nullptr),
-    m_rxBufferSize(0),
+    m_rxBuf(nullptr),
+    m_rxBufOffset(0),
     m_timeout(3000),
     m_isLastWriteAcked(true),
     m_dns{IP4_ADDRESS_NONE, false, false} {}
@@ -42,8 +42,8 @@ TcpClientInterface::TcpClientInterface() :
 TcpClientInterface::TcpClientInterface(struct tcp_pcb* pcb):
     m_pcb(pcb),
     m_isConnected(true),
-    m_rxBuffer(nullptr),
-    m_rxBufferSize(0),
+    m_rxBuf(nullptr),
+    m_rxBufOffset(0),
     m_timeout(3000),
     m_isLastWriteAcked(true),
     m_dns{IP4_ADDRESS_NONE, false, false} {
@@ -167,23 +167,28 @@ int16_t TcpClientInterface::connect(const uint8_t* host, uint16_t port) {
  */
 int16_t TcpClientInterface::disconnect() {
 
-    // the pcb check and its release belong to one section, and our reference is
-    // cleared before leaving it so nothing can reach a closed pcb
-    NESTED_CRITICAL_SECTION_ENTER
-    if (m_pcb) {
+    struct tcp_pcb* pcb = nullptr;
 
-        tcp_arg(m_pcb, NULL);
-        tcp_sent(m_pcb, NULL);
-        tcp_recv(m_pcb, NULL);
-        tcp_err(m_pcb, NULL);
-        err_t err = tcp_close(m_pcb);
-        if( err != ERR_OK ){
-            tcp_abort(m_pcb); // Forcefully abort if close fails
-        }
-        m_pcb = nullptr;
-    }
+    // our reference is dropped inside the section so nothing can reach the pcb
+    // once it is being released, the release itself reaches the driver and is
+    // kept outside
+    NESTED_CRITICAL_SECTION_ENTER
+    pcb = m_pcb;
+    m_pcb = nullptr;
     m_isConnected = false;
     NESTED_CRITICAL_SECTION_EXIT
+
+    if (pcb) {
+
+        tcp_arg(pcb, NULL);
+        tcp_sent(pcb, NULL);
+        tcp_recv(pcb, NULL);
+        tcp_err(pcb, NULL);
+        err_t err = tcp_close(pcb);
+        if( err != ERR_OK ){
+            tcp_abort(pcb); // Forcefully abort if close fails
+        }
+    }
     return 0;
 }
 
@@ -298,47 +303,101 @@ int32_t TcpClientInterface::write_ro(const char *c_str)
  */
 int32_t TcpClientInterface::read(uint8_t* buffer, uint32_t size) {
 
-    // the buffer is checked, copied out and consumed in one section, a receive
-    // callback may replace it between those otherwise
-    NESTED_CRITICAL_SECTION_ENTER
-
-    if (!m_rxBuffer || m_rxBufferSize == 0) {
-        NESTED_CRITICAL_SECTION_EXIT
+    if (m_rxBuf == nullptr || size == 0) {
         return PDI_ERR_STATE;
     }
 
-    int32_t bytesToRead = (size < m_rxBufferSize) ? size : m_rxBufferSize;
     memset(buffer, 0, size); // Clear the buffer
-    // Copy data from the receive buffer to the provided buffer
-    memcpy(buffer, m_rxBuffer, bytesToRead);
 
-    consumeRxBuffer(bytesToRead);
+    uint32_t copied = 0;
 
-    NESTED_CRITICAL_SECTION_EXIT
+    while (copied < size) {
 
-    return bytesToRead;
+        uint32_t headleft = 0;
+
+        // only the chain pointers belong in the section, the payload of the head
+        // is never touched by the receive callback
+        NESTED_CRITICAL_SECTION_ENTER
+        if (m_rxBuf != nullptr) {
+            headleft = m_rxBuf->len - m_rxBufOffset;
+        }
+        NESTED_CRITICAL_SECTION_EXIT
+
+        if (headleft == 0) {
+            break;
+        }
+
+        uint32_t toread = (size - copied) < headleft ? (size - copied) : headleft;
+
+        // Copy data from the head of the receive chain to the provided buffer
+        memcpy(buffer + copied, (const uint8_t*)m_rxBuf->payload + m_rxBufOffset, toread);
+
+        consumeRxBuffer(toread);
+        copied += toread;
+    }
+
+    return copied;
 }
 
 /**
- * @brief Drop the leading bytes of the receive buffer and open the tcp window.
+ * @brief Drop the leading bytes of the receive chain and open the tcp window.
  */
 void TcpClientInterface::consumeRxBuffer(uint32_t size) {
 
-    // Adjust the receive buffer
-    memmove(m_rxBuffer, m_rxBuffer + size, m_rxBufferSize - size);
-    m_rxBufferSize -= size;
+    uint32_t consumed = 0;
 
-    if(m_pcb != nullptr){
+    while (size > 0) {
+
+        struct pbuf *released = nullptr;
+        uint32_t taken = 0;
+
         NESTED_CRITICAL_SECTION_ENTER
-        tcp_recved(m_pcb, size); // Notify the TCP stack that data has been read
+        if (m_rxBuf != nullptr) {
+
+            uint32_t headleft = m_rxBuf->len - m_rxBufOffset;
+            taken = size < headleft ? size : headleft;
+
+            if (taken < headleft) {
+
+                m_rxBufOffset += taken;
+            } else if (m_rxBuf->next == nullptr) {
+
+                released = m_rxBuf;
+                m_rxBuf = nullptr;
+                m_rxBufOffset = 0;
+            } else {
+
+                released = m_rxBuf;
+                m_rxBuf = m_rxBuf->next;
+                m_rxBufOffset = 0;
+                pbuf_ref(m_rxBuf);
+            }
+        }
         NESTED_CRITICAL_SECTION_EXIT
+
+        // kept out of the section, releasing a buffer can reach back into the
+        // driver that owns its payload
+        if (released != nullptr) {
+            pbuf_free(released);
+        }
+
+        if (taken == 0 && released == nullptr) {
+            break;
+        }
+
+        size -= taken;
+        consumed += taken;
+    }
+
+    if (m_pcb != nullptr && consumed > 0) {
+        tcp_recved(m_pcb, consumed); // Notify the TCP stack that data has been read
     }
 }
 
 /**
  * @brief Reads until the provided char is found.
  */
-void TcpClientInterface::readStringUntil(pdiutil::string &_outstr, char _delimiter, bool _keepdelimiterinstr, CallBackVoidArgFn _yield, uint32_t _maxlen) {
+void TcpClientInterface::readStringUntil(pdiutil::string &_outstr, char _delimiter, bool _keepdelimiterinstr, const CallBackVoidArgFn &_yield, uint32_t _maxlen) {
 
     uint32_t len = 0;
 
@@ -346,25 +405,46 @@ void TcpClientInterface::readStringUntil(pdiutil::string &_outstr, char _delimit
         _yield();
     }
 
-    while (m_rxBuffer != nullptr && m_rxBufferSize > 0) {
-
-        uint32_t blocklen = m_rxBufferSize;
-        if (_maxlen > 0 && blocklen > (_maxlen - len)) {
-            blocklen = _maxlen - len;
-        }
+    while (1) {
 
         bool delimiterfound = false;
-        if (_delimiter != 0) {
-            const uint8_t *delimiterat = (const uint8_t *)memchr(m_rxBuffer, _delimiter, blocklen);
-            if (delimiterat != nullptr) {
-                blocklen = (uint32_t)(delimiterat - m_rxBuffer);
-                delimiterfound = true;
+        bool blockread = false;
+        const uint8_t *head = nullptr;
+        uint32_t blocklen = 0;
+
+        // only the chain pointers belong in the section, the payload of the head
+        // is never touched by the receive callback
+        NESTED_CRITICAL_SECTION_ENTER
+        if (m_rxBuf != nullptr) {
+
+            head = (const uint8_t *)m_rxBuf->payload + m_rxBufOffset;
+            blocklen = m_rxBuf->len - m_rxBufOffset;
+        }
+        NESTED_CRITICAL_SECTION_EXIT
+
+        if (blocklen > 0) {
+
+            if (_maxlen > 0 && blocklen > (_maxlen - len)) {
+                blocklen = _maxlen - len;
             }
+
+            if (_delimiter != 0) {
+                const uint8_t *delimiterat = (const uint8_t *)memchr(head, _delimiter, blocklen);
+                if (delimiterat != nullptr) {
+                    blocklen = (uint32_t)(delimiterat - head);
+                    delimiterfound = true;
+                }
+            }
+
+            _outstr.append((const char *)head, blocklen);
+            consumeRxBuffer(blocklen + (delimiterfound ? 1 : 0));
+            len += blocklen;
+            blockread = true;
         }
 
-        _outstr.append((const char *)m_rxBuffer, blocklen);
-        consumeRxBuffer(blocklen + (delimiterfound ? 1 : 0));
-        len += blocklen;
+        if (!blockread) {
+            break;
+        }
 
         if (delimiterfound) {
             if (_keepdelimiterinstr) {
@@ -387,7 +467,7 @@ void TcpClientInterface::readStringUntil(pdiutil::string &_outstr, char _delimit
  * @brief Check the number of bytes available to read.
  */
 int32_t TcpClientInterface::available() {
-    return m_rxBufferSize;
+    return m_rxBuf != nullptr ? (int32_t)(m_rxBuf->tot_len - m_rxBufOffset) : 0;
 }
 
 /**
@@ -426,31 +506,19 @@ err_t TcpClientInterface::onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf
             return err;
         }
 
-        // the buffer length is read and grown in one section, a reader taking
-        // bytes out in between would leave the copy sized against a stale length
+        // The chain is kept as delivered, so nothing is copied and no heap is
+        // taken. The tcp window stays closed until the reader consumes it, which
+        // is what holds the sender back.
         NESTED_CRITICAL_SECTION_ENTER
-        // Append the received data to the receive buffer
-        uint32_t newSize = client->m_rxBufferSize + p->tot_len;
-        uint8_t* newBuffer = pdiutil::safe_new_array<uint8_t>(newSize);
-        if (!newBuffer) {
-            NESTED_CRITICAL_SECTION_EXIT
-#ifndef ENABLE_CONTEXTUAL_EXECUTION
-            // lwip callback context, kept off the logger when scheduling is enabled
-            SysLogE("TCP onReceive: alloc fail, in=%u rxQ=%u\n",
-                (unsigned)p->tot_len, (unsigned)client->m_rxBufferSize);
-#endif
-            return ERR_MEM;
-        }
-        if (client->m_rxBuffer) {
-            memcpy(newBuffer, client->m_rxBuffer, client->m_rxBufferSize);
-            pdiutil::safe_delete_array(client->m_rxBuffer);
-        }
-        pbuf_copy_partial(p, newBuffer + client->m_rxBufferSize, p->tot_len, 0);
-        client->m_rxBuffer = newBuffer;
-        client->m_rxBufferSize = newSize;
-        NESTED_CRITICAL_SECTION_EXIT
+        if (client->m_rxBuf != nullptr) {
 
-        pbuf_free(p);
+            pbuf_cat(client->m_rxBuf, p);
+        } else {
+
+            client->m_rxBuf = p;
+            client->m_rxBufOffset = 0;
+        }
+        NESTED_CRITICAL_SECTION_EXIT
     }
 
     return ERR_OK;
@@ -464,6 +532,11 @@ void TcpClientInterface::onError(void* arg, err_t err) {
     if (client) {
 
         bool haspcb = false;
+
+#ifndef ENABLE_CONTEXTUAL_EXECUTION
+        // lwip callback context, kept off the logger when scheduling is enabled
+        LogE("TCP onError: err=%u \n",(unsigned)err);
+#endif
 
         // lwip has already freed the pcb before raising this callback, so only
         // drop our reference to it, never call tcp_* on it here
@@ -644,27 +717,37 @@ bool TcpClientInterface::availableforwrite(uint32_t size) {
  */
 void TcpClientInterface::flush() {
 
-    // the window is reopened and the buffer released in one section so a
-    // receive callback cannot grow it in between
+    struct pbuf *released = nullptr;
+    uint32_t pending = 0;
+
+    // the chain is detached inside the section, the release and the window
+    // update reach into lwip and are kept outside of it
     NESTED_CRITICAL_SECTION_ENTER
 
-    if (m_rxBuffer) {
+    if (m_rxBuf) {
 
-        if(nullptr != m_pcb && m_rxBufferSize > 0){
+        released = m_rxBuf;
+        pending = m_rxBuf->tot_len - m_rxBufOffset;
+        m_rxBuf = nullptr;
+        m_rxBufOffset = 0;
+    }
 
-            tcp_recved(m_pcb, m_rxBufferSize); // Notify the TCP stack that data has been read
+    NESTED_CRITICAL_SECTION_EXIT
+
+    if (released != nullptr) {
+
+        if(nullptr != m_pcb && pending > 0){
+
+            tcp_recved(m_pcb, pending); // Notify the TCP stack that data has been read
         }
 
-        pdiutil::safe_delete_array(m_rxBuffer);
-        m_rxBufferSize = 0;
+        pbuf_free(released);
     }
 
     if(nullptr != m_pcb){
 
         tcp_output(m_pcb);
     }
-
-    NESTED_CRITICAL_SECTION_EXIT
 
     m_isLastWriteAcked = true;
 }

@@ -13,6 +13,9 @@ created Date    : 1st June 2019
 
 #include "Controller.h"
 #include <webserver/pages/StorageListPage.h>
+#ifdef ENABLE_AUTH_SERVICE
+#include <service_provider/user/UserStoreService.h>
+#endif
 
 #define CURRENT_PATH_ATTRIBUTE	"?cp="
 
@@ -76,9 +79,11 @@ public:
 	 *
 	 * @param	char*	_page
 	 * @param	bool|false	_enable_flash
+	 * @param	const char*|nullptr	_message
+	 * @param	FLASH_MSG_TYPE|ALERT_SUCCESS	_alert_type
 	 * @param	int|PAGE_HTML_MAX_SIZE	_max_size
 	 */
-	void build_storage_html(char *_page, bool _enable_flash = false, int _max_size = PAGE_HTML_MAX_SIZE)
+	void build_storage_html(char *_page, bool _enable_flash = false, const char *_message = nullptr, FLASH_MSG_TYPE _alert_type = ALERT_SUCCESS, int _max_size = PAGE_HTML_MAX_SIZE)
 	{
 		if (nullptr == this->m_web_resource ||
 			nullptr == this->m_web_resource->m_server ||
@@ -88,7 +93,7 @@ public:
 		}
 
 		// memset(_page, 0, _max_size);
-		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+		concat_header_html( _page, true );
 		strcat_ro(_page, WEB_SERVER_STORAGE_LIST_PAGE_TOP);
 		CONTINUE_SEND_IN_CHUNK(_page);
 
@@ -110,7 +115,7 @@ public:
 
 			strcat_ro(_page, HTML_TABLE_OPEN_TAG);
 			concat_id_attribute(_page, RODT_ATTR("strg-tbl"));
-			concat_style_attribute(_page, RODT_ATTR("width:92%;margin-bottom:10px;"));
+			concat_style_attribute(_page, RODT_ATTR("width:100%;margin-bottom:10px;"));
 			strcat_ro(_page, HTML_TAG_CLOSE_BRACKET);
 			CONTINUE_SEND_IN_CHUNK(_page);
 
@@ -122,13 +127,13 @@ public:
 			stat += pdiutil::to_string(__i_fs.getFreeSize());
 			stat += (char*)CHARPTR_WRAP(" Bytes Free");
 			char *_storage_path_row[] = {(char*)currentpath.c_str(), (char*)stat.c_str()};
-			const char *_storage_path_row_colspan[] = {RODT_ATTR("3"), RODT_ATTR("1' style='width:80px;")};
-			concat_table_data_row(_page, _storage_path_row, 2, nullptr, nullptr, nullptr, nullptr, _storage_path_row_colspan);
+			const char *_storage_path_row_colspan[] = {RODT_ATTR("4"), RODT_ATTR("3' class='num")};
+			concat_table_data_row(_page, _storage_path_row, 2, RODT_ATTR("pth"), nullptr, nullptr, nullptr, _storage_path_row_colspan);
 			CONTINUE_SEND_IN_CHUNK(_page);
 
 			// Add empty row
 			char *_storage_empty_row[] = {"&nbsp;"};
-			const char *_storage_empty_row_colspan[] = {RODT_ATTR("3")};
+			const char *_storage_empty_row_colspan[] = {RODT_ATTR("7")};
 			concat_table_data_row(_page, _storage_empty_row, 1, nullptr, nullptr, nullptr, nullptr, _storage_empty_row_colspan);
 
 			// Add loader empty row
@@ -198,13 +203,19 @@ public:
 
 		strcat_ro(_page, WEB_SERVER_STORAGE_LIST_PAGE_BOTTOM_SCRIPT1);
 		CONTINUE_SEND_IN_CHUNK(_page);
-		strcat_ro(_page, WEB_SERVER_STORAGE_LIST_PAGE_BOTTOM_FORMS);
+		strcat_ro(_page, WEB_SERVER_STORAGE_LIST_PAGE_BOTTOM_FORMS1);
+		concat_csrf_input_html_tag(_page);
+		CONTINUE_SEND_IN_CHUNK(_page);
+		strcat_ro(_page, WEB_SERVER_STORAGE_LIST_PAGE_BOTTOM_FORMS2);
+		concat_csrf_input_html_tag(_page);
+		CONTINUE_SEND_IN_CHUNK(_page);
+		strcat_ro(_page, WEB_SERVER_STORAGE_LIST_PAGE_BOTTOM_FORMS3);
 		CONTINUE_SEND_IN_CHUNK(_page);
 		strcat_ro(_page, WEB_SERVER_STORAGE_LIST_PAGE_BOTTOM_SCRIPT2);
 		CONTINUE_SEND_IN_CHUNK(_page);
 
 		if (_enable_flash)
-			concat_flash_message_div(_page, HTML_SUCCESS_FLASH, ALERT_SUCCESS);
+			concat_flash_message_div(_page, nullptr != _message ? (char *)_message : HTML_SUCCESS_FLASH, _alert_type);
 		strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
 		CONTINUE_SEND_IN_CHUNK(_page);
 	}
@@ -223,15 +234,55 @@ public:
 			return;
 		}
 
+		bool _is_error = this->m_web_resource->m_server->hasArg("err");
+		pdiutil::string _message;
+
+		if (_is_error)
+		{
+			pdiutil::string _err = this->m_web_resource->m_server->arg("err");
+			_message = (_err == CHARPTR_WRAP("perm")) ? CHARPTR_WRAP("Permission denied.") : CHARPTR_WRAP("Operation failed.");
+		}
+
 		char *_page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
 		if (nullptr == _page) return;
 
 		BEGIN_SEND_IN_CHUNK(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
-		this->build_storage_html(_page);
+		this->build_storage_html(_page, _is_error, _is_error ? _message.c_str() : nullptr, ALERT_DANGER);
 		END_SENDING_CHUNK();
 
 		// this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page);
 		pdiutil::safe_delete_array(_page);
+	}
+
+	/**
+	 * append a failure reason to the redirect location so the list page can
+	 * report it. only a denied permission is called out as such.
+	 *
+	 * @param	pdiutil::string&	_loc
+	 * @param	pdi_err_t	_result
+	 */
+	void appendErrorToLocation(pdiutil::string &_loc, pdi_err_t _result)
+	{
+		_loc += (_loc.find('?') != pdiutil::string::npos) ? "&" : "?";
+		_loc += CHARPTR_WRAP("err=");
+		_loc += (PDI_ERR_PERM == _result) ? CHARPTR_WRAP("perm") : CHARPTR_WRAP("fail");
+	}
+
+	/**
+	 * assign a freshly uploaded file to the logged in user.
+	 *
+	 * the staged file is created while the request body is parsed, before the
+	 * session is known, so it lands owned by root and has to be handed over.
+	 *
+	 * @param	const char*	_path
+	 */
+	void claimUploadedFile(const char *_path)
+	{
+#ifdef ENABLE_AUTH_SERVICE
+		__i_fs.beginPrivileged();
+		__i_fs.setFileOwner(_path, SessionManager::getCurrentUid(), SessionManager::getCurrentGid());
+		__i_fs.endPrivileged();
+#endif
 	}
 
 	/**
@@ -282,7 +333,13 @@ public:
 				}
 
 				// Move file to expected path
-				__i_fs.rename(nf.c_str(), newfilepath.c_str());
+				pdi_err_t _result = __i_fs.rename(nf.c_str(), newfilepath.c_str());
+
+				if( PDI_OK == _result ){
+					this->claimUploadedFile(newfilepath.c_str());
+				}else{
+					this->appendErrorToLocation(loc, _result);
+				}
 			}
 		}
 
@@ -385,6 +442,8 @@ public:
 		);
 
 		jsonresp += tempbuffer;
+		jsonresp += CHARPTR_WRAP("\",\"csrf\":\"");
+		jsonresp += get_csrf_token();
 		jsonresp += CHARPTR_WRAP("\",\"lst\":[");
 
 		if(!(resultCode < 0)){
@@ -406,12 +465,25 @@ public:
 				}
 				strncat(tempbuffer, _path.c_str(), _path.length());
 
+				char permbuf[11];
+				FilePermsToString(item.m_perms, item.m_type == FILE_TYPE_DIR, permbuf);
+
 				jsonresp += CHARPTR_WRAP("{\"n\":\"");
 				jsonresp += item.m_name;
 				jsonresp += CHARPTR_WRAP("\",\"s\":\"");
 				jsonresp += pdiutil::to_string(item.m_size);
 				jsonresp += CHARPTR_WRAP("\",\"t\":\"");
 				jsonresp += item.m_type == FILE_TYPE_DIR ? "D":"F";
+				jsonresp += CHARPTR_WRAP("\",\"p\":\"");
+				jsonresp += permbuf;
+#ifdef ENABLE_AUTH_SERVICE
+				pdiutil::string owner, group;
+				__user_store_service.resolveOwnerNames(item.m_uid, item.m_gid, owner, group);
+				jsonresp += CHARPTR_WRAP("\",\"o\":\"");
+				jsonresp += owner;
+				jsonresp += CHARPTR_WRAP("\",\"g\":\"");
+				jsonresp += group;
+#endif
 				jsonresp += CHARPTR_WRAP("\",\"l\":\"");
 				jsonresp += tempbuffer;
 				jsonresp += CHARPTR_WRAP("\"},");
@@ -465,10 +537,15 @@ public:
 				(__i_fs.isFileExist(df.c_str()) || __i_fs.isDirExist(df.c_str())) ){
 
 				// delete file/dir
+				pdi_err_t _result = PDI_OK;
 				if( __i_fs.isDirectory(df.c_str()) ){
-					__i_fs.deleteDirectory(df.c_str());
+					_result = __i_fs.deleteDirectory(df.c_str());
 				}else{
-					__i_fs.deleteFile(df.c_str());
+					_result = __i_fs.deleteFile(df.c_str());
+				}
+
+				if( PDI_OK != _result ){
+					this->appendErrorToLocation(loc, _result);
 				}
 			}
 		}

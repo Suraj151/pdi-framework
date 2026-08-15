@@ -188,8 +188,8 @@ private:
 
     BearSSLState* m_bear;
 
-    uint8_t* m_rxQueue;
-    uint32_t m_rxQueueLen;
+    struct pbuf* m_rxBuf;
+    uint32_t m_rxBufOffset;
     bool     m_pumpPending;
     volatile bool m_inPump;
 
@@ -206,15 +206,23 @@ private:
 
     dnsFoundResult m_dns;
 
-    #ifdef ENABLE_CONTEXTUAL_EXECUTION
-    PreemptiveMutex m_mutex;
-    #endif
-
     static err_t onConnected(void* arg, struct tcp_pcb* tpcb, err_t err);
     static err_t onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf* p, err_t err);
     static void  onError(void* arg, err_t err);
     static err_t onSent(void* arg, struct tcp_pcb* tpcb, u16_t len);
     static void  onDnsFound(const char *name, const ip_addr_t *ipaddr, void *arg);
+
+    /**
+     * @brief Bytes still held in the receive chain.
+     */
+    uint32_t rxAvailable() const;
+
+    /**
+     * @brief Drop the leading bytes of the receive chain, releasing each buffer
+     * as it is emptied. The tcp window is opened by the caller in one go.
+     * @param size The number of bytes to drop.
+     */
+    void consumeRxQueue(uint32_t size);
 
     void pumpEngine();
     void serviceRx();

@@ -97,6 +97,16 @@ public:
   virtual uint32_t get_free_heap(){ return 0; }
 
   /**
+   * @brief Returns the largest block that can still be allocated in one piece.
+   *
+   * Free heap counts every gap, so on a fragmented heap it stays comfortable
+   * while an allocation of a fraction of that size already fails. Ports that
+   * can report the largest contiguous block override this; the default falls
+   * back to the total, which is the best a port without the query can offer.
+   */
+  virtual uint32_t get_max_free_block(){ return get_free_heap(); }
+
+  /**
    * @brief Check and start if possible of measure stack in use for next functions
    */
   virtual bool can_measure_stack(){ return false; }

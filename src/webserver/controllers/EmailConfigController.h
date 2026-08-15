@@ -78,7 +78,7 @@ public:
 	{
 
 		// memset(_page, 0, _max_size);
-		strcat_ro(_page, WEB_SERVER_HEADER_HTML);
+		concat_header_html( _page );
 		strcat_ro(_page, WEB_SERVER_EMAIL_CONFIG_PAGE_TOP);
 		CONTINUE_SEND_IN_CHUNK(_page);
 
@@ -105,6 +105,7 @@ public:
 		// concat_tr_input_html_tags( _page, RODT_ATTR("Mail Frequency:"), RODT_ATTR("ml_freq"), _freq );
 		CONTINUE_SEND_IN_CHUNK(_page);
 
+		concat_csrf_input_html_tag( _page );
 		strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 
 		if (_enable_flash)

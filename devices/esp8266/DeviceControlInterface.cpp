@@ -422,6 +422,14 @@ uint32_t DeviceControlInterface::get_free_heap()
 }
 
 /**
+ * return the largest block still allocatable in one piece
+ */
+uint32_t DeviceControlInterface::get_max_free_block()
+{
+    return ESP.getMaxFreeBlockSize();
+}
+
+/**
  * log helper for utility
  */
 void DeviceControlInterface::log(logger_type_t log_type, const char *content)
@@ -492,6 +500,7 @@ void DeviceControlInterface::yield()
     // #endif
 }
 
+#ifdef ENABLE_OTA_SERVICE
 /**
  * Upgrade device with provided binary path and new version
  */
@@ -562,36 +571,77 @@ upgrade_status_t DeviceControlInterface::Upgrade(const char *path, const char *v
         return UPGRADE_STATUS_FAILED;
     }
 
-    if (!Update.begin((size_t)got, U_FLASH)) {
+    // the downloaded image is flashed through the same local path the portal
+    // uses, so both routes share one updater implementation
+    upgrade_status_t status = UpgradeFromFile(tmp_path.c_str());
+    __i_fs.deleteFile(tmp_path.c_str());
+
+    return status;
+
+#endif
+}
+
+#ifdef ENABLE_STORAGE_SERVICE
+/**
+ * Flash a firmware image already stored on the filesystem
+ */
+upgrade_status_t DeviceControlInterface::UpgradeFromFile(const char *path)
+{
+    if (nullptr == path || 0 == path[0] || !__i_fs.isFileExist(path)) {
+        SysLogE("DEVICE_UPGRADE_NO_IMAGE\n");
+        return UPGRADE_STATUS_FAILED;
+    }
+
+    int64_t imagesize = __i_fs.getFileSize(path);
+    if (imagesize <= 0) {
+        SysLogE("DEVICE_UPGRADE_EMPTY_IMAGE\n");
+        return UPGRADE_STATUS_FAILED;
+    }
+
+    if (!Update.begin((size_t)imagesize, U_FLASH)) {
         SysLogE("DEVICE_UPGRADE_BEGIN_FAILED : %d\n", (int)Update.getError());
-        __i_fs.deleteFile(tmp_path.c_str());
         return UPGRADE_STATUS_FAILED;
     }
 
     bool write_ok = true;
-    int64_t bytes_read = __i_fs.readFile(tmp_path.c_str(), 1024, [&](char *data, uint32_t sz) -> bool {
+    bool magic_checked = false;
+    int64_t bytes_read = __i_fs.readFile(path, OTA_FILE_READ_CHUNK_SIZE, [&](char *data, uint32_t sz) -> bool {
+        // an image that does not carry the firmware magic byte would brick the
+        // device, so reject it before the first block reaches flash.
+        if (!magic_checked) {
+            magic_checked = true;
+            if (sz > 0 && (uint8_t)data[0] != OTA_IMAGE_MAGIC_BYTE) {
+                write_ok = false;
+                return false;
+            }
+        }
         __i_dvc_ctrl.yield();
         size_t written = Update.write((uint8_t*)data, sz);
         if (written != sz) { write_ok = false; return false; }
         return true;
     });
 
-    if (bytes_read != got) {
-        SysLogE("DEVICE_UPGRADE_READ_SHORT : %d/%d\n", (int)bytes_read, (int)got);
-        write_ok = false;
+    if (!write_ok) {
+        SysLogE("DEVICE_UPGRADE_IMAGE_REJECTED\n");
+        Update.end(false);
+        return UPGRADE_STATUS_FAILED;
     }
 
-    __i_fs.deleteFile(tmp_path.c_str());
+    if (bytes_read != imagesize) {
+        SysLogE("DEVICE_UPGRADE_READ_SHORT : %d/%d\n", (int)bytes_read, (int)imagesize);
+        Update.end(false);
+        return UPGRADE_STATUS_FAILED;
+    }
 
-    if (!write_ok || !Update.end(false)) {
+    if (!Update.end(false)) {
         SysLogE("DEVICE_UPGRADE_END_FAILED : %d\n", (int)Update.getError());
         return UPGRADE_STATUS_FAILED;
     }
 
-    LogS("DEVICE_UPGRADE_OK\n");
+    LogS("DEVICE_UPGRADE_OK size=%d\n", (int)imagesize);
     return UPGRADE_STATUS_SUCCESS;
-
-#endif
 }
+#endif
+#endif
 
 DeviceControlInterface __i_dvc_ctrl;

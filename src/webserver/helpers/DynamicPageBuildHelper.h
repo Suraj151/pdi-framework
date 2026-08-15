@@ -447,4 +447,35 @@ void concat_link_element(
   const char *_style = nullptr
 );
 
+/**
+ * @brief Appends the page header and opens the content container.
+ *
+ * The header is held in several program-memory parts so no single part fills
+ * the page buffer; this flushes a chunk between them, so the caller continues
+ * with an empty buffer.
+ *
+ * @param _page The buffer to which the header is appended.
+ * @param _wide Whether to widen the container above the mobile breakpoint,
+ *              which suits a page showing a table or a dashboard.
+ */
+void concat_header_html( char *_page, bool _wide = false );
+
+/**
+ * @brief Appends the csrf hidden input of the active session to a form.
+ *
+ * Every form that posts to an authenticated route must carry this field,
+ * otherwise the middleware rejects the submission. Appends nothing when the
+ * request has no active session.
+ *
+ * @param _page The buffer to which the hidden input is appended.
+ */
+void concat_csrf_input_html_tag( char *_page );
+
+/**
+ * @brief Returns the csrf token of the active session, or an empty string.
+ *
+ * Intended for pages that submit through script instead of a plain form.
+ */
+const char* get_csrf_token( void );
+
 #endif
