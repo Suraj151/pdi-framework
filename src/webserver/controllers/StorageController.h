@@ -392,7 +392,7 @@ public:
 		int resultCode = __i_fs.getDirFileList(currentpath.c_str(), itemlist);
 
 		// Prepare temporary buffers
-		uint32_t tempbufferlen = max(strlen(SVG_ICON48_1616_PATH_TRASH),max(strlen(SVG_ICON48_1416_PATH_FOLDER), strlen(SVG_ICON48_1216_PATH_FILE))) + 100;
+		uint32_t tempbufferlen = pdistd::max(strlen(SVG_ICON48_1616_PATH_TRASH), pdistd::max(strlen(SVG_ICON48_1416_PATH_FOLDER), strlen(SVG_ICON48_1216_PATH_FILE))) + 100;
 		char *tempbuffer = pdiutil::safe_new_array<char>(tempbufferlen);
 		if (nullptr == tempbuffer) {
 			for (file_info_t &item : itemlist) {

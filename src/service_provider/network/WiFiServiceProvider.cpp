@@ -13,6 +13,15 @@ created Date    : 1st June 2019
 
 #include "WiFiServiceProvider.h"
 
+/**
+ * only the ports that can actually offer nat define this, and esp8266 defines it
+ * just when lwip reports IP_NAPT, so the delay falls back to the value those
+ * ports use and the call below stays compilable everywhere.
+ */
+#ifndef NAPT_INIT_DURATION_AFTER_WIFI_CONNECT
+#define NAPT_INIT_DURATION_AFTER_WIFI_CONNECT MILLISECOND_DURATION_5000
+#endif
+
 __status_wifi_t __status_wifi = {
   false, false, 0, {0}
 };
@@ -606,7 +615,9 @@ void WiFiServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
  */
 void WiFiServiceProvider::printStatusToTerminal(iTerminalInterface *terminal){
 
-  if( nullptr != terminal ){
+  // every line below reads the radio, which is only attached once the service
+  // has been handed one at init
+  if( nullptr != terminal && nullptr != this->m_wifi ){
 
     pdiutil::string stname = NOT_APPLICABLE;
     pdiutil::string apname = NOT_APPLICABLE;

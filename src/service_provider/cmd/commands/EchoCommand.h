@@ -93,7 +93,10 @@ struct EchoCommand : public CommandBase {
 				return CMD_RESULT_ARGS_ERROR;
 			}
 
-			int iStatus = __i_fs.writeFile(filepath.c_str(), blob, textend, false);
+			pdiutil::string payload(blob, textend);
+			payload += "\n";
+
+			int iStatus = __i_fs.writeFile(filepath.c_str(), payload.c_str(), payload.size(), false);
 			if( iStatus < 0 ){
 				m_terminal->putln();
 				m_terminal->write_ro(RODT_ATTR("Failed : "));

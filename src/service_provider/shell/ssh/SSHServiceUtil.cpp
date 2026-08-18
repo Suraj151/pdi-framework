@@ -1194,6 +1194,9 @@ bool LWSSH::generate_ed25519_key(const char* dir) {
     memset(path, 0, sizeof(path));
     build_key_path(path, sizeof(path), dir, ed_algo.c_str(), "");
     int status = __i_fs.writeFile(path, (const char*)privkey, sizeof(privkey));
+    if (status >= 0) {
+        __i_fs.setFilePermissions(path, SSH_PRIVATE_KEY_PERMS);
+    }
 
     if (status >= 0) {
         memset(path, 0, sizeof(path));
@@ -1205,6 +1208,9 @@ bool LWSSH::generate_ed25519_key(const char* dir) {
         memset(path, 0, sizeof(path));
         build_key_path(path, sizeof(path), dir, ed_algo.c_str(), ".seed");
         status = __i_fs.writeFile(path, (const char*)seed, sizeof(seed));
+        if (status >= 0) {
+            __i_fs.setFilePermissions(path, SSH_PRIVATE_KEY_PERMS);
+        }
     }
 
     return status >= 0;
@@ -1234,6 +1240,9 @@ bool LWSSH::save_rsa_key(const rsa_key& key, const char* dir) {
     append_bn_string(pb, key.dq);
     append_bn_string(pb, key.qinv);
     int privst = __i_fs.writeFile(priv, (const char*)pb.data(), pb.size());
+    if (privst >= 0) {
+        __i_fs.setFilePermissions(priv, SSH_PRIVATE_KEY_PERMS);
+    }
 
     pdiutil::vector<uint8_t> blob;
     build_rsa_hostkey_blob(key, blob);

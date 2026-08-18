@@ -12,7 +12,7 @@ created Date    : 6th Apr 2025
 
 #include "interface/pdi/modules/storage/iFileSystemInterface.h"
 
-// Include the LittleFS library
+// Include the LittleFS library.
 #define LFS_NAME_MAX FILE_NAME_MAX_SIZE
 #define LFS_NO_DEBUG
 #define LFS_NO_WARN
@@ -302,6 +302,9 @@ protected:
 private:
     lfs_t m_lfs;
     lfs_config m_lfscfg;
+
+    // set once a mount succeeds. 
+    bool m_mounted;
 
     /**
      * @brief Callback for reading data from storage.

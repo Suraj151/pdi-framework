@@ -40,6 +40,18 @@ created Date    : 18th July 2026
 #define USER_STORE_ROOT_GID 0
 #endif
 
+/**
+ * Identity given to a session that authenticated but has no record in the
+ * store. Carries no privilege of any kind.
+ */
+#ifndef USER_STORE_NOBODY_UID
+#define USER_STORE_NOBODY_UID 65534
+#endif
+
+#ifndef USER_STORE_NOBODY_GID
+#define USER_STORE_NOBODY_GID 65534
+#endif
+
 #ifndef USER_STORE_DEFAULT_SHELL
 #define USER_STORE_DEFAULT_SHELL "cmd"
 #endif

@@ -70,15 +70,15 @@ bool HttpServer::initService(void *arg)
   __web_resource.collect_resource(this->m_server);
 
   // Boot all registered controllers
-  for (int i = 0; i < Controller::m_controllers.size(); i++) {
+  for (int i = 0; i < Controller::ControllerRegistry().size(); i++) {
     // if(nullptr != m_terminal){
     //   m_terminal->write_ro(RODT_ATTR("  Booting "));
-    //   m_terminal->write(Controller::m_controllers[i].controller->m_controller_name);
+    //   m_terminal->write(Controller::ControllerRegistry()[i].controller->m_controller_name);
     //   m_terminal->writeln_ro(RODT_ATTR(" Controller"));
     // }
   
-    // LogI("Booting: %s controller\n", Controller::m_controllers[i].controller->m_controller_name);
-    Controller::m_controllers[i].controller->boot();
+    // LogI("Booting: %s controller\n", Controller::ControllerRegistry()[i].controller->m_controller_name);
+    Controller::ControllerRegistry()[i].controller->boot();
   }
 
   // Define headers to be tracked by the server

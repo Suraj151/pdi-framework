@@ -70,7 +70,10 @@ void RouteHandler::register_route(const char* _uri, CallBackVoidArgFn _fn, middl
  */
 void RouteHandler::register_not_found_fn(CallBackVoidArgFn _fn) {
   if (nullptr != __web_resource.m_server) {
-    __web_resource.m_server->onNotFound(_fn);
+    __web_resource.m_server->onNotFound([=]() {
+      _fn();
+      this->release_request_session();
+    });
   }
 }
 

@@ -37,12 +37,12 @@ struct HelpCommand : public CommandBase {
 		if(nullptr != m_terminal){
 			m_terminal->putln();
 			m_terminal->write_ro(RODT_ATTR("Registered commands ("));
-			m_terminal->write((int32_t)CommandBase::m_cmd_registry.size());
+			m_terminal->write((int32_t)CommandBase::CommandRegistry().size());
 			m_terminal->writeln_ro(RODT_ATTR("):"));
 
-			for (uint16_t i = 0; i < CommandBase::m_cmd_registry.size(); i++){
-				const char *cmdname = CommandBase::m_cmd_registry[i].cmdname;
-				auto registrar = CommandBase::m_cmd_registry[i].cmdregistrar;
+			for (uint16_t i = 0; i < CommandBase::CommandRegistry().size(); i++){
+				const char *cmdname = CommandBase::CommandRegistry()[i].cmdname;
+				auto registrar = CommandBase::CommandRegistry()[i].cmdregistrar;
 
 				m_terminal->write_ro(RODT_ATTR("  "));
 				m_terminal->write(cmdname);

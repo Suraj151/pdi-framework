@@ -155,7 +155,7 @@ int16_t TcpClientInterface::disconnect() {
  */
 int16_t TcpClientInterface::close() {
     int16_t res = disconnect();
-    flush();
+    flush(FLUSH_ALL);
     return res;
 }
 
@@ -434,7 +434,7 @@ void TcpClientInterface::onError(void* arg, err_t err) {
         client->m_isConnected = false;
 
         if (haspcb) {
-            client->flush();
+            client->flush(FLUSH_ALL);
         }
     }
 }
@@ -579,9 +579,9 @@ bool TcpClientInterface::availableforwrite(uint32_t size) {
 /**
  * @brief Flush the buffer.
  */
-void TcpClientInterface::flush() {
+void TcpClientInterface::flush(int16_t flushtype) {
     TCP_GUARD_BEGIN
-    if (m_rxBuf) {
+    if (IsFlushRx(flushtype) && m_rxBuf) {
 
         uint32_t pending = m_rxBuf->tot_len - m_rxBufOffset;
 
@@ -593,7 +593,7 @@ void TcpClientInterface::flush() {
         m_rxBufOffset = 0;
     }
 
-    if(nullptr != m_pcb){
+    if(IsFlushTx(flushtype) && nullptr != m_pcb){
         tcp_output(m_pcb);
     }
 

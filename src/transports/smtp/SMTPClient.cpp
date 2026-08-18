@@ -134,7 +134,7 @@ void SMTPClient::readResponse(){
 
 void SMTPClient::flushClient(){
   if( nullptr != this->m_client ){
-    this->m_client->flush();
+    this->m_client->flush(FLUSH_ALL);
     uint32_t _now = __i_dvc_ctrl.millis_now();
   	while(this->m_client->available() && (__i_dvc_ctrl.millis_now()-_now) < SMTP_DEFAULT_TIMEOUT ){
       this->m_client->read();

@@ -92,13 +92,17 @@ void AuthServiceProvider::setAuthorized(bool auth)
     s->m_loginAt = (uint32_t)__i_dvc_ctrl.millis_now();
     s->m_lastActivityAt = s->m_loginAt;
 
-    s->m_uid = 0;
-    s->m_gid = 0;
+    s->m_uid = USER_STORE_ROOT_UID;
+    s->m_gid = USER_STORE_ROOT_GID;
 #ifdef ENABLE_STORAGE_SERVICE
+    pdiutil::string shadow_path = CHARPTR_WRAP(USER_STORE_SHADOW_PATH);
     user_record_t rec;
     if( __user_store_service.findUserByName(s->m_username.c_str(), rec) ){
       s->m_uid = rec.m_uid;
       s->m_gid = rec.m_gid;
+    }else if( __i_fs.isFileExist(shadow_path.c_str()) ){
+      s->m_uid = USER_STORE_NOBODY_UID;
+      s->m_gid = USER_STORE_NOBODY_GID;
     }
     s->m_umask = FILE_UMASK_DEFAULT;
 #endif

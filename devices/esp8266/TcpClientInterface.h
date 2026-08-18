@@ -184,7 +184,7 @@ public:
     /** 
      * @brief Flush the output buffer.
      */
-    void flush() override;    
+    void flush(int16_t flushtype = FLUSH_TX) override;    
 private:
     struct dnsFoundResult {
         ip_addr_t addr;

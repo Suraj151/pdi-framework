@@ -584,7 +584,7 @@ void MQTTClient::mqtt_client_delete()
   if (nullptr != this->m_client)
   {
     // delete this->m_client;
-    this->m_client->flush();
+    this->m_client->flush(FLUSH_ALL);
     this->m_client->close();
     this->m_client = nullptr;
   }

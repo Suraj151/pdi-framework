@@ -236,12 +236,8 @@ private:
 
 	bool requireRoot(){
 #if defined(ENABLE_AUTH_SERVICE) && defined(ENABLE_STORAGE_SERVICE)
-		const char *me = __auth_service.getUsername();
-		if( nullptr != me && me[0] ){
-			user_record_t meRec;
-			if( __user_store_service.findUserByName(me, meRec) && meRec.m_uid == USER_STORE_ROOT_UID ){
-				return true;
-			}
+		if( SessionManager::getCurrentUid() == USER_STORE_ROOT_UID ){
+			return true;
 		}
 		m_terminal->writeln_ro(RODT_ATTR("\nroot required"));
 		return false;

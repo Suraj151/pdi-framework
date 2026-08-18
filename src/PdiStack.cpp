@@ -43,25 +43,6 @@ PDIStack::PDIStack()
   m_server(&__i_http_server)
 #endif
 {
-#ifdef ENABLE_WIFI_SERVICE
-  #ifdef ENABLE_TLS_SERVICE
-  m_client = __i_instance.getNewTlsClientInstance();
-  if (m_client && m_client->isSecure()) {
-      // To verify the servers this client connects to, point the line
-      // below at a CA bundle on the device filesystem and comment out
-      // the setVerifyPeer(false) call. Default here is encrypted-but-
-      // unverified TLS so no cert needs to be provisioned for testing.
-      // static_cast<iTlsClientInterface*>(m_client)
-      //     ->setCertificateAuthorityPath(TLS_DEFAULT_OUTBOUND_CA_BUNDLE_PATH);
-      static_cast<iTlsClientInterface*>(m_client)->setVerifyPeer(false);
-  }
-  #else
-  m_client = __i_instance.getNewTcpClientInstance();
-  #endif
-#endif
-  __utl_event.begin(&__i_dvc_ctrl);
-  __task_scheduler.setUtilityInterface(&__i_dvc_ctrl);
-  __task_scheduler.setMaxTasksLimit(MAX_SCHEDULABLE_TASKS);
 }
 
 /**
@@ -86,6 +67,27 @@ PDIStack::~PDIStack(){
 void PDIStack::initialize(){
 
   pdiutil::enable_heap_check();
+
+#ifdef ENABLE_WIFI_SERVICE
+  m_server = &__i_http_server;
+  #ifdef ENABLE_TLS_SERVICE
+  m_client = __i_instance.getNewTlsClientInstance();
+  if (m_client && m_client->isSecure()) {
+      // To verify the servers this client connects to, point the line
+      // below at a CA bundle on the device filesystem and comment out
+      // the setVerifyPeer(false) call. Default here is encrypted-but-
+      // unverified TLS so no cert needs to be provisioned for testing.
+      // static_cast<iTlsClientInterface*>(m_client)
+      //     ->setCertificateAuthorityPath(TLS_DEFAULT_OUTBOUND_CA_BUNDLE_PATH);
+      static_cast<iTlsClientInterface*>(m_client)->setVerifyPeer(false);
+  }
+  #else
+  m_client = __i_instance.getNewTcpClientInstance();
+  #endif
+#endif
+  __utl_event.begin(&__i_dvc_ctrl);
+  __task_scheduler.setUtilityInterface(&__i_dvc_ctrl);
+  __task_scheduler.setMaxTasksLimit(MAX_SCHEDULABLE_TASKS);
 
   __log_manager.init(__i_dvc_ctrl.getTerminal());
   // LogI("\n________________________\n\nInitializing PDI Stack\nRelease : %s\nConfig  : %s\n________________________\n", RELEASE, CONFIG_VERSION);

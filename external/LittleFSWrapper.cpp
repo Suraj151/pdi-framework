@@ -31,7 +31,9 @@ static int lfsToPdiErr(int rc) {
  * system, and formats it if mounting fails.
  */
 LittleFSWrapper::LittleFSWrapper(iStorageInterface& storage, bool defaultConfig)
-    : iFileSystemInterface(storage) {
+    : iFileSystemInterface(storage), m_mounted(false) {
+    memset(&m_lfs, 0, sizeof(m_lfs));
+    memset(&m_lfscfg, 0, sizeof(m_lfscfg));
     if (defaultConfig) {
         initLFSConfig();
     }
@@ -41,7 +43,10 @@ LittleFSWrapper::LittleFSWrapper(iStorageInterface& storage, bool defaultConfig)
  * @brief Destructor to unmount the LittleFS file system.
  */
 LittleFSWrapper::~LittleFSWrapper() {
-    lfs_unmount(&m_lfs);
+    if (m_mounted) {
+        lfs_unmount(&m_lfs);
+        m_mounted = false;
+    }
 }
 
 /**
@@ -51,6 +56,11 @@ LittleFSWrapper::~LittleFSWrapper() {
  */
 int LittleFSWrapper::initLFSConfig(lfs_config *lfscnfg)
 {
+    if (m_mounted) {
+        lfs_unmount(&m_lfs);
+        m_mounted = false;
+    }
+
     memset(&m_lfs, 0, sizeof(m_lfs));
     memset(&m_lfscfg, 0, sizeof(m_lfscfg));
 
@@ -87,6 +97,8 @@ int LittleFSWrapper::initLFSConfig(lfs_config *lfscnfg)
         lfs_format(&m_lfs, &m_lfscfg);
         ret = lfs_mount(&m_lfs, &m_lfscfg);
     }
+
+    m_mounted = (ret == LFS_ERR_OK);
 
     return lfsToPdiErr(ret); // Success
 }

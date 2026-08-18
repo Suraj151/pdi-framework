@@ -583,11 +583,11 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
           _cmdtosearch = session->m_linebuf.substr(0, session->m_prevCmdSize);
         }
 
-        for (int16_t i = 0; i < CommandBase::m_cmd_registry.size(); i++){
+        for (int16_t i = 0; i < CommandBase::CommandRegistry().size(); i++){
 
-          if(CommandBase::isCommandMatch(CommandBase::m_cmd_registry[i].cmdname, _cmdtosearch.c_str(), true)){
+          if(CommandBase::isCommandMatch(CommandBase::CommandRegistry()[i].cmdname, _cmdtosearch.c_str(), true)){
 
-            matchedCmds.push_back(pdiutil::string(CommandBase::m_cmd_registry[i].cmdname));
+            matchedCmds.push_back(pdiutil::string(CommandBase::CommandRegistry()[i].cmdname));
           }
         }
 
@@ -659,6 +659,13 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
 #ifdef ENABLE_STORAGE_SERVICE      // reset index as we are in middle of command execution
       session->m_historyIdx = -1;
 #endif
+
+      // asking for a completion never runs the line. nothing matched, or there
+      // was nothing typed to match, so the line is left exactly as it is
+      // instead of falling through and being executed.
+      if( inseq == CMD_TERM_INSEQ_TAB ){
+        return CMD_RESULT_TERMINAL_HOLD_BUFFER;
+      }
     }
   }else{
 #ifdef ENABLE_STORAGE_SERVICE    // reset index as we are in middle of command execution
@@ -802,14 +809,29 @@ cmd_result_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cm
   }
   #endif
 
-  if( 
-    !is_executing_lastcommand || 
-    CMD_RESULT_OK == res || 
+  if( CMD_RESULT_NOT_FOUND == res && nullptr != cmd && cmd->size() ){
+
+    uint16_t namelen = 0;
+    while( namelen < cmd->size() && (*cmd)[namelen] != ' ' ) namelen++;
+
+    m_terminal->writeln();
+    m_terminal->write(cmd->c_str(), namelen);
+    m_terminal->writeln_ro(RODT_ATTR(": command not found"));
+  }
+
+  if(
+    !is_executing_lastcommand ||
+    CMD_RESULT_OK == res ||
     CMD_RESULT_ABORTED == res ||
     CMD_RESULT_FAILED == res
     #ifdef ENABLE_AUTH_SERVICE
     || (isWaitingForUserAuth && res == CMD_RESULT_WRONG_CREDENTIAL)
     #endif
+    || (
+      CMD_RESULT_INCOMPLETE != res &&
+      CMD_RESULT_TERMINAL_HOLD_BUFFER != res &&
+      CMD_RESULT_TERMINAL_ABORTED != res
+    )
   ){
     // start new interaction
     startInteraction();
@@ -915,6 +937,30 @@ void CommandLineServiceProvider::useTerminal(iTerminalInterface *terminal)
     startInteraction();
   }else{
     SessionManager::detachCurrent();
+  }
+}
+
+/**
+ * @brief Drop every command belonging to a session that is going away.
+ *
+ * A command left waiting for input is skipped by the cleanup that runs after
+ * each execution, so without this it would outlive its session. Session slots
+ * are reused, and the next terminal handed the same slot would inherit the
+ * unfinished prompt along with whatever it was still holding.
+ *
+ * @param session session_t* session being torn down
+ */
+void CommandLineServiceProvider::releaseSession(session_t *session)
+{
+  if( nullptr == session ) return;
+
+  for (int16_t i = static_cast<int16_t>(m_cmdlist.size()) - 1; i >= 0; i--){
+
+    if(nullptr != m_cmdlist[i] && m_cmdlist[i]->m_owner == session){
+
+      pdiutil::safe_delete(m_cmdlist[i]);
+      m_cmdlist.erase(m_cmdlist.begin() + i);
+    }
   }
 }
 

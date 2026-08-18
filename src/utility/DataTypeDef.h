@@ -256,6 +256,32 @@ enum logger_type : uint8_t {
 typedef enum logger_type logger_type_t;
 
 /**
+ * Flush directions. Names which side of an i/o buffer a flush acts on, so a
+ * caller that only wants pending output written cannot also discard input that
+ * has arrived and not been read yet.
+ */
+enum flush_type : int16_t {
+    FLUSH_TX,   /** write out pending output, leave input alone */
+    FLUSH_RX,   /** discard unread input, leave output alone */
+    FLUSH_ALL,  /** both */
+    FLUSH_MAX
+};
+typedef enum flush_type flush_type_t;
+
+/**
+ * Which sides a requested flush covers. Implementations ask these rather than
+ * comparing against the enum, so a value added later changes behaviour only
+ * here and never silently widens what an existing flush does.
+ */
+inline bool IsFlushTx(int16_t flushtype) {
+    return FLUSH_TX == flushtype || FLUSH_ALL == flushtype;
+}
+
+inline bool IsFlushRx(int16_t flushtype) {
+    return FLUSH_RX == flushtype || FLUSH_ALL == flushtype;
+}
+
+/**
  * IP address types
  */
 enum ip_addr_type : uint8_t {

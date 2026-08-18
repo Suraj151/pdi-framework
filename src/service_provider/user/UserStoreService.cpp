@@ -209,10 +209,19 @@ bool UserStoreService::removeLineByUsername(const char *filepath, const char *us
 {
   if (!__i_fs.isFileExist(filepath)) return false;
 
+  file_info_t original;
+  bool haveoriginal = (0 == __i_fs.getFileMeta(filepath, original));
+
   const char *tempdir = __i_fs.getTempDirectory();
   pdiutil::string temppath = pdiutil::string(tempdir) + __i_fs.basename(filepath);
   if (__i_fs.isFileExist(temppath.c_str())) {
     __i_fs.deleteFile(temppath.c_str());
+  }
+
+  if (haveoriginal && __i_fs.createFile(temppath.c_str(), "") >= 0) {
+    __i_fs.beginPrivileged();
+    __i_fs.setFilePermissions(temppath.c_str(), original.m_perms);
+    __i_fs.endPrivileged();
   }
 
   int64_t fs = __i_fs.getFileSize(filepath);
@@ -250,6 +259,13 @@ bool UserStoreService::removeLineByUsername(const char *filepath, const char *us
   if (removed) {
     __i_fs.deleteFile(filepath);
     __i_fs.moveFile(temppath.c_str(), filepath);
+
+    if (haveoriginal) {
+      __i_fs.beginPrivileged();
+      __i_fs.setFilePermissions(filepath, original.m_perms);
+      __i_fs.setFileOwner(filepath, original.m_uid, original.m_gid);
+      __i_fs.endPrivileged();
+    }
   } else {
     __i_fs.deleteFile(temppath.c_str());
   }

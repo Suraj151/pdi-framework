@@ -47,7 +47,7 @@ public:
     void setNoDelay(bool noDelay) override;
     void setTimeout(uint32_t timeout) override;
     bool availableforwrite(uint32_t size) override;
-    void flush() override;
+    void flush(int16_t flushtype = FLUSH_TX) override;
 
     bool setCertificateAuthorityPath(const char* path) override;
     bool setClientCertificatePath(const char* path) override;

@@ -23,7 +23,7 @@ added by        : Suraj I.
  * @param data_len Length of the data to be hashed
  * @param output Pointer to the output buffer for the HMAC
  */
-void hmac_sha1(const uint8_t *key, unsigned int key_len, const uint8_t *data, unsigned int data_len, uint8_t *output){
+inline void hmac_sha1(const uint8_t *key, unsigned int key_len, const uint8_t *data, unsigned int data_len, uint8_t *output){
     uint8_t k_ipad[64] = {0};
     uint8_t k_opad[64] = {0};
     uint8_t tk[20];

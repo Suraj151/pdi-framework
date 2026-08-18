@@ -163,7 +163,7 @@ public:
     /** 
      * @brief Flush the output buffer.
      */
-    void flush() override;
+    void flush(int16_t flushtype = FLUSH_TX) override;
 
     /**
      * @brief Commit IO operations in case if queued.

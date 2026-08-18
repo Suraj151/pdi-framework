@@ -117,7 +117,7 @@ public:
     void setNoDelay(bool noDelay) override;
     void setTimeout(uint32_t timeout) override;
     bool availableforwrite(uint32_t size) override;
-    void flush() override;
+    void flush(int16_t flushtype = FLUSH_TX) override;
 
     /**
      * @brief Set the path to the trusted CA bundle for verifying the peer server.

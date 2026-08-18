@@ -115,7 +115,7 @@ pdiutil::string FileSystemInterfaceImpl::getLastPWD() const{
  * @param path The path to which the file separator will be appended.
  */
 void FileSystemInterfaceImpl::appendFileSeparator(char *path) {
-    if (nullptr != path && path[strlen(path) - 1] != FILE_SEPARATOR[0]) {
+    if (nullptr != path && (0 == path[0] || path[strlen(path) - 1] != FILE_SEPARATOR[0])) {
         strncat(path, FILE_SEPARATOR, 1);
     }
 }
@@ -125,7 +125,7 @@ void FileSystemInterfaceImpl::appendFileSeparator(char *path) {
  * @param path The path to which the file separator will be appended.
  */
 void FileSystemInterfaceImpl::appendFileSeparator(pdiutil::string &path) {
-    if (path[path.length() - 1] != FILE_SEPARATOR[0]) {
+    if (path.empty() || path[path.length() - 1] != FILE_SEPARATOR[0]) {
         path += FILE_SEPARATOR;
     }
 }

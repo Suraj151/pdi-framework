@@ -1012,6 +1012,25 @@ void LWSSH::SSHServer::handleChannelRequest(){
                 #endif
             }
         }
+
+        #ifdef ENABLE_CMD_SERVICE
+        pdiutil::string rt_shell_pending = CHARPTR_WRAP("shell");
+        pdiutil::string rt_pty_pending = CHARPTR_WRAP("pty-req");
+        if( m_session->m_sshclient &&
+            m_session->current_channel.ischannelreqsuccess > 1 &&
+            ( m_session->current_channel.req_type == rt_shell_pending ||
+              m_session->current_channel.req_type == rt_pty_pending ) &&
+            m_session->m_sshclient->available() > 0
+        ){
+            cmd_result_t res = __cmd_service.processTerminalInput(m_session->m_sshclient);
+
+            if( res == CMD_RESULT_TERMINAL_ABORTED ){
+                __auth_service.setAuthorized(false);
+                SessionManager::changeDirectory(__i_fs.getHomeDirectory());
+                m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+            }
+        }
+        #endif
     }
 }
 

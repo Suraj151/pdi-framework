@@ -52,8 +52,9 @@ bool base64Encode(char input_str[], int len_str, char *res_str)
       // Shift the current value 8 bits to the left
       val = val << 8;
 
-      // Add the current byte to the value
-      val = val | input_str[j];
+      // Add the current byte to the value. the cast keeps a byte over 0x7f from
+      // sign extending and swallowing the bits already accumulated
+      val = val | (unsigned char)input_str[j];
 
       // Increment the count of processed bytes
       count++;
@@ -129,7 +130,10 @@ int base64Decode(const char *input_str, int len_str, unsigned char *res_buf)
     return -1;
   }
 
-  int val = 0, bits = 0, outlen = 0;
+  // only bits + 6 bits of val are ever live, so it is masked back each round to
+  // keep the accumulator from running past the width of the type
+  uint32_t val = 0;
+  int bits = 0, outlen = 0;
 
   for (int i = 0; i < len_str; i++)
   {
@@ -150,7 +154,7 @@ int base64Decode(const char *input_str, int len_str, unsigned char *res_buf)
       return -1;
     }
 
-    val = (val << 6) | decoded;
+    val = ((val << 6) | (uint32_t)decoded) & 0x3FFFu;
     bits += 6;
 
     if (bits >= 8)

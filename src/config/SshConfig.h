@@ -48,6 +48,11 @@ created Date    : 1st June 2025
 #define SSH_CONFIG_KEY_PASSWORD_AUTH "PasswordAuthentication"
 #define SSH_CONFIG_KEY_PUBKEY_AUTH "PubkeyAuthentication"
 
+/* Private host key material, readable only by its owner like the user store */
+#ifndef SSH_PRIVATE_KEY_PERMS
+#define SSH_PRIVATE_KEY_PERMS 0600
+#endif
+
 /* SSH Key algorithm options */
 enum SSHKeyAlgorithm{
     SSH_KEY_ALGO_MIN = 0,

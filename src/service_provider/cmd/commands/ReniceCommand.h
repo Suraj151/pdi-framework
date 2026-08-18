@@ -99,14 +99,7 @@ struct ReniceCommand : public CommandBase {
 		uint8_t task_owner = t->m_owner;
 
 #if defined(ENABLE_AUTH_SERVICE) && defined(ENABLE_STORAGE_SERVICE)
-		bool isRoot = false;
-		const char *me = __auth_service.getUsername();
-		if( nullptr != me && me[0] ){
-			user_record_t meRec;
-			if( __user_store_service.findUserByName(me, meRec) && meRec.m_uid == USER_STORE_ROOT_UID ){
-				isRoot = true;
-			}
-		}
+		bool isRoot = ( SessionManager::getCurrentUid() == USER_STORE_ROOT_UID );
 		if( !isRoot ){
 			session_t *cur = SessionManager::current();
 			uint8_t cur_sid = (nullptr != cur) ? cur->m_sid : 0;

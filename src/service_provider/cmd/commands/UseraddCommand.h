@@ -51,8 +51,7 @@ struct UseraddCommand : public CommandBase {
 
 		const char *me = __auth_service.getUsername();
 		if( nullptr == me || 0 == me[0] ) return CMD_RESULT_NEED_AUTH;
-		user_record_t meRec;
-		if( !__user_store_service.findUserByName(me, meRec) || meRec.m_uid != USER_STORE_ROOT_UID ){
+		if( SessionManager::getCurrentUid() != USER_STORE_ROOT_UID ){
 			if( nullptr != m_terminal ) m_terminal->writeln_ro(RODT_ATTR("\nroot required"));
 			return CMD_RESULT_FAILED;
 		}

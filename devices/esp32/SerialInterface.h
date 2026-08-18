@@ -54,7 +54,7 @@ public:
   int32_t available() override;
   int8_t connected() override;
   void setTimeout(uint32_t timeout) override;
-  void flush() override;
+  void flush(int16_t flushtype = FLUSH_TX) override;
 
   // terminal api
   iTerminalInterface* with_timestamp() override;

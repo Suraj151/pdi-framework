@@ -103,7 +103,7 @@ public:
 		}
 
 		int y1 = this->_last_monitor_point.y,
-			y2 = map(
+			y2 = MapRange(
 				__gpio_service.m_gpio_config_copy.gpio_readings[MAX_DIGITAL_GPIO_PINS], 0, ANALOG_GPIO_RESOLUTION,
 				GPIO_GRAPH_TOP_MARGIN, GPIO_MAX_GRAPH_HEIGHT - GPIO_GRAPH_BOTTOM_MARGIN),
 			x1 = this->_last_monitor_point.x < GPIO_MAX_GRAPH_WIDTH ? this->_last_monitor_point.x : GPIO_MAX_GRAPH_WIDTH - GPIO_GRAPH_ADJ_POINT_DISTANCE,

@@ -199,4 +199,16 @@ uint8_t Int32DigitCount(int32_t x);
  */
 uint8_t Int64DigitCount(int64_t x);
 
+/**
+ * @brief Re-scales a value from one range onto another, as the arduino cores'
+ *        map() does. Kept here so callers do not depend on a core global.
+ * @param value The value to re-scale.
+ * @param fromlow Lower bound of the value's current range.
+ * @param fromhigh Upper bound of the value's current range.
+ * @param tolow Lower bound of the target range.
+ * @param tohigh Upper bound of the target range.
+ * @return The re-scaled value, or tolow when the source range is empty.
+ */
+int32_t MapRange(int32_t value, int32_t fromlow, int32_t fromhigh, int32_t tolow, int32_t tohigh);
+
 #endif

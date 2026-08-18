@@ -768,9 +768,9 @@ bool TlsClientInterface::availableforwrite(uint32_t size) {
     return m_isLastWriteAcked;
 }
 
-void TlsClientInterface::flush() {
+void TlsClientInterface::flush(int16_t flushtype) {
     TCP_GUARD_BEGIN
-    if (m_pcb) tcp_output(m_pcb);
+    if (IsFlushTx(flushtype) && m_pcb) tcp_output(m_pcb);
     TCP_GUARD_END
     m_isLastWriteAcked = true;
 }

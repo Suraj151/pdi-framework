@@ -171,7 +171,7 @@ void HttpServerInterfaceImpl::handleClient(){
             }
             
             // Flush the client buffer
-            m_client->flush();
+            m_client->flush(FLUSH_ALL);
 
             // Update current client liast activity timestamp
             m_currentclient_lastactivity_timestamp = __i_instance.getUtilityInstance().millis_now();

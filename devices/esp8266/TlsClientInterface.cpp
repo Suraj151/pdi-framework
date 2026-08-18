@@ -901,8 +901,8 @@ bool TlsClientInterface::availableforwrite(uint32_t size) {
     return m_isLastWriteAcked;
 }
 
-void TlsClientInterface::flush() {
-    if (m_bear){
+void TlsClientInterface::flush(int16_t flushtype) {
+    if (IsFlushTx(flushtype) && m_bear){
 
         br_ssl_engine_context* eng = TLS_ENG;
         br_ssl_engine_flush(eng, 0);
@@ -912,7 +912,7 @@ void TlsClientInterface::flush() {
     // the receive chain is not touched here, flush runs between requests on a
     // live connection and the chain holds transport bytes the engine has not
     // consumed yet
-    if (m_pcb) tcp_output(m_pcb);
+    if (IsFlushTx(flushtype) && m_pcb) tcp_output(m_pcb);
 
     m_isLastWriteAcked = true;
 }

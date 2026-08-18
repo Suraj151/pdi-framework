@@ -216,14 +216,14 @@ void UARTSerial::setTimeout(uint32_t timeout)
 /**
  * flush
  */
-void UARTSerial::flush()
+void UARTSerial::flush(int16_t flushtype)
 {
   #ifdef ENABLE_CONTEXTUAL_EXECUTION
   m_mutex.critical_lock();
   #endif
 
-  m_hwserial.flush();
-  while (m_hwserial.available() > 0) m_hwserial.read(); 
+  if (IsFlushTx(flushtype)) m_hwserial.flush();
+  if (IsFlushRx(flushtype)) while (m_hwserial.available() > 0) m_hwserial.read();
 
   #ifdef ENABLE_CONTEXTUAL_EXECUTION
   m_mutex.critical_unlock();

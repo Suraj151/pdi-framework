@@ -190,17 +190,17 @@ void UARTSerial::setTimeout(uint32_t timeout)
 /**
  * flush
  */
-void UARTSerial::flush()
+void UARTSerial::flush(int16_t flushtype)
 {
 #if ARDUINO_USB_CDC_ON_BOOT
   if (m_cdcserial) {
-    m_cdcserial->flush();
-    while (m_cdcserial->available() > 0) m_cdcserial->read();
+    if (IsFlushTx(flushtype)) m_cdcserial->flush();
+    if (IsFlushRx(flushtype)) while (m_cdcserial->available() > 0) m_cdcserial->read();
     return;
   }
 #endif
-  m_hwserial.flush();
-  while (m_hwserial.available() > 0) m_hwserial.read();
+  if (IsFlushTx(flushtype)) m_hwserial.flush();
+  if (IsFlushRx(flushtype)) while (m_hwserial.available() > 0) m_hwserial.read();
 }
 
 /**

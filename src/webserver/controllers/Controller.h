@@ -97,10 +97,19 @@ public:
     virtual void boot() = 0;
 
     /**
-     * @var pdiutil::vector<struct_controllers> m_controllers
-     * @brief Static vector to store registered controllers.
+     * @brief The registry of every controller known to the build.
+     *
+     * Controllers register from global constructors in other translation
+     * units, which run in an order the linker decides. The registry is created
+     * on its first use so it exists whichever constructor gets there first.
+     *
+     * @return Reference to the registry.
      */
-    static pdiutil::vector<struct_controllers> m_controllers;
+    static pdiutil::vector<struct_controllers> &ControllerRegistry(){
+
+        static pdiutil::vector<struct_controllers> registry;
+        return registry;
+    }
 
     /**
      * @var const char* m_controller_name

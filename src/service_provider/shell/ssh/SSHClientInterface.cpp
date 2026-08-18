@@ -91,11 +91,14 @@ int32_t SSHClientInterface::write(const uint8_t* c_str, uint32_t size){
             }
         }else{
 
-            // Schedule commiting written data task in queue
-            m_writeCommitTaskId = __task_scheduler.updateTimeout( m_writeCommitTaskId, [&]() {
-                this->commit();
-                m_writeCommitTaskId = -1;
-            }, 1, __i_dvc_ctrl.millis_now() );
+            // Schedule commiting written data task in queue, only when none is
+            // pending. A pending commit already covers writes that follow it.
+            if( m_writeCommitTaskId < 0 ){
+                m_writeCommitTaskId = __task_scheduler.setTimeout( [&]() {
+                    this->commit();
+                    m_writeCommitTaskId = -1;
+                }, 1, __i_dvc_ctrl.millis_now() );
+            }
 
             return size;
         }
@@ -264,11 +267,9 @@ void SSHClientInterface::setTimeout(uint32_t timeout){
 /** 
  * @brief Flush the output buffer.
  */
-void SSHClientInterface::flush(){
-    // if(m_tcpClient){
-    //     m_tcpClient->flush();
-        m_received_data.clear();
-    // }
+void SSHClientInterface::flush(int16_t flushtype){
+    if(IsFlushTx(flushtype)) commit();
+    if(IsFlushRx(flushtype)) m_received_data.clear();
 }
 
 /** 

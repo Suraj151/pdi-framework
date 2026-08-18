@@ -158,8 +158,22 @@ typedef struct CommandBase {
     const char* m_optionseparator;               ///< Separator for options.
     uint16_t m_iterations;
     static CommandExecutionInterface *m_cmdexecinterface;  ///< Interface for command execution.
-    static pdiutil::vector<CommandProp> m_cmd_registry;
     bool m_runinbackground;
+
+    /**
+     * @brief The registry of every command known to the build.
+     *
+     * Commands register from global constructors in other translation units,
+     * which run in an order the linker decides. The registry is created on its
+     * first use so it exists whichever constructor gets there first.
+     *
+     * @return Reference to the registry.
+     */
+    static pdiutil::vector<CommandProp> &CommandRegistry(){
+
+        static pdiutil::vector<CommandProp> registry;
+        return registry;
+    }
 
     /**
      * @brief Constructor for the CommandBase structure.
@@ -168,6 +182,19 @@ typedef struct CommandBase {
      */
     CommandBase(){
         // Clear();
+    }
+
+    /**
+     * @brief Destructor for the CommandBase structure.
+     *
+     * Commands are created by their registrar and released through a
+     * CommandBase pointer, both from the command list and from help, so the
+     * derived destructor has to be reachable for its members to be released.
+     * An option value the command was holding is owned by it and is released
+     * here, since a command can be dropped while it still holds one.
+     */
+    virtual ~CommandBase(){
+        ClearOptions(true);
     }
 
     /**
@@ -194,7 +221,7 @@ typedef struct CommandBase {
     static void RegisterCommand(const char* cmdname, CallBackVoidPointerArgVoidPointerRetFn cmdregistrar){
 
         if(nullptr != cmdname && nullptr != cmdregistrar)
-            m_cmd_registry.push_back(CommandProp(cmdname, cmdregistrar));
+            CommandRegistry().push_back(CommandProp(cmdname, cmdregistrar));
     }
 
     /**
@@ -204,9 +231,9 @@ typedef struct CommandBase {
      */
     static bool IsCommandRegistered(const char *cmdname){
 
-        for (uint16_t i = 0; i < m_cmd_registry.size(); i++){
+        for (uint16_t i = 0; i < CommandRegistry().size(); i++){
             
-            if(isCommandMatch(m_cmd_registry[i].cmdname, cmdname)){
+            if(isCommandMatch(CommandRegistry()[i].cmdname, cmdname)){
 
                 return true;
             }
@@ -221,11 +248,11 @@ typedef struct CommandBase {
      */
     static CommandBase* GetCommand(const char *cmdname){
 
-        for (uint16_t i = 0; i < m_cmd_registry.size(); i++){
+        for (uint16_t i = 0; i < CommandRegistry().size(); i++){
             
-            if(isCommandMatch(m_cmd_registry[i].cmdname, cmdname) && nullptr != m_cmd_registry[i].cmdregistrar){
+            if(isCommandMatch(CommandRegistry()[i].cmdname, cmdname) && nullptr != CommandRegistry()[i].cmdregistrar){
 
-                return (CommandBase*)m_cmd_registry[i].cmdregistrar(nullptr);
+                return (CommandBase*)CommandRegistry()[i].cmdregistrar(nullptr);
             }
         }
         return nullptr;
@@ -306,12 +333,15 @@ typedef struct CommandBase {
 
             char argcmd[CMD_SIZE_MAX];
             memset(argcmd, 0, CMD_SIZE_MAX);
-            memcpy(argcmd, _cmd + cmd_start_indx, pdistd::min((int)CMD_SIZE_MAX, (int)abs(cmd_end_indx - cmd_start_indx)));
-            
+            // one byte stays for the terminator: a name that filled the buffer
+            // left the comparison below reading past the end of it
+            int16_t argcmd_len = pdistd::min((int)CMD_SIZE_MAX - 1, (int)abs(cmd_end_indx - cmd_start_indx));
+            memcpy(argcmd, _cmd + cmd_start_indx, argcmd_len);
+
             if( _partialmatch ){
-                return __are_arrays_equal(cmdname, argcmd, pdistd::min((int)CMD_SIZE_MAX, (int)abs(cmd_end_indx - cmd_start_indx)));
+                return __are_arrays_equal(cmdname, argcmd, argcmd_len);
             }
-            return __are_str_equals(cmdname, argcmd, pdistd::min((int)CMD_SIZE_MAX, (int)abs(cmd_end_indx - cmd_start_indx)));
+            return __are_str_equals(cmdname, argcmd, argcmd_len);
         }
         return false;
         // return ((nullptr != _cmd) && __are_arrays_equal(cmdname, _cmd, strlen(cmdname)));
@@ -459,7 +489,10 @@ typedef struct CommandBase {
                 if( cmd_start_indx >= 0 && cmd_start_indx < cmd_end_indx && cmd_end_indx <= cmd_max_len ){
                     char argcmd[CMD_SIZE_MAX];
                     memset(argcmd, 0, CMD_SIZE_MAX);
-                    memcpy(argcmd, _args+cmd_start_indx, abs(cmd_end_indx-cmd_start_indx));
+                    // a line with no space is as long as the line itself, so the
+                    // copy is bounded by the buffer and leaves room to terminate
+                    memcpy(argcmd, _args+cmd_start_indx,
+                           pdistd::min((int)CMD_SIZE_MAX - 1, (int)abs(cmd_end_indx-cmd_start_indx)));
                     if( isValidCommand(argcmd) ){
                         char argoptn[CMD_OPTION_SIZE_MAX];
                         // get the option start and end indices
@@ -488,7 +521,10 @@ typedef struct CommandBase {
                                     // next option start index will start with last option value end index
                                     optn_start_indx = optn_val_end_index+strlen(m_optionseparator);
                                     // optn_start_indx += optn_start_indx != -1 ? (optn_val_end_index+strlen(m_optionseparator)) : 0;
-                                    optn_end_indx = __strstr(_args+optn_start_indx, CMD_OPTION_ASSIGN_OPERATOR);
+                                    // the last option leaves this past the end, and the
+                                    // loop condition only sees it after the search below
+                                    optn_end_indx = optn_start_indx < cmd_max_len ?
+                                        __strstr(_args+optn_start_indx, CMD_OPTION_ASSIGN_OPERATOR) : -1;
                                     optn_end_indx += optn_end_indx != -1 ? optn_start_indx : 0;
                                 } while ( optn_start_indx > 0 && optn_end_indx > 0 && optn_end_indx < cmd_max_len && optn_start_indx < optn_end_indx);
                             }else{
@@ -496,9 +532,13 @@ typedef struct CommandBase {
                             }
                         }else{
 
-                            if(m_acceptArgsOptions){
+                            // the first value starts one past the command, so a
+                            // command given on its own has none. reading from
+                            // there would start past the terminator and walk
+                            // whatever follows the command line in memory.
+                            if(m_acceptArgsOptions && (cmd_end_indx + 1) < cmd_max_len){
 
-                                // if command has free options. 
+                                // if command has free options.
                                 uint8_t option_indx = m_waitingoptionindx != -1 ? m_waitingoptionindx : 0;
                                 int16_t optn_val_start_index = cmd_end_indx + 1;
                                 int16_t optn_val_end_index = -1;

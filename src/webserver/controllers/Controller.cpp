@@ -19,12 +19,6 @@ Created Date    : 1st June 2019
 #include "Controller.h"
 
 /**
- * @var pdiutil::vector<struct_controllers> Controller::m_controllers
- * @brief Static vector to store registered controllers.
- */
-pdiutil::vector<struct_controllers> Controller::m_controllers;
-
-/**
  * @brief Default constructor for the `Controller` class.
  *
  * Initializes the controller with default values and registers it in the
@@ -75,7 +69,7 @@ Controller::~Controller() {
  */
 void Controller::register_controller(Controller* that) {
   struct_controllers _c(that);
-  this->m_controllers.push_back(_c);
+  ControllerRegistry().push_back(_c);
 }
 
 #endif

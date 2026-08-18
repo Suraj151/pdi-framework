@@ -197,7 +197,7 @@ int16_t TcpClientInterface::disconnect() {
  */
 int16_t TcpClientInterface::close() {
     int16_t res = disconnect();
-    flush();
+    flush(FLUSH_ALL);
     return res;
 }
 
@@ -547,7 +547,7 @@ void TcpClientInterface::onError(void* arg, err_t err) {
         NESTED_CRITICAL_SECTION_EXIT
 
         if (haspcb) {
-            client->flush();
+            client->flush(FLUSH_ALL);
         }
     }
 }
@@ -715,7 +715,7 @@ bool TcpClientInterface::availableforwrite(uint32_t size) {
 /**
  * @brief Flush the buffer.
  */
-void TcpClientInterface::flush() {
+void TcpClientInterface::flush(int16_t flushtype) {
 
     struct pbuf *released = nullptr;
     uint32_t pending = 0;
@@ -724,7 +724,7 @@ void TcpClientInterface::flush() {
     // update reach into lwip and are kept outside of it
     NESTED_CRITICAL_SECTION_ENTER
 
-    if (m_rxBuf) {
+    if (IsFlushRx(flushtype) && m_rxBuf) {
 
         released = m_rxBuf;
         pending = m_rxBuf->tot_len - m_rxBufOffset;
@@ -744,7 +744,7 @@ void TcpClientInterface::flush() {
         pbuf_free(released);
     }
 
-    if(nullptr != m_pcb){
+    if(IsFlushTx(flushtype) && nullptr != m_pcb){
 
         tcp_output(m_pcb);
     }

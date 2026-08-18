@@ -10,7 +10,7 @@ template <typename T> void PROGMEM_read(const T* sce, T& dest)
 {
     memset(&dest, 0, sizeof(T)); // Clear the destination object
     // Copy the data from program memory to the destination object
-	memcpy_P (&dest, sce, sizeof (T));
+	memcpy_ro (&dest, sce, sizeof (T));
 }
 
 

@@ -630,7 +630,7 @@ int16_t Http_Client::SendRequest(const char *type, const char *url, const char *
             }
             else
             {
-                m_client->flush();
+                m_client->flush(FLUSH_ALL);
                 m_client->disconnect();
                 // __i_dvc_ctrl.wait(100);
                 // m_client->setTimeout(m_request.timeout);

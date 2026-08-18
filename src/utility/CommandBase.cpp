@@ -12,4 +12,3 @@ Created Date    : 1st June 2019
 
 // Initialize static members of Command base
 CommandExecutionInterface * CommandBase::m_cmdexecinterface = nullptr;
-pdiutil::vector<CommandBase::CommandProp> CommandBase::m_cmd_registry;

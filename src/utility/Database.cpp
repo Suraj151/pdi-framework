@@ -80,15 +80,30 @@ void Database::clear_all()
  */
 bool Database::register_table(struct_tables &_table)
 {
-    struct_tables _last = this->get_last_table();
-    if (
-        (_last.m_table_address + _last.m_table_size + 2) < _table.m_table_address &&
-        (_table.m_table_address + _table.m_table_size + 2) < m_max_db_size)
+    if ((uint32_t)(_table.m_table_address + _table.m_table_size + 2) >= m_max_db_size)
     {
-        this->m_database_tables.push_back(_table);
-        return true;
+        return false;
     }
-    return false;
+
+    // tables boot in instance creation order, not in address order, so the new
+    // span is checked against every registered one instead of only the last
+    for (uint8_t i = 0; i < this->m_database_tables.size(); i++)
+    {
+        uint32_t _existing_end = (uint32_t)this->m_database_tables[i].m_table_address +
+                                 this->m_database_tables[i].m_table_size + 2;
+        uint32_t _new_end = (uint32_t)_table.m_table_address + _table.m_table_size + 2;
+
+        bool _clear = (_existing_end < _table.m_table_address) ||
+                      (_new_end < this->m_database_tables[i].m_table_address);
+
+        if (!_clear)
+        {
+            return false;
+        }
+    }
+
+    this->m_database_tables.push_back(_table);
+    return true;
 }
 
 /**
@@ -102,8 +117,14 @@ bool Database::register_table(struct_tables &_table)
 struct_tables Database::get_last_table()
 {
     struct_tables _last;
-    uint8_t _last_add = 0;
     memset(&_last, 0, sizeof(struct_tables));
+
+    if (0 == this->m_database_tables.size())
+    {
+        return _last;
+    }
+
+    uint8_t _last_add = 0;
     for (uint8_t i = 1; i < this->m_database_tables.size(); i++)
     {
         if (this->m_database_tables[_last_add].m_table_address < this->m_database_tables[i].m_table_address)
@@ -111,9 +132,8 @@ struct_tables Database::get_last_table()
             _last_add = i;
         }
     }
-    if (_last_add != 0)
-        return this->m_database_tables[_last_add];
-    return _last;
+
+    return this->m_database_tables[_last_add];
 }
 
 /**

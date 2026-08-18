@@ -393,8 +393,9 @@ public:
 
   /**
    * @brief Flushes the I/O buffer.
+   * @param flushtype Which side to act on; output only unless asked otherwise.
    */
-  virtual void flush() {}
+  virtual void flush(int16_t flushtype = FLUSH_TX) {}
 
   /**
    * @brief Is secure flag.

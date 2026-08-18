@@ -54,24 +54,14 @@ struct IdCommand : public CommandBase {
 
 		char numbuf[8];
 
-#ifdef ENABLE_STORAGE_SERVICE
-		user_record_t rec;
-		if( __user_store_service.findUserByName(u, rec) ){
-			m_terminal->write_ro(RODT_ATTR("uid="));
-			Uint32ToString((uint32_t)rec.m_uid, numbuf, sizeof(numbuf));
-			m_terminal->write(numbuf);
-			m_terminal->write_ro(RODT_ATTR("("));
-			m_terminal->write(rec.m_username.c_str());
-			m_terminal->write_ro(RODT_ATTR(") gid="));
-			Uint32ToString((uint32_t)rec.m_gid, numbuf, sizeof(numbuf));
-			m_terminal->write(numbuf);
-			return CMD_RESULT_OK;
-		}
-#endif
-
-		m_terminal->write_ro(RODT_ATTR("uid=?("));
+		m_terminal->write_ro(RODT_ATTR("uid="));
+		Uint32ToString((uint32_t)SessionManager::getCurrentUid(), numbuf, sizeof(numbuf));
+		m_terminal->write(numbuf);
+		m_terminal->write_ro(RODT_ATTR("("));
 		m_terminal->write(u);
-		m_terminal->write_ro(RODT_ATTR(") gid=?"));
+		m_terminal->write_ro(RODT_ATTR(") gid="));
+		Uint32ToString((uint32_t)SessionManager::getCurrentGid(), numbuf, sizeof(numbuf));
+		m_terminal->write(numbuf);
 		return CMD_RESULT_OK;
 	}
 };

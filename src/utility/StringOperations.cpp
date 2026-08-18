@@ -114,7 +114,7 @@ char *__strtrim_val(char *str, char _val, uint16_t _overflow_limit)
             _begin++;
             n++;
         }
-        while (*(str + len - 1) && len > 0 && n < _overflow_limit)
+        while (len > 0 && *(str + len - 1) && n < _overflow_limit)
         {
             if (*(str + len - 1) == _val)
             {
@@ -632,17 +632,19 @@ bool __get_from_json(const char *_str, const char *_key, char *_value, int _max_
     memset(_value, 0, _max_value_len);
     memcpy(_value, start, len);
 
+    // the trimmed pointer walks forward inside _value, so the shift back to the
+    // front overlaps and has to carry the trimmed length along with its nul
     char* _trimmedstr = __strtrim_val(_value, ',', _max_value_len);
     if( nullptr != _trimmedstr )
-    memcpy(_value, _trimmedstr, strlen(_value));
+    memmove(_value, _trimmedstr, strlen(_trimmedstr) + 1);
 
     _trimmedstr = __strtrim(_value, _max_value_len);
     if( nullptr != _trimmedstr )
-    memcpy(_value, _trimmedstr, strlen(_value));
+    memmove(_value, _trimmedstr, strlen(_trimmedstr) + 1);
 
     _trimmedstr = __strtrim_val(_value, '"', _max_value_len);
     if( nullptr != _trimmedstr )
-    memcpy(_value, _trimmedstr, strlen(_value));
+    memmove(_value, _trimmedstr, strlen(_trimmedstr) + 1);
 
     return true;
 }

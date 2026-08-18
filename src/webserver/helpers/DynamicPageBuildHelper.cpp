@@ -193,7 +193,7 @@ void concat_input_html_tag(
 
   if( !_is_checkbox && !_is_range ){
     char _maxlen[7]; memset(_maxlen, 0, 7);
-    itoa( _maxlength, _maxlen, 10 );
+    Int32ToString( _maxlength, _maxlen, sizeof(_maxlen) );
 
     strcat_ro( _page, HTML_MAXLEN_ATTR );
     strcat( _page, "'" );
@@ -208,7 +208,7 @@ void concat_input_html_tag(
   if( _is_range ){
     char _minbuff[7]; char _maxbuff[7];
     memset(_minbuff, 0, 7); memset(_maxbuff, 0, 7);
-    itoa( _min, _minbuff, 10 ); itoa( _max, _maxbuff, 10 );
+    Int32ToString( _min, _minbuff, sizeof(_minbuff) ); Int32ToString( _max, _maxbuff, sizeof(_maxbuff) );
 
     strcat_ro( _page, HTML_MIN_RANGE_ATTR );
     strcat( _page, "'" );
@@ -259,7 +259,7 @@ void concat_input_html_tag(
 
   if( !_is_checkbox && !_is_range ){
     char _maxlen[7]; memset(_maxlen, 0, 7);
-    itoa( _maxlength, _maxlen, 10 );
+    Int32ToString( _maxlength, _maxlen, sizeof(_maxlen) );
 
     strcat_ro( _page, HTML_MAXLEN_ATTR );
     strcat( _page, "'" );
@@ -274,7 +274,7 @@ void concat_input_html_tag(
   if( _is_range ){
     char _minbuff[7]; char _maxbuff[7];
     memset(_minbuff, 0, 7); memset(_maxbuff, 0, 7);
-    itoa( _min, _minbuff, 10 ); itoa( _max, _maxbuff, 10 );
+    Int32ToString( _min, _minbuff, sizeof(_minbuff) ); Int32ToString( _max, _maxbuff, sizeof(_maxbuff) );
 
     strcat_ro( _page, HTML_MIN_RANGE_ATTR );
     strcat( _page, "'" );
@@ -441,7 +441,7 @@ void concat_select_html_tag( char *_page, char *_name, const char** _options, in
     if( strlen(_options[i]) > 0 && ( ( i ) != _exception ) ){
       char buf[3];
       memset( buf, 0, 3 );
-      itoa( i, buf, 10 );
+      Int32ToString( i, buf, sizeof(buf) );
       strcat_ro( _page, HTML_OPTION_OPEN );
       strcat_ro( _page, HTML_VALUE_ATTR );
       strcat( _page, "'" );
@@ -472,7 +472,7 @@ void concat_select_html_tag( char *_page, const char *_name, const char** _optio
     if( strlen(_options[i]) > 0 && ( ( i ) != _exception ) ){
       char buf[3];
       memset( buf, 0, 3 );
-      itoa( i, buf, 10 );
+      Int32ToString( i, buf, sizeof(buf) );
       strcat_ro( _page, HTML_OPTION_OPEN );
       strcat_ro( _page, HTML_VALUE_ATTR );
       strcat( _page, "'" );
@@ -654,9 +654,9 @@ void concat_graph_axis_title_div( char *_page, char *_title, char *_style ){
 void concat_svg_tag( char *_page, const char *_path, const char *_style, const char *_viewbox, int _width, int _height, char *_fill ){
 
   char _widthbuff[7]; memset(_widthbuff, 0, 7);
-  itoa( _width, _widthbuff, 10 );
+  Int32ToString( _width, _widthbuff, sizeof(_widthbuff) );
   char _heightbuff[7]; memset(_heightbuff, 0, 7);
-  itoa( _height, _heightbuff, 10 );
+  Int32ToString( _height, _heightbuff, sizeof(_heightbuff) );
 
   strcat_ro( _page, HTML_SVG_OPEN_TAG );
   concat_style_attribute( _page, _style);

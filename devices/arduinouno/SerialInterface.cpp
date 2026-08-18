@@ -143,10 +143,10 @@ void UARTSerial::setTimeout(uint32_t timeout)
 /**
  * flush
  */
-void UARTSerial::flush()
+void UARTSerial::flush(int16_t flushtype)
 {
-  Serial.flush();
-  while (Serial.available() > 0) Serial.read(); 
+  if (IsFlushTx(flushtype)) Serial.flush();
+  if (IsFlushRx(flushtype)) while (Serial.available() > 0) Serial.read();
 }
 
 /**

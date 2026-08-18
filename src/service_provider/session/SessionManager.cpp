@@ -9,6 +9,9 @@ created Date    : 18th July 2026
 ******************************************************************************/
 
 #include "SessionManager.h"
+#ifdef ENABLE_CMD_SERVICE
+#include <service_provider/cmd/CommandLineServiceProvider.h>
+#endif
 
 session_t SessionManager::m_sessions[PDI_MAX_SESSIONS];
 session_t *SessionManager::m_current = nullptr;
@@ -47,6 +50,11 @@ void SessionManager::detach(iTerminalInterface *terminal) {
 
   session_t *s = findByTerminal(terminal);
   if (nullptr != s) {
+#ifdef ENABLE_CMD_SERVICE
+    // a command still waiting for input belongs to this session, not to the
+    // next terminal that is handed the slot
+    __cmd_service.releaseSession(s);
+#endif
     s->clear();
     if (m_current == s) {
       m_current = nullptr;
@@ -57,6 +65,9 @@ void SessionManager::detach(iTerminalInterface *terminal) {
 void SessionManager::detachCurrent() {
 
   if (nullptr != m_current) {
+#ifdef ENABLE_CMD_SERVICE
+    __cmd_service.releaseSession(m_current);
+#endif
     m_current->clear();
     m_current = nullptr;
   }
