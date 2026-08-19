@@ -67,6 +67,7 @@ class PingInterface : public iPingInterface {
     bool isPingComplete( void ) override;
     bool isHostRespondingToPing( void ) override;
     const ping_stats_t &getPingStats( void ) override;
+    bool isPingBusy( void ) override;
 
   protected:
     /**

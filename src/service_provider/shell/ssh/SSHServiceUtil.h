@@ -160,7 +160,7 @@ struct LWSSHSession {
         m_server_version("SSH-2.0-LWSSH_0.1"), // Default server version
         m_server_kex_init_sent(0),
         m_last_recv_timestamp(0),
-        m_session_timeout(10000), // Default session timeout in milliseconds
+        m_session_timeout(SSH_HANDSHAKE_IDLE_MS), // Default session timeout in milliseconds
         packets_seq_num_ctos(0),
         packets_seq_num_stoc(0)
     { 
@@ -197,6 +197,10 @@ struct LWSSHSession {
     // Check if the session is in a valid state
     bool isSessionTimeout() const {
         return (__i_dvc_ctrl.millis_now() - m_last_recv_timestamp) > m_session_timeout;
+    }
+
+    void markActive() {
+        m_last_recv_timestamp = __i_dvc_ctrl.millis_now();
     }
 
     // member variables

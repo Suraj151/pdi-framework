@@ -538,7 +538,7 @@ struct task_t {
     uint64_t m_total_exec_us;                   ///< Cumulative execution time (µs) since registration
     uint8_t m_pending_sig;                      ///< Pending signal number to consume on next tick (SIG_NONE = idle)
     bool m_stoppable;                           ///< false = ignore SIG_STOP / SIG_CONT (e.g. exec'd programs)
-    CallBackVoidArgFn m_finalizer;              ///< Teardown hook run once when the task is reaped (natural exit or kill)
+    CallBackVoidPointerArgFn m_finalizer;       ///< Teardown hook run once when the task is reaped (natural exit or kill), given the task itself
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
     iExecutive* m_task_exec = nullptr;          ///< Task executive
     #endif

@@ -99,7 +99,7 @@ public:
 	cmd_result_t processTerminalInput(iTerminalInterface *terminal);
 	cmd_result_t executeCommand(pdiutil::string *cmd = nullptr, cmd_term_inseq_t inseq = CMD_TERM_INSEQ_NONE) override;
 	static void startInteraction();
-    void useTerminal(iTerminalInterface *terminal);
+    bool useTerminal(iTerminalInterface *terminal);
 	void releaseSession(session_t *session);
 	bool getCommandExecutedFromHistory(pdiutil::string &cmdExec, int16_t index, const char* pattern = nullptr);
 

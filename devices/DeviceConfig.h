@@ -10,6 +10,16 @@ created Date    : 1st June 2019
 #ifndef _DEVICES_COMMON_CONFIG_H_
 #define _DEVICES_COMMON_CONFIG_H_
 
+/**
+ * MOCK_DEVICE_TEST is set on the compiler command line by the test build. it
+ * selects the mock device and leaves the generated device setup untouched.
+ */
+#ifdef MOCK_DEVICE_TEST
+
+#include "mockdevice/mockdevice_device_config.h"
+
+#else
+
 #if __has_include("DeviceSetup.h")
 #include "DeviceSetup.h"
 #else
@@ -27,6 +37,8 @@ created Date    : 1st June 2019
 #include "arduinouno/arduinouno_device_config.h"
 #else
 #include "esp32/esp32_device_config.h"
+#endif
+
 #endif
 
 /**
@@ -47,6 +59,20 @@ created Date    : 1st June 2019
 // #define ENABLE_CONTEXTUAL_EXECUTION
 #if defined(ENABLE_CONTEXTUAL_EXECUTION) && !defined(DEVICE_SUPPORTS_CONTEXTUAL_EXECUTION)
 #undef ENABLE_CONTEXTUAL_EXECUTION
+#endif
+
+/**
+ * enable/disable dynamic program loading — load a compiled program from the
+ * filesystem into RAM and run it at runtime. Each device maps this to its own
+ * loadable-binary format (esp32: ELF). Supported only on devices that declare
+ * DEVICE_SUPPORTS_PROGRAM_EXEC and with the storage service.
+ */
+#define ENABLE_PROGRAM_EXEC
+#if defined(ENABLE_PROGRAM_EXEC) && (!defined(DEVICE_SUPPORTS_PROGRAM_EXEC) || !defined(ENABLE_STORAGE_SERVICE))
+#undef ENABLE_PROGRAM_EXEC
+#endif
+#if defined(ENABLE_PROGRAM_EXEC)
+#define ENABLE_CONTEXTUAL_EXECUTION
 #endif
 
 /**
@@ -77,7 +103,7 @@ created Date    : 1st June 2019
  * DEVICE_SUPPORTS_OFFLOOP_NETWORK_TASK, elsewhere the request runs inline.
  */
 #if defined(ENABLE_CONTEXTUAL_EXECUTION) && defined(DEVICE_SUPPORTS_OFFLOOP_NETWORK_TASK)
-#define ENABLE_HTTP_ASYNC_REQUEST
+#define ENABLE_HTTP_CLIENT_ASYNC_REQUEST
 #endif
 
 /**
@@ -131,7 +157,7 @@ created Date    : 1st June 2019
  * enable/disable device iot feature here
  */
 #ifdef ENABLE_MQTT_SERVICE
-#define ENABLE_DEVICE_IOT
+// #define ENABLE_DEVICE_IOT
 #endif
 
 /**
@@ -181,6 +207,7 @@ created Date    : 1st June 2019
 #define WIFI_STATION_CONNECT_ATTEMPT_TIMEOUT  1  // will try to connect within this seconds
 #define WIFI_CONNECTIVITY_CHECK_DURATION      MILLISECOND_DURATION_5000
 #define INTERNET_CONNECTIVITY_CHECK_DURATION  WIFI_CONNECTIVITY_CHECK_DURATION
+#define INTERNET_CHECK_MAX_PING_BUSY_WAIT     (MILLISECOND_DURATION_10000*2)
 
 /**
  * WiFi reconnect escalation tiers
@@ -245,20 +272,6 @@ created Date    : 1st June 2019
  */
 #if defined(ENABLE_SYSLOG_SERVICE) && defined(ENABLE_NETWORK_SERVICE)
 // #define ENABLE_SYSLOG_FORWARD
-#endif
-
-/**
- * enable/disable dynamic program loading — load a compiled program from the
- * filesystem into RAM and run it at runtime. Each device maps this to its own
- * loadable-binary format (esp32: ELF). Supported only on devices that declare
- * DEVICE_SUPPORTS_PROGRAM_EXEC and with the storage service.
- */
-#define ENABLE_PROGRAM_EXEC
-#if defined(ENABLE_PROGRAM_EXEC) && (!defined(DEVICE_SUPPORTS_PROGRAM_EXEC) || !defined(ENABLE_STORAGE_SERVICE))
-#undef ENABLE_PROGRAM_EXEC
-#endif
-#if defined(ENABLE_PROGRAM_EXEC)
-#define ENABLE_CONTEXTUAL_EXECUTION
 #endif
 
 /**

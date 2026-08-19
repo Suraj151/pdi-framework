@@ -512,8 +512,10 @@ void __str_ip_to_int(char *_str, uint8_t *_ip, int _len, bool _clear_str_after_d
  * @param _find_str The substring to find.
  * @param _replace_with The substring to replace with.
  * @param _occurence The number of occurrences to replace.
+ * @param _max_len Capacity of _str including the terminator. The result is
+ * written back only when it fits; -1 allows no growth beyond the current text.
  */
-void __find_and_replace(char *_str, const char *_find_str, const char *_replace_with, int _occurence)
+void __find_and_replace(char *_str, const char *_find_str, const char *_replace_with, int _occurence, int32_t _max_len)
 {
     if (nullptr == _str || nullptr == _find_str || nullptr == _replace_with)
     {
@@ -524,8 +526,17 @@ void __find_and_replace(char *_str, const char *_find_str, const char *_replace_
     int _find_str_len = strlen(_find_str);
     int _replace_str_len = strlen(_replace_with);
 
-    int _total_len = _str_len + (_replace_str_len * _occurence) - (_occurence * _find_str_len) + 1;
-    _total_len = pdistd::max(_str_len, _total_len) + 1;
+    if (_find_str_len <= 0 || _occurence <= 0)
+    {
+        return;
+    }
+
+    if (_max_len <= 0)
+    {
+        _max_len = _str_len + 1;
+    }
+
+    int _total_len = _str_len + (_replace_str_len * _occurence) + 1;
     char *_buf = pdiutil::safe_new_array<char>(_total_len);
 
     if (nullptr == _buf)
@@ -533,14 +544,16 @@ void __find_and_replace(char *_str, const char *_find_str, const char *_replace_
         return;
     }
 
-    int j = 0, o = 0;
+    int j = 0, o = 0, w = 0;
     for (; j < _str_len && o < _occurence;)
     {
         int _occur_index = __strstr(&_str[j], _find_str, _str_len-j);
         if (_occur_index >= 0)
         {
-            strncat(_buf, &_str[j], _occur_index);
-            strncat(_buf, _replace_with, _replace_str_len);
+            memcpy(&_buf[w], &_str[j], _occur_index);
+            w += _occur_index;
+            memcpy(&_buf[w], _replace_with, _replace_str_len);
+            w += _replace_str_len;
             j += _occur_index + _find_str_len;
             o++;
         }
@@ -550,15 +563,18 @@ void __find_and_replace(char *_str, const char *_find_str, const char *_replace_
         }
     }
 
-    if (j < _str_len)
-        strncat(_buf, &_str[j], (_str_len - j));
-    int _fin_len = _str_len - (o * _find_str_len) + (o * _replace_str_len);
-
-    if (strlen(_buf) > 0 && o > 0 && _str_len > _fin_len)
+    if (o > 0)
     {
-        memset(_str, 0, _str_len);
-        memcpy(_str, _buf, _fin_len + 1);
+        memcpy(&_buf[w], &_str[j], _str_len - j);
+        w += _str_len - j;
+        _buf[w] = 0;
+
+        if (w < _max_len)
+        {
+            memcpy(_str, _buf, w + 1);
+        }
     }
+
     pdiutil::safe_delete_array(_buf);
 }
 

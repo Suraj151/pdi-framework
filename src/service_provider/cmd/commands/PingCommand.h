@@ -22,6 +22,7 @@ created Date    : 23rd July 2026
 #define PING_CMD_DEFAULT_COUNT   4
 #define PING_CMD_MAX_COUNT       10
 #define PING_CMD_PER_PACKET_MS   1500
+#define PING_CMD_BUSY_WAIT_MS    MILLISECOND_DURATION_10000
 
 /**
  * ping command
@@ -88,6 +89,30 @@ struct PingCommand : public CommandBase {
 		if( count > PING_CMD_MAX_COUNT ) count = PING_CMD_MAX_COUNT;
 
 		m_terminal->putln();
+
+		uint32_t waited = 0;
+		while( __i_ping.isPingBusy() && waited < PING_CMD_BUSY_WAIT_MS ){
+			if( 0 == waited ){
+				m_terminal->write_ro(RODT_ATTR("waiting for another ping to finish"));
+			}
+			__i_dvc_ctrl.wait(50);
+			__i_dvc_ctrl.yield();
+			waited += 50;
+			if( 0 == (waited % MILLISECOND_DURATION_1000) ){
+				m_terminal->write_ro(RODT_ATTR("."));
+				m_terminal->commit();
+			}
+		}
+
+		if( waited > 0 ){
+			m_terminal->putln();
+		}
+
+		if( __i_ping.isPingBusy() ){
+			m_terminal->writeln_ro(RODT_ATTR("ping: another ping is in progress, try again"));
+			return CMD_RESULT_FAILED;
+		}
+
 		ipaddress_t ip;
 		if( !NameResolver::resolve(host.c_str(), ip) ){
 			m_terminal->write_ro(RODT_ATTR("ping: cannot resolve host: "));
@@ -130,6 +155,7 @@ struct PingCommand : public CommandBase {
 		while( !__i_ping.isPingComplete() && (__i_dvc_ctrl.millis_now() - start) < budget ){
 			__i_dvc_ctrl.wait(50);
 			__i_dvc_ctrl.yield();
+			m_terminal->commit();
 		}
 
 		const ping_stats_t &st = __i_ping.getPingStats();

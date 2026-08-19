@@ -121,6 +121,11 @@ bool PingInterface::isPingComplete(){
   return _ping_complete;
 }
 
+bool PingInterface::isPingBusy(){
+
+  return (_ping_count > 0) && !_ping_complete;
+}
+
 bool PingInterface::isHostRespondingToPing(){
 
   return _host_resp;

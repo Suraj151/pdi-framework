@@ -327,7 +327,7 @@ void DeviceIotServiceProvider::configureMQTT(){
   _mqtt_lwt_configs.will_qos = 1;
   _mqtt_lwt_configs.will_retain = 0;
   pdiutil::string duid_placeholder = CHARPTR_WRAP("[duid]");
-  __find_and_replace( _mqtt_lwt_configs.will_message, duid_placeholder.c_str(), this->m_device_iot_configs.device_iot_duid, 2 );
+  __find_and_replace( _mqtt_lwt_configs.will_message, duid_placeholder.c_str(), this->m_device_iot_configs.device_iot_duid, 2, MQTT_WILL_MSG_BUF_SIZE );
 
   __database_service.set_mqtt_general_config_table( &_mqtt_general_configs );
   __database_service.set_mqtt_lwt_config_table( &_mqtt_lwt_configs );

@@ -100,7 +100,7 @@ public:
 		// Prepare the path to fetch
 		pdiutil::string currentpath = __i_fs.getHomeDirectory();
 		__i_fs.appendFileSeparator(currentpath);
-		if(this->m_web_resource->m_server->hasArg("cp")){
+		if(!this->m_web_resource->m_server->arg("cp").empty()){
 			pdiutil::string cp = this->m_web_resource->m_server->arg("cp");
 			__i_fs.updatePathNotations(cp.c_str(), currentpath);
 			currentpath.replace("//", "/"); // avoid double file seperator in path
@@ -301,7 +301,7 @@ public:
 
 		pdiutil::string loc = WEB_SERVER_HOME_ROUTE;
 		pdiutil::string currentdir;
-		if(this->m_web_resource->m_server->hasArg("loc")){
+		if(!this->m_web_resource->m_server->arg("loc").empty()){
 			loc = this->m_web_resource->m_server->arg("loc");
 			currentdir = loc;
 
@@ -381,7 +381,7 @@ public:
 		// Prepare the path to fetch
 		pdiutil::string currentpath = __i_fs.getHomeDirectory();
 		__i_fs.appendFileSeparator(currentpath);
-		if(this->m_web_resource->m_server->hasArg("cp")){
+		if(!this->m_web_resource->m_server->arg("cp").empty()){
 			pdiutil::string cp = this->m_web_resource->m_server->arg("cp");
 			__i_fs.updatePathNotations(cp.c_str(), currentpath);
 			currentpath.replace("//", "/"); // avoid double file seperator in path
@@ -517,12 +517,12 @@ public:
 		}
 
 		pdiutil::string loc = WEB_SERVER_HOME_ROUTE;
-		if(this->m_web_resource->m_server->hasArg("df")){
+		if(!this->m_web_resource->m_server->arg("df").empty()){
 
 			pdiutil::string df = this->m_web_resource->m_server->arg("df");
 			pdiutil::string currentdir;
 
-			if(this->m_web_resource->m_server->hasArg("loc")){
+			if(!this->m_web_resource->m_server->arg("loc").empty()){
 				loc = this->m_web_resource->m_server->arg("loc");
 				currentdir = loc;
 

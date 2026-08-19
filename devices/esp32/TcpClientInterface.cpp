@@ -171,9 +171,7 @@ int8_t TcpClientInterface::connected() {
  */
 int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
 
-    TCP_GUARD_BEGIN
     if (!m_isConnected || !m_pcb) {
-        TCP_GUARD_END
         return PDI_ERR_STATE;
     }
 
@@ -185,38 +183,75 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
 
     err_t err = ERR_OK;
     int32_t total_sent = 0;
+    uint32_t waited = 0;
 
     while (total_sent < size) {
 
         int32_t remaining = size - total_sent;
-        int32_t chunk = std::min(remaining, (int32_t)TCP_SND_BUF);
+        uint16_t avail = 0;
+
+        {
+            TCP_GUARD_BEGIN
+            avail = m_pcb ? tcp_sndbuf(m_pcb) : 0;
+            TCP_GUARD_END
+        }
+
+        if (0 == avail || ERR_MEM == err) {
+
+            if (!m_pcb || waited >= TCP_WRITE_DRAIN_TIMEOUT_MS) {
+                break;
+            }
+
+            {
+                TCP_GUARD_BEGIN
+                err = m_pcb ? tcp_output(m_pcb) : ERR_CLSD;
+                TCP_GUARD_END
+            }
+
+            __i_dvc_ctrl.wait(1);
+            __i_dvc_ctrl.yield();
+            waited++;
+            continue;
+        }
+
+        int32_t chunk = std::min(remaining, (int32_t)avail);
 
         if (chunk < remaining)
             flags |= TCP_WRITE_FLAG_MORE;
 
-        err = tcp_write(m_pcb, c_str + total_sent, chunk, flags);
-        if (err != ERR_OK) {
+        {
+            TCP_GUARD_BEGIN
+            err = m_pcb ? tcp_write(m_pcb, c_str + total_sent, chunk, flags) : ERR_CLSD;
             TCP_GUARD_END
+        }
+
+        if (ERR_MEM == err) {
+            continue;
+        }
+
+        if (err != ERR_OK) {
             return PDI_ERR_FROM_LWIP(err);
         }
 
         total_sent += chunk;
+        waited = 0;
     }
 
     if (m_isLastWriteAcked){
 
+        TCP_GUARD_BEGIN
         m_isLastWriteAcked = false;
-        err = tcp_output(m_pcb);
+        err = m_pcb ? tcp_output(m_pcb) : ERR_CLSD;
+        TCP_GUARD_END
+
         if (err != ERR_OK) {
-            TCP_GUARD_END
             return PDI_ERR_FROM_LWIP(err);
         }
     }
-    TCP_GUARD_END
 
     __i_dvc_ctrl.yield();
 
-    return size;
+    return total_sent;
 }
 
 /**

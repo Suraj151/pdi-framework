@@ -27,6 +27,7 @@ static void on_ping_success( esp_ping_handle_t hdl, void *args ){
   esp_ping_get_profile(hdl, ESP_PING_PROF_TIMEGAP, &elapsed, sizeof(elapsed));
 
   _host_resp = true;
+  _ping_stats.m_transmitted++;
   _ping_stats.m_received++;
   if (_ping_stats.m_received == 1 || elapsed < _ping_stats.m_min_ms) _ping_stats.m_min_ms = elapsed;
   if (elapsed > _ping_stats.m_max_ms) _ping_stats.m_max_ms = elapsed;
@@ -46,6 +47,7 @@ static void on_ping_timeout( esp_ping_handle_t hdl, void *args ){
   esp_ping_get_profile(hdl, ESP_PING_PROF_SEQNO, &seqno, sizeof(seqno));
 
   _host_resp = false;
+  _ping_stats.m_transmitted++;
   if (_ping_pkt_cb) {
     ping_pkt_t pkt = { seqno, false, 0 };
     _ping_pkt_cb((void*)&pkt);
@@ -126,6 +128,11 @@ bool PingInterface::ping( const ipaddress_t &target, uint16_t count, CallBackVoi
 bool PingInterface::isPingComplete(){
 
   return _ping_complete;
+}
+
+bool PingInterface::isPingBusy(){
+
+  return (nullptr != _ping_hdl) && !_ping_complete;
 }
 
 bool PingInterface::isHostRespondingToPing(){

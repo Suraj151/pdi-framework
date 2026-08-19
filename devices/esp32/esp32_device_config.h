@@ -43,6 +43,10 @@ extern portMUX_TYPE __pdi_critical_mux;
 #define CMD_OPTION_MAX              6   ///< Maximum number of options for a command.
 #define CMD_OPTION_SIZE_MAX         3   ///< Maximum size of an option.
 
+#define PDI_MAX_SESSIONS            6
+#define SSH_MAX_SESSIONS            4
+#define TCP_WRITE_DRAIN_TIMEOUT_MS  (MILLISECOND_DURATION_1000/2)
+
 /**
  * gpio pin counts - per esp32 variant
  * C3 and H2 have fewer GPIOs available after excluding flash/USB/UART/boot-strap,

@@ -123,6 +123,7 @@ struct SSHKeygenCommand : public CommandBase {
 
 				m_terminal->putln();
 				m_terminal->writeln_ro(RODT_ATTR("Generating RSA key, this may take a while..."));
+				m_terminal->commit();
 
 				bn_set_yield_hook([](){ __i_dvc_ctrl.yield(); });
 				bool gen = rsa_generate_keypair(key, SSH_RSA_KEY_BITS, LWSSH::ssh_rng_fill);

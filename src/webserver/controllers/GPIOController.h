@@ -580,7 +580,7 @@ public:
 				__appendUintToBuff(_label, "d%d", _pin, 5);
 
 				uint16_t _val = StringToUint16(this->m_web_resource->m_server->arg(_label).c_str());
-				if (this->m_web_resource->m_server->hasArg(_label))
+				if (!this->m_web_resource->m_server->arg(_label).empty())
 				{
 					__gpio_service.m_gpio_config_copy.gpio_readings[_pin] = __i_dvc_ctrl.isExceptionalGpio(_pin) ? 0 : _val;
 
@@ -829,7 +829,7 @@ public:
 						__appendUintToBuff(_label, "d%d", _evtidx, 7);
 						__appendUintToBuff(_event_label, "al%d", _evtidx, 7);
 
-						if (this->m_web_resource->m_server->hasArg(_label) && this->m_web_resource->m_server->hasArg(_event_label))
+						if (!this->m_web_resource->m_server->arg(_label).empty() && !this->m_web_resource->m_server->arg(_event_label).empty())
 						{
 							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventCondition = EQUAL;
 							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventConditionValue = StringToUint16(this->m_web_resource->m_server->arg(_label).c_str());
@@ -851,7 +851,7 @@ public:
 						__appendUintToBuff(_event_label, "anlt%d", _evtidx, 7);
 						__appendUintToBuff(_event_value, "aval%d", _evtidx, 7);
 
-						if (this->m_web_resource->m_server->hasArg(_label) && this->m_web_resource->m_server->hasArg(_event_value) && this->m_web_resource->m_server->hasArg(_event_label))
+						if (!this->m_web_resource->m_server->arg(_label).empty() && !this->m_web_resource->m_server->arg(_event_value).empty() && !this->m_web_resource->m_server->arg(_event_label).empty())
 						{
 							
 							__gpio_service.m_gpio_config_copy.gpio_events[_evtidx].eventCondition = StringToUint8(this->m_web_resource->m_server->arg(_label).c_str());

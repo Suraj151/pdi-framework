@@ -139,12 +139,12 @@ int32_t SSHClientInterface::write_ro(const char *c_str){
         int to_write = pdistd::min(sizeof(buff), (size_t)(len - n));
         memcpy_ro(buff, p, to_write);
         auto written = write(buff, to_write);
-        n += written;
-        p += written;
-        if (!written) {
+        if (written <= 0) {
             // Some error, write() should write at least 1 byte before returning
             break;
         }
+        n += written;
+        p += written;
     }
     return n;
 }
@@ -293,6 +293,9 @@ int32_t SSHClientInterface::commit(){
  */
 void SSHClientInterface::setReceivedChannelData(pdiutil::vector<uint8_t> &recvpayload){
     m_received_data.insert(m_received_data.end(), recvpayload.begin(), recvpayload.end());
+    if(m_client_session){
+        m_client_session->markActive();
+    }
 }
 
 

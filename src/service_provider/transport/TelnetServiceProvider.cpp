@@ -23,9 +23,10 @@ created Date    : 1st May 2025
  * Sets the service type to SERVICE_TELNET and the service name to "Telnet".
  */
 TelnetServiceProvider::TelnetServiceProvider() : 
-    m_server(nullptr), 
+    m_server(nullptr),
     m_client(nullptr),
-    ServiceProvider(SERVICE_TELNET, RODT_ATTR("Telnet")) 
+    m_last_activity(0),
+    ServiceProvider(SERVICE_TELNET, RODT_ATTR("Telnet"))
 {}
 
 
@@ -136,14 +137,25 @@ void TelnetServiceProvider::handle() {
                 __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln_ro(RODT_ATTR("Telnet Client Session started."));
             }
 
-            __cmd_service.useTerminal(m_client);
-            #endif            
+            if( !__cmd_service.useTerminal(m_client) ){
+                closeClient();
+                return;
+            }
+            #endif
+            m_last_activity = __i_dvc_ctrl.millis_now();
         }
     }
 
     if (m_client && m_client->connected()) {
 
+        if( (__i_dvc_ctrl.millis_now() - m_last_activity) > TELNET_SHELL_IDLE_MS ){
+            closeClient();
+            return;
+        }
+
         if( m_client->available() ){
+
+            m_last_activity = __i_dvc_ctrl.millis_now();
 
             // process and execute if command has provided
             #ifdef ENABLE_CMD_SERVICE

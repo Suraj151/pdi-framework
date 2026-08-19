@@ -256,20 +256,17 @@ void SSHServer::serviceSession() {
     // If a client is connected, handle the SSH session
     if (m_session && m_session->m_client && m_session->m_client->connected()) {
 
-        // Idle reaping for SFTP subsystem sessions only. Shell sessions are
-        // not reaped because a human may pause at the prompt for a long
-        // time; sftp clients are machine-driven and any silence past the
-        // window means the client was suspended/killed.
-        if (m_session->current_channel.req_type == "subsystem" &&
-            m_session->current_channel.subsystem_req.subsystem.find("sftp") == 0 &&
-            m_session->m_state == LWSSHSession::SESSION_STATE_CHANNEL_REQUEST) {
+        if (m_session->m_state == LWSSHSession::SESSION_STATE_CHANNEL_REQUEST ||
+            m_session->m_state == LWSSHSession::SESSION_STATE_SESSION_ESTABLISHED) {
 
-            // Use a longer idle window for sftp; default 10s is for handshake.
-            m_session->m_session_timeout = 120000; // 2 minutes
+            bool is_sftp = (m_session->current_channel.req_type == "subsystem" &&
+                            m_session->current_channel.subsystem_req.subsystem.find("sftp") == 0);
+
+            m_session->m_session_timeout = is_sftp ? SSH_SFTP_IDLE_MS : SSH_SHELL_IDLE_MS;
 
             if (m_session->m_client->available() > 0) {
                 // Activity from client: refresh idle timestamp
-                m_session->m_last_recv_timestamp = __i_dvc_ctrl.millis_now();
+                m_session->markActive();
             } else if (m_session->isSessionTimeout()) {
                 m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_TIMEOUT;
             }
@@ -690,12 +687,30 @@ void LWSSH::SSHServer::handleAuthentication(){
                 if( sent_pk_ok ){
                     // Waiting for the signed request; nothing else to do
                 }else if( authed ){
-                    pdiutil::vector<uint8_t> reply;
-                    reply.push_back(SSH2_MSG_USERAUTH_SUCCESS); // 52
-                    if( send_server_ssh_packet(m_session, reply, true) ){
-                        SessionManager::attach(m_session->m_sshclient);
-                        __auth_service.setAuthorized(true);
-                        m_session->m_state = LWSSHSession::SESSION_STATE_CHANNEL_REQUEST;
+                    if( nullptr == SessionManager::attach(m_session->m_sshclient) ){
+                        SysLogW("SSH: no free session, refusing login\n");
+
+                        const char *nofree = "no session available";
+                        pdiutil::vector<uint8_t> bye;
+                        bye.push_back(SSH2_MSG_DISCONNECT);
+                        bye.push_back((SSH2_DISCONNECT_TOO_MANY_CONNECTIONS >> 24) & 0xFF);
+                        bye.push_back((SSH2_DISCONNECT_TOO_MANY_CONNECTIONS >> 16) & 0xFF);
+                        bye.push_back((SSH2_DISCONNECT_TOO_MANY_CONNECTIONS >> 8) & 0xFF);
+                        bye.push_back(SSH2_DISCONNECT_TOO_MANY_CONNECTIONS & 0xFF);
+                        append_ssh_string(bye, nofree, strlen(nofree));
+                        append_ssh_string(bye, "", 0);
+                        send_server_ssh_packet(m_session, bye, true);
+
+                        m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+                    }else{
+                        pdiutil::vector<uint8_t> reply;
+                        reply.push_back(SSH2_MSG_USERAUTH_SUCCESS); // 52
+                        if( send_server_ssh_packet(m_session, reply, true) ){
+                            __auth_service.setAuthorized(true);
+                            m_session->m_state = LWSSHSession::SESSION_STATE_CHANNEL_REQUEST;
+                        }else{
+                            SessionManager::detach(m_session->m_sshclient);
+                        }
                     }
                 }else{
                     pdiutil::vector<uint8_t> reply;

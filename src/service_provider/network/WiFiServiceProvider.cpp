@@ -116,6 +116,18 @@ void WiFiServiceProvider::handleInternetConnectivity(){
     memset(__status_wifi.ignore_bssid, 0, 6);
   }else{
 
+    if( __i_ping.isPingBusy() ){
+
+      if( 0 == m_ping_busy_since ){
+        m_ping_busy_since = __i_dvc_ctrl.millis_now();
+      }
+
+      if( (__i_dvc_ctrl.millis_now() - m_ping_busy_since) < INTERNET_CHECK_MAX_PING_BUSY_WAIT ){
+        return;
+      }
+    }
+    m_ping_busy_since = 0;
+
     ipaddress_t ping_target(DEFAULT_DNS_IP[0], DEFAULT_DNS_IP[1], DEFAULT_DNS_IP[2], DEFAULT_DNS_IP[3]);
     bool ping_ret = __i_ping.ping(ping_target, 1);
     bool ping_resp = __i_ping.isHostRespondingToPing();

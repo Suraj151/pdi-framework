@@ -33,6 +33,8 @@ created Date    : 1st Jan 2026
 #define strncmp_ro strncmp_P
 #define memcpy_ro memcpy_P
 
+#define TCP_WRITE_DRAIN_TIMEOUT_MS    (MILLISECOND_DURATION_1000/2)
+
 /**
  * gpio pin counts
  */

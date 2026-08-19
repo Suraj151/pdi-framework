@@ -225,11 +225,41 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
 
     err_t err = ERR_OK;
     int32_t total_sent = 0;
+    uint32_t waited = 0;
 
     while (total_sent < size) {
 
         int32_t remaining = size - total_sent;
-        int32_t chunk = std::min(remaining, (int32_t)TCP_SND_BUF); // TCP_SND_BUF is lwIP's max send size
+
+        #ifdef ENABLE_CONTEXTUAL_EXECUTION
+        __lwip_mutex.critical_lock();
+        #endif
+        uint16_t avail = m_pcb ? tcp_sndbuf(m_pcb) : 0;
+        #ifdef ENABLE_CONTEXTUAL_EXECUTION
+        __lwip_mutex.critical_unlock();
+        #endif
+
+        if (0 == avail || ERR_MEM == err) {
+
+            if (!m_pcb || waited >= TCP_WRITE_DRAIN_TIMEOUT_MS) {
+                break;
+            }
+
+            #ifdef ENABLE_CONTEXTUAL_EXECUTION
+            __lwip_mutex.critical_lock();
+            #endif
+            err = m_pcb ? tcp_output(m_pcb) : ERR_CLSD;
+            #ifdef ENABLE_CONTEXTUAL_EXECUTION
+            __lwip_mutex.critical_unlock();
+            #endif
+
+            __i_dvc_ctrl.wait(1);
+            __i_dvc_ctrl.yield();
+            waited++;
+            continue;
+        }
+
+        int32_t chunk = std::min(remaining, (int32_t)avail);
 
         // uint8_t flags = TCP_WRITE_FLAG_COPY;
         if (chunk < remaining)
@@ -244,11 +274,17 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
         __lwip_mutex.critical_unlock();
         #endif
+
+        if (ERR_MEM == err) {
+            continue;
+        }
+
         if (err != ERR_OK) {
             return PDI_ERR_FROM_LWIP(err); // Return error code if write fails
         }
 
         total_sent += chunk;
+        waited = 0;
     }
 
     // Ensure last write has been ackowledged
@@ -271,7 +307,7 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
 
     __i_dvc_ctrl.yield();
 
-    return size;
+    return total_sent;
 }
 
 /**
@@ -288,12 +324,12 @@ int32_t TcpClientInterface::write_ro(const char *c_str)
         size_t to_write = std::min(sizeof(buff), (size_t)(len - n));
         memcpy_P(buff, p, to_write);
         auto written = write(buff, to_write);
-        n += written;
-        p += written;
-        if (!written) {
+        if (written <= 0) {
             // Some error, write() should write at least 1 byte before returning
             break;
         }
+        n += written;
+        p += written;
     }
     return n;
 }

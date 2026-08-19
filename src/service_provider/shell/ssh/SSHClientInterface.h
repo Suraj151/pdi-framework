@@ -29,7 +29,7 @@ public:
     SSHClientInterface(iTcpClientInterface* tcpclient) : 
         m_tcpClient(tcpclient), 
         m_client_session(nullptr),
-        m_minSizeToWritePayload(100),
+        m_minSizeToWritePayload(1024),
         m_writeCommitTaskId(-1)
     {}
     

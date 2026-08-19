@@ -492,7 +492,7 @@ int16_t Http_Client::GetAsync(const char *url, CallBackVoidPointerArgFn on_compl
         }
     }
 
-#ifdef ENABLE_HTTP_ASYNC_REQUEST
+#ifdef ENABLE_HTTP_CLIENT_ASYNC_REQUEST
 
     if (watched)
     {

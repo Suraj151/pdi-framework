@@ -450,9 +450,9 @@ void TaskScheduler::handle_tasks()
                 if( _exec->is_finished() ){
                     _exec->reap();
                     if( _task.m_finalizer ){
-                        CallBackVoidArgFn _fin = _task.m_finalizer;
+                        CallBackVoidPointerArgFn _fin = _task.m_finalizer;
                         _task.m_finalizer = nullptr;
-                        _fin();
+                        _fin(&_task);
                     }
                 }
             }
@@ -562,6 +562,15 @@ void TaskScheduler::remove_expired_tasks()
     {
         if (this->m_tasks[i].m_task_id >= 0 && this->m_tasks[i].m_max_attempts == 0)
         {
+            if (this->m_tasks[i].m_finalizer)
+            {
+                CallBackVoidPointerArgFn _fin = this->m_tasks[i].m_finalizer;
+                CRITICAL_SECTION_ENTER
+                this->m_tasks[i].m_finalizer = nullptr;
+                CRITICAL_SECTION_EXIT
+                _fin(&this->m_tasks[i]);
+            }
+
             // released in place. erasing would shift later entries, and that
             // reassignment frees the callable a running task is executing
             CRITICAL_SECTION_ENTER
@@ -569,6 +578,44 @@ void TaskScheduler::remove_expired_tasks()
             CRITICAL_SECTION_EXIT
         }
     }
+}
+
+/**
+ * @brief Sets the teardown hook run once when a task is reaped.
+ *
+ * @param _id The unique ID of the task.
+ * @param _fn The callback to run when the task is released.
+ * @return True if the task was found and the hook set.
+ */
+bool TaskScheduler::setTaskFinalizer(pdiutil::task_id_t _id, CallBackVoidPointerArgFn _fn)
+{
+    int16_t _index = this->is_registered_task(_id);
+    if (_index < 0)
+    {
+        return false;
+    }
+
+    CRITICAL_SECTION_ENTER
+    this->m_tasks[_index].m_finalizer = _fn;
+    CRITICAL_SECTION_EXIT
+    return true;
+}
+
+/**
+ * @brief Reports whether a task already carries a teardown hook.
+ *
+ * @param _id The unique ID of the task.
+ * @return True when the task exists and has a finalizer set.
+ */
+bool TaskScheduler::hasTaskFinalizer(pdiutil::task_id_t _id)
+{
+    int16_t _index = this->is_registered_task(_id);
+    if (_index < 0)
+    {
+        return false;
+    }
+
+    return (bool)this->m_tasks[_index].m_finalizer;
 }
 
 /**

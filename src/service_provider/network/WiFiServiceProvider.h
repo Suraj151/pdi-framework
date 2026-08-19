@@ -70,6 +70,7 @@ public:
   uint32_t m_last_reconnect_attempt_ms = 0;
   // Count of recovery attempts in the current disconnect window (for logging).
   uint16_t m_reconnect_attempt = 0;
+  uint32_t m_ping_busy_since = 0;
 
 protected:
   /**

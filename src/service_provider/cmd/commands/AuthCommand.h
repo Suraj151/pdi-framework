@@ -79,6 +79,9 @@ struct LoginCommand : public CommandBase {
 				return CMD_RESULT_INCOMPLETE;
 			}
 
+			bool isPasswordAnswered = isWaitingForOption(CMD_OPTION_NAME_P) &&
+									  terminputaction == CMD_TERM_INSEQ_ENTER;
+
 			if( isPasswordProvided ){
 				memcpy(_password, passwordcmdoptn->optionval, passwordcmdoptn->optionvalsize);
 			}else{
@@ -88,12 +91,14 @@ struct LoginCommand : public CommandBase {
 					setWaitingForOption(CMD_OPTION_NAME_U);
 					return CMD_RESULT_ABORTED;
 				}
-				
-				setWaitingForOption(CMD_OPTION_NAME_P);
-				if( nullptr != m_terminal ){
-					m_terminal->write_ro(RODT_ATTR("\nPass : "));
+
+				if( !isPasswordAnswered ){
+					setWaitingForOption(CMD_OPTION_NAME_P);
+					if( nullptr != m_terminal ){
+						m_terminal->write_ro(RODT_ATTR("\nPass : "));
+					}
+					return CMD_RESULT_INCOMPLETE;
 				}
-				return CMD_RESULT_INCOMPLETE;
 			}
 
 			if( strlen(_username) && strlen(_password) && __auth_service.isAuthorized(_username, _password) ){

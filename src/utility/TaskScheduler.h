@@ -182,6 +182,23 @@ public:
     void remove_expired_tasks(void);
 
     /**
+     * @brief Sets the teardown hook run once when a task is reaped.
+     *
+     * @param _id The unique ID of the task.
+     * @param _fn The callback to run when the task is released.
+     * @return True if the task was found and the hook set.
+     */
+    bool setTaskFinalizer(pdiutil::task_id_t _id, CallBackVoidPointerArgFn _fn);
+
+    /**
+     * @brief Reports whether a task already carries a teardown hook.
+     *
+     * @param _id The unique ID of the task.
+     * @return True when the task exists and has a finalizer set.
+     */
+    bool hasTaskFinalizer(pdiutil::task_id_t _id);
+
+    /**
      * @brief Checks if a task is registered.
      *
      * @param _id The unique ID of the task to check.

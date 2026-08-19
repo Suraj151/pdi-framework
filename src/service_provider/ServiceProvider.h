@@ -176,6 +176,15 @@ class ServiceProvider{
         if (m_service_task_ids[i] == _id) return false; // already tracked
       }
       m_service_task_ids[m_service_task_count++] = _id;
+
+      if (!__task_scheduler.hasTaskFinalizer(_id)) {
+        ServiceProvider *_owner = this;
+        __task_scheduler.setTaskFinalizer(_id, [_owner](void *_reaped) {
+          task_t *_task = reinterpret_cast<task_t *>(_reaped);
+          if (nullptr != _task) _owner->untrackServiceTask(_task->m_task_id);
+        });
+      }
+
       // Backward-compat: keep the historical "primary" slot pointing at the
       // first task for services that inspect m_service_routine_task_id directly.
       if (m_service_routine_task_id < 0) m_service_routine_task_id = _id;

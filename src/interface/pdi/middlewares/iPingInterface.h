@@ -42,6 +42,7 @@ class iPingInterface {
     virtual bool isPingComplete( void ) = 0;
     virtual bool isHostRespondingToPing( void ) = 0;
     virtual const ping_stats_t &getPingStats( void ) = 0;
+    virtual bool isPingBusy( void ) = 0;
 };
 
 extern PingInterface __i_ping;

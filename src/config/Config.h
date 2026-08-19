@@ -57,6 +57,10 @@ created Date    : 1st June 2019
 #include "TlsConfig.h"
 #endif
 
+#ifdef ENABLE_TELNET_SERVICE
+#include "TelnetConfig.h"
+#endif
+
 #ifdef ENABLE_SSH_SERVICE
 #include "SshConfig.h"
 #endif

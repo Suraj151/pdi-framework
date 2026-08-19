@@ -923,21 +923,29 @@ cmd_t *CommandLineServiceProvider::getActiveCommandByName(const char *_cmd)
  * @brief Use terminal for command line interaction
  * @param terminal iTerminalInterface* terminal
  */
-void CommandLineServiceProvider::useTerminal(iTerminalInterface *terminal)
+bool CommandLineServiceProvider::useTerminal(iTerminalInterface *terminal)
 {
   setTerminal(terminal);
 
   if( nullptr != terminal ){
     session_t *s = SessionManager::attach(terminal);
+    if( nullptr == s ){
+      SysLogW("CMD: no free session for this terminal\n");
+      terminal->writeln();
+      terminal->writeln_ro(RODT_ATTR("no session available, try again later"));
+      return false;
+    }
     for (int16_t i = 0; i < m_cmdlist.size(); i++){
       if(nullptr != m_cmdlist[i] && m_cmdlist[i]->m_owner == s){
         m_cmdlist[i]->SetTerminal(terminal);
       }
     }
     startInteraction();
-  }else{
-    SessionManager::detachCurrent();
+    return true;
   }
+
+  SessionManager::detachCurrent();
+  return false;
 }
 
 /**

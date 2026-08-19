@@ -108,8 +108,10 @@ void __str_ip_to_int(char *_str, uint8_t *_ip, int _len = 15, bool _clear_str_af
  * @param _find_str The substring to find.
  * @param _replace_with The substring to replace with.
  * @param _occurence The number of occurrences to replace.
+ * @param _max_len Capacity of _str including the terminator. The result is
+ * written back only when it fits; -1 allows no growth beyond the current text.
  */
-void __find_and_replace(char *_str, const char *_find_str, const char *_replace_with, int _occurence);
+void __find_and_replace(char *_str, const char *_find_str, const char *_replace_with, int _occurence, int32_t _max_len = -1);
 
 /**
  * @brief Extracts a value from a JSON string based on a key.

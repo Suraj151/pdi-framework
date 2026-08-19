@@ -176,7 +176,7 @@ struct ElfLoadCommand : public CommandBase {
 		task_t *t = __task_scheduler.get_task(pid);
 		if( nullptr != t ){
 			t->m_stoppable = false;
-			t->m_finalizer = [elf]() {
+			t->m_finalizer = [elf](void *) {
 				esp_elf_deinit(elf);
 				esp_elf_free(elf);
 			};

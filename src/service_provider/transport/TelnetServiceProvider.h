@@ -53,6 +53,7 @@ public:
 private:
     iTcpServerInterface* m_server;
     iClientInterface* m_client;
+    uint64_t m_last_activity;
 };
 
 extern TelnetServiceProvider __telnet_service;

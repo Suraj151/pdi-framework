@@ -19,6 +19,18 @@ created Date    : 1st June 2025
 #define SSH_MAX_SESSIONS 2
 #endif
 
+#ifndef SSH_HANDSHAKE_IDLE_MS
+#define SSH_HANDSHAKE_IDLE_MS 10000
+#endif
+
+#ifndef SSH_SFTP_IDLE_MS
+#define SSH_SFTP_IDLE_MS 120000
+#endif
+
+#ifndef SSH_SHELL_IDLE_MS
+#define SSH_SHELL_IDLE_MS 500000
+#endif
+
 #define SSH_DEFAULT_DIR ".ssh"
 #define SSH_KEY_ALGO_ED25519_STR "ed25519"
 #define SSH_KEY_ALGO_RSA_STR "rsa"

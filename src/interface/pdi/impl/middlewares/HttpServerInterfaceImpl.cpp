@@ -212,7 +212,12 @@ void HttpServerInterfaceImpl::close(){
  * on uri find call registered handler
  */
 void HttpServerInterfaceImpl::on(const pdiutil::string &uri, CallBackVoidArgFn handler){
+    uint32_t before = m_uriHandlerMap.size();
     m_uriHandlerMap.push_back({uri, handler});
+
+    if (m_uriHandlerMap.size() == before) {
+        SysLogE("HTTP: route %s not registered, out of memory\n", uri.c_str());
+    }
 }
 
 /**
@@ -249,10 +254,26 @@ pdiutil::string HttpServerInterfaceImpl::arg(const pdiutil::string &name) const 
 
 /**
  * hasArg
- * check if argument exists
+ * check if argument exists. an argument submitted with an empty value still
+ * exists, so a form clearing a field is not mistaken for a form never sent.
  */
 bool HttpServerInterfaceImpl::hasArg(const pdiutil::string &name) const{
-    return !arg(name).empty();
+    for (uint32_t j = 0; j < m_clientRequest.queries.size(); j++){
+        if (m_clientRequest.queries[j].isKeyMatch(name.c_str())) {
+            return true;
+        }
+    }
+    for (uint32_t j = 0; j < m_clientRequest.formdata.size(); j++){
+        if (m_clientRequest.formdata[j].isKeyMatch(name.c_str())) {
+            return true;
+        }
+    }
+    for (uint32_t j = 0; j < m_clientRequest.files.size(); j++){
+        if (m_clientRequest.files[j].isKeyMatch(name.c_str())) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /**
