@@ -621,14 +621,20 @@ int32_t TlsClientInterface::write(const uint8_t* data, uint32_t size) {
     if (!m_tls->handshakeDone) return 0;
 
     uint32_t written = 0;
+    uint32_t waited = 0;
     while (written < size) {
         int rc = mbedtls_ssl_write(&m_tls->ssl, data + written, size - written);
         if (rc > 0) {
             written += rc;
+            waited = 0;
             continue;
         }
         if (rc == MBEDTLS_ERR_SSL_WANT_READ || rc == MBEDTLS_ERR_SSL_WANT_WRITE) {
+            if (!m_pcb || !m_isConnected || waited >= TCP_WRITE_DRAIN_TIMEOUT_MS) {
+                break;
+            }
             __i_dvc_ctrl.wait(1);
+            waited++;
             continue;
         }
         SysLogE("TLS write: ssl_write=%d\n", rc);

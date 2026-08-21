@@ -759,20 +759,29 @@ int32_t TlsClientInterface::write(const uint8_t* data, uint32_t size) {
     br_ssl_engine_context* eng = TLS_ENG;
 
     uint32_t written = 0;
+    uint32_t waited = 0;
     while (written < size) {
         unsigned state = br_ssl_engine_current_state(eng);
         if (state & BR_SSL_CLOSED) break;
-        if (!(state & BR_SSL_SENDAPP)) break;
 
         size_t bufLen = 0;
-        unsigned char* appBuf = br_ssl_engine_sendapp_buf(eng, &bufLen);
-        if (!appBuf || bufLen == 0) break;
+        unsigned char* appBuf = (state & BR_SSL_SENDAPP) ? br_ssl_engine_sendapp_buf(eng, &bufLen) : nullptr;
+
+        if (!appBuf || bufLen == 0) {
+            if (!m_pcb || !m_isConnected || waited >= TCP_WRITE_DRAIN_TIMEOUT_MS) break;
+            br_ssl_engine_flush(eng, 0);
+            pumpEngine();
+            __i_dvc_ctrl.wait(1);
+            waited++;
+            continue;
+        }
 
         uint32_t toCopy = size - written;
         if (toCopy > bufLen) toCopy = bufLen;
         memcpy(appBuf, data + written, toCopy);
         br_ssl_engine_sendapp_ack(eng, toCopy);
         written += toCopy;
+        waited = 0;
 
         br_ssl_engine_flush(eng, 0);
         pumpEngine();

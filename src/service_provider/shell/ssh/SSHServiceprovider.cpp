@@ -262,13 +262,25 @@ void SSHServer::serviceSession() {
             bool is_sftp = (m_session->current_channel.req_type == "subsystem" &&
                             m_session->current_channel.subsystem_req.subsystem.find("sftp") == 0);
 
-            m_session->m_session_timeout = is_sftp ? SSH_SFTP_IDLE_MS : SSH_SHELL_IDLE_MS;
+            session_t *termsession = m_session->m_sshclient ?
+                SessionManager::findByTerminal(m_session->m_sshclient) : nullptr;
 
-            if (m_session->m_client->available() > 0) {
-                // Activity from client: refresh idle timestamp
-                m_session->markActive();
-            } else if (m_session->isSessionTimeout()) {
-                m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_TIMEOUT;
+            if (!is_sftp && nullptr != termsession) {
+
+                if (__cmd_service.isSessionBusy(termsession)) {
+                    termsession->m_lastActivityAt = (uint32_t)__i_dvc_ctrl.millis_now();
+                } else if (((uint32_t)__i_dvc_ctrl.millis_now() - termsession->m_lastActivityAt) > SSH_SHELL_IDLE_MS) {
+                    m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_TIMEOUT;
+                }
+            } else {
+
+                m_session->m_session_timeout = is_sftp ? SSH_SFTP_IDLE_MS : SSH_SHELL_IDLE_MS;
+
+                if (m_session->m_client->available() > 0) {
+                    m_session->markActive();
+                } else if (m_session->isSessionTimeout()) {
+                    m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_TIMEOUT;
+                }
             }
         }
 
@@ -955,28 +967,21 @@ void LWSSH::SSHServer::handleChannelRequest(){
                     reply.push_back(exit_status & 0xFF);
                     send_server_ssh_packet(m_session, reply, true);
 
-                    // Schedule task in queue to send channel closure request
-                    // if client not send close channel request within timeout
+                    __i_dvc_ctrl.wait(10);
+                    reply.clear();
+                    reply.push_back(SSH2_MSG_CHANNEL_CLOSE); // 97
+                    reply.push_back((m_session->current_channel.client_channel_id >> 24) & 0xFF);
+                    reply.push_back((m_session->current_channel.client_channel_id >> 16) & 0xFF);
+                    reply.push_back((m_session->current_channel.client_channel_id >> 8) & 0xFF);
+                    reply.push_back(m_session->current_channel.client_channel_id & 0xFF);
+                    send_server_ssh_packet(m_session, reply, true);
+                    m_session->current_channel.ischannelreqsuccess = -1;
+
                     __task_scheduler.setTimeout( [&]() {
-
-                        if( nullptr != m_session && m_session->current_channel.ischannelreqsuccess >= 0 ){
-
-                            pdiutil::vector<uint8_t> chclose;
-                            chclose.push_back(SSH2_MSG_CHANNEL_CLOSE); // 97
-                            // recipient channel (client's channel id)
-                            chclose.push_back((m_session->current_channel.client_channel_id >> 24) & 0xFF);
-                            chclose.push_back((m_session->current_channel.client_channel_id >> 16) & 0xFF);
-                            chclose.push_back((m_session->current_channel.client_channel_id >> 8) & 0xFF);
-                            chclose.push_back(m_session->current_channel.client_channel_id & 0xFF);
-
-                            if(send_server_ssh_packet(m_session, chclose, true)){
-                                m_session->current_channel.ischannelreqsuccess = -1;
-                                m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
-                            }else{
-                                m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
-                            }
+                        if( nullptr != m_session ){
+                            m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
                         }
-                    }, 500, __i_dvc_ctrl.millis_now() );
+                    }, SSH_CHANNEL_CLOSE_GRACE_MS, __i_dvc_ctrl.millis_now() );
                 }else{
                     m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
                 }

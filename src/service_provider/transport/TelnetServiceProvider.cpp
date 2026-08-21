@@ -148,9 +148,21 @@ void TelnetServiceProvider::handle() {
 
     if (m_client && m_client->connected()) {
 
-        if( (__i_dvc_ctrl.millis_now() - m_last_activity) > TELNET_SHELL_IDLE_MS ){
-            closeClient();
-            return;
+        session_t *termsession = SessionManager::findByTerminal(m_client);
+
+        if( nullptr != termsession && __cmd_service.isSessionBusy(termsession) ){
+            termsession->m_lastActivityAt = (uint32_t)__i_dvc_ctrl.millis_now();
+            m_last_activity = __i_dvc_ctrl.millis_now();
+        }else{
+
+            uint32_t idle = nullptr != termsession ?
+                ((uint32_t)__i_dvc_ctrl.millis_now() - termsession->m_lastActivityAt) :
+                ((uint32_t)__i_dvc_ctrl.millis_now() - m_last_activity);
+
+            if( idle > TELNET_SHELL_IDLE_MS ){
+                closeClient();
+                return;
+            }
         }
 
         if( m_client->available() ){

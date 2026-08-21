@@ -972,6 +972,21 @@ void CommandLineServiceProvider::releaseSession(session_t *session)
   }
 }
 
+bool CommandLineServiceProvider::isSessionBusy(session_t *session)
+{
+  if( nullptr == session ) return false;
+
+  for (int16_t i = 0; i < static_cast<int16_t>(m_cmdlist.size()); i++){
+
+    cmd_t *cmd = m_cmdlist[i];
+    if(nullptr != cmd && cmd->m_owner == session &&
+       (cmd->isRunningInBackground() || cmd->isWaitingForOption())){
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
  * @brief Get command executed from history by index
  * @param cmdExec pdiutil::string &cmdExec

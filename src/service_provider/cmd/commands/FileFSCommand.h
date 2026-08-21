@@ -528,19 +528,46 @@ struct FileEditCommand : public CommandBase {
 	   The active line was already committed when the ESC menu opened; the
 	   buffer now holds the "!w" token, so must not be committed again. */
 	cmd_result_t finalizeSave(session_t *s){
+		pdi_err_t ret = PDI_OK;
+		pdiutil::string retstr = CHARPTR_WRAP("saved");
 		if( __i_fs.isFileExist(m_origpath.c_str()) ){
-			__i_fs.deleteFile(m_origpath.c_str());
+			ret = __i_fs.deleteFile(m_origpath.c_str());
 		}
-		__i_fs.rename(m_tmppath.c_str(), m_origpath.c_str());
-		return closeEditor(s, RODT_ATTR("saved"));
+
+		if(ret < 0){
+			retstr = CHARPTR_WRAP("err : ");
+			retstr += pdiutil::to_string((int)(ret));
+
+			if( __i_fs.isFileExist(m_tmppath.c_str()) ){
+				__i_fs.deleteFile(m_tmppath.c_str());
+			}
+
+			return closeEditor(s, retstr.c_str());
+		}
+
+		ret = __i_fs.rename(m_tmppath.c_str(), m_origpath.c_str());
+
+		if(ret < 0){
+			retstr = CHARPTR_WRAP("err : ");
+			retstr += pdiutil::to_string((int)(ret)); 
+
+			if( __i_fs.isFileExist(m_tmppath.c_str()) ){
+				__i_fs.deleteFile(m_tmppath.c_str());
+			}
+
+			return closeEditor(s, retstr.c_str());
+		}
+
+		return closeEditor(s, retstr.c_str());
 	}
 
 	/* Discard the working copy and close the editor */
 	cmd_result_t cancelEdit(session_t *s){
+		pdiutil::string retstr = CHARPTR_WRAP("cancelled");
 		if( __i_fs.isFileExist(m_tmppath.c_str()) ){
 			__i_fs.deleteFile(m_tmppath.c_str());
 		}
-		return closeEditor(s, RODT_ATTR("cancelled"));
+		return closeEditor(s, retstr.c_str());
 	}
 
 	/* Tear down editor state and hand the terminal back to the shell */
@@ -552,7 +579,7 @@ struct FileEditCommand : public CommandBase {
 		m_terminal->write_ro(RODT_ATTR("fedit "));
 		m_terminal->write(m_origpath.c_str());
 		m_terminal->write_ro(RODT_ATTR(" : "));
-		m_terminal->write_ro(msg);
+		m_terminal->write(msg);
 		s->m_linebuf.clear();
 		s->m_cursor = 0;
 		return CMD_RESULT_OK;

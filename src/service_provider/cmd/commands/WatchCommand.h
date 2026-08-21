@@ -138,8 +138,10 @@ struct WatchCommand : public CommandBase {
 						__task_scheduler.remove_task(m_watchtaskid);
 						m_watchtaskid = -1;
 					}
+
+					m_terminal->commit();
 				}
-				
+
 			}, interval, 0, __i_dvc_ctrl.millis_now(), numberofiterations, CMD_NAME_WATCH );
 
 			if( m_watchtaskid < 0 ){

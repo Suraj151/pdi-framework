@@ -101,6 +101,7 @@ public:
 	static void startInteraction();
     bool useTerminal(iTerminalInterface *terminal);
 	void releaseSession(session_t *session);
+	bool isSessionBusy(session_t *session);
 	bool getCommandExecutedFromHistory(pdiutil::string &cmdExec, int16_t index, const char* pattern = nullptr);
 
 private:

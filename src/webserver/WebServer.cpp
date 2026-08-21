@@ -82,7 +82,7 @@ bool HttpServer::initService(void *arg)
   }
 
   // Define headers to be tracked by the server
-  const char *headerkeys[] = {"Cookie"};
+  const char *headerkeys[] = {"Cookie", "Host"};
   size_t headerkeyssize = sizeof(headerkeys) / sizeof(char *);
   this->m_server->collectHeaders(headerkeys, headerkeyssize);
 

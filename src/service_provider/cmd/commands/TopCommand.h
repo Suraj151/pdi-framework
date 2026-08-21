@@ -103,6 +103,7 @@ struct TopCommand : public CommandBase {
 			m_terminal->csi_erase_display();
 			m_terminal->csi_cursor_home();
 			__task_scheduler.printPsToTerminal(m_terminal, m_filter_owner);
+			m_terminal->commit();
 		}, interval, 0, __i_dvc_ctrl.millis_now(), iterations, CMD_NAME_TOP );
 
 		if( m_toptaskid < 0 ){

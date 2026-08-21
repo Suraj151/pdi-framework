@@ -784,7 +784,10 @@ void TaskScheduler::printPsToTerminal(iTerminalInterface *terminal, uint8_t filt
     terminal->write_ro(RODT_ATTR("s, "));
     Int32ToString((int32_t)shown, content, 24, 0);
     terminal->write(content);
-    terminal->writeln_ro(RODT_ATTR(" tasks"));
+    terminal->write_ro(RODT_ATTR(" tasks, "));
+    Int32ToString((int32_t)m_util->get_free_heap(), content, 24, 0);
+    terminal->write(content);
+    terminal->writeln_ro(RODT_ATTR(" bytes free heap"));
 
     terminal->write_ro(RODT_ATTR("PID  "));
     terminal->write_ro(RODT_ATTR("OWN  "));

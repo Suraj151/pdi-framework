@@ -31,6 +31,10 @@ created Date    : 1st June 2025
 #define SSH_SHELL_IDLE_MS 500000
 #endif
 
+#ifndef SSH_CHANNEL_CLOSE_GRACE_MS
+#define SSH_CHANNEL_CLOSE_GRACE_MS 3000
+#endif
+
 #define SSH_DEFAULT_DIR ".ssh"
 #define SSH_KEY_ALGO_ED25519_STR "ed25519"
 #define SSH_KEY_ALGO_RSA_STR "rsa"

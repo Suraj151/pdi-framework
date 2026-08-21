@@ -52,66 +52,29 @@ created Date    : 1st June 2019
 #define ENABLE_SERIAL_SERVICE
 
 /**
- * enable/disable concurrency in task scheduling. By default kept disabled.
- * use only if you aware on the task context handling.
- *
- */
-// #define ENABLE_CONTEXTUAL_EXECUTION
-#if defined(ENABLE_CONTEXTUAL_EXECUTION) && !defined(DEVICE_SUPPORTS_CONTEXTUAL_EXECUTION)
-#undef ENABLE_CONTEXTUAL_EXECUTION
-#endif
-
-/**
  * enable/disable dynamic program loading — load a compiled program from the
  * filesystem into RAM and run it at runtime. Each device maps this to its own
  * loadable-binary format (esp32: ELF). Supported only on devices that declare
  * DEVICE_SUPPORTS_PROGRAM_EXEC and with the storage service.
  */
 #define ENABLE_PROGRAM_EXEC
+
 #if defined(ENABLE_PROGRAM_EXEC) && (!defined(DEVICE_SUPPORTS_PROGRAM_EXEC) || !defined(ENABLE_STORAGE_SERVICE))
 #undef ENABLE_PROGRAM_EXEC
 #endif
+
+/**
+ * enable/disable concurrency in task scheduling. By default kept disabled.
+ * use only if you aware on the task context handling.
+ *
+ */
+// #define ENABLE_CONTEXTUAL_EXECUTION
+
 #if defined(ENABLE_PROGRAM_EXEC)
 #define ENABLE_CONTEXTUAL_EXECUTION
 #endif
-
-/**
- * enable/disable tls service which provides the tls server and client instance to be use.
- * NOTE : tls service require more memory for its operations. which leaves minimal memory
- * to use it for app logic so keep this in mind while enabling the tls service.
- * By default kept disabled.
- */
-// #define ENABLE_TLS_SERVICE
-#if defined(ENABLE_TLS_SERVICE) && !defined(DEVICE_SUPPORTS_TLS)
-#undef ENABLE_TLS_SERVICE
-#endif
-#if defined(ENABLE_TLS_SERVICE)
-#define ENABLE_CONTEXTUAL_EXECUTION
-#endif
-
-/**
- * enable/disable tls certificate generation. Supported only on devices
- * that declare DEVICE_SUPPORTS_TLS_CERT_GENERATION.
- */
-#if defined(ENABLE_TLS_SERVICE) && defined(DEVICE_SUPPORTS_TLS_CERT_GENERATION)
-#define ENABLE_TLS_CERT_GENERATION
-#endif
-
-/**
- * enable/disable carrying a http request on a scheduled task instead of blocking
- * the caller. Supported only on devices that declare
- * DEVICE_SUPPORTS_OFFLOOP_NETWORK_TASK, elsewhere the request runs inline.
- */
-#if defined(ENABLE_CONTEXTUAL_EXECUTION) && defined(DEVICE_SUPPORTS_OFFLOOP_NETWORK_TASK)
-#define ENABLE_HTTP_CLIENT_ASYNC_REQUEST
-#endif
-
-/**
- * Build-time gate for on-device generation of the HTTPS server certificate.
- * By default enabled.
- */
-#ifdef ENABLE_TLS_CERT_GENERATION
-#define ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME
+#if defined(ENABLE_CONTEXTUAL_EXECUTION) && !defined(DEVICE_SUPPORTS_CONTEXTUAL_EXECUTION)
+#undef ENABLE_CONTEXTUAL_EXECUTION
 #endif
 
 #ifdef ENABLE_NETWORK_SERVICE
@@ -172,9 +135,7 @@ created Date    : 1st June 2019
  * of device to use https.
  */
 #define ENABLE_HTTP_SERVER
-#if defined(ENABLE_TLS_SERVICE)
 // #define ENABLE_HTTPS_SERVER
-#endif
 
 /**
  * enable/disable http client
@@ -234,6 +195,48 @@ created Date    : 1st June 2019
 #define SWITCHING_DURATION_FOR_NO_INTERNET_CONNECTION WIFI_RECONNECT_TIER2_DURATION + WIFI_RECONNECT_TIER2_GAP
 #endif
 
+/**
+ * enable/disable tls service which provides the tls server and client instance to be use.
+ * NOTE : tls service require more memory for its operations. which leaves minimal memory
+ * to use it for app logic so keep this in mind while enabling the tls service.
+ * By default kept disabled.
+ */
+// #define ENABLE_TLS_SERVICE
+
+#if defined(ENABLE_HTTPS_SERVER)
+#define ENABLE_TLS_SERVICE
+#endif
+#if defined(ENABLE_TLS_SERVICE) && !defined(DEVICE_SUPPORTS_TLS)
+#undef ENABLE_TLS_SERVICE
+#endif
+#if defined(ENABLE_TLS_SERVICE)
+#define ENABLE_CONTEXTUAL_EXECUTION
+#endif
+
+/**
+ * enable/disable tls certificate generation. Supported only on devices
+ * that declare DEVICE_SUPPORTS_TLS_CERT_GENERATION.
+ */
+#if defined(ENABLE_TLS_SERVICE) && defined(DEVICE_SUPPORTS_TLS_CERT_GENERATION)
+#define ENABLE_TLS_CERT_GENERATION
+#endif
+
+/**
+ * enable/disable carrying a http request on a scheduled task instead of blocking
+ * the caller. Supported only on devices that declare
+ * DEVICE_SUPPORTS_OFFLOOP_NETWORK_TASK, elsewhere the request runs inline.
+ */
+#if defined(ENABLE_CONTEXTUAL_EXECUTION) && defined(DEVICE_SUPPORTS_OFFLOOP_NETWORK_TASK)
+#define ENABLE_HTTP_CLIENT_ASYNC_REQUEST
+#endif
+
+/**
+ * Build-time gate for on-device generation of the HTTPS server certificate.
+ * By default enabled.
+ */
+#ifdef ENABLE_TLS_CERT_GENERATION
+#define ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME
+#endif
 
 #endif
 

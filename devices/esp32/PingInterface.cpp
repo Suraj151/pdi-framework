@@ -57,9 +57,9 @@ static void on_ping_timeout( esp_ping_handle_t hdl, void *args ){
 // Invoked once after the whole session finishes.
 static void on_ping_end( esp_ping_handle_t hdl, void *args ){
 
-  uint32_t transmitted = 0;
-  esp_ping_get_profile(hdl, ESP_PING_PROF_REQUEST, &transmitted, sizeof(transmitted));
-  _ping_stats.m_transmitted = (uint16_t)transmitted;
+  // uint32_t transmitted = 0;
+  // esp_ping_get_profile(hdl, ESP_PING_PROF_REQUEST, &transmitted, sizeof(transmitted));
+  // _ping_stats.m_transmitted = (uint16_t)transmitted;
   _ping_complete = true;
 }
 

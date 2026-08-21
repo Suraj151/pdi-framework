@@ -53,6 +53,16 @@ int16_t UARTSerial::connect(uint16_t port, uint64_t speed)
   m_speed = speed;
 
   m_hwserial.begin(speed);
+
+  uint32_t last_seen = millis();
+  while ((millis() - last_seen) < SERIAL_BOOT_RX_QUIET_MS) {
+    if (m_hwserial.available() > 0) {
+      m_hwserial.read();
+      last_seen = millis();
+    }
+    yield();
+  }
+
   m_connected = true;
   return 1;
 }

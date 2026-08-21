@@ -30,6 +30,9 @@ HttpServerInterfaceImpl::HttpServerInterfaceImpl() :
 #ifdef ENABLE_TLS_SERVICE
     , m_secure(false)
 #endif
+#if defined(ENABLE_HTTPS_SERVER) && defined(ENABLE_TLS_SERVICE)
+    , m_insecure_server(nullptr)
+#endif
 {
     m_clientRequest.clear();
     m_uriHandlerMap.clear();
@@ -45,6 +48,9 @@ HttpServerInterfaceImpl::~HttpServerInterfaceImpl(){
         pdiutil::safe_delete(m_server);
         m_server = nullptr;
     }
+    #if defined(ENABLE_HTTPS_SERVER) && defined(ENABLE_TLS_SERVICE)
+    pdiutil::safe_delete(m_insecure_server);
+    #endif
 }
 
 /**
@@ -94,6 +100,15 @@ void HttpServerInterfaceImpl::begin(uint16_t port, bool secure){
         }
     }
 
+    #if defined(ENABLE_HTTPS_SERVER) && defined(ENABLE_TLS_SERVICE)
+    if( secure && nullptr == m_insecure_server ){
+        m_insecure_server = __i_instance.getNewTcpServerInstance();
+        if( nullptr != m_insecure_server ){
+            m_insecure_server->begin(HTTP_DEFAULT_PORT);
+        }
+    }
+    #endif
+
     #ifdef ENABLE_STORAGE_SERVICE
     __i_instance.getFileSystemInstance().createDirectory(m_storagePath.c_str());
     #endif
@@ -138,12 +153,35 @@ void HttpServerInterfaceImpl::handleClient(){
         m_handlingclientfromcb = false;
     }
 
+    #if defined(ENABLE_HTTPS_SERVER) && defined(ENABLE_TLS_SERVICE)
+    if (!m_client && nullptr != m_insecure_server && m_insecure_server->hasClient()) {
+
+        m_handlingclientfromcb = true;
+        m_client = m_insecure_server->accept();
+        m_currentclient_lastactivity_timestamp = __i_instance.getUtilityInstance().millis_now();
+        m_handlingclientfromcb = false;
+    }
+    #endif
+
     if (m_client && m_client->connected()) {
 
         if( m_client->available() ){
 
             // Parse the incoming request
             parseRequest();
+
+            #if defined(ENABLE_HTTPS_SERVER) && defined(ENABLE_TLS_SERVICE)
+            if( m_client && !m_client->isSecure() ){
+                sendHttpsRedirect();
+                if( !m_clientRequest.isPending ){
+                    m_clientRequest.clear();
+                }
+                m_client->flush(FLUSH_ALL);
+                // closeClient();
+                // m_currentclient_lastactivity_timestamp = 0;
+                return;
+            }
+            #endif
 
             // Handle the request based on the URI
             bool uriFound = false;
@@ -206,7 +244,30 @@ void HttpServerInterfaceImpl::close(){
     if( nullptr != m_server ){
         m_server->close();
     }
+    #if defined(ENABLE_HTTPS_SERVER) && defined(ENABLE_TLS_SERVICE)
+    if( nullptr != m_insecure_server ){
+        m_insecure_server->close();
+    }
+    #endif
 }
+
+#if defined(ENABLE_HTTPS_SERVER) && defined(ENABLE_TLS_SERVICE)
+void HttpServerInterfaceImpl::sendHttpsRedirect(){
+
+    pdiutil::string host = header(CHARPTR_WRAP(HTTP_HEADER_KEY_HOST));
+    pdiutil::string::size_type port_sep = host.find(':');
+    if( port_sep != pdiutil::string::npos ){
+        host = host.substr(0, port_sep);
+    }
+
+    pdiutil::string location = CHARPTR_WRAP("https://");
+    location += host;
+    location += m_clientRequest.uri;
+
+    addHeader(CHARPTR_WRAP(HTTP_HEADER_KEY_LOCATION), location);
+    send(HTTP_RESP_MOVED_PERMANENTLY);
+}
+#endif
 
 /**
  * on uri find call registered handler

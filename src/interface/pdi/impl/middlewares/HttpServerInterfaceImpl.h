@@ -70,6 +70,11 @@ protected:
   bool m_secure;
   #endif
 
+  #if defined(ENABLE_HTTPS_SERVER) && defined(ENABLE_TLS_SERVICE)
+  iTcpServerInterface* m_insecure_server;
+  void sendHttpsRedirect();
+  #endif
+
   #ifdef ENABLE_TLS_SERVICE
   pdiutil::string m_serverCertPath;
   pdiutil::string m_serverKeyPath;

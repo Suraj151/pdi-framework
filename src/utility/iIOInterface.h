@@ -120,7 +120,7 @@ public:
    * @param c_str Pointer to the character string.
    * @return Number of bytes written.
    */
-  virtual int32_t write(const char *c_str) { return write((const uint8_t *)c_str); }
+  virtual int32_t write(const char *c_str) { if(c_str) return write((const uint8_t *)c_str); return 0; }
 
   /**
    * @brief Writes a specified number of characters.
@@ -128,7 +128,7 @@ public:
    * @param size The number of characters to write.
    * @return Number of bytes written.
    */
-  virtual int32_t write(const char *c_str, uint32_t size) { return write((const uint8_t *)c_str, size); }
+  virtual int32_t write(const char *c_str, uint32_t size) { if(c_str) return write((const uint8_t *)c_str, size); return 0; }
 
   /**
    * @brief Writes a specified number of characters.
