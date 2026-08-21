@@ -114,7 +114,8 @@ The **[Detailed Documentation](#detailed-documentation)** below is the in-tree r
 - **[14. Device Layer & Porting Guide](#14-device-layer--porting-guide)** — how to add a new board.
 - **[15. Utility Library](#15-utility-library)** — event bus, string ops, embedded STL, crypto.
 - **[16. Extending the Framework](#16-extending-the-framework)** — adding services, commands, pages.
-- **[17. Troubleshooting & FAQ](#17-troubleshooting--faq)** — common issues and fixes.
+- **[17. Test Suite](#17-test-suite)** — the three tiers, running them, adding a test.
+- **[18. Troubleshooting & FAQ](#18-troubleshooting--faq)** — common issues and fixes.
 
 # Detailed Documentation
 
@@ -489,7 +490,7 @@ Every flag acts as a triple gate: which interface the device exposes, which serv
 | `ENABLE_NETWORK_SERVICE` | non-UNO | umbrella for everything below | TCP client/server, NTP, ping, WiFi | — |
 | `ENABLE_WIFI_SERVICE` | with network | WiFi service + `WifiConfig.h` | `iWiFiInterface` | medium |
 | `ENABLE_HTTP_SERVER` | with network | web portal + `ServerConfig.h`, `HttpConfig.h` | `iHttpServerInterface` | medium |
-| `ENABLE_HTTPS_SERVER` | off | serves the portal on 443 with certs from the filesystem | `ENABLE_TLS_SERVICE` | high |
+| `ENABLE_HTTPS_SERVER` | off | serves the portal on 443 with certs from the filesystem, and redirects plain HTTP on 80 to it | turns on `ENABLE_TLS_SERVICE` | high |
 | `ENABLE_HTTP_CLIENT` | with network | outbound HTTP | TCP client | low |
 | `ENABLE_MQTT_SERVICE` | with network | MQTT service + `MqttConfig.h` | TCP client | medium |
 | `ENABLE_OTA_SERVICE` | with network | OTA service + `OtaConfig.h` | TCP client, `iUpgradeInterface` | low |
@@ -1172,7 +1173,7 @@ Copying, renaming or moving across mounts streams the file chunk by chunk into t
 
 #### 6.2.12 `WebServer` — `__web_server`
 
-Started with the HTTP server interface and ticked from every pass of `serve()`. With HTTPS on, `initService` sets the certificate, key and — under mTLS — client CA paths, then binds 443 with TLS enabled; otherwise it binds 80. It has its own router, middleware chain, controllers and session handling, all covered in [§8](#8-web-server).
+Started with the HTTP server interface and ticked from every pass of `serve()`. With HTTPS on, `initService` sets the certificate, key and — under mTLS — client CA paths, then binds 443 with TLS enabled and also opens a plain listener on 80 that answers every request with a redirect to the matching `https://` URL, so a browser that arrives on `http://` is carried up to the secure portal; without HTTPS it binds 80 directly. It has its own router, middleware chain, controllers and session handling, all covered in [§8](#8-web-server).
 
 #### 6.2.13 `TelnetServiceProvider` — `__telnet_service`
 
@@ -1651,7 +1652,7 @@ What makes the output loadable is two lines in the project's top-level `CMakeLis
 ---
 ## 8. Web Server
 
-The web server is the on-device admin portal. With `ENABLE_HTTP_SERVER` on, the device serves HTTP/1.1 on its access-point address — `192.168.0.1` by default — so a phone or laptop can log in, configure WiFi, drive GPIO, watch a dashboard, upload files and manage MQTT, OTA, email and IoT without a cable. Adding `ENABLE_HTTPS_SERVER` moves the same portal to 443 over TLS; no controller, page or route changes, only a different `begin()` call and a certificate on disk.
+The web server is the on-device admin portal. With `ENABLE_HTTP_SERVER` on, the device serves HTTP/1.1 on its access-point address — `192.168.0.1` by default — so a phone or laptop can log in, configure WiFi, drive GPIO, watch a dashboard, upload files and manage MQTT, OTA, email and IoT without a cable. Adding `ENABLE_HTTPS_SERVER` serves the same portal on 443 over TLS and turns `ENABLE_TLS_SERVICE` on for it; port 80 stays open only to redirect `http://` callers up to `https://`, so a typed-in plain address still lands on the secure portal. No controller, page or route changes, only a different `begin()` call and a certificate on disk.
 
 It is the largest subsystem in the framework, but it is built from a handful of pieces: an orchestrator, a route registry, a middleware check, a resource provider that owns the response buffer, one controller per feature, and HTML fragments in flash.
 
@@ -1705,7 +1706,7 @@ this->m_server->begin(HTTP_DEFAULT_PORT);                                 // 80
 #endif
 ```
 
-Nothing else in the subsystem is conditional on TLS. The per-tick `handle_clients()` is a single call into the port; all the work happens inside the route lambdas.
+When it binds 443, the secure `begin()` also stands up a bare TCP listener on 80 whose only job is to answer each request with a redirect to the `https://` URL, so the plain port is never left dark for a browser that omits the scheme. Nothing else in the subsystem is conditional on TLS. The per-tick `handle_clients()` is a single call into the port; all the work happens inside the route lambdas.
 
 ### 8.3 Routes
 
@@ -2708,7 +2709,7 @@ Say the board is `myboard`.
 - With storage on, upload and download over SFTP work.
 - With contextual execution on, a task on each lane runs and prints without corrupting a stack.
 - With TLS on, the factory returns a live instance and a handshake against a known peer completes.
-- With HTTPS on, the portal answers on 443 once the certificate and key are on the filesystem.
+- With HTTPS on, the portal answers on 443 once the certificate and key are on the filesystem, and plain HTTP on 80 redirects to it.
 - With on-device cert generation on, the `tls` command writes both files where the config says.
 
 ---
@@ -2919,11 +2920,90 @@ Remember that a feature flag gates three things — the device aggregator includ
 And keep one global per slot. A second service instance overwrites the first in the service table, and a second table at the same address is quietly skipped at registration.
 
 ---
-## 17. Troubleshooting & FAQ
+## 17. Test Suite
+
+Everything runs from one command:
+
+```
+python3 tests/run_tests.py
+```
+
+Exit status is zero only when every selected test passed. `tests/README.md` is the full reference;
+this section is the shape of it.
+
+### 17.1 Three tiers
+
+| Tier | What it is | Needs |
+|---|---|---|
+| `unit` | Native host binary linking the framework against the mock device | a compiler |
+| `system` | The whole stack as a host process (`pdid`) you can ssh, sftp and curl | a compiler |
+| `device` | The same feature suites over serial, telnet or ssh | a board |
+
+```
+python3 tests/run_tests.py --tier unit
+python3 tests/run_tests.py --tier system --features
+python3 tests/run_tests.py --device ssh:pdiStack@<ip> --password <pw>
+```
+
+The unit tier asserts on functions and runs under Address and UB sanitizers, so an out-of-bounds
+read fails the run rather than passing quietly. The other two drive the framework the way a user
+does — a shell, an ssh channel, the web portal, an MQTT broker.
+
+### 17.2 How the host build works
+
+`src/` contains no Arduino or vendor SDK includes; every SDK dependency lives under `devices/`. The
+test build compiles the real framework sources against the mock adapter in `devices/mockdevice/`
+with `MOCK_DEVICE_TEST` defined on the command line. That gate is the only thing selecting the mock
+device — `devices/DeviceSetup.h`, which records the board you build firmware for, is never read or
+written by a test run, so testing never disturbs your build.
+
+### 17.3 Feature suites
+
+`tests/suite/features/` holds one file per area: terminal, filesystem, users, sessions, processes,
+networking, name resolution, portal, ssh, sftp, mDNS, MQTT. Each is written against a `Target`
+rather than a transport, so one source runs against the host process and against a board over any
+of the three transports.
+
+Two rules keep the results honest. A capability difference is found by **attempting** the thing and
+skipping with the reason, never by branching on the transport's name. And a test that needs a peer
+service brings its own — the suite ships a small MQTT broker and a multicast DNS client, each bound
+to a port of its own, because pointing a test at a broker already running on the developer's machine
+tests the machine rather than the board.
+
+State that outlives a run, such as the hosts file or the MQTT config in the device database, is read
+first and written back afterwards, so a run leaves the board as it found it.
+
+### 17.4 Adding a test
+
+A unit test is a `.cpp` file dropped in `tests/host/unit/`; CMake globs the directory.
+
+```cpp
+TEST(stringops, strtrim_removes_surrounding_spaces)
+{
+    char buf[32];
+    strcpy(buf, "   padded   ");
+    ASSERT_STREQ(__strtrim(buf), "padded");
+}
+```
+
+A feature test is a decorated function in `tests/suite/features/`:
+
+```python
+@test("the shell reports the current directory", needs=("pwd", "cd"))
+def pwd_follows_cd(t):
+    t.run("cd /etc")
+    expect_in("/etc", t.run("pwd"), "pwd after cd")
+```
+
+`needs`, `mounts` and `services` declare what the target must have; the runner skips with a reason
+when it does not.
+
+---
+## 18. Troubleshooting & FAQ
 
 Short entries; the explanations live in the sections they point at.
 
-### 17.1 Build and flash
+### 18.1 Build and flash
 
 **The build succeeds for ESP8266 or UNO but the device misbehaves.**
 The setup script was never run for that target, so the ESP32 fallback produced an ESP32-shaped binary — right code, wrong table addresses and flags. Run `python3 DeviceSetup.py -d <board>` and rebuild ([§2.5](#25-how-the-esp32-default-works)).
@@ -2940,7 +3020,7 @@ A vendor header leaked above the device layer. Push the include down into the po
 **Compile errors inside `pdiutil::function` or `pdiutil::vector` on an unusual target.**
 The toolchain is missing the GCC extensions PdiSTL relies on. Use a GCC-based toolchain.
 
-### 17.2 Boot and runtime
+### 18.2 Boot and runtime
 
 **The device factory-resets every five seconds.**
 NVM is invalid — a corrupt checksum, or a struct that changed shape since the last flash. With auto-reset on, one cycle recovers it. If it loops, a table has outgrown its address slot ([§5.9](#59-adding-a-table)).
@@ -2963,7 +3043,7 @@ The scheduler runs one inline task per pass, so a task doing too much per call d
 **Free heap drifts down over days.**
 Something is allocating in a hot path. The habits that prevent it are in [§12.4](#124-heap-discipline).
 
-### 17.3 Network and portal
+### 18.3 Network and portal
 
 **Cannot join the `pdiStack` access point.**
 The password is `pdiStack@123`, case-sensitive. Confirm the radio is up with `srvc status WiFi` over serial.
@@ -3004,7 +3084,7 @@ NAPT is almost certainly on as well. The two cannot share that heap ([§12.3](#1
 **The auto cert-generation listener never fires.**
 It hangs off the station getting an IP, so it does not run in AP-only mode. Check with `net ip`.
 
-### 17.4 Shell
+### 18.4 Shell
 
 **Telnet or SSH rejects the right credentials.**
 The shell shares the portal's credential row. If they were changed through the portal, the shell inherits them.
@@ -3025,7 +3105,7 @@ Press Esc for the menu, then `!w` to save and leave or `!c` to discard.
 **Tab completion works but the arrow keys don't recall history.**
 History is a file, so it needs storage; completion reads the in-RAM registry and works either way ([§7.6](#76-the-dispatcher)).
 
-### 17.5 Questions that come up
+### 18.5 Questions that come up
 
 **Can I run two `PdiStack` instances?**
 No. One global stack, one singleton per interface and per service — and on these memory budgets there would be no gain.
@@ -3057,12 +3137,12 @@ For a development box on ESP32 none of that is needed: with `ENABLE_SERVER_TLS_C
 The mock device lets the framework compile off-device for analysis; it does not simulate behaviour. Interactive testing means real hardware.
 
 **How do I unit-test framework code?**
-Mock the interfaces the unit depends on and link against its source. Bring your own harness — PdiSTL builds on host x86 with GCC.
+`python3 tests/run_tests.py` — see [§17](#17-test-suite). The framework compiles against the mock device on host x86, so a unit test links the real source with no board attached.
 
 **Where do I report issues?**
 GitHub: <https://github.com/Suraj151/pdi-framework>.
 
-### 17.6 When you're properly stuck
+### 18.6 When you're properly stuck
 
 ```
   1  enable console logging, flash, watch serial at 115200

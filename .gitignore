@@ -2,5 +2,6 @@
 !/src/database/tables/.gitignore
 !/src/database/tables/*.h
 /devices/DeviceSetup.h
-/scripts/__pycache__/
+__pycache__/
+/tests/.build/
 .vscode/

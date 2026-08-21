@@ -14,32 +14,33 @@ created Date    : 1st June 2019
 #include "mockdevice.h"
 #include <interface/pdi/middlewares/iNtpInterface.h>
 
-
 /**
  * NtpInterface class
+ *
+ * Starts unsynced the way a freshly booted device does, so nothing reads a
+ * wall clock time before something has supplied one. init_ntp_time takes the
+ * host clock, and a caller can set an exact epoch instead when a test needs
+ * timestamps to be reproducible.
  */
-class NtpInterface : public iNtpInterface {
+class NtpInterface : public iNtpInterface
+{
 
-  public:
+public:
+  NtpInterface();
+  ~NtpInterface();
 
-    /**
-     * NtpInterface constructor.
-     */
-    NtpInterface(){}
+  void init_ntp_time() override;
+  bool is_valid_ntptime() override;
+  pdiutil::epoch_time_t get_ntp_time() override;
+  bool set_ntp_time(pdiutil::epoch_time_t epoch) override;
 
-    /**
-		 * NtpInterface destructor
-		 */
-    ~NtpInterface(){}
+  /**
+   * @brief Return to the unsynced state.
+   */
+  void clearTime();
 
-    void init_ntp_time() override{}
-    bool is_valid_ntptime() override{return m_epoch > 0;}
-    pdiutil::epoch_time_t get_ntp_time() override{return m_epoch;}
-    bool set_ntp_time(pdiutil::epoch_time_t epoch) override{ m_epoch = epoch; return true; }
-
-  private:
-
-    pdiutil::epoch_time_t m_epoch = 0;
+private:
+  pdiutil::epoch_time_t m_epoch;
 };
 
 #endif

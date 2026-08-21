@@ -131,8 +131,6 @@ created Date    : 1st June 2019
 /**
  * enable/disable http & https server feature here. by default https kept disabled.
  * you can enable it if required.
- * Note : make sure you make server certificates available at /etc/http/ filesystem path
- * of device to use https.
  */
 #define ENABLE_HTTP_SERVER
 // #define ENABLE_HTTPS_SERVER
