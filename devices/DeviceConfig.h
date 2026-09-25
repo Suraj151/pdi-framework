@@ -192,7 +192,8 @@ created Date    : 1st June 2019
 
 /**
  * enable/disable http & https server feature here. by default https kept disabled.
- * you can enable it if required.
+ * as https may require more memory for encrypt/decrypt cycles it is disabled by default.
+ * devices can enable https in their config by default if sufficient memory is available.
  */
 #define ENABLE_HTTP_SERVER
 // #define ENABLE_HTTPS_SERVER

@@ -13,7 +13,7 @@ Created Date    : 1st June 2025
 /**
  * Constructor
  */
-PreemptiveMutex::PreemptiveMutex() : m_locked(false), m_owner(nullptr) {
+PreemptiveMutex::PreemptiveMutex() : m_locked(false), m_owner(nullptr), m_depth(0) {
     // Pre-reserve waiters so push_back() in lock() never reallocates.
     m_waiters.reserve(MAX_SCHEDULABLE_TASKS);
 }
@@ -31,6 +31,7 @@ PreemptiveMutex::~PreemptiveMutex() {
     }
     m_locked = false;
     m_owner = nullptr;
+    m_depth = 0;
 }
 
 /**
@@ -50,23 +51,26 @@ void PreemptiveMutex::lock(){
         return;
     }
 
-    if (!m_locked) { 
+    if (!m_locked) {
 
-        m_locked = true; 
+        m_locked = true;
         m_owner = __i_preemptive_scheduler.current;
+        m_depth = 1;
         CRITICAL_SECTION_EXIT
-        return; 
+        return;
     }
 
-    // Avoid lock twice
+    // re-entry by the holder counts a level rather than taking it again, so the
+    // matching unlock releases only the level it paired with
     if (__i_preemptive_scheduler.current == m_owner) {
 
-        CRITICAL_SECTION_EXIT 
-        return; 
-    }    
+        m_depth++;
+        CRITICAL_SECTION_EXIT
+        return;
+    }
 
-    m_waiters.push_back(__i_preemptive_scheduler.current); 
-    __i_preemptive_scheduler.mute(); // park this current preemptive 
+    m_waiters.push_back(__i_preemptive_scheduler.current);
+    __i_preemptive_scheduler.mute(); // park this current preemptive
 
     CRITICAL_SECTION_EXIT
 }
@@ -88,19 +92,29 @@ void PreemptiveMutex::unlock(){
         CRITICAL_SECTION_EXIT
         return;
     }
-    
+
+    // an outer level still holds it, so nothing is handed on yet
+    if (m_depth > 1) {
+
+        m_depth--;
+        CRITICAL_SECTION_EXIT
+        return;
+    }
+
     if (!m_waiters.empty()) {
-    
+
         Preemptive* f = m_waiters.front();     // FIFO;
         m_waiters.erase(m_waiters.begin());
         m_owner = f;
+        m_depth = 1;
         __i_preemptive_scheduler.add_to_ready(f);
     } else {
-    
+
         m_locked = false;
         m_owner = nullptr;
-    }    
-    
+        m_depth = 0;
+    }
+
     CRITICAL_SECTION_EXIT
 }
 
@@ -142,6 +156,7 @@ bool PreemptiveMutex::try_lock(){
     if (!m_locked) {
         m_locked = true;
         m_owner = __i_preemptive_scheduler.current;
+        m_depth = 1;
         CRITICAL_SECTION_EXIT
         return true;
     }
@@ -149,6 +164,7 @@ bool PreemptiveMutex::try_lock(){
     // Re-entrant: already own it. Treat as success so caller's matching
     // unlock() pairing stays correct. (Mirrors regular lock() behavior.)
     if (__i_preemptive_scheduler.current == m_owner) {
+        m_depth++;
         CRITICAL_SECTION_EXIT
         return true;
     }

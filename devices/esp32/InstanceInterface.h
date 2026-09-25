@@ -40,6 +40,9 @@ public:
   iTlsServerInterface* getNewTlsServerInstance() override;
   iTlsClientInterface* getNewTlsClientInstance() override;
   #endif
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  iMutex* getNewPreemptiveMutexInstance() override;
+  #endif
   iFileSystemInterface& getFileSystemInstance() override;
 };
 

@@ -342,6 +342,7 @@ public:
 
     uint8_t c = 0;
     uint32_t len = 0;
+    uint32_t cap = (_maxlen > 0) ? _maxlen : IO_READ_SPAN_MAX;
 
     if(_yield != nullptr) {
       _yield();
@@ -360,7 +361,7 @@ public:
         _yield();
       }
       len++;
-      if (_maxlen > 0 && len >= _maxlen) {
+      if (len >= cap) {
         break; // Stop reading if max length is reached
       }
     }
@@ -376,7 +377,7 @@ public:
   virtual void readLine(pdiutil::string &_outstr, const CallBackVoidArgFn &_yield = nullptr, uint32_t _maxlen = 0){
     _outstr.clear();
     readStringUntil(_outstr, '\r', false, _yield, _maxlen);
-    readStringUntil(_outstr, '\n', false, _yield, 0);
+    readStringUntil(_outstr, '\n', false, _yield, _maxlen);
   }
 
   /**

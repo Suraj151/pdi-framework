@@ -49,12 +49,9 @@ MqttServiceProvider::~MqttServiceProvider(){
 bool MqttServiceProvider::initService( void *arg ){
 
   // m_client = reinterpret_cast<iClientInterface*>(arg);
-  m_client = pdiutil::safe_new<TcpClientInterface>(); // Prefer new client instance for mqtt
   this->m_mqtt_payload = pdiutil::safe_new_array<char>( MQTT_PAYLOAD_BUF_SIZE );
 
-  if ( nullptr == m_client || nullptr == this->m_mqtt_payload ) {
-    pdiutil::safe_delete(m_client);
-    pdiutil::safe_delete_array(this->m_mqtt_payload);
+  if ( nullptr == this->m_mqtt_payload ) {
     return false;
   }
 
@@ -227,6 +224,56 @@ bool MqttServiceProvider::stopService(){
 }
 
 /**
+ * Build the transport the configured scheme asks for, keeping the one already
+ * held when it is of the right kind.
+ */
+bool MqttServiceProvider::prepareClientForConfig( mqtt_general_config_table *_general ){
+
+  bool _wantsecure = nullptr != _general && IsSecureScheme(
+    _general->security ? PROTO_SCHEME_MQTTS : PROTO_SCHEME_MQTT );
+
+  if( nullptr != this->m_client && this->m_client->isSecure() == _wantsecure ){
+    return true;
+  }
+
+  pdiutil::safe_delete(this->m_client);
+
+#ifdef ENABLE_TLS_SERVICE
+  if( _wantsecure ){
+
+    iTlsClientInterface *_tls = __i_instance.getNewTlsClientInstance();
+
+    if( nullptr != _tls ){
+
+      pdiutil::string _cabundle = CHARPTR_WRAP(TLS_DEFAULT_OUTBOUND_CA_BUNDLE_PATH);
+
+      if( __i_instance.getFileSystemInstance().isFileExist(_cabundle.c_str()) &&
+          _tls->setCertificateAuthorityPath(_cabundle.c_str()) ){
+        _tls->setVerifyPeer(true);
+      }else{
+        _tls->setVerifyPeer(false);
+        SysLogW("MQTT: no trust anchors at %s, broker identity is unverified\n", _cabundle.c_str());
+      }
+
+      _tls->setSNIHostname(_general->host);
+    }
+
+    this->m_client = _tls;
+  }else
+#endif
+  {
+#ifndef ENABLE_TLS_SERVICE
+    if( _wantsecure ){
+      SysLogW("MQTT: secure connection asked for but this build carries no tls, connecting in the clear\n");
+    }
+#endif
+    this->m_client = __i_instance.getNewTcpClientInstance();
+  }
+
+  return nullptr != this->m_client;
+}
+
+/**
  * handle restart of mqtt services on config change from autherised client
  *
  * @param   int _mqtt_config_type
@@ -268,7 +315,8 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
       __find_and_replace( _general->client_id, mac_placeholder.c_str(), __i_dvc_ctrl.getDeviceMac().c_str(), 2, MQTT_CLIENT_ID_BUF_SIZE );
       __find_and_replace( _lwt->will_message, mac_placeholder.c_str(), __i_dvc_ctrl.getDeviceMac().c_str(), 2, MQTT_WILL_MSG_BUF_SIZE );
 
-      bool _began = this->m_mqtt_client.begin( m_client, _general, _lwt );
+      bool _began = this->prepareClientForConfig( _general ) &&
+                    this->m_mqtt_client.begin( m_client, _general, _lwt );
 
       pdiutil::safe_delete(_general);
       pdiutil::safe_delete(_lwt);

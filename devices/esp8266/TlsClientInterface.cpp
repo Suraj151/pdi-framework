@@ -222,6 +222,7 @@ TlsClientInterface::TlsClientInterface() :
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
     m_taskId(-1),
     m_taskRunning(false),
+    m_taskExited(true),
     #endif
     m_verifyPeer(true),
     m_dns{IP4_ADDRESS_NONE, false, false}
@@ -241,6 +242,7 @@ TlsClientInterface::TlsClientInterface(struct tcp_pcb* pcb) :
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
     m_taskId(-1),
     m_taskRunning(false),
+    m_taskExited(true),
     #endif
     m_verifyPeer(true),
     m_dns{IP4_ADDRESS_NONE, false, false}
@@ -433,11 +435,13 @@ bool TlsClientInterface::beginServer(const char* certPath, const char* keyPath, 
 bool TlsClientInterface::startTlsWorker() {
     if (m_taskId > 0 || m_taskRunning) return true;
 
+    m_taskExited = false;
     m_taskId = __task_scheduler.register_task([&](){
         while (m_taskRunning) {
             serviceRx();
             __i_cooperative_scheduler.sleep(TLS_TASK_POLL_MS);
         }
+        m_taskExited = true;
     });
 
     if (m_taskId < 0) {
@@ -466,11 +470,24 @@ void TlsClientInterface::stopTlsWorker() {
 
     LogI("TLS stopTlsWorker : %d\n", taskid);
 
+    uint32_t waited = 0;
+    while (!m_taskExited && waited < 800) {
+        __i_dvc_ctrl.wait(5);
+        waited += 5;
+    }
+
     task_t* t = __task_scheduler.get_task(taskid);
     if (t && t->m_task_exec) {
-        __i_cooperative_scheduler.destroy_cooperative(
-            static_cast<Cooperative*>(t->m_task_exec));
-        t->m_task_exec = nullptr;
+
+        // a context that has not left its loop still owns whatever it holds, so
+        // it is left for the scheduler to reap once it finishes
+        if (m_taskExited) {
+            __i_cooperative_scheduler.destroy_cooperative(
+                static_cast<Cooperative*>(t->m_task_exec));
+            t->m_task_exec = nullptr;
+        } else {
+            SysLogW("TLS stopTlsWorker: worker %d still running after %u ms\n", (int)taskid, waited);
+        }
     }
     __task_scheduler.remove_task(taskid);
 }
@@ -869,27 +886,39 @@ bool TlsClientInterface::availableforwrite(uint32_t size) {
 
     __i_dvc_ctrl.yield();
 
-    if (!m_pcb || !m_isConnected) return false;
+    bool pcbready = true;
+    uint32_t availablebuff = 0;
+    uint32_t queuelen = 0;
 
-    if (m_pcb->state != ESTABLISHED &&
-        m_pcb->state != CLOSE_WAIT &&
-        m_pcb->state != SYN_SENT &&
-        m_pcb->state != SYN_RCVD) {
-        return false;
-    }
-
+    // every pcb field read and the output call belong to one section
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
     __lwip_mutex.critical_lock();
     #endif
-    if (nullptr != m_pcb->unsent && 0 == (m_pcb->flags & TF_RTO)) {
-        tcp_output(m_pcb);
+
+    if (!m_pcb || !m_isConnected ||
+        (m_pcb->state != ESTABLISHED &&
+         m_pcb->state != CLOSE_WAIT &&
+         m_pcb->state != SYN_SENT &&
+         m_pcb->state != SYN_RCVD)) {
+
+        pcbready = false;
     }
+
+    if (pcbready) {
+
+        if (nullptr != m_pcb->unsent && 0 == (m_pcb->flags & TF_RTO)) {
+            tcp_output(m_pcb);
+        }
+
+        availablebuff = tcp_sndbuf(m_pcb);
+        queuelen = tcp_sndqueuelen(m_pcb);
+    }
+
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
     __lwip_mutex.critical_unlock();
     #endif
 
-    uint32_t availablebuff = tcp_sndbuf(m_pcb);
-    uint32_t queuelen = tcp_sndqueuelen(m_pcb);
+    if (!pcbready) return false;
 
     if ((availablebuff < size) || (queuelen >= TCP_SND_QUEUELEN) || (queuelen > TCP_SNDQUEUELEN_OVERFLOW)) {
         __i_dvc_ctrl.yield();

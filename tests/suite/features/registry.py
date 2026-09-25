@@ -232,13 +232,14 @@ class Target(object):
 
         if self._portal_at is None:
             found = Portal.reachable(self.address(), timeout=min(self.timeout, 15.0))
-            self._portal_at = (found.host, found.port) if found else ()
+            self._portal_at = (found.host, found.port, found.secure) if found else ()
 
         if not self._portal_at:
             raise Skip("the target serves no http portal")
 
         portal = Portal(self._portal_at[0], self._portal_at[1],
-                        timeout=min(self.timeout, 15.0))
+                        timeout=min(self.timeout, 15.0),
+                        secure=self._portal_at[2])
         self._portals.append(portal)
 
         if login:

@@ -492,6 +492,9 @@ void SSHServer::handleVersionExchange() {
                 continue; // Ignore carriage return characters
             }
             m_session->m_client_version += c;
+            if( m_session->m_client_version.length() >= SSH_CLIENT_VERSION_MAX ){
+                break; // a peer that never sends a newline stops here
+            }
             __i_dvc_ctrl.wait(1);
         }
 

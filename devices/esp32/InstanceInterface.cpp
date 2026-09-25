@@ -9,6 +9,9 @@ created Date    : 1st Jan 2024
 ******************************************************************************/
 
 #include "InstanceInterface.h"
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+#include "threading/PreemptiveMutex.h"
+#endif
 #include "DeviceControlInterface.h"
 #ifdef ENABLE_NETWORK_SERVICE
 #include "TcpServerInterface.h"
@@ -64,6 +67,13 @@ iTlsServerInterface *InstanceInterface::getNewTlsServerInstance()
 iTlsClientInterface *InstanceInterface::getNewTlsClientInstance()
 {
     return pdiutil::safe_new<TlsClientInterface>();
+}
+#endif
+
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+iMutex *InstanceInterface::getNewPreemptiveMutexInstance()
+{
+    return pdiutil::safe_new<PreemptiveMutex>();
 }
 #endif
 

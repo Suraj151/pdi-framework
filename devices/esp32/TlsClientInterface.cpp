@@ -304,14 +304,17 @@ void TlsClientInterface::stopTlsWorker() {
     m_workerRunning = false;
 
     uint32_t waited = 0;
-    while (m_workerHandle != nullptr && waited < 200) {
+
+    while (m_workerHandle != nullptr && waited < 800) {
         vTaskDelay(pdMS_TO_TICKS(5));
         waited += 5;
     }
+
     if (m_workerHandle != nullptr) {
-        TaskHandle_t h = m_workerHandle;
-        m_workerHandle = nullptr;
-        vTaskDelete(h);
+        // cutting the worker short here abandons any lock it holds for a storage
+        // write, so it is left to clear its own handle as it leaves
+        // vTaskDelete(m_workerHandle);
+        SysLogW("TLS stopTlsWorker: worker still running after %u ms\n", waited);
     }
 }
 
@@ -749,9 +752,13 @@ void TlsClientInterface::setNoDelay(bool noDelay) {
 bool TlsClientInterface::availableforwrite(uint32_t size) {
 
     __i_dvc_ctrl.yield();
-    if (!m_pcb || !m_isConnected) return false;
 
     TCP_GUARD_BEGIN
+    if (!m_pcb || !m_isConnected) {
+        TCP_GUARD_END
+        return false;
+    }
+
     if (m_pcb->state != ESTABLISHED &&
         m_pcb->state != CLOSE_WAIT &&
         m_pcb->state != SYN_SENT &&

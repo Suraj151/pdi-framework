@@ -519,6 +519,9 @@ void HttpServerInterfaceImpl::parseRequest(){
 
     while (1) {
 
+        // a peer that keeps sending without ever ending the headers stops here
+        if ((__i_instance.getUtilityInstance().millis_now() - start) > IO_READ_SPAN_TIMEOUT_MAX) break;
+
         m_client->readLine(header_line, readLineYield, 256);
         if(header_line.empty()) break; // Exit if no more headers
 
@@ -702,7 +705,12 @@ void HttpServerInterfaceImpl::parseRequest(){
                     }
 
                     // Continue reading lines until we find enpty line after Content-Disposition
+                    uint32_t parthdrat = __i_instance.getUtilityInstance().millis_now();
+
                     while (true){
+                        // a peer that never ends this part's headers stops here
+                        if ((__i_instance.getUtilityInstance().millis_now() - parthdrat) > IO_READ_SPAN_TIMEOUT_MAX) break;
+
                         m_client->readLine(part, readLineYield); // Read the next line after Content-Disposition
                         if (!part.empty()) {
                             pdiutil::string::size_type argtypeStart = part.find(ROPTR_WRAP("Content-Type: "));

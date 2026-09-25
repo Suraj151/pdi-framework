@@ -20,11 +20,19 @@ Created Date    : 20th July 2026
 #include <interface/pdi/modules/storage/iFileSystemInterface.h>
 #include <interface/pdi/modules/storage/iStorageInterface.h>
 #include <config/VfsConfig.h>
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+#include <interface/pdi/threading/iMutex.h>
+#include <utility/SafeAlloc.h>
+#endif
 
 class VfsDispatcher : public iFileSystemInterface {
 public:
     VfsDispatcher();
-    virtual ~VfsDispatcher() {}
+    virtual ~VfsDispatcher() {
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+        pdiutil::safe_delete(m_lock);
+#endif
+    }
 
     int8_t mount(const char* prefix, iFileSystemInterface* backend, const char* name, vfs_type_t type);
 
@@ -139,6 +147,10 @@ protected:
     vfs_mount_t m_mounts[VFS_MAX_MOUNTS];
     uint8_t m_mount_count;
     uint8_t m_priv_depth;
+
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+    iMutex *m_lock;
+#endif
 };
 
 #endif

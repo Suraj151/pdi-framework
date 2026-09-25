@@ -340,6 +340,7 @@ void TcpClientInterface::consumeRxBuffer(uint32_t size) {
 void TcpClientInterface::readStringUntil(pdiutil::string &_outstr, char _delimiter, bool _keepdelimiterinstr, const CallBackVoidArgFn &_yield, uint32_t _maxlen) {
 
     uint32_t len = 0;
+    uint32_t cap = (_maxlen > 0) ? _maxlen : IO_READ_SPAN_MAX;
 
     if (_yield != nullptr) {
         _yield();
@@ -357,8 +358,8 @@ void TcpClientInterface::readStringUntil(pdiutil::string &_outstr, char _delimit
 
             const uint8_t *head = (const uint8_t *)m_rxBuf->payload + m_rxBufOffset;
             uint32_t blocklen = m_rxBuf->len - m_rxBufOffset;
-            if (_maxlen > 0 && blocklen > (_maxlen - len)) {
-                blocklen = _maxlen - len;
+            if (blocklen > (cap - len)) {
+                blocklen = cap - len;
             }
 
             if (_delimiter != 0) {
@@ -387,7 +388,7 @@ void TcpClientInterface::readStringUntil(pdiutil::string &_outstr, char _delimit
             break;
         }
 
-        if (_maxlen > 0 && len >= _maxlen) {
+        if (len >= cap) {
             break; // Stop reading if max length is reached
         }
 

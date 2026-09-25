@@ -64,41 +64,65 @@ void subscribe_callback( uint32_t *args, const char* topic, uint32_t topic_len, 
   pdiutil::safe_delete_array(topicBuf); pdiutil::safe_delete_array(dataBuf);
 }
 
-void configure_mqtt(){
+// copy text into a fixed size config field.
+// clear it first or a shorter new value leaves the tail of the old one behind,
+// and never copy past the end of the field
+void set_config_field( char *_field, uint16_t _fieldsize, const char *_value ){
 
-  // take mqtt tables from database
+  memset( _field, 0, _fieldsize );
+  memcpy( _field, _value, pdistd::min( (size_t)(_fieldsize - 1), strlen(_value) ) );
+}
+
+// each table below is taken in its own function on purpose.
+// a config table is a few hundred bytes, so holding two or three of them on the
+// same stack at once is enough to overflow it on a small board
+void configure_mqtt_general(){
+
   mqtt_general_config_table _mqtt_general_configs;
-  mqtt_lwt_config_table _mqtt_lwt_configs;
-  mqtt_pubsub_config_table _mqtt_pubsub_configs;
   __database_service.get_mqtt_general_config_table(&_mqtt_general_configs);
-  __database_service.get_mqtt_lwt_config_table(&_mqtt_lwt_configs);
-  __database_service.get_mqtt_pubsub_config_table(&_mqtt_pubsub_configs);
 
-  // copy general configs in mqtt general table
-  memcpy( _mqtt_general_configs.host, MQTT_HOST, strlen( MQTT_HOST ) );
+  set_config_field( _mqtt_general_configs.host, MQTT_HOST_BUF_SIZE, MQTT_HOST );
+  set_config_field( _mqtt_general_configs.client_id, MQTT_CLIENT_ID_BUF_SIZE, MQTT_CLIENT_ID );
+  set_config_field( _mqtt_general_configs.username, MQTT_USERNAME_BUF_SIZE, MQTT_USERNAME );
+  set_config_field( _mqtt_general_configs.password, MQTT_PASSWORD_BUF_SIZE, MQTT_PASSWORD );
   _mqtt_general_configs.port = MQTT_PORT;
-  memcpy( _mqtt_general_configs.client_id, MQTT_CLIENT_ID, strlen( MQTT_CLIENT_ID ) );
-  memcpy( _mqtt_general_configs.username, MQTT_USERNAME, strlen( MQTT_USERNAME ) );
-  memcpy( _mqtt_general_configs.password, MQTT_PASSWORD, strlen( MQTT_PASSWORD ) );
   _mqtt_general_configs.keepalive = MQTT_KEEP_ALIVE;
 
-  // copy publish / subscribe configs in mqtt pubsub table
-  // by default 2 publish and subscribe topics are suported you can change it in mqtt configuration file
-  memcpy( _mqtt_pubsub_configs.publish_topics[0].topic, MQTT_PUBLISH_TOPIC, strlen( MQTT_PUBLISH_TOPIC ) );
+  __database_service.set_mqtt_general_config_table( &_mqtt_general_configs );
+}
+
+// by default 2 publish and subscribe topics are suported you can change it in mqtt configuration file
+void configure_mqtt_pubsub(){
+
+  mqtt_pubsub_config_table _mqtt_pubsub_configs;
+  __database_service.get_mqtt_pubsub_config_table(&_mqtt_pubsub_configs);
+
+  set_config_field( _mqtt_pubsub_configs.publish_topics[0].topic, MQTT_TOPIC_BUF_SIZE, MQTT_PUBLISH_TOPIC );
   _mqtt_pubsub_configs.publish_topics[0].qos = MQTT_PUBLISH_QOS;
-  memcpy( _mqtt_pubsub_configs.subscribe_topics[0].topic, MQTT_SUBSCRIBE_TOPIC, strlen( MQTT_SUBSCRIBE_TOPIC ) );
+  set_config_field( _mqtt_pubsub_configs.subscribe_topics[0].topic, MQTT_TOPIC_BUF_SIZE, MQTT_SUBSCRIBE_TOPIC );
   _mqtt_pubsub_configs.subscribe_topics[0].qos = MQTT_SUBSCRIBE_QOS;
   _mqtt_pubsub_configs.publish_frequency = MQTT_PUBLISH_FREQ;
 
-  // copy lwt configs in mqtt lwt table
-  memcpy( _mqtt_lwt_configs.will_topic, MQTT_WILL_TOPIC, strlen( MQTT_WILL_TOPIC ) );
-  memcpy( _mqtt_lwt_configs.will_message, MQTT_WILL_MESSAGE, strlen( MQTT_WILL_MESSAGE ) );
+  __database_service.set_mqtt_pubsub_config_table( &_mqtt_pubsub_configs );
+}
+
+void configure_mqtt_lwt(){
+
+  mqtt_lwt_config_table _mqtt_lwt_configs;
+  __database_service.get_mqtt_lwt_config_table(&_mqtt_lwt_configs);
+
+  set_config_field( _mqtt_lwt_configs.will_topic, MQTT_TOPIC_BUF_SIZE, MQTT_WILL_TOPIC );
+  set_config_field( _mqtt_lwt_configs.will_message, MQTT_WILL_MSG_BUF_SIZE, MQTT_WILL_MESSAGE );
   _mqtt_lwt_configs.will_qos = MQTT_WILL_QOS;
 
-  // set config tables back in database
-  __database_service.set_mqtt_general_config_table( &_mqtt_general_configs );
   __database_service.set_mqtt_lwt_config_table( &_mqtt_lwt_configs );
-  __database_service.set_mqtt_pubsub_config_table( &_mqtt_pubsub_configs );
+}
+
+void configure_mqtt(){
+
+  configure_mqtt_general();
+  configure_mqtt_pubsub();
+  configure_mqtt_lwt();
 
   // set publish subscribe callbacks
   __mqtt_service.setMqttPublishDataCallback( publish_callback );

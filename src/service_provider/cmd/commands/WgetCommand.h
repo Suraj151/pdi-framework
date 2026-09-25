@@ -81,12 +81,10 @@ struct WgetCommand : public CommandBase {
 				url.append(urloptn->optionval, (pdiutil::string::size_type)urloptn->optionvalsize);
 
 				bool validurl = false;
-				bool issecure = false;
 				pdiutil::string urlname;
 				{
 					http_req_t probe;
 					validurl = probe.init(url.c_str());
-					issecure = probe.isHttps;
 					urlname = fileNameFromUri(probe.uri);
 				}
 
@@ -116,18 +114,7 @@ struct WgetCommand : public CommandBase {
 
 					}else{
 
-						iClientInterface *client = getClientForScheme(issecure);
-
-						if( nullptr == client ){
-
-							result = CMD_ERROR_FAILED;
-							m_terminal->putln();
-							m_terminal->writeln_ro(RODT_ATTR("no client available for this url"));
-
-						}else{
-
-							result = downloadTo(url, destpath, client);
-						}
+						result = downloadTo(url, destpath);
 					}
 				}
 			}else{
@@ -207,23 +194,6 @@ protected:
 		return (destpath.size() - start) <= FILE_NAME_MAX_SIZE;
 	}
 
-	/**
-	 * The shared outbound client the scheme needs, secure for https and plain
-	 * otherwise. Null where the build carries no client of that kind.
-	 */
-	iClientInterface *getClientForScheme(bool issecure){
-
-		if( issecure ){
-#ifdef ENABLE_TLS_SERVICE
-			return __i_instance.getSharedTlsClientInstance();
-#else
-			return nullptr;
-#endif
-		}
-
-		return __i_instance.getSharedTcpClientInstance();
-	}
-
 	static constexpr uint8_t PROGRESS_CELLS = 20;
 	static constexpr uint32_t PROGRESS_STEP = 4096;
 
@@ -266,7 +236,7 @@ protected:
 	 * Fetches the url into the path, replacing any file already there and
 	 * leaving nothing behind when the transfer does not complete.
 	 */
-	pdi_err_t downloadTo(const pdiutil::string &url, const pdiutil::string &destpath, iClientInterface *client){
+	pdi_err_t downloadTo(const pdiutil::string &url, const pdiutil::string &destpath){
 
 		Http_Client *http = Http_Client::GetStaticInstance();
 
@@ -278,7 +248,8 @@ protected:
 			__i_fs.deleteFile(destpath.c_str());
 		}
 
-		http->SetClient(client);
+		// the client that carries this url is the http client's to choose
+		http->SetClient(nullptr);
 
 		pdiutil::string path = destpath;
 		int writeerr = 0;

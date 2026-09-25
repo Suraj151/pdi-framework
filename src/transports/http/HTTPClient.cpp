@@ -151,7 +151,7 @@ http_resp_t::http_resp_t() : response(nullptr),
                              status_code(HTTP_RESP_MAX),
                              resp_length(0),
                              max_resp_length(HTTP_CLIENT_BUF_SIZE),
-                             follow_redirects(false),
+                             follow_redirects(true),
                              redirect_limit(10)
 {
     headers.clear();
@@ -170,7 +170,7 @@ void http_resp_t::clear()
     status_code = HTTP_RESP_MAX;
     resp_length = 0;
     max_resp_length = HTTP_CLIENT_BUF_SIZE;
-    follow_redirects = false;
+    follow_redirects = true;
     redirect_limit = 10;
     headers.clear();
 }
@@ -617,15 +617,32 @@ int16_t Http_Client::SendRequest(const char *type, const char *url, const char *
 
     do
     {
-        bStatus = (nullptr != m_client) && SetUrl(_url);
+        bStatus = SetUrl(_url);
 
         m_request.print();
 
-        if (bStatus && m_request.isHttps && !m_client->isSecure())
+        if (bStatus && (nullptr == m_client || m_client->isSecure() != m_request.isHttps))
         {
-            SysLogE("Http_Client: https URL requires a secure client\n");
-            respStatus = HTTP_RESP_MAX;
-            bStatus = false;
+            iClientInterface *scheme_client = __i_instance.getSharedClientForScheme(
+                m_request.isHttps ? PROTO_SCHEME_HTTPS : PROTO_SCHEME_HTTP);
+
+            if (nullptr == scheme_client)
+            {
+                SysLogE("Http_Client: this build carries no client for the url scheme\n");
+                respStatus = HTTP_RESP_MAX;
+                bStatus = false;
+            }
+            else if (scheme_client != m_client)
+            {
+                if (nullptr != m_client)
+                {
+                    m_client->flush(FLUSH_ALL);
+                    m_client->disconnect();
+                }
+
+                m_client = scheme_client;
+                m_request.reuse = false;
+            }
         }
 
         if (bStatus)
@@ -688,6 +705,7 @@ int16_t Http_Client::SendRequest(const char *type, const char *url, const char *
                     else
                     {
                         can_keep_alive = false;
+                        bStatus = false;
                     }
 
                     // check whether we can reuse the connection

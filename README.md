@@ -1,48 +1,34 @@
 # PDI Framework — Portable Device Interface Stack
 
-One C++ codebase that runs on an ESP32, an ESP8266 or an Arduino UNO. Application and service code is written against interfaces — `iWiFiInterface`, `iFileSystemInterface`, `iTcpServerInterface`, etc — and each board ships an adapter that implements them. Nothing above the adapter layer knows which chip it is sitting on.
+**A C++ framework for ESP32, ESP8266 and Arduino boards that boots your device into a small operating system.**
 
-What comes out of the box is closer to a small system than to a sketch template: a WiFi captive portal and web UI, an HTTP/HTTPS server, MQTT, OTA, an SSH server with SFTP and scp, Telnet, SMTP, a virtual filesystem with users and permissions, a task scheduler with three execution models, and a Linux-flavoured shell sitting on top of all of it.
+PDI is a set of libraries tied together — WiFi, storage, networking, scheduling, security, logging — and on top of them runs an operating system your board starts into. Flash one sketch and the device comes up with a web portal, an SSH server, MQTT, over-the-air updates, a filesystem with real users and file permissions, and a Linux-style shell you can log into over serial, Telnet or SSH.
 
-## What it can do
+**Every device inherits what its own hardware can give.** The operating system is written once, against capabilities rather than chips. A board with a radio gets the networking services; one without simply has them left out of its build, and not a line above them changes. The same goes for storage, for TLS, for a second execution lane — each arrives because a port said it could carry it. Adding a new board means describing what that board can do, not porting the system to it.
 
-**Portability is the whole point.** Services depend on abstract interfaces, not on vendor SDKs. Supporting a new board means writing an adapter for the interfaces that board can actually offer; the services, the portal and the shell come along unchanged. Anything a board can't do is switched off at compile time rather than stubbed at runtime.
+**Small on the device, big in what it gives you.** It fits in the flash of an ordinary microcontroller and still hands you the things you would otherwise build yourself every time: remote login, file transfer, scheduled jobs, firmware updates over WiFi, a configuration UI, and an API to your own hardware. You write normal Arduino code on top, and the same sketch moves from one board to another.
 
-**It runs on your laptop too.** One of those adapters targets plain POSIX, so the same firmware builds as a host process you can ssh into, copy files to and open the portal on. That is how the test suite exercises the framework before a board is involved — see [§17](#17-test-suite).
-
-**Services.** WiFi with captive portal, HTTP/HTTPS web portal, MQTT client, OTA updates, SSH server, Telnet server, SMTP client, GPIO, an NVM-backed configuration database, an mDNS/DNS-SD responder, syslog, authentication with a user store, the shell itself, and a device-IoT hook for your own cloud. Each is a `ServiceProvider` with the same lifecycle, and `service` drives them the way `systemctl` drives units: `list`, `status`, `start`, `stop`, `restart`, `enable`, `disable`. `stop` releases what the service holds, so `service stop SSH` gives up port 22 rather than parking it, and nothing lets you stop the service carrying the session you are typing on. TLS (BearSSL or mbedTLS), SFTP and scp, and ESPNOW mesh are things services are built on rather than services in their own right, so `service` does not list them.
-
-**GPIO from wherever you are.** Pins are files under `/sys/class/gpio`, so the shell drives them with `echo` and `cat` over serial, Telnet or SSH. The portal has a page for them, and MQTT and HTTP reach them from anywhere the device can be reached — a pin condition can also be routed out to email or an HTTP endpoint.
-
-**Secrets stay secret at rest.** Config records holding a credential are sealed — encrypted and tagged under a key kept in the eeprom — so a copy of the database taken off the device reveals nothing. Syslog can ship each line to a remote collector as well as to `/var/log`.
-
-**A real shell.** The same fifty-odd commands are reachable over serial, Telnet and SSH: `ls`, `cat`, `grep`, `head`, `tail`, `wc`, `hexdump`, `fedit`, `df`, `mount`, `chmod`, `chown`, `umask`, `ps`, `top`, `kill`, `renice`, `service`, `exec`, `net`, `host`, `ping`, `date`, `uptime`, `useradd`, `su`, `passwd`, `db`, `sshkgen`, `watch`, `source`, `test`, `crontab`, `wget` and the rest. Login, history, tab completion, in-place file editing and Ctrl+C all behave the way muscle memory expects.
-
-**Commands join up.** Output pipes from one command into the next and redirects to and from files, so `ps | grep ssh`, `cat /proc/meminfo > /tmp/mem.txt` and `wc < /home/notes.txt` all mean what they mean on a desktop — see [§7.7](#77-pipes-and-redirection).
-
-**Variables the shell reads.** `export NAME=value` sets one for the session, `/.env` holds what every session shares, and `$NAME` expands the way it does in a shell — quoting included. `PWD`, `USER`, `UID` and `HOSTNAME` are answered from the live session rather than stored, so they cannot go stale — see [§7.14](#714-environment-variables).
-
-**Scripts, and something to run at boot.** A file of shell lines runs with `source <file>`, using the same grammar a typed line uses — pipes, redirects, `&&`, quoting and `$NAME` all work inside one. `if`/`else`/`fi` and `while`/`done` branch and repeat on any command's result, `for`/`done` walks a list of words, and `test` supplies the comparisons: strings, numbers and paths. `/etc/rc.local` runs at the end of boot and names the user it runs as, so a device can bring itself up the way you left it — see [§7.15](#715-shell-scripts-and-etcrclocal).
-
-**A filesystem with users.** Several backends mount into one tree and are routed by longest prefix: LittleFS at the root, a read-only `/proc` of live system nodes covering memory, mounts, a directory per running task and the network under `/proc/net`, a writable `/sys` where GPIO pins and network interfaces are files (`echo 1 > /sys/class/gpio/5/value`), a `/dev` with `null`/`zero`/`random`, and a RAM-backed `/tmp`. Permissions, ownership and per-session umask are enforced in the VFS layer, so `/etc/passwd` and `/etc/shadow` mean what they say and two logged-in users genuinely see different access.
-
-**Settings that live in files.** WiFi, MQTT, OTA and email keep theirs in `/etc/<feature>/<feature>.conf` — plain `key value` text you can `cat`, edit with `fedit`, pull off over SFTP and diff between two devices, rather than something you reflash for. Which services run is a separate flat `/etc/service.conf`. Each settings file is `0600 root:root` and the portal page that edits one demands a root session, so the file and the browser agree on who may change what — see [§3.10](#310-the-etc-config-surface).
-
-**Scheduling that scales down and up.** Tasks run inline, cooperatively, or preemptively on a hardware tick, with priorities, POSIX nice values and per-task signals. Inline selection is weighted virtual runtime behind a due-ness gate — priority changes how fast a task accrues debt for the CPU it uses, rather than granting it a standing advantage, so no task can be starved by a busier one at a higher priority. Where the port supplies a loader, an external program image can be loaded from the filesystem and launched as a background process — `exec <path>` returns a pid you can `ps` and `kill`, no reflash involved.
-
-**Jobs that run on a schedule.** `/etc/crontab` takes the standard five time fields and a command line, read fresh from the file every minute so an edit takes effect on the next one. `crontab` shows the table as the device parsed it, so a row with a typo is visibly absent rather than quietly never running.
-
-**One clock, for everything that needs one.** An essential time service ticks every 10 ms, keeps the current instant broken down once, and publishes second, minute and validity-change events other services subscribe to instead of each converting an epoch of its own. On a board that can reach NTP the time is wall clock; on one that cannot it still counts forward from boot and simply never calls itself valid.
-
-**Found on the network without help.** A from-scratch mDNS/DNS-SD responder built straight on lwIP UDP advertises `pdi-<mac>.local` and the services it is listening on, so the device answers to a name and shows up in `avahi-browse -a`. Name lookups walk IP literal, then `/etc/hosts`, then DNS.
-
-**Configured from a browser.** Any account in the user store can sign in and change its own password; server-side sessions, `HttpOnly` cookies and CSRF-guarded forms back a live dashboard, one settings page per service, GPIO control, a storage browser, MQTT and email testers, and firmware flashing from an image already on the device — all served from flash-resident page fragments that follow the browser's light or dark preference and scale from a phone upward. The portal browses the filesystem as the signed-in user, so it obeys the same permissions the shell does.
+**Stability comes from staying inside the board's limits.** Enable the services the hardware can carry — flash and RAM are the budget — and the device keeps running without resets or dropped connections. That is what the test suite checks: 1300+ unit tests, and 425+ feature tests driven on real hardware — two different boards at once, each over serial, Telnet and SSH at the same time.
 
 ## Quick Start
 
 1. **Install** from the **Arduino Library Manager** (search "pdi-framework"). Builds for ESP32 by default.
    For ESP8266 / Arduino UNO, run: `python3 scripts/DeviceSetup.py -d <board>`.
-2. Open **File → Examples → pdi-framework → PdiStack**, then compile and upload.
+2. Open **File → Examples → pdi-framework → PdiStack**, then compile and upload. That sketch is the whole application:
+
+   ```cpp
+   #include <PdiStack.h>
+
+   void setup() {
+    PdiStack.initialize();
+   }
+
+   void loop() {
+    PdiStack.serve();
+   }
+   ```
+
+   `initialize()` mounts the filesystem tree and starts every service the build enables, each through its own `startService()`. `serve()` is the loop body: it services web clients, runs the inline task scheduler, yields to the device controller and drains pending device events. Everything described on this page runs from those two calls — your own code goes alongside them, not instead of them.
 
    Note : ESP32 require 1.4MB+ app size so make sure you will select suitable partition scheme that fits required app size.
 3. **Over the serial cable.** Open the serial monitor at **115200** and log in as **`pdiStack` / `pdiStack@123`**. You get the full shell — the same one every other route reaches.
@@ -67,22 +53,48 @@ Manual clone paths, the autogen script, board-package versions and git-ignored f
 
 Not every board exposes every capability. An Arduino UNO has no WiFi, so the web server, MQTT and OTA services are compiled out on that port.
 
+## What You Can Do With It
+
+**Log in to your board like a computer.** Open a serial monitor, or `ssh` in, or `telnet` in — you get the same login prompt and the same 57 commands either way. `ls`, `cat`, `grep`, `ps`, `top`, `kill`, `df`, `chmod`, `ping`, `wget` and the rest all behave the way you expect, with tab completion, command history, an in-place file editor and Ctrl+C. Commands pipe into each other and redirect to files, so `ps | grep ssh` and `cat /proc/meminfo > /tmp/mem.txt` do exactly what they look like.
+
+**Run it from a browser.** The device serves its own web portal: a live dashboard, a settings page for each service, GPIO switches, a file browser, MQTT and email testers, and firmware upload. Users sign in with their own accounts and see only what their permissions allow — the same rules the shell uses. It works on a phone and follows your light or dark theme.
+
+**A real filesystem, with real users.** Files live on flash and survive reboots. `/proc` shows live memory, running tasks and network state. `/sys` exposes GPIO pins and network interfaces as files. `/tmp` lives in RAM. Every file has an owner and permission bits, so two people logged in at once genuinely see different things — `/etc/shadow` is readable by root and nobody else, and it means it.
+
+**Control your hardware from anywhere.** Pins are files, so `echo 1 > /sys/class/gpio/5/value` turns one on from any terminal. The portal gives you switches for them. MQTT and HTTP reach them from across the internet, and a pin crossing a threshold can fire off an email or call a web endpoint on its own.
+
+**Get it on the network, and find it again.** A captive portal appears on first boot so you can pick your WiFi from a phone with no code. After that the device announces itself as `pdi-<id>.local`, so you reach it by name instead of hunting for an IP address — it shows up in your router, in `avahi-browse`, and in Finder.
+
+**Update it without plugging it in.** Push new firmware over WiFi from the portal, or from a file already on the device. No cable, no reflash, no losing your settings.
+
+**Give it jobs to do.** Schedule a function to run every few seconds, once after a delay, or continuously on its own stack. Write shell scripts with `if`, `while`, `for` and variables and run them with `source`. Put ordinary cron lines in `/etc/crontab` for anything that should happen at a particular time. `/etc/rc.local` runs at boot, so a device can bring itself back up exactly as you left it.
+
+**Settings you can read, not reflash.** WiFi, MQTT, OTA and email keep their configuration in plain text files under `/etc` that you can open, edit, copy off over SFTP and compare between two devices. Change a setting and restart the service — no rebuild.
+
+**Secrets stay secret.** Stored passwords and keys are encrypted on the device, so a copy of its storage taken off it reveals nothing. SSH uses real host keys, HTTPS is available where the board can support it, and every log line can be shipped to a remote collector as well as kept on disk.
+
+**Try the whole thing on your laptop.** The same code builds as a normal program on your computer — you can `ssh` into it, copy files to it and open its portal in a browser, all without a board plugged in. That is how the test suite checks every change before hardware is involved.
+
+**Make it yours.** Add your own shell command, your own web page, your own settings table, or your own service, and the framework treats it exactly like the built-in ones. The bundled examples show each of these in a sketch you can copy.
+
 ## What's Inside
 
-**Services** — the ones `service list` shows: Time · Cron · WiFi · HTTP/S server · MQTT · OTA · SSH · Telnet · SMTP · GPIO · Serial · Cmd · Database · User store · Auth · mDNS · Syslog · Factory reset · Device-IoT.
+**19 services** — Time · Cron · WiFi · Web server · MQTT · OTA · SSH · Telnet · Email · GPIO · Serial · Shell · Database · User store · Login · mDNS · Syslog · Factory reset · Device-IoT.
+
+You manage them the way you would on Linux: `service list` shows what is running, and `service start`, `stop`, `restart`, `enable` and `disable` do what they say. Stopping the SSH service really gives up port 22 rather than parking it — and the system will not let you stop the service carrying the session you are typing into.
 Per-service reference in [§6 Service Providers](#6-service-providers).
 
-**Capabilities services build on**, not services themselves — TLS · SFTP and scp · ESPNOW mesh.
+**Things the services are built on**, rather than services themselves — TLS/HTTPS · SFTP and scp · link-layer mesh.
 
-**Utilities** — task scheduler, event bus, queues, string helpers, data converters, crypto, PdiSTL, factory reset.
-Full inventory in [§15 Utility Library](#15-utility-library).
+**57 shell commands** — the full list is in [§7.8 Built-in command inventory](#78-built-in-command-inventory).
 
-**Storage** — one VFS tree over LittleFS, `/proc`, `/sys`, `/dev` and `/tmp`, with POSIX permissions and multi-user access control.
+**Storage** — one filesystem tree covering flash, `/proc`, `/sys`, `/dev` and `/tmp`, with Unix-style permissions and multi-user access control.
 Details in [§6.2.12](#6212-storage-interface-init-no-provider).
 
-**CLI** — 50+ built-in commands, listed in [§7.8 Built-in command inventory](#78-built-in-command-inventory).
+**Building blocks** — task scheduler, event bus, queues, string and conversion helpers, crypto, and a compact C++ standard library for boards that ship without one.
+Full inventory in [§15 Utility Library](#15-utility-library).
 
-**Extras** — captive portal, GPIO events over MQTT/HTTP/email, NAT and mesh over ESPNOW, both on the ESP8266 port ([§2.4.1](#241-nat-and-mesh)).
+**Extras** — captive portal, GPIO events over MQTT/HTTP/email, and NAT plus peer-to-peer mesh networking where the radio supports them ([§2.4.1](#241-nat-and-mesh)).
 
 ## A Peek at the Terminal and Web UI
 
@@ -182,12 +194,12 @@ The stack is layered, and the layering is enforced by what each layer is allowed
                                                 │ implemented by
                                                 ▼
                        ┌──────────────────────────────────────────────────┐
-   Devices             │  esp32 · esp8266 · arduinouno · posix            │
+   Devices             │  one folder per supported board, plus a host port │
    (the "adapters")    │  concrete implementations + one aggregator each  │
                        └──────────────────────────────────────────────────┘
 ```
 
-Dependencies only ever point downward. A service never includes a device header; it holds an `i*Interface` pointer and calls through it. The one place device code is reached from above is [src/interface/pdi.h](src/interface/pdi.h), which picks exactly one board aggregator based on the `DEVICE_*` macro that `scripts/DeviceSetup.py` writes into `devices/DeviceSetup.h`.
+Dependencies only ever point downward. A service never includes a device header; it holds an `i*Interface` pointer and calls through it. The one place device code is reached from above is [src/interface/pdi.h](src/interface/pdi.h), which builds the include path for exactly one board aggregator out of `PDI_DEVICE` — the port's directory name, set on the compiler command line or written into `devices/DeviceSetup.h` by `scripts/DeviceSetup.py`.
 
 | Layer | Role | Sees |
 |---|---|---|
@@ -293,7 +305,7 @@ A small set of well-known globals, all prefixed `__`, so any of them can be foun
 | Symbol | From | What it is |
 |---|---|---|
 | `__i_dvc_ctrl` | device | the one `iDeviceControlInterface` for this build |
-| `__i_db`, `__i_fs`, `__i_wifi`, `__i_http_server`, `__i_ntp`, `__i_ping`, `__i_serial` | device | interface singletons, present only when the matching flag is on |
+| `__i_db`, `__i_fs`, `__i_storage`, `__i_wifi`, `__i_http_server`, `__i_ntp`, `__i_ping`, `__i_instance` | device | interface singletons, present only when the matching flag is on |
 | `__task_scheduler`, `__utl_event` | utilities | scheduler and event bus |
 | `__database_service`, `__wifi_service`, `__mqtt_service`, `__ota_service`, … | services | one per `ServiceProvider` subclass |
 | `__i_cooperative_scheduler`, `__i_preemptive_scheduler` | threading port | the contextual lanes |
@@ -304,7 +316,7 @@ Services reach each other by global symbol when the dependency is fixed, and thr
 ---
 ## 2. Build & Toolchain
 
-The build target is the Arduino IDE / arduino-cli toolchain. The code compiles clean against `-std=c++14` or newer with GCC's variadic-macro extension, and nothing else is assumed — PlatformIO or a hand-rolled `make` works as long as you reproduce the usual Arduino-core defines.
+The build target is the Arduino IDE / arduino-cli toolchain. Shared code holds at the `gnu++11` floor, because that is the oldest standard any supported core compiles with; other ports build at `gnu++17` and `gnu++2a`. `scripts/SyntaxSweep.py` compiles every file against all three, so a newer construct cannot quietly slip into a shared header and strand the oldest port. Beyond that and GCC's variadic-macro extension nothing is assumed, so PlatformIO or a hand-rolled `make` works as long as you reproduce the usual Arduino-core defines.
 
 ### 2.1 Board packages
 
@@ -417,7 +429,7 @@ Two settings the ESP32 environment cannot do without. `board_build.partitions = 
 | `CreateDBSourceFromJson.py` | changing the schema of the active device |
 | `JsonToCpp.py` | never directly; it is the codegen engine |
 | `Util.py` | never directly; shared template and path helpers |
-| `GenTlsCerts.py` | provisioning HTTPS certificates off-device, or signing an ESP32 cert with a stable dev CA |
+| `GenTlsCerts.py` | provisioning HTTPS certificates off-device, or signing a device cert with a stable dev CA |
 
 Generated headers are passed through `clang-format --style=Microsoft` when the formatter is on `PATH`, so they read like hand-written code. Without it they are written unformatted and compile the same.
 
@@ -429,13 +441,13 @@ Generated headers are passed through `clang-format --style=Microsoft` when the f
 
 Both are radio-level capabilities layered onto WiFi rather than regular services.
 
-**NAT**, where the device supports it, rewrites IP-header fields on packets in transit so that clients joining the device's access point reach the upstream network the station link is connected to. It runs on the lwIP v2 (IPv4) variant supplied by the device core, selected in the IDE's Tools menu. On the service side, `ENABLE_NAPT` makes the WiFi service schedule a one-shot NAPT enable once the station link is up.
+**NAT**, where the device supports it, rewrites IP-header fields on packets in transit so that clients joining the device's access point reach the upstream network the station link is connected to. It needs the IPv4 network stack the board's core supplies, in the variant that includes translation — on cores that offer the choice it is a Tools-menu setting. On the service side, `ENABLE_NAPT` makes the WiFi service schedule a one-shot NAPT enable once the station link is up.
 
-**Mesh over ESPNOW**, on the ESP8266 port, wraps Espressif's peer-to-peer link-layer protocol into a small API so applications can build broadcasts and hop-distance topologies without touching the driver. It shares the radio with station mode and is configured from the application. Paired with `ENABLE_DYNAMIC_SUBNETTING` and `ENABLE_INTERNET_BASED_CONNECTIONS` on the WiFi service, it gives each node a notion of how many hops it sits from the hub.
+**Mesh**, where the radio offers a connectionless peer-to-peer link layer, wraps that into a small API so applications can build broadcasts and hop-distance topologies without touching the driver. It shares the radio with station mode and is configured from the application. Paired with `ENABLE_DYNAMIC_SUBNETTING` and `ENABLE_INTERNET_BASED_CONNECTIONS` on the WiFi service, it gives each node a notion of how many hops it sits from the hub.
 
 #### 2.4.2 mDNS and DNS-SD
 
-The responder is written from scratch on raw lwIP UDP — `udp_*` plus `igmp_joingroup` on ESP8266, the same wrapped in `LOCK_TCPIP_CORE` on ESP32 — and runs as an ordinary service. No Arduino mDNS library is involved.
+The responder is written from scratch on the network stack's raw UDP API — the datagram calls plus a multicast group join, taken under the stack's core lock where the port needs one — and runs as an ordinary service. No vendor mDNS library is involved.
 
 ```
   EVENT_WIFI_STA_GOT_IP
@@ -455,7 +467,7 @@ It advertises what the build is actually listening on: `_http._tcp` or `_https._
 
 With runtime certificate generation on, the responder is also what provisions the HTTPS certificate. It is the one place holding both the address and the name, so the certificate it asks for carries `<hostname>.local` as a DNS subject alt name alongside the IP, and `https://pdi-<xxxxxx>.local/` matches it. Key generation wants several kB of stack and runs for seconds, so the responder queues it on the scheduler instead of doing the work in the event callback.
 
-### 2.5 How the ESP32 default works
+### 2.5 How the default port works
 
 Three things line up so that a first build needs no scripts:
 
@@ -463,17 +475,19 @@ Three things line up so that a first build needs no scripts:
   devices/DeviceConfig.h
         │
         ├─ #if __has_include("DeviceSetup.h")  →  use the generated macro
-        └─ #else                               →  #define PDI_DEVICE esp32
+        └─ #else                               →  fall back to the default port
                 │
-                ├─ per-port config cascade ends in esp32/device_config.h
-                └─ checked-in placeholder table headers are ESP32-shaped
+                ├─ per-port config cascade ends in that port's device_config.h
+                └─ checked-in placeholder table headers match it
 ```
 
-Running `DeviceSetup.py` for another board overrides all three: the generated `DeviceSetup.h` wins over the fallback and fresh table headers replace the placeholders. To come back to ESP32, either re-run the script with `-d esp32` or delete `devices/DeviceSetup.h` and let the fallback take over again.
+The default is whichever port `DeviceConfig.h` names in that `#else`, and it ships as `esp32` — the one place in the documentation where a particular board matters, because it decides whether you need to run anything at all before your first build.
 
-`DeviceSetup.h` is not tracked, so a fresh clone always starts on the ESP32 fallback. A build that only needs a different port, and not a different table set, can say so on the compiler command line instead — `-DPDI_DEVICE=esp8266` takes precedence over both the generated header and the fallback, and leaves the working tree untouched. See [§14.4](#144-how-a-board-gets-selected).
+Running `DeviceSetup.py` for another board overrides all three: the generated `DeviceSetup.h` wins over the fallback, and fresh table headers replace the placeholders. To come back, either re-run the script for the default port or delete `devices/DeviceSetup.h` and let the fallback take over again.
 
-Because the fallback is silent, a build flashed onto an ESP8266 or an UNO without running the script compiles happily with the ESP32's table set and feature flags. Run the script whenever you leave the ESP32 default, and again whenever you come back — `git checkout src/database/tables/` restores the placeholders if the generated ones are still lying around.
+`DeviceSetup.h` is not tracked, so a fresh clone always starts on the fallback. A build that only needs a different port, and not a different table set, can say so on the compiler command line instead — `-DPDI_DEVICE=<board>` takes precedence over both the generated header and the fallback, and leaves the working tree untouched. See [§14.4](#144-how-a-board-gets-selected).
+
+Because the fallback is silent, a build flashed onto any other board without running the script compiles happily with the default port's table set and feature flags — which is the one failure here that looks like a hardware fault rather than a build mistake. Run the script whenever you leave the default port, and again whenever you come back — `git checkout src/database/tables/` restores the placeholders if the generated ones are still lying around.
 
 #### 2.5.1 Per-port capability flags
 
@@ -481,12 +495,12 @@ Board-specific answers live in each port's `device_config.h`, not in the central
 
 | Macro | Set by | Effect |
 |---|---|---|
-| `DEVICE_SUPPORTS_TLS` | esp8266, esp32 | lets `ENABLE_TLS_SERVICE` take effect; ports without it get the flag undefined automatically |
-| `DEVICE_SUPPORTS_CONTEXTUAL_EXECUTION` | esp8266, esp32 | same shape, for the cooperative and preemptive lanes |
-| `DEVICE_SUPPORTS_TLS_CERT_GENERATION` | esp32 | gates on-device certificate generation |
-| `DEVICE_SUPPORTS_NTP` | esp8266, esp32, posix | the port can reach a time server, so the clock can call itself valid; a port without it still keeps time, counted from boot |
+| `DEVICE_SUPPORTS_TLS` | a port with an SSL backend | lets `ENABLE_TLS_SERVICE` take effect; ports without it get the flag undefined automatically |
+| `DEVICE_SUPPORTS_CONTEXTUAL_EXECUTION` | a port with the threading interfaces | same shape, for the cooperative and preemptive lanes |
+| `DEVICE_SUPPORTS_TLS_CERT_GENERATION` | a port with the RAM and the RNG for it | gates on-device certificate generation |
+| `DEVICE_SUPPORTS_NTP` | a port that can reach the network | the port can reach a time server, so the clock can call itself valid; a port without it still keeps time, counted from boot |
 | `MAX_DIGITAL_GPIO_PINS`, `MAX_ANALOG_GPIO_PINS`, `MAX_DB_TABLES` | every port | per-board limits |
-| `ENABLE_NETWORK_SERVICE`, `ENABLE_AUTH_SERVICE`, `ENABLE_STORAGE_SERVICE`, `ENABLE_GPIO_BASIC_ONLY` | every port | per-board defaults — AVR omits network, auth and storage; the ESP ports enable them |
+| `ENABLE_NETWORK_SERVICE`, `ENABLE_AUTH_SERVICE`, `ENABLE_STORAGE_SERVICE`, `ENABLE_GPIO_BASIC_ONLY` | every port | per-board defaults — a port with no radio and no filesystem omits network, auth and storage; one with both enables them |
 
 The contract is simple: genuinely per-board facts go in the per-port header, and the central `DeviceConfig.h` carries the cross-board feature flags, the auto-undef chains, and settings that are a property of the deployment rather than the board — the timezone (`TZ`, `TZ_SEC`, `DST_MN`) and `NTP_SERVER1` among them, so anything wanting local time does not have to reach into the NTP interface for it. A new port sets its `DEVICE_SUPPORTS_*` macros and the optional services fall in line by themselves.
 
@@ -537,33 +551,32 @@ Every flag acts as a triple gate: which interface the device exposes, which serv
 | Flag | On by default | Brings in | Needs | Cost |
 |---|---|---|---|---|
 | `ENABLE_SERIAL_SERVICE` | all boards | serial service + `SerialConfig.h` | `iSerialInterface` | low |
-| `ENABLE_STORAGE_SERVICE` | yes, except UNO | filesystem + `StorageConfig.h` | `iStorageInterface`, `iFileSystemInterface` | medium |
+| `ENABLE_STORAGE_SERVICE` | where the port has storage | filesystem + `StorageConfig.h` | `iStorageInterface`, `iFileSystemInterface` | medium |
 | `ENABLE_GPIO_SERVICE` | yes | GPIO service + `GpioConfig.h` | `iGpioInterface` | low; `ENABLE_GPIO_BASIC_ONLY` trims it further |
 | `ENABLE_CMD_SERVICE` | yes | the CLI | a terminal source | low |
-| `ENABLE_AUTH_SERVICE` | non-UNO | auth service + the credential table | storage | low |
-| `ENABLE_NETWORK_SERVICE` | non-UNO | umbrella for everything below | TCP client/server, NTP, ping, WiFi | — |
+| `ENABLE_AUTH_SERVICE` | with storage | auth service + the credential table | storage | low |
+| `ENABLE_NETWORK_SERVICE` | where the port has a radio or a link | umbrella for everything below | TCP client/server, NTP, ping, WiFi | — |
 | `ENABLE_WIFI_SERVICE` | with network | WiFi service + `WifiConfig.h` | `iWiFiInterface` | medium |
 | `ENABLE_HTTP_SERVER` | with network | web portal + `ServerConfig.h`, `HttpConfig.h` | `iHttpServerInterface` | medium |
 | `ENABLE_HTTPS_SERVER` | off | serves the portal on 443 with certs from the filesystem, and redirects plain HTTP on 80 to it | turns on `ENABLE_TLS_SERVICE` | high |
 | `ENABLE_HTTP_CLIENT` | with network | outbound HTTP | TCP client | low |
-| `ENABLE_MQTT_SERVICE` | with network | MQTT service + `MqttConfig.h` | TCP client | medium |
+| `ENABLE_MQTT_SERVICE` | with network | MQTT service + `MqttConfig.h` | TCP client, or the TLS client when the broker is configured secure | medium |
 | `ENABLE_OTA_SERVICE` | with network | OTA service + `OtaConfig.h` | TCP client, `iUpgradeInterface` | low |
 | `ENABLE_EMAIL_SERVICE` | with network | email service + `EmailConfig.h` | TCP client | low |
 | `ENABLE_TELNET_SERVICE` | with network | telnet server | TCP server | low |
 | `ENABLE_SSH_SERVICE` | with network and storage | SSH server, SFTP, scp | TCP server, filesystem | high |
 | `ENABLE_DEVICE_IOT` | with network | IoT service + `DeviceIotConfig.h` | TCP client | low |
-| `ENABLE_TLS_SERVICE` | off | TLS client and server + `TlsConfig.h`; turns on contextual execution, since TLS runs on its own cooperative task | BearSSL on esp8266, mbedTLS on esp32 | high — see [§12.3](#123-the-expensive-features) |
-| `ENABLE_TLS_CERT_GENERATION` | off, esp32 | the `tls` command and the on-device issuer | TLS service, esp32 | medium |
+| `ENABLE_TLS_SERVICE` | off | TLS client and server + `TlsConfig.h`; turns on contextual execution, since TLS runs on its own cooperative task | whichever TLS backend the port supplies | high — see [§12.3](#123-the-expensive-features) |
+| `ENABLE_TLS_CERT_GENERATION` | off | the `tls` command and the on-device issuer | TLS service, and a port declaring `DEVICE_SUPPORTS_TLS_CERT_GENERATION` | medium |
 | `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` | with cert generation | the mDNS service mints a self-signed cert covering the address and `<host>.local` once the station gets an IP | cert generation, mDNS | one-shot |
 | `ENABLE_SCRIPT_RUNNER` | yes | `source`, control flow and `/etc/rc.local` | cmd + storage | low |
 | `ENABLE_CONTEXTUAL_EXECUTION` | off | cooperative and preemptive lanes | the threading interfaces | high (per-task stacks) |
-| `ENABLE_TIMER_TASK_SCHEDULER` | off | timer-backed scheduler variant | a device timer | depends |
 
 #### 3.3.2 Behaviour flags
 
 | Flag | Effect |
 |---|---|
-| `ENABLE_GPIO_BASIC_ONLY` | digital-only GPIO, used on UNO |
+| `ENABLE_GPIO_BASIC_ONLY` | digital-only GPIO, for a port with no analog path |
 | `ENABLE_DYNAMIC_SUBNETTING` | AP subnet and gateway chosen at runtime instead of statically |
 | `ENABLE_NAPT` | AP clients reach the station's network; costs heap |
 | `IGNORE_FREE_RELAY_CONNECTIONS` | skip already-connected SSIDs during scan, avoiding mesh loops |
@@ -578,10 +591,10 @@ Every flag acts as a triple gate: which interface the device exposes, which serv
 
 | Macro | Purpose | Typical values |
 |---|---|---|
-| `MAX_DIGITAL_GPIO_PINS` | size of the GPIO config table | 14 UNO · 12 esp32 WROOM/S2/S3/C6 · 8 esp32 C3/H2 · 9 esp8266 |
-| `MAX_ANALOG_GPIO_PINS` | same, analog side | 5 UNO · 4 esp32 · 1 esp8266 |
-| `MAX_DB_TABLES` | upper bound on registered tables | 5 UNO · 15 esp |
-| `MAX_SCHEDULABLE_TASKS` | inline scheduler slots | 25 |
+| `MAX_DIGITAL_GPIO_PINS` | size of the GPIO config table | 8-14, whatever the board exposes |
+| `MAX_ANALOG_GPIO_PINS` | same, analog side | 1-5, whatever the board exposes |
+| `MAX_DB_TABLES` | upper bound on registered tables | 5 where NVM is a kilobyte, 15 where it is a few |
+| `MAX_SCHEDULABLE_TASKS` | inline scheduler slots | 25, trimmed to 8 on a port with kilobytes of RAM |
 | `MAX_FACTORY_RESET_CALLBACKS` | reset hooks | same as the task count |
 | `WIFI_STATION_CONNECT_ATTEMPT_TIMEOUT` | station connect budget, seconds | 1 |
 | `WIFI_CONNECTIVITY_CHECK_DURATION` | link recheck interval, ms | 5000 |
@@ -648,14 +661,17 @@ The always-on tables — global config, plus credentials and WiFi when those ser
 ```
   NETWORK ─┬─ WIFI ─── HTTP_SERVER ─┬─ HTTPS_SERVER ── TLS_SERVICE ── CONTEXTUAL_EXECUTION
            │                        └─ (needs STORAGE for certs)
-           ├─ MQTT · OTA · EMAIL · DEVICE_IOT        (TCP client)
+           ├─ MQTT · OTA · EMAIL · DEVICE_IOT        (TCP client; all but EMAIL
+           │                                          use the TLS one for a
+           │                                          secure address when
+           │                                          TLS_SERVICE is on)
            ├─ TELNET                                 (TCP server, pairs with CMD)
            └─ SSH ─── STORAGE                        (host keys, SFTP)
 
   STORAGE ─┬─ AUTH                                   (credentials survive reboot)
            └─ SYSLOG ─── (+NETWORK) ─── SYSLOG_FORWARD
 
-  TLS_CERT_GENERATION ── TLS_SERVICE + esp32
+  TLS_CERT_GENERATION ── TLS_SERVICE + a port declaring cert generation
   DEVICE_IOT ── the application implements iDeviceIotInterface and passes it to initService
 ```
 
@@ -665,13 +681,13 @@ Most of these are enforced structurally — the dependent flags are physically n
 
 | Goal | Keep | Drop |
 |---|---|---|
-| Smallest possible (UNO class) | serial, CLI, basic GPIO | everything else |
+| Smallest possible | serial, CLI, basic GPIO | everything else |
 | Offline gateway | add storage and auth | everything network |
 | Headless networked node | add network, WiFi, MQTT, OTA, NTP | web server, SSH, email |
 | Full portal | the stock `DeviceConfig.h` | — |
 | Diagnostics build | stock plus console logging, optionally syslog | — |
 | Concurrency demo | stock plus contextual execution | — |
-| HTTPS portal | stock plus TLS and HTTPS (esp32: also cert generation) | NAPT on esp8266 |
+| HTTPS portal | stock plus TLS and HTTPS, and cert generation where the port has it | NAT, which competes for the same heap |
 | HTTPS with client certs | as above plus mTLS | — |
 
 ### 3.8 Defaults are not current values
@@ -682,7 +698,7 @@ To change a live value, go through the portal, the CLI (`net connsta`, `iot seth
 
 ### 3.9 Conventions worth keeping
 
-Branch on `ENABLE_*` with `#ifdef`, never with a runtime `if` — the unreached branch still needs symbols the link cannot provide. Keep config structs POD and fixed-size; a pointer or a `pdiutil::string` inside one cannot be serialised to NVM. Never include one service config from another; if two need the same value, it belongs in `Common.h`. And gate code on the capability (`ENABLE_WIFI_SERVICE`) rather than on the board (`DEVICE_ESP32`) — the board changes, the capability is what the code actually depends on.
+Branch on `ENABLE_*` with `#ifdef`, never with a runtime `if` — the unreached branch still needs symbols the link cannot provide. Keep config structs POD and fixed-size; a pointer or a `pdiutil::string` inside one cannot be serialised to NVM. Never include one service config from another; if two need the same value, it belongs in `Common.h`. And gate code on the capability (`ENABLE_WIFI_SERVICE`) rather than on the board (`DEVICE_<BOARD>`) — boards come and go, the capability is what the code actually depends on.
 
 ### 3.10 The `/etc` config surface
 
@@ -712,7 +728,7 @@ A feature turns its record into pairs and back in `src/helpers/FeatureConfigFile
 
 Values are written with CRLF, the same line ending `fedit` writes and `putln()` sends. `cat` streams file bytes straight to the terminal, so a file with bare newlines would staircase down a raw console.
 
-**Precedence.** Where a filesystem exists, a key present in the conf file wins. A key that is absent leaves whatever the record store or the compiled default supplied, and a value that cannot be read keeps the default rather than silently becoming zero or `false`. On a board with no filesystem the whole layer compiles out — the record store is the fallback and the boot-critical minimum, and the UNO keeps working with no `/etc` at all.
+**Precedence.** Where a filesystem exists, a key present in the conf file wins. A key that is absent leaves whatever the record store or the compiled default supplied, and a value that cannot be read keeps the default rather than silently becoming zero or `false`. On a board with no filesystem the whole layer compiles out — the record store is the fallback and the boot-critical minimum, and such a board keeps working with no `/etc` at all.
 
 #### Which features have a settings file, and turning one on
 
@@ -721,7 +737,7 @@ Four features keep their settings in `/etc`:
 | Feature | File | Gate | Carries |
 |---|---|---|---|
 | WiFi | `/etc/wifi/wifi.conf` | `ENABLE_WIFI_CONFIG_FILE` | station and AP credentials, addresses, and the `sta_enable` / `ap_enable` gates |
-| MQTT | `/etc/mqtt/mqtt.conf` | `ENABLE_MQTT_CONFIG_FILE` | broker host, port, client id, credentials, keepalive, clean session, and the last will |
+| MQTT | `/etc/mqtt/mqtt.conf` | `ENABLE_MQTT_CONFIG_FILE` | broker host, port, whether the broker is reached over TLS, client id, credentials, keepalive, clean session, and the last will |
 | OTA | `/etc/ota/ota.conf` | `ENABLE_OTA_CONFIG_FILE` | update server host and port |
 | Email | `/etc/email/email.conf` | `ENABLE_EMAIL_CONFIG_FILE` | SMTP host, port, credentials, sender, recipient and subject |
 
@@ -1148,7 +1164,7 @@ The key is 16 bytes at the top of the eeprom, above the capacity the store repor
 
 Plain records carry a checksum instead — enough to catch a rotted byte, and there is no point paying for a tag on a record with nothing to hide.
 
-Nothing in the read or write path allocates, and the whole engine costs one 75-byte object plus at most 70 bytes of stack on an UNO. A repack moves only the records whose offset actually changes, so appending a table or growing the last one asks for no memory at all.
+Nothing in the read or write path allocates, and the whole engine costs one 75-byte object plus at most 70 bytes of stack, measured on the tightest port. A repack moves only the records whose offset actually changes, so appending a table or growing the last one asks for no memory at all.
 
 ### 5.9 Factory reset and defaults
 
@@ -1375,7 +1391,7 @@ Each prefix is named once, in [src/config/VfsConfig.h](src/config/VfsConfig.h): 
 
 `/proc/net/route` carries one row per route rather than one per interface, in the `route -n` columns with a `Flags` field. An interface that holds a netmask contributes the network it reaches directly — destination `ip & netmask`, no gateway, flag `U` — and one that holds a gateway contributes the default route as well, `0.0.0.0/0.0.0.0` through it, flag `UG`. An access point therefore appears once, for its own subnet, and an interface that is up but has no address yet appears not at all, because it has nowhere to route.
 
-`/proc/net/dev` and `/proc/net/tcp` each fill in only as far as the port can answer. Counters come from the link, and a link that cannot count is left out rather than listed with zeroes that would read as an idle interface — neither ESP core's prebuilt lwIP carries them, since it is compiled with `MIB2_STATS` off. Endpoints come from the stack, and a port that cannot enumerate one leaves the columns empty rather than reporting a device with nothing listening. Both are port capabilities, so a link or stack that can answer fills the node in without anything above changing.
+`/proc/net/dev` and `/proc/net/tcp` each fill in only as far as the port can answer. Counters come from the link, and a link that cannot count is left out rather than listed with zeroes that would read as an idle interface — a prebuilt network stack often has its statistics module compiled out. Endpoints come from the stack, and a port that cannot enumerate one leaves the columns empty rather than reporting a device with nothing listening. Both are port capabilities, so a link or stack that can answer fills the node in without anything above changing.
 
 Columns are fixed width rather than tab separated, here and in every command that prints a table: a tab only reaches the next eight-column stop, so one long field would push the rest of the row out of line on a terminal that does no reflowing of its own.
 
@@ -1480,7 +1496,13 @@ Full reference, including the field grammar, in [§7.16](#716-scheduled-jobs-and
 
 #### 6.2.18 TLS (no provider; transport hookup + cert provisioning)
 
-TLS has no service class either — it lives at the interface and port level. `iInstanceInterface` hands out the one outbound client the services share, built on first call and kept: `getSharedTcpClientInstance()` and, in a TLS build, `getSharedTlsClientInstance()`. Two literal accessors rather than one that quietly returns whichever is compiled in, so a caller picks its transport and the call site says which. OTA, device-IoT and GPIO posting take the TLS client where the flag is on and the TCP one otherwise. **Email is TCP only** — the SMTP path carries no TLS support. MQTT builds a client of its own instead of sharing.
+TLS has no service class either — it lives at the interface and port level. `iInstanceInterface` hands out the one outbound client the services share, built on first call and kept: `getSharedTcpClientInstance()` and, in a TLS build, `getSharedTlsClientInstance()`.
+
+Most callers ask for neither by name. `getSharedClientForScheme()` takes the protocol you are speaking — `http` or `https`, `mqtt` or `mqtts`, `smtp` or `smtps` — and gives back the right client for it. The address already says which one it needs, so whoever holds the address makes the choice: the HTTP client looks at each URL as it goes, even when a redirect changes it half way.
+
+**A secure address only works on a board that can do TLS, in a build where it is switched on.** Anywhere else there is no secure client to give back. An HTTP request then fails with an error instead of going out unencrypted; MQTT drops back to a plain connection so a broker that was already working keeps working. Both write a line to the log either way, so you can see which happened. Plain `http` and `mqtt` keep working everywhere with a network.
+
+A service that keeps a connection open for a long time holds its own client instead of sharing, because the shared one gets swapped whenever someone else asks for a different protocol. MQTT builds its own from the broker setting: if you have put the broker's certificate at `/etc/ssl/ca-bundle.crt` it checks the broker really is who it claims to be, and if you have not, the traffic is still encrypted but nobody has checked who is on the other end. The log says which of the two you got. **Email is plain only** — the SMTP path has no TLS support.
 
 Each port brings its own TLS backend, named alongside `ENABLE_TLS_SERVICE` in [§3.3.1](#331-service-flags). Nothing above the interface knows which one it has. Certificates and keys are read from the filesystem at runtime, defaulting to `/etc/http/server.crt`, `/etc/http/server.key`, `/etc/http/client-ca.crt` and `/etc/ssl/ca-bundle.crt`.
 
@@ -1530,7 +1552,7 @@ SSH attaches its session as soon as user auth succeeds, so authorisation state i
 
 #### 6.2.21 `MdnsServiceProvider` — `__mdns_service`
 
-The responder from [§2.4.2](#242-mdns-and-dns-sd), running as an ordinary service on raw lwIP UDP. It derives the hostname from the MAC, writes `/etc/hostname`, joins the multicast group when the station gets an IP, and advertises whichever servers this build is running. Responses bundle PTR, SRV, TXT and A so a single query gets everything it needs. `service status MDNS` shows what it is announcing.
+The responder from [§2.4.2](#242-mdns-and-dns-sd), running as an ordinary service on the stack's raw UDP API. It derives the hostname from the MAC, writes `/etc/hostname`, joins the multicast group when the station gets an IP, and advertises whichever servers this build is running. Responses bundle PTR, SRV, TXT and A so a single query gets everything it needs. `service status MDNS` shows what it is announcing.
 
 Holding both the address and the name also makes it the right owner of HTTPS certificate provisioning: with `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` it schedules `ensureServerCert` for `<hostname>.local` plus the IP, one queued job at a time, dropped again if the service stops ([§6.2.18](#6218-tls-no-provider-transport-hookup--cert-provisioning)).
 
@@ -1570,11 +1592,11 @@ Direct calls are reserved for dependencies that are known to already exist. Anyt
 | `EVENT_WIFI_STA_GOT_IP` | WiFi, once the address latches | mDNS, which also queues cert provisioning; anything needing a stable address |
 | `EVENT_WIFI_AP_STACONNECTED` / `_STADISCONNECTED` | WiFi | captive-portal flows, per-client tracking |
 | `EVENT_WIFI_INTERNET_UP` / `_DOWN` | connectivity poller | OTA, IoT, email |
-| `EVENT_GPIO_TRIGGER` | GPIO event detector | email, MQTT, HTTP post |
 | `EVENT_SERIAL_AVAILABLE` | serial bridge | sketch hooks |
 | `EVENT_TIME_SYNC` | time service, when validity changes | anything that must recheck a stored timestamp |
 | `EVENT_TIME_SECOND` / `_MINUTE` | time service, on the boundary | cron, and anything scheduling against a wall clock |
-| `EVENT_OTA_*` | OTA | logger, portal status |
+
+That is the whole list — [src/config/EventConfig.h](src/config/EventConfig.h) is the one place event names are declared, and `EVENT_NAME_MAX` closes it. Not everything that fans out uses the bus: GPIO alerting does not, because a pin crossing its threshold has exactly one destination configured for it, so the GPIO service holds its own HTTP client and calls email and MQTT directly rather than publishing for nobody in particular.
 
 Subscribe with `__utl_event.add_event_listener(name, [&](void* e){ … })`, publish with `__utl_event.execute_event(name, ptr)`.
 
@@ -1722,26 +1744,28 @@ Inside `execute`, options come back by name:
 
 ```cpp
 auto pin = RetrieveOption(CMD_OPTION_NAME_P);
-if (pin == nullptr) return CMD_RESULT_ARGS_MISSING;
+if (pin == nullptr) return CMD_ERROR_ARGS_MISSING;
 ```
 
-A command that cannot finish in one tick — `watch`, `fedit`, an interactive prompt — returns `CMD_RESULT_INCOMPLETE`. The dispatcher keeps the instance alive, counts the iteration, and re-enters `execute` on the next input.
+A command that cannot finish in one tick — `watch`, `fedit`, an interactive prompt — returns `CMD_ERROR_AGAIN`. The dispatcher keeps the instance alive, counts the iteration, and re-enters `execute` on the next input.
 
 One thing to know when you do that: a parsed option value points into the live receive buffer, which is gone by the next keystroke. `holdOptionValue("c")` copies the bytes into storage the option owns, freed when the command clears. Any value that has to survive into the next tick needs it.
 
 ### 7.5 Result codes
 
+A command returns a `pdi_err_t`, from the command band declared in [src/utility/pdi_types.h](src/utility/pdi_types.h). Everything in the framework uses the same type, so a code from storage or the network can travel back out through a command unchanged.
+
 | Result | Meaning | Dispatcher's response |
 |---|---|---|
-| `OK` | done | blank line, options cleared |
-| `INCOMPLETE` | keep me alive | nothing cleared; wait for more input |
-| `ARGS_ERROR`, `ARGS_MISSING`, `INVALID_OPTION` | bad usage | error line plus the command's usage string |
-| `NOT_FOUND`, `INVALID` | no such command, or unparsable | error line |
-| `NEED_AUTH`, `WRONG_CREDENTIAL` | login required or failed | back to the login flow |
-| `ABORTED` | Ctrl+C or Ctrl+Z | error line, iteration stops |
-| `FAILED` | the command's own failure | error line |
-| `FALSE` | the command was asked a question and the answer is no | nothing printed; only `$?` carries it |
-| `TERMINAL_*` | terminal-side states | handled by the service |
+| `PDI_OK` | done | blank line, options cleared |
+| `CMD_ERROR_AGAIN` | keep me alive | nothing cleared; wait for more input |
+| `CMD_ERROR_INVAL`, `CMD_ERROR_ARGS_MISSING`, `CMD_ERROR_OPT` | bad argument, missing argument, unrecognised option | error line plus the command's usage string |
+| `CMD_ERROR_NOENT`, `CMD_ERROR_INVALID` | no such command, or unparsable | error line |
+| `CMD_ERROR_PERM`, `CMD_ERROR_ACCES` | login required, or the credential given was wrong | back to the login flow |
+| `CMD_ERROR_CANCELED`, `CMD_ERROR_INTR` | Ctrl+C or Ctrl+Z, and terminal abort | error line, iteration stops |
+| `CMD_ERROR_FAILED` | the command ran and did not succeed | error line |
+| `CMD_RESULT_FALSE` | the command was asked a question and the answer is no | nothing printed; only `$?` carries it |
+| `CMD_ERROR_NOTTY`, `CMD_ERROR_HOLD_BUFFER`, `CMD_ERROR_UNSET` | no terminal, the terminal is holding the line buffer, no result recorded yet | handled by the service |
 
 ### 7.6 The dispatcher
 
@@ -1797,25 +1821,25 @@ Two limits are worth knowing. A pipe is a fixed buffer of `PDI_PIPE_CAPACITY` by
 | Command | Options | Brief |
 |---|---|---|
 | ls [\<dir>] | | List with mode, owner, group, mtime and size. No arg lists the current directory; relative paths join it. Owner and group show names, falling back to numbers. e.g. **ls**, **ls /proc** |
-| mkdir \<dir> | | Create a directory, `0755` masked by umask, owned by the session. e.g. **mkdir /home/scripts** |
-| touch \<file> | | Create empty at `0644` masked by umask, or bump mtime if it exists. e.g. **touch /home/notes.txt** |
-| mv \<src> \<dst> | | Move or rename, across mounts if needed. e.g. **mv /home/a.txt /home/b.txt** |
-| cp \<src> \<dst> | | Copy a file, across mounts if needed. e.g. **cp /home/a.txt /home/b.txt** |
+| mkdir \<dir> | | Create a directory, `0755` masked by umask, owned by the session. e.g. **mkdir /scripts** |
+| touch \<file> | | Create empty at `0644` masked by umask, or bump mtime if it exists. e.g. **touch /notes.txt** |
+| mv \<src> \<dst> | | Move or rename, across mounts if needed. e.g. **mv /a.txt /b.txt** |
+| cp \<src> \<dst> | | Copy a file, across mounts if needed. e.g. **cp /a.txt /b.txt** |
 | pwd | | Print the working directory. |
-| rm \<path> | | Remove a file or directory; needs write permission. e.g. **rm /home/notes.txt** |
+| rm \<path> | | Remove a file or directory; needs write permission. e.g. **rm /notes.txt** |
 | cat [\<file>] | | Print a file, or the piped input when no file is named; needs read permission. e.g. **cat /proc/uptime** |
-| echo \<text> | | Print text. Like every command it can be redirected or piped ([§7.7](#77-pipes-and-redirection)), which is how a file is written from the shell. e.g. **echo 1 > /sys/class/gpio/5/value**, **echo second line >> /home/notes.txt** |
-| fedit \<file> | | Scrolling in-place line editor. A status bar shows the path; ←/→/Home/End/Backspace edit the active line, ↑/↓ move through the file, Enter splits at the cursor. Esc opens the menu: **!w** save, **!c** cancel, **!d** delete line. Edits stream to a temp copy and commit on save. e.g. **fedit /home/notes.txt** |
+| echo \<text> | | Print text. Like every command it can be redirected or piped ([§7.7](#77-pipes-and-redirection)), which is how a file is written from the shell. e.g. **echo 1 > /sys/class/gpio/5/value**, **echo second line >> /notes.txt** |
+| fedit \<file> | | Scrolling in-place line editor. A status bar shows the path; ←/→/Home/End/Backspace edit the active line, ↑/↓ move through the file, Enter splits at the cursor. Esc opens the menu: **!w** save, **!c** cancel, **!d** delete line. Edits stream to a temp copy and commit on save. e.g. **fedit /notes.txt** |
 | head [\<file>] [N] | | First N lines, default 10, in constant memory. Reads the piped input when no file is named. |
 | tail [\<file>] [N] | | Last N lines, default 10, in constant memory. Reads the piped input when no file is named. |
 | wc [\<file>] | | Lines, words, bytes, of a file or of the piped input. |
 | df | | One row per mount: total, used, free. The mount list comes from `/proc/mounts` and the sizes from the backend behind each prefix. |
 | mount | | The mount table: prefix, type, backend. |
 | chmod \<octal> \<path> | | Set permission bits; owner or root. e.g. **chmod 0644 /etc/passwd** |
-| chown \<uid>[:\<gid>] \<path> | | Change owner, root only; gid defaults to uid. e.g. **chown 1001 /home/alice** |
+| chown \<uid>[:\<gid>] \<path> | | Change owner, root only; gid defaults to uid. e.g. **chown 1001 /alice** |
 | umask [\<octal>] | | Show or set this session's umask, default `0022`. |
 | hexdump \<file> | | Offset, sixteen hex bytes, ASCII. |
-| grep \<pattern> [\<path>] | | Search a file or directory tree, or the piped input, printing `path:line:col:content`. Regex subset: `.` `*` `+` `?` `^` `$` `[abc]` `[a-z]` `[^abc]` and escapes. e.g. **grep ^ERROR /home/log.txt**, **ps \| grep ssh** |
+| grep \<pattern> [\<path>] | | Search a file or directory tree, or the piped input, printing `path:line:col:content`. Regex subset: `.` `*` `+` `?` `^` `$` `[abc]` `[a-z]` `[^abc]` and escapes. e.g. **grep ^ERROR /log.txt**, **ps \| grep ssh** |
 | cls | | Clear the screen. |
 | cd \<dir> | | Change directory; `~` and `-` work. |
 | login | u=, p= | Interactive login, or inline with both options. |
@@ -1839,7 +1863,7 @@ Two limits are worth knowing. A pipe is a fixed buffer of `PDI_PIPE_CAPACITY` by
 | net \<option> | ip, scansta, connsta | Network state and control. e.g. **net connsta,\<ssid>,\<password>** |
 | host \<name> | | Resolve a name: IP literal, then `/etc/hosts`, then DNS. |
 | ping \<host> [count] | | ICMP echo, default four packets and at most ten, streaming each reply and finishing with a loss and rtt summary. |
-| wget [\<path>] \<url> | | Download an `http` or `https` url to a file, redrawing a transfer bar as it goes. The path may name a file or a directory; left out, the file lands in the working directory under the name the url ends with. An existing file is replaced. The transfer is refused before anything is fetched when the name is longer than the filesystem allows or the body will not fit in the free space, and a failed transfer leaves no partial file. `https` needs the TLS service ([§6.2.18](#6218-tls-no-provider-transport-hookup--cert-provisioning)). e.g. **wget https://host/app.bin**, **wget /home/app.bin https://host/app.bin** |
+| wget [\<path>] \<url> | | Download an `http` or `https` url to a file, redrawing a transfer bar as it goes. The path may name a file or a directory; left out, the file lands in the working directory under the name the url ends with. An existing file is replaced. The transfer is refused before anything is fetched when the name is longer than the filesystem allows or the body will not fit in the free space, and a failed transfer leaves no partial file. `https` needs the TLS service ([§6.2.18](#6218-tls-no-provider-transport-hookup--cert-provisioning)). e.g. **wget https://host/app.bin**, **wget /app.bin https://host/app.bin** |
 | date [-u] [-n] [-s \<epoch>] [+\<fmt>] | | Show or set the clock. `-u` for UTC, `+fmt` for a custom format, `-s` to set, `-n` to force an NTP resync. |
 | tdctl | | Clock status: local and universal time, zone, sync state, server. |
 | reboot | | Reboot. |
@@ -2006,16 +2030,17 @@ The command returns to the prompt immediately with a pid. The app runs concurren
 
 The path goes through the normal VFS, so apps arrive by SFTP or HTTP upload like any other file. The feature needs storage and brings contextual execution with it.
 
-The program must be a small position-independent ELF built against the loader — not an ESP-IDF firmware image — calling only symbols the firmware exports; the common libc entries are already there. Build one from Espressif's template with the IDF environment active:
+The program must be a small position-independent ELF built against the loader — not a firmware image — calling only symbols the firmware exports; the common libc entries are already there. How you build one depends on the SDK behind the port, and the loader ships with a template project for it:
 
 ```bash
-idf.py create-project-from-example "espressif/elf_loader=*:build_elf_file_example"
-cd build_elf_file_example        # edit main/main.c, keeping int main(int argc, char *argv[])
-idf.py set-target esp32          # plain esp32, matching the loader config
-idf.py elf                       # → build/hello_world.app.elf
+# with the port's SDK environment active
+<sdk> create-project-from-example "<loader template>"
+cd <project>                     # edit main.c, keeping int main(int argc, char *argv[])
+<sdk> set-target <board>         # must match the loader's own target
+<sdk> elf                        # → build/<name>.app.elf
 ```
 
-What makes the output loadable is two lines in the project's top-level `CMakeLists.txt`: `include(elf_loader)` and `project_elf(<name>)`. Upload the result and run it.
+Two lines in the project's build file are what make the output loadable rather than a normal binary: `include(elf_loader)` and `project_elf(<name>)`. Upload the result and run it. A port without a loader simply has no `exec` command, and nothing else changes.
 
 ### 7.14 Environment variables
 
@@ -2638,9 +2663,13 @@ http.SetClient(tls);
 int16_t code = http.Get("https://api.example.com/v1/ping");
 ```
 
-Handshake, verification, record framing and the same response parsing all come along. Worth knowing: the URL scheme is informational. A TLS client with an `http://` URL still travels encrypted; a TCP client with an `https://` URL connects in plaintext on port 443. Pair them deliberately. `setVerifyPeer(false)` keeps the channel encrypted while skipping chain validation, which is right for a self-signed development box and wrong for anything crossing a network you don't own.
+Handshake, verification, record framing and the same response parsing all come along. `setVerifyPeer(false)` keeps the channel encrypted while skipping chain validation, which is right for a self-signed development box and wrong for anything crossing a network you don't own.
 
-When TLS is enabled, the client bundled into `PdiStack` is already the TLS one, so OTA, IoT and GPIO posting go over HTTPS without a line of sketch code.
+**The URL picks the client.** Each request reads its URL first and takes the client that URL needs, changing the one it holds only if it is the wrong sort. An `http://` URL goes over the plain client, an `https://` URL over the TLS one — and that includes a redirect that switches from one to the other half way, which you could not have known about when you started the request. Handing in your own client with `SetClient()` still works, and it is left alone as long as it matches.
+
+**`https://` needs a board that can do TLS and a build with it switched on.** Without both there is no secure client to use, and the request fails with an error rather than going out unencrypted. `http://` works on any build with a network.
+
+Because the choice is made per request, OTA, device-IoT and GPIO posting all share one client and none of them has to pick anything, and turning TLS on no longer sends a plain `http://` address into a handshake it cannot answer.
 
 There is no HTTP *server* class here. The server side lives at the interface layer with a portable default implementation, plumbed through the web server, and `begin(port, secure)` is what flips it into TLS ([§8.7.1](#871-https-wiring-and-certificates)).
 
@@ -2719,6 +2748,9 @@ Two rules apply to every transport. The client instance belongs to whoever creat
 |---|---|
 | `PdiStack` | the smallest possible sketch: initialise, then serve |
 | `TaskScheduling` | all three task modes, plus rescheduling and cancelling |
+| `AddingCommand` | your own shell command, reachable over serial, Telnet and SSH |
+| `Logging` | console logging against logging to a file under `/var/log` |
+| `ScriptAndCron` | writing a script from the sketch, running it, scheduling it in `/etc/crontab` |
 | `AddingDatabaseTable` | app-side persistence without touching the codegen |
 | `AddingController` | a custom web route behind auth |
 | `MqttExample` | configuring MQTT from code and wiring callbacks |
@@ -2833,11 +2865,31 @@ From there the service drives everything: sampling at the configured rate, build
 
 It is the only example with a separate `.h` and `.cpp` rather than a single sketch file, because the Arduino preprocessor handles a class with virtual overrides poorly when it lives inline in an `.ino`.
 
-### 11.7 Suggested order
+### 11.7 `AddingCommand`
 
-Start with `PdiStack` to confirm the toolchain. Then `TaskScheduling`, because the scheduler is the primitive you reach for as soon as you add behaviour. Then `MqttExample` for the read-modify-write-then-reload pattern, which transfers directly to WiFi, OTA and IoT. After that, take whichever of `AddingDatabaseTable`, `AddingController` and `DeviceIotExample` matches what you are building.
+A command is a struct deriving from `CommandBase` with a name, a usage line and an `execute`. Registering it is one static call, and the sketch makes that call from `setup()` after `initialize()` — the shell resolves commands by name when they run, so nothing has to be compiled into the framework.
 
-Two practical notes. Run `DeviceSetup.py` before compiling any of them if you are not on the ESP32 default. And most examples stop the build with an `#error` when their feature flag is off — the stock config has them all on, so this only bites after you have trimmed the config for memory.
+What comes for free once it is registered: the command answers over serial, Telnet and SSH alike, tab completion offers it, `help` lists its usage line, and overriding `needauth()` puts it behind a login. Names are capped at seven characters.
+
+### 11.8 `Logging`
+
+`Log*` writes to the console. `SysLog*` writes to the console **and** appends to `/var/log/syslog.<level>`, which you can `cat` later. The example shows both, plus the case that decides between them: a path that discards data logs with `SysLogE`, because a console-only warning vanishes entirely on a board whose console log is off.
+
+Which is the trap the example leads with — console logging ships switched off. Uncomment `ENABLE_CONSOLE_LOG_ALL` in `devices/DeviceConfig.h` or the sketch appears to do nothing at all.
+
+### 11.9 `ScriptAndCron`
+
+The sketch writes a shell script to `/hello.sh`, runs it straight away, and appends a row to `/etc/crontab` so the framework keeps running it every minute by itself. It is the feature seen from the application side rather than from the shell.
+
+The part worth reading closely is which call to use. `ScriptRunner::runScheduledScript()` runs a file with nobody watching, as the user its `# UID` header names — the same call `initialize()` uses for `/etc/rc.local`. `ScriptRunner::runDetachedLine()` does the same for a single line, with the uid passed in. The two that look right and are not: `ScriptRunner::run()` wants the session of whoever asked for the script, and `__cmd_service.executeCommand()` wants a terminal **and** a session. A sketch has neither, so both answer `CMD_ERROR_NOTTY`.
+
+Installation is keyed off the script file already existing, and the crontab row is **appended** rather than the table being rewritten — so a row you add or delete yourself survives a reboot. ⚠ Cron needs a real clock; on a board that never reaches the internet the row sits in the table and never fires, while running the script from the sketch still works.
+
+### 11.10 Suggested order
+
+Start with `PdiStack` to confirm the toolchain. Then `TaskScheduling`, because the scheduler is the primitive you reach for as soon as you add behaviour. `AddingCommand` and `Logging` are short and pay off immediately — one gives you a way to drive your own code from the shell, the other a way to see what it did. `ScriptAndCron` follows naturally: once there is something to run, that is how you make the device run it on its own. Then `MqttExample` for the read-modify-write-then-reload pattern, which transfers directly to WiFi, OTA and IoT. After that, take whichever of `AddingDatabaseTable`, `AddingController` and `DeviceIotExample` matches what you are building.
+
+Two practical notes. Run `DeviceSetup.py` before compiling any of them if you are not building for the default port. And most examples stop the build with an `#error` when their feature flag is off — the stock config has them all on, so this only bites after you have trimmed the config for memory.
 
 ---
 ## 12. Memory & Performance Notes
@@ -2846,15 +2898,15 @@ The constraints scattered through the preceding sections, collected in one place
 
 ### 12.1 Budget per target
 
-Roughly what is left after the Arduino core, lwIP and the standard library are linked. Orders of magnitude, not guarantees.
+Roughly what is left after the board's core, its network stack and the standard library are linked. Boards are grouped by the budget they bring, since that is what actually decides the answer. Orders of magnitude, not guarantees.
 
-| Target | Flash | RAM | NVM | What fits |
+| Class of board | Flash | RAM | NVM | What fits |
 |---|---|---|---|---|
-| Arduino UNO | 32 KB | 2 KB | 1 KB | serial, EEPROM storage, basic GPIO, shell — no network |
-| ESP8266 | 1 MB | ~50 KB free heap | ~4 KB | the full build short of SSH; contextual execution is comfortable |
-| ESP32 | 4 MB | ~250 KB free heap | ~4 KB | the full build, with room for a second contextual lane |
+| kilobytes of RAM, no radio | ~32 KB | ~2 KB | ~1 KB | serial, EEPROM storage, basic GPIO, shell — no network |
+| tens of kilobytes, with a radio | ~1 MB | ~50 KB free heap | ~4 KB | the full build short of SSH; contextual execution is comfortable |
+| hundreds of kilobytes, with a radio | ~4 MB | ~250 KB free heap | ~4 KB | the full build, with room for a second contextual lane |
 
-That table is why entire feature groups are gated on the board in the device config, and why the table limit is 5 on UNO against 15 on the ESP ports.
+That table is why entire feature groups are gated on declared capability rather than assumed, and why the table limit is 5 where NVM is a kilobyte against 15 where it is a few.
 
 ### 12.2 Keeping strings out of RAM
 
@@ -2864,7 +2916,7 @@ Two macros, one purpose:
 |---|---|---|
 | `RODT_ATTR("text")` | wraps the literal so it stays in flash | plain literal, same behaviour |
 | `PROG_RODT_ATTR` | a storage qualifier that puts the variable in flash | empty; the variable is already read-only data |
-| `PROG_RODT_PTR` | the right pointer type for reading flash on AVR | a plain `const char*` |
+| `PROG_RODT_PTR` | the right pointer type where program memory is a separate address space | a plain `const char*` |
 
 The rule is simple: a literal used inline goes in `RODT_ATTR(...)`, and one held in a named variable is declared `static const char foo[] PROG_RODT_ATTR = "…"`. Every prompt, page fragment, log message and service name in the framework follows it, which is why the binary is dense rather than RAM-hungry.
 
@@ -2886,14 +2938,14 @@ What matters with TLS is per-session, not per-build:
         ├─ record buffers             in + out
         └─ engine state               keys, cipher contexts, cert chain during validation
 
-   esp8266 / BearSSL   10-15 KB per session   on a 30-40 KB working budget
-   esp32   / mbedTLS   35-50 KB per session   mostly the 16 KB record buffers
-                                              trim them in sdkconfig to halve this
+   a compact backend   10-15 KB per session   on a 30-40 KB working budget
+   a full one          35-50 KB per session   mostly the 16 KB record buffers,
+                                             which the SDK config can halve
 ```
 
-Every byte of that comes back when the client disconnects — the worker exits, buffers are freed, state is torn down, though on FreeRTOS the stack is reclaimed by the idle task a moment later. Size for the worst-case number of *concurrent* sessions; an idle build always looks healthy because none of it is allocated yet.
+Every byte of that comes back when the client disconnects — the worker exits, buffers are freed, state is torn down, though where an RTOS owns the threads its idle task reclaims the stack a moment later. Size for the worst-case number of *concurrent* sessions; an idle build always looks healthy because none of it is allocated yet.
 
-**NAPT** is invisible in flash and expensive in heap, because lwIP holds the translation table. Leave it off unless the device is bridging its AP to the station link.
+**NAPT** is invisible in flash and expensive in heap, because the network stack holds the translation table. Leave it off unless the device is bridging its AP to the station link.
 
 **The portal's controllers** each carry their own form-validation code, and there are a dozen. If you don't need the portal, drop the HTTP server even while keeping WiFi.
 
@@ -2947,7 +2999,7 @@ Wrap every literal in `RODT_ATTR` — skipping it breaks nothing and quietly mov
 
 Use `char[]` for anything NVM-shaped and `pdiutil::string` for transient work; mixing them inside one config struct breaks the serialisation contract.
 
-Use explicit-width integer types in config structs. `sizeof(int)` differs between AVR and the ESP parts, and an NVM layout that depends on it is not portable.
+Use explicit-width integer types in config structs. `sizeof(int)` differs between 8-bit and 32-bit ports, and an NVM layout that depends on it is not portable.
 
 Stay away from the `printf` family; the framework's own conversions save four to eight kilobytes by never linking libc's formatter.
 
@@ -3092,7 +3144,7 @@ Not every interface is worth rewriting per device. The portable defaults ship un
 
 The HTTP server implementation is a protocol-correct HTTP/1.1 server built on nothing but the TCP server and client interfaces — and with TLS enabled, the same file serves HTTPS by wrapping accepted connections. The filesystem side is larger: LittleFS on top of any storage interface, the dispatcher that routes one tree across several backends, and the generated filesystems behind `/proc`, `/sys`, `/dev` and `/tmp`. None of them are per-board.
 
-So a new device needs to supply raw TCP and raw storage, and inherits the HTTP server, the HTTPS server, the whole filesystem and every synthetic mount for free. The TLS classes are deliberately not here, because BearSSL and mbedTLS are different enough that each port supplies its own pair.
+So a new device needs to supply raw TCP and raw storage, and inherits the HTTP server, the HTTPS server, the whole filesystem and every synthetic mount for free. The TLS classes are deliberately not here, because SSL backends differ enough from one another that each port supplies its own pair.
 
 ### 13.5 What an implementation must promise
 
@@ -3109,7 +3161,7 @@ The bar is whether at least two devices could implement it differently. If they 
 1. Pick the group — drivers for silicon, middlewares for network and device operations, modules for orthogonal features, threading for execution, top level for cross-cutting concerns.
 2. Forward-declare the concrete class and declare the `extern` singleton at the bottom.
 3. Guard it with the same flag that gates the service consuming it, so no existing port has to provide anything until it opts in.
-4. Add an implementation to the posix port so the off-device build still links.
+4. Add an implementation to the host port so the off-device build still links.
 5. Write it up here.
 
 An interface with exactly one implementation is usually a sign the abstraction is premature — keep it in device-specific code until a second port needs it.
@@ -3122,8 +3174,8 @@ The device layer is the only place vendor SDK and Arduino-core symbols are allow
 ### 14.1 What a port contains
 
 ```
-  devices/esp32/
-    esp32.h                     umbrella include for the SDK and core
+  devices/<board>/
+    <board>.h                   umbrella include for the SDK and core
     device_config.h             platform macros: flash strings, critical sections
     device_pdi.h                header aggregator — what the framework sees
     device_pdi.cpp              source aggregator — see below
@@ -3141,9 +3193,9 @@ The device layer is the only place vendor SDK and Arduino-core symbols are allow
     TcpClient / TcpServer       with networking
     UdpInterface                with networking
     NtpInterface / PingInterface with networking
-    TlsClient / TlsServer       with TLS — BearSSL on esp8266, mbedTLS on esp32
+    TlsClient / TlsServer       with TLS, on whichever SSL backend the board has
     cert loader                 per backend, loads PEM and DER off the filesystem
-    TlsCertProvisioner          esp32, with on-device cert generation
+    TlsCertProvisioner          with on-device cert generation
     ExceptionsNotifier          optional crash capture
 
     config/DBTableSchema.json   this board's table layout
@@ -3151,9 +3203,9 @@ The device layer is the only place vendor SDK and Arduino-core symbols are allow
     threading/                  optional: the cooperative and preemptive lanes
 ```
 
-The two ends of the spectrum are worth looking at. The **posix** port targets the machine you develop on: real BSD sockets, real files, real ICMP for `ping`, and a restart that re-execs the process. It is what the test suite runs the whole framework against, so a shell, an ssh channel and the portal can all be driven without a board. The **Arduino UNO** port has no network, no storage beyond EEPROM and no web server at all — device control, database, serial, storage, filesystem and the instance factory, and nothing more.
+The two ends of the spectrum are worth looking at. The **host** port targets the machine you develop on: real BSD sockets, real files, real ICMP for `ping`, and a restart that re-execs the process. It is what the test suite runs the whole framework against, so a shell, an ssh channel and the portal can all be driven without a board. At the other end, a port for a board with no radio and no filesystem beyond EEPROM supplies device control, database, serial, storage and the instance factory, and nothing more — no network, no web server.
 
-For threading, ESP32 builds on FreeRTOS primitives while ESP8266 ships bare-metal Xtensa context switching driven by a hardware timer. Both satisfy the same interfaces.
+Threading is where ports differ most and it matters least: one may build on the primitives an RTOS already provides, another on bare-metal context switching driven by a hardware timer. Both satisfy the same interfaces, and nothing above them can tell which it got.
 
 ### 14.2 Required versus optional
 
@@ -3167,8 +3219,8 @@ For threading, ESP32 builds on FreeRTOS primitives while ESP8266 ships bare-meta
 | WiFi, HTTP server | with WiFi | station and AP, the embedded server |
 | TCP client and server | with networking | MQTT, SMTP, OTA, telnet, SSH |
 | NTP, ping | with networking | time sync and reachability |
-| TLS client and server | with TLS | when on, the orchestrator hands these out instead of plain TCP, and every outbound service upgrades transparently |
-| cert provisioner | with on-device cert generation | esp32; free functions rather than a virtual interface |
+| TLS client and server | with TLS | handed out when something asks for a secure address, so a build with TLS still reaches plain ones |
+| cert provisioner | with on-device cert generation | free functions rather than a virtual interface |
 | threading family | with contextual execution | also required by TLS, which runs off the main stack |
 | GPIO and watchdog | always, folded in | implemented as part of device control rather than as separate classes |
 
@@ -3195,20 +3247,20 @@ A third aggregator, `device_pdi.c`, carries pure-C translation units. It is requ
 ### 14.4 How a board gets selected
 
 ```
-  DeviceSetup.py -d esp8266
+  DeviceSetup.py -d <board>
         │  writes
         ▼
-  devices/DeviceSetup.h        #define PDI_DEVICE esp8266
+  devices/DeviceSetup.h        #define PDI_DEVICE <board>
         │  included by
         ▼
   devices/DeviceConfig.h       cascades into ENABLE_* flags, and pulls in
-        │                      esp8266/device_config.h so the platform macros exist
+        │                      <board>/device_config.h so the platform macros exist
         │                      before any framework header is parsed. that header
-        │                      defines DEVICE_ESP8266, so the port names itself
+        │                      defines DEVICE_<BOARD>, so the port names itself
         ▼
   src/config/Config.h          now everything under src/ sees flags and macros
         ▼
-  src/interface/pdi.h          includes esp8266/device_pdi.h
+  src/interface/pdi.h          includes <board>/device_pdi.h
         ▼
   the port's interface headers  which transitively pull in the SDK
 ```
@@ -3216,7 +3268,7 @@ A third aggregator, `device_pdi.c`, carries pure-C translation units. It is requ
 `PDI_DEVICE` names the port directory, and every selector builds its include path from that one macro. Setting it on the compiler command line takes precedence over the generated header, so a build matrix can cover every port from one tree without rewriting a file:
 
 ```
-  -DPDI_DEVICE=esp32
+  -DPDI_DEVICE=<board>
 ```
 
 Adding a board therefore touches **no** source file outside its own folder — only the architecture list in `library.properties` and `library.json`.
@@ -3228,7 +3280,7 @@ Each port instantiates exactly one object per interface, under the name the fram
 | Symbol | Required when |
 |---|---|
 | `__i_dvc_ctrl`, `__i_db`, `__i_instance` | always |
-| `__i_serial` | serial service |
+| `__serial_uart`, `__serial_uart1` | serial service — registered with `iSerialInterface`, which hands them out by `getSerialInstance(type)` rather than through a single global |
 | `__i_storage`, `__i_fs` | storage |
 | `__i_wifi`, `__i_http_server` | WiFi |
 | `__i_ntp`, `__i_ping` | networking |
@@ -3263,7 +3315,7 @@ Say the board is `myboard`.
 2. **Implement the three required interfaces** — device control, database, instance factory — each deriving from its abstract counterpart, each defining its `__i_*` global.
 3. **Write the three aggregators** — `device_pdi.h`, `device_pdi.cpp` and `device_pdi.c` — mirroring an existing board's set and keeping only what you have implemented. The `.c` is required even if it stays empty.
 4. **Nothing to register.** The selectors build their paths from `PDI_DEVICE`, so the folder name is the registration.
-5. **Add the per-board limits** — pin counts, table count — and switch off any service the board cannot support, the way the UNO port does.
+5. **Add the per-board limits** — pin counts, table count — and switch off any service the board cannot support, the way a port with no radio does.
 6. **Generate the setup files**: `python3 DeviceSetup.py -d myboard`.
 7. **Build the bundled example** for the new board. That is the first real validation.
 8. **Add optional interfaces one flag at a time**, rebuilding as you go.
@@ -3272,7 +3324,7 @@ Say the board is `myboard`.
 
 ### 14.9 Before you call it done
 
-- The posix port still compiles — proof that nothing under `src/` picked up a vendor header.
+- The host port still compiles — proof that nothing under `src/` picked up a vendor header.
 - The bundled example builds with every flag the board can support.
 - Every `__i_*` symbol the flag set implies is defined exactly once.
 - Microsecond time is monotonic across the platform's counter wrap, and `ps` shows non-zero CPU share for tasks with sub-millisecond callbacks after a few ticks.
@@ -3353,7 +3405,7 @@ A small, production-quality kit. Everything is plain functions over fixed-size b
 
 The Curve25519 and Ed25519 code comes from the standard portable reference. The RSA and big-integer layer is self-contained and device-agnostic, and the caller injects the RNG.
 
-Every long asymmetric operation yields through one shared hook, `crypto_set_yield_hook` — the RSA ladder, the Ed25519 scalar multiplications and the Curve25519 ladder all call it from their inner loops. Install it around the operation and clear it afterwards, including on an early return, or the next caller inherits it. That is what carries on-device keygen and a handshake through without disabling the watchdog, which on ESP8266 stops the hardware feed and defeats the purpose. SSH leans on all of it: host key generation, the key exchange, host-key signing, public-key authentication, and AES-CTR for transport encryption.
+Every long asymmetric operation yields through one shared hook, `crypto_set_yield_hook` — the RSA ladder, the Ed25519 scalar multiplications and the Curve25519 ladder all call it from their inner loops. Install it around the operation and clear it afterwards, including on an early return, or the next caller inherits it. That is what carries on-device keygen and a handshake through without disabling the watchdog — on some ports disabling it stops the hardware feed rather than suspending it, which defeats the purpose entirely. SSH leans on all of it: host key generation, the key exchange, host-key signing, public-key authentication, and AES-CTR for transport encryption.
 
 One property worth knowing before you rely on it: constant-time behaviour holds only where the upstream implementation provides it. Ed25519 verification is constant-time; the table-based AES and the big-integer path are not hardened against timing observation.
 
@@ -3388,7 +3440,7 @@ Every section above has its own "how do I add one of these" part. This one is th
 | persist something only your sketch cares about | the database escape hatch | [§11.3](#113-addingdatabasetable) |
 | react to another service without coupling to it | the event bus | [§6.4](#64-the-event-bus) |
 | run periodic or long work | the scheduler | [§4](#4-task-scheduler) |
-| encrypt everything outbound | turn on TLS — each outbound service asks `__i_instance` for the shared TLS client instead of the TCP one | [§6.2.18](#6218-tls-no-provider-transport-hookup--cert-provisioning) |
+| encrypt a connection going out | turn on TLS and use the secure address — HTTP reads it from the URL, MQTT from the broker setting | [§6.2.18](#6218-tls-no-provider-transport-hookup--cert-provisioning) |
 | serve the portal over HTTPS | turn on HTTPS and drop a cert and key on the filesystem | [§8.7.1](#871-https-wiring-and-certificates) |
 | call a service from a sketch | the global | [§16.9](#169-calling-a-service-from-a-sketch) |
 
@@ -3400,7 +3452,7 @@ Create the folder with its SDK umbrella header, its platform-macro header and th
 
 ### 16.3 A new interface
 
-Pick the group, write the header with pure virtuals plus a forward-declared concrete class and its `extern` singleton, guard it behind the flag that gates its consumers, and add a posix implementation so off-device builds still link. If more than one port would end up writing the same logic, put a default implementation under `impl/` instead.
+Pick the group, write the header with pure virtuals plus a forward-declared concrete class and its `extern` singleton, guard it behind the flag that gates its consumers, and add a host-port implementation so off-device builds still link. If more than one port would end up writing the same logic, put a default implementation under `impl/` instead.
 
 The bar is that two ports would genuinely implement it differently. A single implementation belongs in the device folder instead.
 
@@ -3467,7 +3519,7 @@ void setup() {
         __i_dvc_ctrl.getTerminal()->writeln("tick");
     }, 1000, millis());
 
-    __utl_event.add_event_listener(EVENT_WIFI_CONNECTED, [&](void*) {
+    __utl_event.add_event_listener(EVENT_WIFI_STA_GOT_IP, [&](void*) {
         // reactive code
     });
 }
@@ -3509,7 +3561,7 @@ this section is the shape of it.
 
 | Tier | What it is | Needs |
 |---|---|---|
-| `unit` | Native host binary linking the framework against the posix port | a compiler |
+| `unit` | Native binary linking the framework against the host port | a compiler |
 | `system` | The whole stack as a host process (`pdid`) you can ssh, sftp and curl | a compiler |
 | `device` | The same feature suites over serial, telnet or ssh | a board |
 | `fuzz` | libFuzzer harnesses over the parsers that face the network before login | clang |
@@ -3535,8 +3587,8 @@ session and pool defects show up.
 ### 17.2 How the host build works
 
 `src/` contains no Arduino or vendor SDK includes; every SDK dependency lives under `devices/`. The
-test build compiles the real framework sources against the posix port in `devices/posix/` with
-`MOCK_DEVICE_TEST` defined on the command line. That gate is the only thing selecting the posix
+test build compiles the real framework sources against the host port in `devices/posix/` with
+`MOCK_DEVICE_TEST` defined on the command line. That gate is the only thing selecting the host
 port — `devices/DeviceSetup.h`, which records the board you build firmware for, is never read or
 written by a test run, so testing never disturbs your build.
 
@@ -3593,17 +3645,17 @@ Short entries; the explanations live in the sections they point at.
 
 ### 18.1 Build and flash
 
-**The build succeeds for ESP8266 or UNO but the device misbehaves.**
-The setup script was never run for that target, so the ESP32 fallback produced an ESP32-shaped binary — right code, wrong table set and flags. Run `python3 DeviceSetup.py -d <board>` and rebuild ([§2.5](#25-how-the-esp32-default-works)).
+**The build succeeds for a board but the device misbehaves.**
+The setup script was never run for that target, so the default-port fallback produced a binary shaped for the wrong board — right code, wrong table set and flags. Run `python3 DeviceSetup.py -d <board>` and rebuild ([§2.5](#25-how-the-default-port-works)).
 
 **The build succeeds but `service list` is empty and no access point appears.**
-Same cause seen from the other end: `devices/DeviceSetup.h` still names the previous board. Re-run the script, or delete the file to fall back to ESP32.
+Same cause seen from the other end: `devices/DeviceSetup.h` still names the previous board. Re-run the script, or delete the file to fall back to the default port.
 
 **`multiple definition of __i_<x>`.**
 Either two ports define the same singleton, or a device `.cpp` was included from outside its aggregator chain. Every device translation unit must be reached through exactly one aggregator ([§14.3](#143-the-two-aggregators)).
 
-**`fatal error: esp_wifi.h: No such file or directory` while building for AVR.**
-A vendor header leaked above the device layer. Push the include down into the port ([§16.10](#1610-what-to-watch-for)).
+**A vendor SDK header is not found while building for a board that does not have it.**
+The header leaked above the device layer — the giveaway is that it builds for one port and not another. Push the include down into the port ([§16.10](#1610-what-to-watch-for)).
 
 **Compile errors inside `pdiutil::function` or `pdiutil::vector` on an unusual target.**
 The toolchain is missing the GCC extensions PdiSTL relies on. Use a GCC-based toolchain.
@@ -3663,10 +3715,10 @@ The certificate and key are missing from the filesystem or sitting at different 
 **Outbound HTTPS to an unknown CA fails.**
 The bundled client ships with peer verification off so first-boot demos work. For production, point it at `/etc/ssl/ca-bundle.crt` and drop the `setVerifyPeer(false)` line.
 
-**ESP8266 TLS handshakes fail on large records.**
+**TLS handshakes fail on large records.**
 Two ceilings meet here. The handshake runs on a dedicated task stack sized by `TLS_TASK_STACK_SIZE` because the default main stack is too small for an ECDSA sign, and the inbound record buffer defaults well below the 16 KB a peer may emit. Raise the buffer — and pay the heap — only when you cannot control the peer.
 
-**HTTPS works on ESP32 and refuses everything on ESP8266.**
+**HTTPS works on a roomier board and refuses everything on a tighter one.**
 NAPT is almost certainly on as well. The two cannot share that heap ([§12.3](#123-the-expensive-features)).
 
 **The auto cert-generation listener never fires.**
@@ -3708,10 +3760,10 @@ No. One global stack, one singleton per interface and per service — and on the
 In your sketch, yes. In framework code, no — its allocator differs per core, which is exactly the portability the framework is built to avoid depending on.
 
 **Why are command names so short?**
-Eight characters for a name and three for an option are sized for AVR-class RAM, and the cost of loosening them multiplies across every command slot.
+Eight characters for a name and three for an option are sized for the tightest board the framework supports, and the cost of loosening them multiplies across every command slot.
 
 **Why is SSH so heavy?**
-Host keys, key exchange, streaming AES and per-session protocol state add roughly 150 KB of flash and 8 to 16 KB of heap per session. That is why ESP32 is the recommended target for SSH builds ([§12.3](#123-the-expensive-features)).
+Host keys, key exchange, streaming AES and per-session protocol state add roughly 150 KB of flash and 8 to 16 KB of heap per session. That is why SSH wants a board with heap to spare ([§12.3](#123-the-expensive-features)).
 
 **Can the device be reconfigured without reflashing?**
 Yes. Everything persisted in NVM is reachable from the portal, the shell, or a sketch. Flashing only changes defaults ([§3.8](#38-defaults-are-not-current-values)).
@@ -3720,18 +3772,18 @@ Yes. Everything persisted in NVM is reachable from the portal, the shell, or a s
 Console lines go to serial at 115200. With syslog on, those lines also land in `/var/log/syslog.<level>`, and with forwarding on they go to a collector as well ([§9.6](#96-where-syslog-goes)).
 
 **How do I turn on TLS?**
-Set `ENABLE_TLS_SERVICE` — BearSSL on ESP8266, mbedTLS on ESP32. Add `ENABLE_HTTPS_SERVER` for the portal, `ENABLE_HTTPS_SERVER_MTLS` for client certificates, and on ESP32 the cert-generation flags for on-boot minting. It is the most expensive flag in the framework ([§12.3](#123-the-expensive-features)), and on ESP8266 it cannot share the board with NAPT.
+Set `ENABLE_TLS_SERVICE`; the port supplies whichever SSL backend it has. Add `ENABLE_HTTPS_SERVER` for the portal, `ENABLE_HTTPS_SERVER_MTLS` for client certificates, and the cert-generation flags for on-boot minting where the port declares support. It is the most expensive flag in the framework ([§12.3](#123-the-expensive-features)), and on a tight board it cannot share the heap with NAPT.
 
 **How do I provision certificates?**
-On ESP32, `tls q=1,t=0,l=256,n=device.local,i=192.168.1.50` writes a self-signed EC pair straight to the configured paths. Anywhere else, `python3 scripts/GenTlsCerts.py --dns device.local --ip 192.168.1.50` produces them off-device for upload. Run the script once with `--gen-ca` and reuse that CA for every device, and a client that trusts it trusts your whole fleet.
+Where the port can generate them, `tls q=1,t=0,l=256,n=device.local,i=192.168.1.50` writes a self-signed EC pair straight to the configured paths. Otherwise, `python3 scripts/GenTlsCerts.py --dns device.local --ip 192.168.1.50` produces them off-device for upload. Run the script once with `--gen-ca` and reuse that CA for every device, and a client that trusts it trusts your whole fleet.
 
-For a development box on ESP32 none of that is needed: with `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` the mDNS service mints one covering the address and `<hostname>.local` as soon as the station has an IP, and reissues it if either changes.
+For a development box none of that is needed, where the port can mint its own: with `ENABLE_SERVER_TLS_CERT_GENERATION_AT_RUNTIME` the mDNS service mints one covering the address and `<hostname>.local` as soon as the station has an IP, and reissues it if either changes.
 
 **Is there a simulator?**
-The posix port runs the whole framework as a host process, so most behaviour can be exercised without a board — the feature suites drive it over a shell, ssh and the portal. What it cannot stand in for is timing, radio and flash wear, so anything that depends on those still needs real hardware.
+The host port runs the whole framework as a normal process on your computer, so most behaviour can be exercised without a board — the feature suites drive it over a shell, ssh and the portal. What it cannot stand in for is timing, radio and flash wear, so anything that depends on those still needs real hardware.
 
 **How do I unit-test framework code?**
-`python3 tests/run_tests.py` — see [§17](#17-test-suite). The framework compiles against the posix port on host x86, so a unit test links the real source with no board attached.
+`python3 tests/run_tests.py` — see [§17](#17-test-suite). The framework compiles against the host port on host x86, so a unit test links the real source with no board attached.
 
 **Where do I report issues?**
 GitHub: <https://github.com/Suraj151/pdi-framework>.

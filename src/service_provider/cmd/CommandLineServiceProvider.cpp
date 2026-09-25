@@ -764,7 +764,8 @@ pdi_err_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cmd_t
           __i_dvc_ctrl.yield();
         });
         if(newlineindices.size() > CMD_TERMINAL_HISTORY_MAX_LINES){
-          uint32_t remove_upto_index = newlineindices[newlineindices.size() - CMD_TERMINAL_HISTORY_MAX_LINES - 1];
+          uint32_t keeplines = CMD_TERMINAL_HISTORY_MAX_LINES - CMD_TERMINAL_HISTORY_ROTATE_SLACK;
+          uint32_t remove_upto_index = newlineindices[newlineindices.size() - keeplines - 1];
 
           const char *tempdir = __i_instance.getFileSystemInstance().getTempDirectory();
           pdiutil::string tempFilePath = pdiutil::string(tempdir) + __i_instance.getFileSystemInstance().basename(m_termhistoryfile.c_str());
@@ -791,8 +792,8 @@ pdi_err_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cmd_t
         }
 
         // append command to history file
+        originalCmd += "\r\n";
         __i_instance.getFileSystemInstance().writeFile(m_termhistoryfile.c_str(), (char*)originalCmd.c_str(), originalCmd.size(), true);
-        __i_instance.getFileSystemInstance().writeFile(m_termhistoryfile.c_str(), (char*)"\r\n", 2, true);
     }
     #endif
 

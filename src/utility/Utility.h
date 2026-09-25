@@ -17,11 +17,7 @@ Created Date    : 1st June 2019
 
 #include <config/Config.h>
 
-#ifdef ENABLE_TIMER_TASK_SCHEDULER
-#include "TimerTaskScheduler.h"
-#else
 #include "TaskScheduler.h"
-#endif
 
 #include "iUtilityInterface.h"
 #include "iInstanceInterface.h"

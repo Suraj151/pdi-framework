@@ -128,6 +128,13 @@ public:
 
     pdiutil::string _clean_value_ro = CHARPTR_WRAP("clean");
 
+#ifdef ENABLE_TLS_SERVICE
+    pdiutil::string _secure_value_ro = CHARPTR_WRAP("secure");
+    pdiutil::string _secure_note_ro = CHARPTR_WRAP("Encrypted always. Upload trust anchors to ");
+    _secure_note_ro += CHARPTR_WRAP(TLS_DEFAULT_OUTBOUND_CA_BUNDLE_PATH);
+    _secure_note_ro += CHARPTR_WRAP(" to verify the broker identity.");
+#endif
+
 #ifdef ALLOW_MQTT_CONFIG_MODIFICATION
 
     concat_tr_input_html_tags(_page, RODT_ATTR("Host Address:"), RODT_ATTR("hst"), _mqtt_general_configs.host, MQTT_HOST_BUF_SIZE - 1);
@@ -138,6 +145,12 @@ public:
     concat_tr_input_html_tags(_page, RODT_ATTR("Password:"), RODT_ATTR("pswd"), _mqtt_general_configs.password, MQTT_PASSWORD_BUF_SIZE - 1);
     concat_tr_input_html_tags(_page, RODT_ATTR("Keep Alive:"), RODT_ATTR("kpalv"), _keepalive);
     concat_tr_input_html_tags(_page, RODT_ATTR("Clean Session:"), RODT_ATTR("cln"), (char *)_clean_value_ro.c_str(), HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_general_configs.clean_session != 0);
+#ifdef ENABLE_TLS_SERVICE
+    concat_tr_input_html_tags(_page, RODT_ATTR("Secure Connection:"), RODT_ATTR("sec"), (char *)_secure_value_ro.c_str(), HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_general_configs.security != 0);
+    CONTINUE_SEND_IN_CHUNK(_page);
+    concat_tr_heading_html_tags(_page, _secure_note_ro.c_str(), 5, RODT_ATTR("2"));
+    CONTINUE_SEND_IN_CHUNK(_page);
+#endif
 
     concat_csrf_input_html_tag( _page );
     strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
@@ -152,7 +165,12 @@ public:
     concat_tr_input_html_tags(_page, RODT_ATTR("Password:"), RODT_ATTR("pswd"), _mqtt_general_configs.password, MQTT_PASSWORD_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
     concat_tr_input_html_tags(_page, RODT_ATTR("Keep Alive:"), RODT_ATTR("kpalv"), _keepalive, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true);
     concat_tr_input_html_tags(_page, RODT_ATTR("Clean Session:"), RODT_ATTR("cln"), (char *)_clean_value_ro.c_str(), HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_general_configs.clean_session != 0, true);
+#ifdef ENABLE_TLS_SERVICE
+    concat_tr_input_html_tags(_page, RODT_ATTR("Secure Connection:"), RODT_ATTR("sec"), (char *)_secure_value_ro.c_str(), HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_CHECKBOX_TAG_TYPE, _mqtt_general_configs.security != 0, true);
     CONTINUE_SEND_IN_CHUNK(_page);
+    concat_tr_heading_html_tags(_page, _secure_note_ro.c_str(), 5, RODT_ATTR("2"));
+    CONTINUE_SEND_IN_CHUNK(_page);
+#endif
 #endif
 
     if (_enable_flash)
@@ -188,6 +206,7 @@ public:
       pdiutil::string _password = this->m_web_resource->m_server->arg(CHARPTR_WRAP("pswd"));
       pdiutil::string _keep_alive = this->m_web_resource->m_server->arg(CHARPTR_WRAP("kpalv"));
       pdiutil::string _clean_session = this->m_web_resource->m_server->arg(CHARPTR_WRAP("cln"));
+      pdiutil::string _security = this->m_web_resource->m_server->arg(CHARPTR_WRAP("sec"));
       __i_dvc_ctrl.yield();
 
       LogI("\nSubmitted info :\n");
@@ -214,6 +233,8 @@ public:
         _mqtt_general_configs->keepalive = StringToUint16(_keep_alive.c_str());
         pdiutil::string clean_flag = CHARPTR_WRAP("clean");
         _mqtt_general_configs->clean_session = (int)(_clean_session == clean_flag);
+        pdiutil::string secure_flag = CHARPTR_WRAP("secure");
+        _mqtt_general_configs->security = (int)(_security == secure_flag);
 
         this->m_web_resource->m_db_conn->set_mqtt_general_config_table(_mqtt_general_configs);
         pdiutil::safe_delete(_mqtt_general_configs);

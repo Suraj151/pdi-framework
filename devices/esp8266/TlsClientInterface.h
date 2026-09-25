@@ -196,6 +196,7 @@ private:
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
     pdiutil::task_id_t m_taskId;
     volatile bool m_taskRunning;
+    volatile bool m_taskExited;
     #endif
 
     pdiutil::string m_caPath;

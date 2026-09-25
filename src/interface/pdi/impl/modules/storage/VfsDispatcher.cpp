@@ -35,7 +35,11 @@ const pdiutil::string s_empty_string;
 
 }
 
-VfsDispatcher::VfsDispatcher() : iFileSystemInterface(s_null_storage), m_mount_count(0), m_priv_depth(0) {}
+VfsDispatcher::VfsDispatcher() : iFileSystemInterface(s_null_storage), m_mount_count(0), m_priv_depth(0)
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+    , m_lock(nullptr)
+#endif
+{}
 
 int8_t VfsDispatcher::mount(const char* prefix, iFileSystemInterface* backend, const char* name, vfs_type_t type) {
     if (!prefix || !backend) {
@@ -143,6 +147,11 @@ const vfs_mount_t* VfsDispatcher::findMountForPath(const char* path) const {
 
 pdi_err_t VfsDispatcher::init() {
     int rc = 0;
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+    if (nullptr == m_lock) {
+        m_lock = __i_instance.getNewPreemptiveMutexInstance();
+    }
+#endif
     for (uint8_t i = 0; i < m_mount_count; ++i) {
         if (m_mounts[i].m_backend) {
             int r = m_mounts[i].m_backend->init();
@@ -200,6 +209,12 @@ bool VfsDispatcher::checkOwnerOrRoot(const char* path) {
 #endif
 }
 
+#ifdef ENABLE_CONTEXTUAL_EXECUTION
+#define VFS_GUARD() iScopedLock _vfs_guard(m_lock)   /* held for this call */
+#else
+#define VFS_GUARD() ((void)0)
+#endif
+
 #define VFS_ROUTE_PATH(_method, _path, _fail, ...)                                  \
     do {                                                                            \
         const char* rel = nullptr;                                                  \
@@ -209,96 +224,120 @@ bool VfsDispatcher::checkOwnerOrRoot(const char* path) {
     } while (0)
 
 int VfsDispatcher::createFile(const char* path, const char* content, int64_t size) {
+    VFS_GUARD();
     VFS_ROUTE_PATH(createFile, path, STORAGE_ERROR_NOT_MOUNTED, content, size);
 }
 int VfsDispatcher::editFile(const char* path, uint64_t offset, const char* content, uint32_t size) {
+    VFS_GUARD();
     if (!checkAccess(path, VFS_ACCESS_W)) return PDI_ERR_PERM;
     VFS_ROUTE_PATH(editFile, path, STORAGE_ERROR_NOT_MOUNTED, offset, content, size);
 }
 int VfsDispatcher::writeFile(const char* path, const char* content, uint32_t size, bool append) {
+    VFS_GUARD();
     if (!checkAccess(path, VFS_ACCESS_W)) return PDI_ERR_PERM;
     VFS_ROUTE_PATH(writeFile, path, STORAGE_ERROR_NOT_MOUNTED, content, size, append);
 }
 int VfsDispatcher::readFile(const char* path, uint64_t size, pdiutil::function<bool(char*, uint32_t)> readbackfn, uint64_t offset, const char* readUntilMatchStr, bool* didmatchfound) {
+    VFS_GUARD();
     if (!checkAccess(path, VFS_ACCESS_R)) return PDI_ERR_PERM;
     VFS_ROUTE_PATH(readFile, path, STORAGE_ERROR_NOT_MOUNTED, size, readbackfn, offset, readUntilMatchStr, didmatchfound);
 }
 int64_t VfsDispatcher::getOffsetFromLineNumber(const char* path, int linenumber, CallBackVoidArgFn yield) {
+    VFS_GUARD();
     if (!checkAccess(path, VFS_ACCESS_R)) return PDI_ERR_PERM;
     VFS_ROUTE_PATH(getOffsetFromLineNumber, path, STORAGE_ERROR_NOT_MOUNTED, linenumber, yield);
 }
 int64_t VfsDispatcher::getLineNumberFromOffset(const char* path, int64_t offset, CallBackVoidArgFn yield) {
+    VFS_GUARD();
     if (!checkAccess(path, VFS_ACCESS_R)) return PDI_ERR_PERM;
     VFS_ROUTE_PATH(getLineNumberFromOffset, path, STORAGE_ERROR_NOT_MOUNTED, offset, yield);
 }
 int VfsDispatcher::findInFile(const char* path, const char* findStr, pdiutil::vector<uint32_t>* findindices, int maxindices, int everynthindice, int64_t offset, CallBackVoidArgFn yield) {
+    VFS_GUARD();
     if (!checkAccess(path, VFS_ACCESS_R)) return PDI_ERR_PERM;
     VFS_ROUTE_PATH(findInFile, path, STORAGE_ERROR_NOT_MOUNTED, findStr, findindices, maxindices, everynthindice, offset, yield);
 }
 int VfsDispatcher::getLineNumbersInFile(const char* path, pdiutil::vector<uint32_t>& linenumberindices, int maxlinenumbers, int linenumberoffset, CallBackVoidArgFn yield) {
+    VFS_GUARD();
     if (!checkAccess(path, VFS_ACCESS_R)) return PDI_ERR_PERM;
     VFS_ROUTE_PATH(getLineNumbersInFile, path, STORAGE_ERROR_NOT_MOUNTED, linenumberindices, maxlinenumbers, linenumberoffset, yield);
 }
 int VfsDispatcher::readLineInFile(const char* path, int32_t linenumber, pdiutil::string& linedata, const char* pattern, CallBackVoidArgFn yield) {
+    VFS_GUARD();
     if (!checkAccess(path, VFS_ACCESS_R)) return PDI_ERR_PERM;
     VFS_ROUTE_PATH(readLineInFile, path, STORAGE_ERROR_NOT_MOUNTED, linenumber, linedata, pattern, yield);
 }
 pdi_err_t VfsDispatcher::createDirectory(const char* path) {
+    VFS_GUARD();
     VFS_ROUTE_PATH(createDirectory, path, STORAGE_ERROR_NOT_MOUNTED);
 }
 pdi_err_t VfsDispatcher::deleteDirectory(const char* path) {
+    VFS_GUARD();
     if (!checkAccess(path, VFS_ACCESS_W)) return PDI_ERR_PERM;
     VFS_ROUTE_PATH(deleteDirectory, path, STORAGE_ERROR_NOT_MOUNTED);
 }
 pdi_err_t VfsDispatcher::deleteFile(const char* path) {
+    VFS_GUARD();
     if (!checkAccess(path, VFS_ACCESS_W)) return PDI_ERR_PERM;
     VFS_ROUTE_PATH(deleteFile, path, STORAGE_ERROR_NOT_MOUNTED);
 }
 int64_t VfsDispatcher::getFileSize(const char* path) {
+    VFS_GUARD();
     VFS_ROUTE_PATH(getFileSize, path, STORAGE_ERROR_NOT_MOUNTED);
 }
 int VfsDispatcher::getDirFileList(const char* path, pdiutil::vector<file_info_t>& items, const char* pattern) {
+    VFS_GUARD();
     if (!checkAccess(path, VFS_ACCESS_R)) return PDI_ERR_PERM;
     VFS_ROUTE_PATH(getDirFileList, path, STORAGE_ERROR_NOT_MOUNTED, items, pattern);
 }
 bool VfsDispatcher::isFileExist(const char* path) {
+    VFS_GUARD();
     const char* rel = nullptr;
     iFileSystemInterface* b = resolve(path, &rel);
     return b ? b->isFileExist(rel) : false;
 }
 bool VfsDispatcher::isDirExist(const char* path) {
+    VFS_GUARD();
     const char* rel = nullptr;
     iFileSystemInterface* b = resolve(path, &rel);
     return b ? b->isDirExist(rel) : false;
 }
 bool VfsDispatcher::isDirectory(const char* path) {
+    VFS_GUARD();
     const char* rel = nullptr;
     iFileSystemInterface* b = resolve(path, &rel);
     return b ? b->isDirectory(rel) : false;
 }
 int VfsDispatcher::setFileAttr(const char* path, uint8_t type, const void* buffer, uint32_t size) {
+    VFS_GUARD();
     if (!checkOwnerOrRoot(path)) return PDI_ERR_PERM;
     VFS_ROUTE_PATH(setFileAttr, path, STORAGE_ERROR_NOT_MOUNTED, type, buffer, size);
 }
 int VfsDispatcher::getFileAttr(const char* path, uint8_t type, void* buffer, uint32_t size) {
+    VFS_GUARD();
     VFS_ROUTE_PATH(getFileAttr, path, STORAGE_ERROR_NOT_MOUNTED, type, buffer, size);
 }
 pdi_err_t VfsDispatcher::removeFileAttr(const char* path, uint8_t type) {
+    VFS_GUARD();
     if (!checkOwnerOrRoot(path)) return PDI_ERR_PERM;
     VFS_ROUTE_PATH(removeFileAttr, path, STORAGE_ERROR_NOT_MOUNTED, type);
 }
 pdi_err_t VfsDispatcher::getFileMeta(const char* path, file_info_t& out) {
+    VFS_GUARD();
     VFS_ROUTE_PATH(getFileMeta, path, STORAGE_ERROR_NOT_MOUNTED, out);
 }
 int VfsDispatcher::setFilePermissions(const char* path, uint16_t perms) {
+    VFS_GUARD();
     if (!checkOwnerOrRoot(path)) return PDI_ERR_PERM;
     VFS_ROUTE_PATH(setFilePermissions, path, STORAGE_ERROR_NOT_MOUNTED, perms);
 }
 int VfsDispatcher::setFileOwner(const char* path, uint16_t uid, uint16_t gid) {
+    VFS_GUARD();
     if (!checkRoot()) return PDI_ERR_PERM;
     VFS_ROUTE_PATH(setFileOwner, path, STORAGE_ERROR_NOT_MOUNTED, uid, gid);
 }
 pdi_err_t VfsDispatcher::touch(const char* path) {
+    VFS_GUARD();
     if (!checkAccess(path, VFS_ACCESS_W)) return PDI_ERR_PERM;
     VFS_ROUTE_PATH(touch, path, STORAGE_ERROR_NOT_MOUNTED);
 }
@@ -335,6 +374,8 @@ pdi_fhandle_t VfsDispatcher::openFile(const char* path, uint8_t flags) {
     if (!path || '\0' == path[0]) {
         return (pdi_fhandle_t)STORAGE_ERROR_BAD_PATH;
     }
+
+    VFS_GUARD();
 
     uint8_t need = 0;
     if (flags & FILE_OPEN_READ) need |= VFS_ACCESS_R;
@@ -383,6 +424,7 @@ pdi_fhandle_t VfsDispatcher::openFile(const char* path, uint8_t flags) {
  */
 int VfsDispatcher::readFileHandle(pdi_fhandle_t handle, char* buffer, uint32_t size) {
 
+    VFS_GUARD();
     pdi_fhandle_t bh = 0;
     iFileSystemInterface* backend = resolveHandle(handle, bh);
     if (!backend) {
@@ -401,6 +443,7 @@ int VfsDispatcher::readFileHandle(pdi_fhandle_t handle, char* buffer, uint32_t s
  */
 int VfsDispatcher::writeFileHandle(pdi_fhandle_t handle, const char* content, uint32_t size) {
 
+    VFS_GUARD();
     pdi_fhandle_t bh = 0;
     iFileSystemInterface* backend = resolveHandle(handle, bh);
     if (!backend) {
@@ -419,6 +462,7 @@ int VfsDispatcher::writeFileHandle(pdi_fhandle_t handle, const char* content, ui
  */
 int64_t VfsDispatcher::seekFile(pdi_fhandle_t handle, int64_t offset, file_seek_t whence) {
 
+    VFS_GUARD();
     pdi_fhandle_t bh = 0;
     iFileSystemInterface* backend = resolveHandle(handle, bh);
     if (!backend) {
@@ -436,6 +480,7 @@ int64_t VfsDispatcher::seekFile(pdi_fhandle_t handle, int64_t offset, file_seek_
  */
 pdi_err_t VfsDispatcher::syncFile(pdi_fhandle_t handle) {
 
+    VFS_GUARD();
     pdi_fhandle_t bh = 0;
     iFileSystemInterface* backend = resolveHandle(handle, bh);
     if (!backend) {
@@ -452,6 +497,7 @@ pdi_err_t VfsDispatcher::syncFile(pdi_fhandle_t handle) {
  */
 pdi_err_t VfsDispatcher::closeFile(pdi_fhandle_t handle) {
 
+    VFS_GUARD();
     pdi_fhandle_t bh = 0;
     iFileSystemInterface* backend = resolveHandle(handle, bh);
     if (!backend) {
@@ -488,6 +534,7 @@ int VfsDispatcher::crossCopy(iFileSystemInterface* sb, const char* srel, iFileSy
 }
 
 pdi_err_t VfsDispatcher::rename(const char* oldPath, const char* newPath) {
+    VFS_GUARD();
     if (!checkAccess(newPath, VFS_ACCESS_W)) return PDI_ERR_PERM;
     const char *orel = nullptr, *nrel = nullptr;
     iFileSystemInterface* ob = resolve(oldPath, &orel);
@@ -500,6 +547,7 @@ pdi_err_t VfsDispatcher::rename(const char* oldPath, const char* newPath) {
     return ob->deleteFile(orel);
 }
 pdi_err_t VfsDispatcher::copyFile(const char* sourcePath, const char* destPath) {
+    VFS_GUARD();
     if (!checkAccess(sourcePath, VFS_ACCESS_R)) return PDI_ERR_PERM;
     if (!checkAccess(destPath, VFS_ACCESS_W)) return PDI_ERR_PERM;
     const char *srel = nullptr, *drel = nullptr;
@@ -510,6 +558,7 @@ pdi_err_t VfsDispatcher::copyFile(const char* sourcePath, const char* destPath) 
     return crossCopy(sb, srel, db, drel);
 }
 pdi_err_t VfsDispatcher::moveFile(const char* oldPath, const char* newPath) {
+    VFS_GUARD();
     if (!checkAccess(newPath, VFS_ACCESS_W)) return PDI_ERR_PERM;
     const char *orel = nullptr, *nrel = nullptr;
     iFileSystemInterface* ob = resolve(oldPath, &orel);
@@ -522,14 +571,17 @@ pdi_err_t VfsDispatcher::moveFile(const char* oldPath, const char* newPath) {
 }
 
 uint64_t VfsDispatcher::getTotalSize() {
+    VFS_GUARD();
     iFileSystemInterface* r = rootBackend();
     return r ? r->getTotalSize() : 0;
 }
 uint64_t VfsDispatcher::getUsedSize() {
+    VFS_GUARD();
     iFileSystemInterface* r = rootBackend();
     return r ? r->getUsedSize() : 0;
 }
 uint64_t VfsDispatcher::getFreeSize() {
+    VFS_GUARD();
     iFileSystemInterface* r = rootBackend();
     return r ? r->getFreeSize() : 0;
 }
@@ -559,6 +611,7 @@ bool VfsDispatcher::updatePathNotations(const char* path, pdiutil::string& updat
     return r ? r->updatePathNotations(path, updatedpath) : false;
 }
 bool VfsDispatcher::changeDirectory(const char* path) {
+    VFS_GUARD();
     iFileSystemInterface* r = rootBackend();
     return r ? r->changeDirectory(path) : false;
 }

@@ -630,3 +630,190 @@ def clearing_a_field_keeps_the_submission(t):
             raise AssertionError("%s is %r, not the submitted %r — clearing one "
                                  "field discarded the rest of the form"
                                  % (field, stored.get(field), wanted))
+
+
+# --------------------------------------------------------------------- tls
+
+# the secure tests stand up a broker of their own, so the shared connection has
+# to be handed back afterwards; a reconnect costs the same wait as the setup
+SECURE_REFUSE_WAIT = 45.0
+CA_BUNDLE = "/etc/ssl/ca-bundle.crt"
+
+
+def point_at(portal, host, port, secure):
+    """Rewrite the general config, checking the secure box only when asked."""
+    fields = {
+        "hst": host, "prt": str(port),
+        "clid": CLIENT_ID, "usrn": "pdiuser", "pswd": "pdipass",
+        "kpalv": str(KEEPALIVE), "cln": "clean",
+    }
+    if secure:
+        fields["sec"] = "secure"
+    write_form(portal, GENERAL, fields)
+
+
+def hand_back(t, state):
+    """Point the board at the shared plain broker again and wait for it."""
+    point_at(portal_for(t), state.address, state.broker.port, False)
+    state.broker.wait_for_connect(CONNECT_WAIT)
+
+
+def require_secure_client(t):
+    """
+    Skip unless this build can actually speak tls to a broker.
+
+    The config page offers the secure field only where the tls client was
+    compiled in, so the page is asked rather than a command whose own gate is
+    certificate generation and answers for something else entirely. The raw page
+    is searched because an unchecked box is not something a browser submits, so
+    a parsed form cannot tell an absent field from an unset one.
+    """
+    if "name='sec'" not in portal_for(t).get(GENERAL).body:
+        raise Skip("this build has no tls client for mqtt")
+
+
+@test("a secure client does not complete a connect to a plain broker",
+      needs=("service",), services=("MQTT",), slow=True)
+def secure_refuses_a_plain_broker(t):
+    """
+    The transport really changed, proved by what does not happen.
+
+    A plain tcp client pointed here would connect happily, so a broker that
+    speaks no tls and still sees an mqtt CONNECT means the secure setting was
+    ignored and the traffic went out in the clear.
+    """
+    require_secure_client(t)
+    state = fixture(t)
+    plain = MqttBroker("0.0.0.0", 0).start()
+
+    try:
+        point_at(portal_for(t), state.address, plain.port, True)
+
+        if plain.wait_for_connect(SECURE_REFUSE_WAIT) is not None:
+            raise AssertionError(
+                "the board completed an mqtt connect to a broker speaking "
+                "plain tcp while its config asked for a secure connection, so "
+                "the credentials went out unencrypted")
+    finally:
+        plain.stop()
+        hand_back(t, state)
+
+
+@test("a secure connection with no trust anchors is reported",
+      needs=("service", "cat"), services=("MQTT",), slow=True)
+def secure_without_trust_anchors_warns(t):
+    """
+    Encrypted but unverified is a real state, and it has to be visible.
+
+    The client still connects with no ca bundle present, so nothing else in the
+    run would show that the broker's identity was never checked.
+    """
+    require_secure_client(t)
+    state = fixture(t)
+    t.run("rm %s" % CA_BUNDLE)
+
+    plain = MqttBroker("0.0.0.0", 0).start()
+
+    try:
+        point_at(portal_for(t), state.address, plain.port, True)
+        plain.wait_for_connect(SECURE_REFUSE_WAIT)
+
+        expect_in("no trust anchors", t.run("cat /var/log/syslog.warning"),
+                  "the warning a secure connection without a ca bundle leaves")
+    finally:
+        plain.stop()
+        hand_back(t, state)
+
+
+def put_trust_anchors(t, certpath):
+    """Place the broker's certificate where the client looks for trust anchors."""
+    try:
+        import paramiko
+        # importing the ssh transport registers the key exchange name the board
+        # offers, which a run with no ssh lane would otherwise never do
+        from ..driver import ssh_shell  # noqa: F401
+    except ImportError:
+        raise Skip("paramiko is not installed, so the ca bundle cannot be placed")
+
+    t.run("mkdir /etc/ssl")
+
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    try:
+        client.connect(t.address(), username=t.username, password=t.password,
+                       timeout=45, banner_timeout=45, auth_timeout=45,
+                       allow_agent=False, look_for_keys=False)
+    except Exception as err:
+        client.close()
+        raise Skip("no ssh to place the ca bundle: %s" % err)
+
+    try:
+        sftp = client.open_sftp()
+    except Exception as err:
+        client.close()
+        raise Skip("the target has no sftp subsystem: %s" % err)
+
+    try:
+        with open(certpath, "rb") as handle:
+            pem = handle.read()
+        with sftp.open(CA_BUNDLE, "wb") as remote:
+            remote.write(pem)
+    finally:
+        sftp.close()
+        client.close()
+
+    if "BEGIN CERTIFICATE" not in t.run("cat %s" % CA_BUNDLE):
+        raise Skip("the ca bundle did not land on the target")
+
+
+@test("a secure connection is made to a broker the device trusts",
+      needs=("service", "cat"), services=("MQTT",), slow=True)
+def secure_connects_to_a_trusted_broker(t):
+    """
+    The whole secure path, end to end and verified rather than merely encrypted.
+
+    The certificate names this machine's address because the client checks the
+    peer against the address it dialled, and it is generated per run since that
+    address is only known once the fixture has chosen an interface.
+    """
+    import shutil
+    import tempfile
+
+    from ..driver.tls_certs import self_signed, AVAILABLE
+
+    if not AVAILABLE:
+        raise Skip("python cryptography is not installed, so no test "
+                   "certificate can be made")
+
+    require_secure_client(t)
+    state = fixture(t)
+    workdir = tempfile.mkdtemp(prefix="pdi-mqtt-tls-")
+    secure = None
+
+    try:
+        certpath, keypath = self_signed(state.address, workdir)
+        put_trust_anchors(t, certpath)
+
+        secure = MqttBroker("0.0.0.0", 0,
+                            certfile=certpath, keyfile=keypath).start()
+
+        point_at(portal_for(t), state.address, secure.port, True)
+
+        session = secure.wait_for_connect(CONNECT_WAIT)
+        if session is None:
+            raise AssertionError(
+                "the board never completed an mqtt connect over tls: %d tcp "
+                "connection(s) failed the handshake"
+                % secure.handshake_failures)
+
+        if secure.handshake_failures:
+            raise AssertionError(
+                "the session came up but %d earlier handshake(s) failed, so "
+                "the trust anchors are not being read cleanly"
+                % secure.handshake_failures)
+    finally:
+        if secure is not None:
+            secure.stop()
+        t.run("rm %s" % CA_BUNDLE)
+        hand_back(t, state)
+        shutil.rmtree(workdir, ignore_errors=True)

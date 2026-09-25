@@ -82,6 +82,7 @@ created Date    : 1st June 2019
  */
 static const char 		CMD_TERMINAL_HISTORY_STATIC_FILEPATH   []PROG_RODT_ATTR = "/.term_history";
 static const uint16_t 	CMD_TERMINAL_HISTORY_MAX_LINES     = 25;
+static const uint16_t 	CMD_TERMINAL_HISTORY_ROTATE_SLACK  = 8;
 
 #endif
 

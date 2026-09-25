@@ -61,6 +61,12 @@ public:
    * refusing while it holds none and when the text does not fit.
    */
   bool setMqttPayload(const char *data, uint16_t len);
+
+  /**
+   * Build the transport the configured scheme asks for, keeping the one already
+   * held when it is of the right kind.
+   */
+  bool prepareClientForConfig(mqtt_general_config_table *_general);
   void handleMqttConfigChange(int _mqtt_config_type = MQTT_GENERAL_CONFIG);
   static void handleMqttDataCb(uint32_t *args, const char *topic, uint32_t topic_len, const char *data, uint32_t data_len);
   void setMqttPublishDataCallback(MqttPublishDataCallback _cb);

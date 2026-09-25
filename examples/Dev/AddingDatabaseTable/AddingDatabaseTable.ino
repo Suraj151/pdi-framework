@@ -6,11 +6,9 @@
 #include <PdiStack.h>
 
 
-// be carefull about table address or else table will not register.
-// it should be on minimum distant from last added table address + last added table size
-// keep safe distance between table addresses accordings their size
 // ids 1 to 9 belong to the framework tables, so take one from 10 onwards. An id
 // is permanent, never give a new table the id a removed one had.
+// where the record is kept is worked out by the framework, so there is no address to pick.
 // The database is a few kilobytes, so put only important configs in tables.
 
 #define MAX_STUDENTS			5
@@ -26,11 +24,16 @@ typedef struct {
 } student_t;
 
 struct student_table {
+
+	// the framework reads a record into a default constructed struct, so give it one
+	student_table(){
+		memset(students, 0, sizeof(students));
+		student_count = 0;
+	}
+
   	student_t students[MAX_STUDENTS];
 	int student_count;
 };
-
-const student_table PROGMEM _student_table_defaults = {NULL, 0};
 
 /**
  * StudentTable class should extends public DatabaseTable as its base/parent class
@@ -45,8 +48,9 @@ StudentTable __student_table;
 
 void setup() {
 
-	// NOTE : Please disable framework serial log for this demo or framework log will get printed alongwith this demo log
-	// Disable it by commenting ==> #define ENABLE_LOG_* lines in devices/DeviceConfig.h file of this framework library
+	// NOTE : framework console log ships switched off, so only this demo log prints.
+	// If you have uncommented ENABLE_CONSOLE_LOG_* in devices/DeviceConfig.h of this
+	// framework library, comment them again or both logs will mix on the console.
 
 	Serial.begin(115200);
 	Serial.printf("Hold on!!!, Stack will initialize and begin within next %d seconds !\n", WIFI_STATION_CONNECT_ATTEMPT_TIMEOUT);

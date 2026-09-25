@@ -16,6 +16,7 @@ the whole point of testing a last will.
 """
 
 import socket
+import ssl
 import struct
 import threading
 import time
@@ -91,9 +92,12 @@ class MqttBroker(object):
     keeps the state easy to reason about.
     """
 
-    def __init__(self, host="0.0.0.0", port=0):
+    def __init__(self, host="0.0.0.0", port=0, certfile=None, keyfile=None):
         self.host = host
         self.port = port            # 0 asks the kernel for a free one
+        self.certfile = certfile    # both set means the listener speaks tls
+        self.keyfile = keyfile
+        self.handshake_failures = 0 # a client that reached tcp but not tls
         self.messages = []          # PUBLISH received from the client
         self.sessions = []          # one per CONNECT
         self.wills_delivered = []   # wills this broker published on a drop
@@ -105,11 +109,16 @@ class MqttBroker(object):
         self._running = False
         self._client = None
         self._session = None
+        self._tls = None
         self._lock = threading.Lock()
 
     # -- lifecycle ---------------------------------------------------------
 
     def start(self):
+        if self.certfile is not None and self.keyfile is not None:
+            self._tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            self._tls.load_cert_chain(self.certfile, self.keyfile)
+
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._socket.bind((self.host, self.port))
@@ -258,6 +267,19 @@ class MqttBroker(object):
                 continue
             except OSError:
                 break
+
+            if self._tls is not None:
+                client.settimeout(20.0)
+                try:
+                    client = self._tls.wrap_socket(client, server_side=True)
+                except (ssl.SSLError, OSError, ValueError):
+                    with self._lock:
+                        self.handshake_failures += 1
+                    try:
+                        client.close()
+                    except OSError:
+                        pass
+                    continue
 
             client.settimeout(0.5)
             with self._lock:

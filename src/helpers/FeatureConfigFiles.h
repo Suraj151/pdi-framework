@@ -64,6 +64,7 @@ bool syncWifiConfigFile();
 #define MQTT_CONFIG_FEATURE_NAME "mqtt"
 #define MQTT_CONFIG_KEY_HOST "host"
 #define MQTT_CONFIG_KEY_PORT "port"
+#define MQTT_CONFIG_KEY_SECURITY "security"
 #define MQTT_CONFIG_KEY_CLIENT_ID "client_id"
 #define MQTT_CONFIG_KEY_USERNAME "username"
 #define MQTT_CONFIG_KEY_PASSWORD "password"

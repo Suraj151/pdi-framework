@@ -9,10 +9,10 @@ Created Date    : 31st Aug 2026
 ******************************************************************************/
 
 #include "iInstanceInterface.h"
+#include <interface/pdi/middlewares/iClientInterface.h>
 
 #ifdef ENABLE_NETWORK_SERVICE
 
-#include <interface/pdi/middlewares/iClientInterface.h>
 #include "SafeAlloc.h"
 
 /**
@@ -72,3 +72,32 @@ void iInstanceInterface::releaseSharedTlsClientInstance()
 #endif
 
 #endif
+
+/**
+ * The shared client that carries the named protocol, null where this build
+ * has none of that kind.
+ */
+iClientInterface* iInstanceInterface::getSharedClientForScheme(protocol_scheme_t scheme)
+{
+  switch (scheme) {
+
+#ifdef ENABLE_NETWORK_SERVICE
+    case PROTO_SCHEME_HTTP:
+    case PROTO_SCHEME_MQTT:
+    case PROTO_SCHEME_SMTP:
+      return getSharedTcpClientInstance();
+#endif
+
+#ifdef ENABLE_TLS_SERVICE
+    case PROTO_SCHEME_HTTPS:
+    case PROTO_SCHEME_MQTTS:
+    case PROTO_SCHEME_SMTPS:
+      return getSharedTlsClientInstance();
+#endif
+
+    default:
+      break;
+  }
+
+  return nullptr;
+}

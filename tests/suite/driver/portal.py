@@ -18,10 +18,12 @@ import http.client
 import json
 import re
 import socket
+import ssl
 import time
 import urllib.parse
 
 DEFAULT_PORT = 80
+DEFAULT_TLS_PORT = 443
 
 # a listener the host refuses at its real port moves here, see the mock
 # TcpServerInterface
@@ -30,6 +32,20 @@ SHADOW_PORT_BASE = 10000
 # <input type='hidden' name='csrf' value='...'> — the page builder quotes
 # attributes with apostrophes
 CSRF_INPUT = re.compile(r"name='csrf'\s+value='([0-9a-fA-F]+)'")
+
+
+def _tls_context():
+    """
+    A context that accepts the target's own certificate.
+
+    The device signs its own, and the tests reach it by address rather than by
+    the name the certificate carries, so neither the chain nor the hostname can
+    be checked here.
+    """
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    return context
 
 
 class PortalError(Exception):
@@ -68,11 +84,34 @@ class Response(object):
 class Portal(object):
     """An http conversation with one target, remembering its cookies."""
 
-    def __init__(self, host, port=DEFAULT_PORT, timeout=20.0):
+    def __init__(self, host, port=DEFAULT_PORT, timeout=20.0, secure=False):
         self.host = host
         self.port = port
         self.timeout = timeout
+        self.secure = secure
         self.jar = {}
+
+    def _secure_twin(self, answer):
+        """
+        The https portal a redirect points at, or None.
+
+        A build that serves tls answers port 80 with a permanent redirect, so
+        the scheme is settled once at discovery and every later request speaks
+        it directly rather than being redirected again.
+        """
+        if answer.status not in (301, 302, 307, 308):
+            return None
+
+        location = answer.location
+        if not location.lower().startswith("https://"):
+            return None
+
+        split = urllib.parse.urlsplit(location)
+        port = split.port or DEFAULT_TLS_PORT
+        if port < SHADOW_PORT_BASE and self.port >= SHADOW_PORT_BASE:
+            port += SHADOW_PORT_BASE
+
+        return Portal(split.hostname or self.host, port, self.timeout, secure=True)
 
     @classmethod
     def reachable(cls, host, port=DEFAULT_PORT, timeout=20.0):
@@ -93,6 +132,14 @@ class Portal(object):
                 answer = portal.get("/")
             except (PortalError, OSError):
                 continue
+
+            secure = portal._secure_twin(answer)
+            if secure is not None:
+                try:
+                    answer = secure.get("/")
+                except (PortalError, OSError):
+                    continue
+                portal = secure
 
             if answer.status and "text/html" in answer.headers.get("content-type", ""):
                 return portal
@@ -130,8 +177,13 @@ class Portal(object):
 
         last = None
         for attempt in range(attempts):
-            connection = http.client.HTTPConnection(self.host, self.port,
-                                                    timeout=self.timeout)
+            if self.secure:
+                connection = http.client.HTTPSConnection(self.host, self.port,
+                                                         timeout=self.timeout,
+                                                         context=_tls_context())
+            else:
+                connection = http.client.HTTPConnection(self.host, self.port,
+                                                        timeout=self.timeout)
             try:
                 connection.request(method, path, body=body, headers=headers)
                 raw = connection.getresponse()

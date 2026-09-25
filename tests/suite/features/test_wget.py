@@ -340,6 +340,30 @@ def a_padded_url_is_fetched(t):
         cleanup(t, "m.bin")
 
 
+@test("a plain http url is still fetched on a build that carries tls",
+      needs=("wget", "tls"))
+def plain_http_on_a_tls_build(t):
+    """
+    The gate is tls rather than https, and the fetch below is still plain http.
+
+    A build with tls in it has a secure client sitting alongside the plain one,
+    and the failure this guards against is every outbound request taking the
+    secure one — which turns an http url into a handshake against a server that
+    is not speaking tls, and reports as a refused download rather than as a
+    configuration mistake. The client is chosen from the url's scheme, so a
+    plain fetch has to arrive here exactly as it does on a build without tls.
+    """
+    dest, out = fetch(t, "n.bin", "/sized.bin")
+    try:
+        expect_in("saved", outcome(out), "the download did not report a saved file")
+        expect_in(str(SIZED), outcome(out), "the size reported is not the body's")
+
+        listed = t.run("ls /")
+        expect_in(W + "n.bin", listed, "the file is not on the filesystem")
+    finally:
+        cleanup(t, "n.bin")
+
+
 @test("the shell still answers for itself after a download", needs=("wget",))
 def shell_is_not_left_behind(t):
     """

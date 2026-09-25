@@ -73,8 +73,9 @@ void preemptive_task(){
 
 void setup() {
 
-	// NOTE : Please disable framework serial log for this demo or framework log will get printed alongwith this demo log
-	// Disable it by commenting ==> #define ENABLE_LOG_* lines in devices/DeviceConfig.h file of this framework library
+	// NOTE : framework console log ships switched off, so only this demo log prints.
+	// If you have uncommented ENABLE_CONSOLE_LOG_* in devices/DeviceConfig.h of this
+	// framework library, comment them again or both logs will mix on the console.
 
 	Serial.begin(115200);
 

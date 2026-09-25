@@ -19,6 +19,10 @@ created Date    : 1st June 2025
 #define SSH_DEFAULT_PORT 22
 #endif
 
+#ifndef SSH_CLIENT_VERSION_MAX
+#define SSH_CLIENT_VERSION_MAX 255   /* longest identification string the protocol allows */
+#endif
+
 #ifndef SSH_MAX_SESSIONS
 #define SSH_MAX_SESSIONS 2
 #endif

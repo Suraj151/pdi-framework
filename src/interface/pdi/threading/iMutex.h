@@ -25,4 +25,20 @@ public:
     virtual bool try_lock() { return true; }
 };
 
+class iScopedLock {
+    iMutex *m_mutex;
+
+public:
+    iScopedLock(iMutex *mutex) : m_mutex(mutex) {
+        if (nullptr != m_mutex) m_mutex->lock();
+    }
+
+    ~iScopedLock() {
+        if (nullptr != m_mutex) m_mutex->unlock();
+    }
+
+    iScopedLock(const iScopedLock&) = delete;
+    iScopedLock& operator=(const iScopedLock&) = delete;
+};
+
 #endif

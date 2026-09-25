@@ -179,6 +179,7 @@ void mqttConfigToKvs(const mqtt_general_config_table *_general, const mqtt_lwt_c
   pdiutil::string key_password = CHARPTR_WRAP(MQTT_CONFIG_KEY_PASSWORD);
   pdiutil::string key_keepalive = CHARPTR_WRAP(MQTT_CONFIG_KEY_KEEPALIVE);
   pdiutil::string key_clean_session = CHARPTR_WRAP(MQTT_CONFIG_KEY_CLEAN_SESSION);
+  pdiutil::string key_security = CHARPTR_WRAP(MQTT_CONFIG_KEY_SECURITY);
   pdiutil::string key_will_topic = CHARPTR_WRAP(MQTT_CONFIG_KEY_WILL_TOPIC);
   pdiutil::string key_will_message = CHARPTR_WRAP(MQTT_CONFIG_KEY_WILL_MESSAGE);
   pdiutil::string key_will_qos = CHARPTR_WRAP(MQTT_CONFIG_KEY_WILL_QOS);
@@ -190,6 +191,7 @@ void mqttConfigToKvs(const mqtt_general_config_table *_general, const mqtt_lwt_c
   appendConfigValue(_out, key_username, pdiutil::string(_general->username));
   appendConfigValue(_out, key_password, pdiutil::string(_general->password));
   appendConfigValue(_out, key_keepalive, configNumberAsValue(_general->keepalive));
+  appendConfigValue(_out, key_security, configBoolAsValue(0 != _general->security));
   appendConfigValue(_out, key_clean_session, configBoolAsValue(0 != _general->clean_session));
 
   appendConfigValue(_out, key_will_topic, pdiutil::string(_lwt->will_topic));
@@ -216,6 +218,7 @@ bool mqttConfigFromKvs(const pdiutil::vector<config_kv_t> &_kvs, mqtt_general_co
   pdiutil::string key_password = CHARPTR_WRAP(MQTT_CONFIG_KEY_PASSWORD);
   pdiutil::string key_keepalive = CHARPTR_WRAP(MQTT_CONFIG_KEY_KEEPALIVE);
   pdiutil::string key_clean_session = CHARPTR_WRAP(MQTT_CONFIG_KEY_CLEAN_SESSION);
+  pdiutil::string key_security = CHARPTR_WRAP(MQTT_CONFIG_KEY_SECURITY);
   pdiutil::string key_will_topic = CHARPTR_WRAP(MQTT_CONFIG_KEY_WILL_TOPIC);
   pdiutil::string key_will_message = CHARPTR_WRAP(MQTT_CONFIG_KEY_WILL_MESSAGE);
   pdiutil::string key_will_qos = CHARPTR_WRAP(MQTT_CONFIG_KEY_WILL_QOS);
@@ -225,6 +228,7 @@ bool mqttConfigFromKvs(const pdiutil::vector<config_kv_t> &_kvs, mqtt_general_co
 
   applied |= takeConfigText(_kvs, key_host, _general->host, MQTT_HOST_BUF_SIZE);
   applied |= takeConfigNumber(_kvs, key_port, &_general->port);
+  applied |= takeConfigBool(_kvs, key_security, &_general->security);
   applied |= takeConfigText(_kvs, key_client_id, _general->client_id, MQTT_CLIENT_ID_BUF_SIZE);
   applied |= takeConfigText(_kvs, key_username, _general->username, MQTT_USERNAME_BUF_SIZE);
   applied |= takeConfigText(_kvs, key_password, _general->password, MQTT_PASSWORD_BUF_SIZE);

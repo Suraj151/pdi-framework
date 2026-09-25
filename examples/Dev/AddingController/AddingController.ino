@@ -30,6 +30,17 @@ class TestController : public Controller {
      *
      * AUTH_MIDDLEWARE is middlware which enable auth check service to this route so that
      * handler method will only call if user is authenticated before with login credentials.
+     *
+     * NOTE : a registered route is reached by typing it in the browser, it does not
+     * appear on the home page by itself. To give it a card there, add one line to
+     * src/webserver/controllers/HomeController.h inside the has_active_session()
+     * block, next to the cards already listed :
+     *
+     *   concat_svg_menu_card(_page, TITLE, ICON, ROUTE);
+     *
+     * TITLE is a read only string, add yours to src/webserver/pages/HomePage.h in the
+     * same form as the titles there. ICON is one of the SVG_ICON48_PATH_* paths in
+     * src/webserver/helpers/icon/SvgIcons.h. ROUTE is the path given below.
 		 */
 		void boot( void ){
 			this->m_route_handler->register_route( "/test-route", [&]() { this->handleTestRoute(); }, AUTH_MIDDLEWARE );
@@ -44,7 +55,8 @@ class TestController : public Controller {
 
       /**
        * take new dynamic array to build html response page
-       * PAGE_HTML_MAX_SIZE defined in framework as 5000
+       * PAGE_HTML_MAX_SIZE is defined in framework as 1800, a page larger than
+       * that is sent in chunks the way the framework controllers do
        */
       char* _page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
       if( nullptr == _page ) return;

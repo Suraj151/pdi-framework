@@ -428,12 +428,17 @@ TEST(featureconfig, an_mqtt_record_renders_every_option_the_file_carries)
     pdiutil::vector<config_kv_t> kvs;
     mqttConfigToKvs(&general, &lwt, kvs);
 
-    ASSERT_EQ((uint32_t)kvs.size(), 11u);
+    ASSERT_EQ((uint32_t)kvs.size(), 12u);
 
     pdiutil::string port;
     pdiutil::string key = CHARPTR_WRAP(MQTT_CONFIG_KEY_PORT);
     ASSERT_TRUE(findConfigValue(kvs, key, port));
     ASSERT_STREQ(port.c_str(), "1883");
+
+    pdiutil::string security;
+    pdiutil::string security_key = CHARPTR_WRAP(MQTT_CONFIG_KEY_SECURITY);
+    ASSERT_TRUE(findConfigValue(kvs, security_key, security));
+    ASSERT_STREQ(security.c_str(), "no");
 }
 
 TEST(featureconfig, the_mqtt_config_carries_no_publish_or_subscribe_topic)
@@ -535,6 +540,40 @@ TEST(featureconfig, a_flag_kept_as_a_byte_round_trips_through_the_file_form)
     ASSERT_TRUE(mqttConfigFromKvs(off, &general, &lwt));
     ASSERT_EQ((uint32_t)general.clean_session, 0u);
     ASSERT_EQ((uint32_t)lwt.will_retain, 1u);
+}
+
+TEST(featureconfig, the_broker_security_flag_round_trips_through_the_file_form)
+{
+    mqtt_general_config_table general;
+    mqtt_lwt_config_table lwt;
+    general.security = 1;
+
+    pdiutil::vector<config_kv_t> kvs;
+    mqttConfigToKvs(&general, &lwt, kvs);
+
+    pdiutil::string value;
+    pdiutil::string key = CHARPTR_WRAP(MQTT_CONFIG_KEY_SECURITY);
+    ASSERT_TRUE(findConfigValue(kvs, key, value));
+    ASSERT_STREQ(value.c_str(), "yes");
+
+    pdiutil::vector<config_kv_t> off;
+    off.push_back(mqttKv(MQTT_CONFIG_KEY_SECURITY, "no"));
+
+    ASSERT_TRUE(mqttConfigFromKvs(off, &general, &lwt));
+    ASSERT_EQ((uint32_t)general.security, 0u);
+}
+
+TEST(featureconfig, a_file_with_no_security_key_leaves_the_broker_flag_alone)
+{
+    mqtt_general_config_table general;
+    mqtt_lwt_config_table lwt;
+    general.security = 1;
+
+    pdiutil::vector<config_kv_t> kvs;
+    kvs.push_back(mqttKv(MQTT_CONFIG_KEY_HOST, "broker.example.com"));
+
+    ASSERT_TRUE(mqttConfigFromKvs(kvs, &general, &lwt));
+    ASSERT_EQ((uint32_t)general.security, 1u);
 }
 
 /* -------------------------------------------------------------- mqtt sync */

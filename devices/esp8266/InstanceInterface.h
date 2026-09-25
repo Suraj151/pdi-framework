@@ -41,6 +41,9 @@ public:
   iTlsClientInterface* getNewTlsClientInstance() override;
   #endif
   #ifdef ENABLE_STORAGE_SERVICE
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  iMutex* getNewPreemptiveMutexInstance() override;
+  #endif
   iFileSystemInterface& getFileSystemInstance() override;
   #endif
 };

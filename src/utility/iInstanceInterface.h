@@ -15,6 +15,8 @@ Created Date    : 1st Jan 2024
 #include "iUtilityInterface.h"
 
 // Forward declaration of interfaces
+class iMutex;
+class iClientInterface;
 class iTcpServerInterface;
 class iTcpClientInterface;
 class iTlsServerInterface;
@@ -76,6 +78,19 @@ public:
    * stops leaves it for the services still running.
    */
   void releaseSharedTlsClientInstance();
+  #endif
+
+  /**
+   * The shared client that carries the named protocol, null where this build
+   * has none of that kind.
+   */
+  iClientInterface* getSharedClientForScheme(protocol_scheme_t scheme);
+
+  #ifdef ENABLE_CONTEXTUAL_EXECUTION
+  /**
+   * A mutex that holds against a preemptive task, null where the port has none.
+   */
+  virtual iMutex* getNewPreemptiveMutexInstance() { return nullptr; }
   #endif
 
   #ifdef ENABLE_STORAGE_SERVICE

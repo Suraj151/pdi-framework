@@ -147,6 +147,14 @@ namespace pdiutil {
 
 #define TERMINAL_NEW_LINE "\r\n"
 
+#ifndef IO_READ_SPAN_MAX
+#define IO_READ_SPAN_MAX 4096   /* bytes one delimited read takes when the caller names no limit */
+#endif
+
+#ifndef IO_READ_SPAN_TIMEOUT_MAX
+#define IO_READ_SPAN_TIMEOUT_MAX 10000   /* ms a read or the loop draining one may occupy */
+#endif
+
 
 // define weak functions, so when the device doesn't define them,
 // the linker just sets their address to 0
@@ -281,6 +289,37 @@ inline bool IsFlushTx(int16_t flushtype) {
 
 inline bool IsFlushRx(int16_t flushtype) {
     return FLUSH_RX == flushtype || FLUSH_ALL == flushtype;
+}
+
+/**
+ * Protocol a caller speaks. The instance factory maps one of these onto
+ * whichever client can carry it, so a caller never names a transport.
+ */
+enum protocol_scheme : uint8_t {
+    PROTO_SCHEME_HTTP,          /** plain http */
+    PROTO_SCHEME_HTTPS,         /** http over tls */
+    PROTO_SCHEME_MQTT,          /** plain mqtt */
+    PROTO_SCHEME_MQTTS,         /** mqtt over tls */
+    PROTO_SCHEME_SMTP,          /** plain smtp */
+    PROTO_SCHEME_SMTPS,         /** smtp over tls */
+    PROTO_SCHEME_CAN,           /** plain can */
+    PROTO_SCHEME_CAN_SECURE,    /** can with an authenticated payload */
+    PROTO_SCHEME_I2C,           /** plain i2c */
+    PROTO_SCHEME_I2C_SECURE,    /** i2c with an authenticated payload */
+    PROTO_SCHEME_SPI,           /** plain spi */
+    PROTO_SCHEME_SPI_SECURE,    /** spi with an authenticated payload */
+    PROTO_SCHEME_MAX
+};
+typedef enum protocol_scheme protocol_scheme_t;
+
+/**
+ * Whether a scheme carries its payload protected, asked here so a scheme added
+ * later is answered once rather than at every site that cares.
+ */
+inline bool IsSecureScheme(protocol_scheme_t scheme) {
+    return PROTO_SCHEME_HTTPS == scheme || PROTO_SCHEME_MQTTS == scheme ||
+           PROTO_SCHEME_SMTPS == scheme || PROTO_SCHEME_CAN_SECURE == scheme ||
+           PROTO_SCHEME_I2C_SECURE == scheme || PROTO_SCHEME_SPI_SECURE == scheme;
 }
 
 /**

@@ -19,6 +19,7 @@ class PreemptiveMutex : public iMutex {
     bool m_locked = false;
     pdiutil::vector<Preemptive*> m_waiters;
     Preemptive* m_owner = nullptr;
+    uint16_t m_depth = 0;
 public:
     PreemptiveMutex();
     virtual ~PreemptiveMutex();

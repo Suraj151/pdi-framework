@@ -126,4 +126,12 @@ extern portMUX_TYPE __pdi_critical_mux;
 // #define MAKE_STORAGE_DEPENDENT_OTA_UPGRADE
 // #endif
 
+/**
+ * enable by default https for esp32 here.
+ */
+#if defined(DEVICE_SUPPORTS_TLS) && defined(DEVICE_SUPPORTS_CONTEXTUAL_EXECUTION)
+#define ENABLE_HTTPS_SERVER
+#endif
+
+
 #endif // _ESP32_DEVICE_CONFIG_H_

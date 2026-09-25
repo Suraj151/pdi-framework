@@ -19,8 +19,8 @@ created Date    : 20th July 2026
  * chown command — change owning uid (and optionally gid) of a file/dir.
  * Root only (enforced by VfsDispatcher).
  *
- * e.g. chown 1001 /home/alice        gid defaults to uid
- *      chown 1001:1001 /home/alice   explicit gid via colon (POSIX)
+ * e.g. chown 1001 /notes.txt        gid defaults to uid
+ *      chown 1001:1001 /notes.txt   explicit gid via colon (POSIX)
  */
 struct ChownCommand : public CommandBase {
 

@@ -10,8 +10,6 @@ Created Date    : 1st June 2019
 
 #include <config/Common.h>
 
-#ifndef ENABLE_TIMER_TASK_SCHEDULER
-
 #include "TaskScheduler.h"
 #include "DataTypeConversions.h"
 
@@ -956,5 +954,3 @@ int TaskScheduler::scheduleUnderExecSched(iExecutionScheduler* _exec_sched, pdiu
  * This instance is used to manage tasks throughout the PDI stack.
  */
 TaskScheduler __task_scheduler;
-
-#endif
