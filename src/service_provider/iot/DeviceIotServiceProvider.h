@@ -56,6 +56,18 @@ class DeviceIotServiceProvider : public ServiceProvider {
       return _n;
     }
 
+    /**
+     * Generate and store the device key when there is none yet. True once a
+     * key is in place.
+     */
+    bool ensureDeviceKey( device_iot_config_table *_device_iot_configs );
+
+    /**
+     * Authorize a request as this device, with its key when it has one and
+     * its mac otherwise.
+     */
+    void setDeviceAuthorization( Http_Client *_client, const device_iot_config_table *_device_iot_configs = nullptr ) const;
+
     void handleRegistrationOtpRequest(  device_iot_config_table *_device_iot_configs, pdiutil::string &_response  );
     void handleDeviceIotConfigRequest( void );
     void handleDeviceIotConfigResponse( Http_Client *client );
@@ -81,9 +93,9 @@ class DeviceIotServiceProvider : public ServiceProvider {
 
     char      m_server_configurable_channel_host[DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE];
     pdiutil::net_port_t m_server_configurable_channel_port;
+    uint8_t   m_server_configurable_channel_secure;
     char      m_server_configurable_channel_read[DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE];
     char      m_server_configurable_channel_write[DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE];
-    char      m_server_configurable_channel_token[DEVICE_IOT_CONFIG_CHANNEL_TOKEN_MAX_SIZE];
 
     pdiutil::vector<pdiutil::string> m_server_configurable_interface_read;
     pdiutil::vector<pdiutil::string> m_server_configurable_interface_write;

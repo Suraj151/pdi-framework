@@ -565,6 +565,22 @@ bool DatabaseServiceProvider::set_email_config_table(email_config_table *_table)
  */
 bool DatabaseServiceProvider::set_device_iot_config_table(device_iot_config_table *_table)
 {
+  device_iot_config_table *_stored = pdiutil::safe_new<device_iot_config_table>();
+
+  if (nullptr != _stored)
+  {
+    __device_iot_table.get(_stored);
+  }
+
+  if (nullptr == _stored ||
+      0 != strncmp(_stored->device_iot_host, _table->device_iot_host, DEVICE_IOT_HOST_BUF_SIZE) ||
+      0 != strncmp(_stored->device_iot_duid, _table->device_iot_duid, DEVICE_IOT_DUID_MAX_LENGTH))
+  {
+    memset(_table->device_iot_key, 0, DEVICE_IOT_KEY_BUF_SIZE);
+  }
+
+  pdiutil::safe_delete(_stored);
+
   return __device_iot_table.set(_table);
 }
 #endif

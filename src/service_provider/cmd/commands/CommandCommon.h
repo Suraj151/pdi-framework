@@ -105,6 +105,7 @@ created Date    : 1st June 2019
 #define CMD_NAME_EXEC			    "exec"
 #define CMD_NAME_ENV			    "env"
 #define CMD_NAME_EXPORT			    "export"
+#define CMD_NAME_READ			    "read"
 #define CMD_NAME_UNSET			    "unset"
 #define CMD_NAME_SOURCE			    "source"
 #define CMD_NAME_TEST			    "test"

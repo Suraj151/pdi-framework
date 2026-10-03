@@ -316,6 +316,18 @@ uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length){
   }
 }
 
+/**
+ * The return code of a CONNACK, MQTT_CONNACK_ACCEPTED when the broker took the
+ * connection and MQTT_CONNACK_MALFORMED when the packet cannot carry one.
+ */
+uint8_t mqtt_get_connect_return_code(uint8_t* buffer, uint16_t length){
+
+  if( nullptr == buffer || length < 4 || MQTT_MSG_TYPE_CONNACK != mqtt_get_type(buffer) || 2 != buffer[1] ){
+    return MQTT_CONNACK_MALFORMED;
+  }
+  return buffer[3];
+}
+
 mqtt_message_t* mqtt_msg_connect(mqtt_connection_t* connection, mqtt_connect_info_t* info){
 
   if( nullptr == connection || nullptr == info ){

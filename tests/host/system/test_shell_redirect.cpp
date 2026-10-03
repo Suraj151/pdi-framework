@@ -16,6 +16,7 @@ created Date    : 26th Aug 2026
 #include <pditest.h>
 
 #include <service_provider/cmd/ShellParser.h>
+#include <service_provider/session/Environment.h>
 #include <service_provider/session/SessionManager.h>
 
 #if defined(ENABLE_CMD_SERVICE) && defined(ENABLE_STORAGE_SERVICE)
@@ -37,6 +38,13 @@ namespace
             if (nullptr != r) return std::string(line + r->m_start, (size_t)r->m_len);
         }
         return std::string();
+    }
+
+    std::string envValue(const char *key)
+    {
+        pdiutil::string out;
+        Environment::get(key, out);
+        return std::string(out.c_str());
     }
 
     std::string slurp(const char *path)
@@ -541,6 +549,224 @@ TEST(redirect, a_middle_pipeline_stage_keeps_its_own_target)
     ASSERT_TRUE(slurp("/mid_stage.txt").find("mid") != std::string::npos);
 
     __i_fs.deleteFile("/mid_stage.txt");
+}
+
+TEST(capture, a_piped_line_lands_in_a_variable)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+    Environment::clearSession();
+
+    sh.run("echo hello | read CAUGHT");
+
+    ASSERT_EQ((int)sh.result(), (int)PDI_OK);
+    ASSERT_STREQ(envValue("CAUGHT").c_str(), "hello");
+}
+
+TEST(capture, the_captured_value_carries_no_line_break)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+    Environment::clearSession();
+
+    sh.run("echo hello | read CAUGHT");
+
+    // the leading newline a command opens with and the carriage return of the
+    // ending are both gone before the bytes reach the pipe, so what is caught
+    // is the text and nothing else
+    std::string value = envValue("CAUGHT");
+    ASSERT_EQ((int)value.size(), 5);
+    ASSERT_TRUE(value.find('\r') == std::string::npos);
+    ASSERT_TRUE(value.find('\n') == std::string::npos);
+}
+
+TEST(capture, a_caught_value_is_still_there_on_the_next_line)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+    Environment::clearSession();
+
+    sh.run("echo remembered | read CAUGHT");
+
+    ASSERT_TRUE(sh.run("echo $CAUGHT").find("remembered") != std::string::npos);
+}
+
+TEST(capture, two_names_take_a_field_each)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+    Environment::clearSession();
+
+    sh.run("echo alpha beta | read ONE TWO");
+
+    ASSERT_STREQ(envValue("ONE").c_str(), "alpha");
+    ASSERT_STREQ(envValue("TWO").c_str(), "beta");
+}
+
+TEST(capture, the_last_name_takes_what_is_left)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+    Environment::clearSession();
+
+    sh.run("echo alpha beta gamma | read ONE REST");
+
+    ASSERT_STREQ(envValue("ONE").c_str(), "alpha");
+    ASSERT_STREQ(envValue("REST").c_str(), "beta gamma");
+}
+
+TEST(capture, a_name_the_line_has_nothing_for_reads_empty)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+    Environment::clearSession();
+
+    sh.run("echo alpha | read ONE SPARE");
+
+    ASSERT_STREQ(envValue("ONE").c_str(), "alpha");
+
+    pdiutil::string held;
+    ASSERT_TRUE(Environment::get("SPARE", held));
+    ASSERT_EQ((int)held.size(), 0);
+}
+
+TEST(capture, a_file_can_feed_it)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+    Environment::clearSession();
+    __i_fs.writeFile("/cap_in.txt", "from a file\n", 12, false);
+
+    sh.run("read CAUGHT < /cap_in.txt");
+
+    ASSERT_STREQ(envValue("CAUGHT").c_str(), "from a file");
+
+    __i_fs.deleteFile("/cap_in.txt");
+}
+
+TEST(capture, it_takes_one_line_and_leaves_the_rest)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+    Environment::clearSession();
+    __i_fs.writeFile("/cap_lines.txt", "first\nsecond\nthird\n", 19, false);
+
+    sh.run("read CAUGHT < /cap_lines.txt");
+
+    ASSERT_STREQ(envValue("CAUGHT").c_str(), "first");
+
+    __i_fs.deleteFile("/cap_lines.txt");
+}
+
+TEST(capture, input_that_ends_before_a_line_still_counts)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+    Environment::clearSession();
+    __i_fs.writeFile("/cap_bare.txt", "no ending", 9, false);
+
+    sh.run("read CAUGHT < /cap_bare.txt");
+
+    ASSERT_EQ((int)sh.result(), (int)PDI_OK);
+    ASSERT_STREQ(envValue("CAUGHT").c_str(), "no ending");
+
+    __i_fs.deleteFile("/cap_bare.txt");
+}
+
+TEST(capture, nothing_to_read_answers_no_rather_than_failing)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+    Environment::clearSession();
+    __i_fs.deleteFile("/cap_empty.txt");
+    __i_fs.createFile("/cap_empty.txt", "", 0);
+
+    sh.run("read CAUGHT < /cap_empty.txt");
+
+    // the answer is no, not a fault, so nothing is printed and the variable is
+    // left as it was
+    ASSERT_EQ((int)sh.result(), (int)CMD_RESULT_FALSE);
+
+    pdiutil::string held;
+    ASSERT_FALSE(Environment::get("CAUGHT", held));
+
+    __i_fs.deleteFile("/cap_empty.txt");
+}
+
+TEST(capture, a_value_longer_than_the_bound_is_clamped)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+    Environment::clearSession();
+
+    std::string wide(ENV_VALUE_MAX + 40, 'w');
+    wide += '\n';
+    __i_fs.writeFile("/cap_wide.txt", (char *)wide.c_str(), (uint32_t)wide.size(), false);
+
+    sh.run("read CAUGHT < /cap_wide.txt");
+
+    ASSERT_EQ((int)envValue("CAUGHT").size(), (int)ENV_VALUE_MAX);
+
+    __i_fs.deleteFile("/cap_wide.txt");
+}
+
+TEST(capture, it_refuses_when_nothing_is_feeding_it)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+    Environment::clearSession();
+
+    sh.run("read CAUGHT");
+
+    ASSERT_EQ((int)sh.result(), (int)CMD_ERROR_ARGS_MISSING);
+
+    pdiutil::string held;
+    ASSERT_FALSE(Environment::get("CAUGHT", held));
+}
+
+TEST(capture, it_wants_a_name)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+
+    sh.run("echo anything | read");
+
+    ASSERT_EQ((int)sh.result(), (int)CMD_ERROR_ARGS_MISSING);
+}
+
+TEST(capture, a_name_the_session_answers_for_is_refused)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+    SessionManager::setPWD(FILE_SEPARATOR);
+
+    sh.run("echo /nowhere | read PWD");
+
+    ASSERT_EQ((int)sh.result(), (int)CMD_ERROR_PERM);
+    ASSERT_STREQ(envValue("PWD").c_str(), FILE_SEPARATOR);
+}
+
+TEST(capture, a_name_that_is_not_a_variable_is_refused)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+
+    sh.run("echo value | read 1bad");
+
+    ASSERT_EQ((int)sh.result(), (int)CMD_ERROR_INVAL);
+}
+
+TEST(capture, repeating_a_capture_holds_on_to_nothing)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+
+    for (uint16_t round = 0; round < 40; round++) {
+        sh.run("echo again | read CAUGHT");
+        ASSERT_NULL(SessionManager::current()->m_fdtable);
+    }
+
+    ASSERT_STREQ(envValue("CAUGHT").c_str(), "again");
 }
 
 #endif

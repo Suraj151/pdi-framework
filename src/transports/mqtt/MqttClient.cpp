@@ -239,10 +239,19 @@ void MQTTClient::mqtt_client_recv()
 
       if (MQTT_MSG_TYPE_CONNACK == msg_type)
       {
+        uint8_t connack_code = mqtt_get_connect_return_code(this->m_mqttClient.mqtt_state.in_buffer, len);
+
         if (MQTT_MSG_TYPE_CONNECT != this->m_mqttClient.mqtt_state.pending_msg_type)
         {
           SysLogE("MQTT: Invalid packet recieved\n");
           this->m_mqttClient.connState = MQTT_HOST_RECONNECT_REQ;
+        }
+        else if (MQTT_CONNACK_ACCEPTED != connack_code)
+        {
+          SysLogE("MQTT: connection refused by broker, code %d\n", (int)connack_code);
+          this->m_mqttClient.connState = MQTT_CONNECT_FAILED;
+          this->m_mqttClient.host_connect_tick = 0;
+          this->disconnectServer();
         }
         else
         {
@@ -775,7 +784,15 @@ void MQTTClient::InitConnection(char *host, pdiutil::net_port_t port, uint8_t se
   LogI("MQTT: InitConnection\n");
 
   int _host_len = strlen(host);
-  memset(&this->m_mqttClient, 0, sizeof(MQTT_Client));
+  memset(&this->m_mqttClient.mqtt_state, 0, sizeof(mqtt_state_t));
+  memset(&this->m_mqttClient.connect_info, 0, sizeof(mqtt_connect_info_t));
+  memset(&this->m_mqttClient.msgQueue, 0, sizeof(QUEUE));
+  this->m_mqttClient.keepAliveTick = 0;
+  this->m_mqttClient.sendTimeout = 0;
+  this->m_mqttClient.readTimeout = 0;
+  this->m_mqttClient.connState = MQTT_PUBLISH_RECV;
+  this->m_mqttClient.host_connect_tick = 0;
+  this->m_mqttClient.mqtt_connected = false;
   this->m_host = pdiutil::safe_new_array<char>(_host_len + 1);
 
   if (nullptr != this->m_host)

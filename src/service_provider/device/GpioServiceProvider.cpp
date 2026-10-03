@@ -165,9 +165,8 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isEventPost ){
       this->m_http_client->Begin();
 
       #ifdef ENABLE_DEVICE_IOT
-      pdiutil::string auth_user = CHARPTR_WRAP("mac");
       this->m_http_client->SetUserAgent(user_agent.c_str());
-      this->m_http_client->SetBasicAuthorization(auth_user.c_str(), __i_dvc_ctrl.getDeviceMac().c_str());
+      __device_iot_service.setDeviceAuthorization(this->m_http_client);
       #else
       pdiutil::string auth_user = CHARPTR_WRAP("user");
       pdiutil::string auth_pass = CHARPTR_WRAP("password");

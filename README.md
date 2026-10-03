@@ -640,7 +640,7 @@ The struct carries no size constant of its own. A table declares `sizeof(Table)`
 | MqttConfig | general / LWT / pub-sub tables | broker, last will, publish and subscribe slots |
 | GpioConfig | `gpio_config_table` | pin map, modes, event conditions and channels |
 | EmailConfig | `email_config_table` | SMTP host, port, auth, default subject |
-| DeviceIotConfig | `device_iot_config_table` | config and OTP URLs, channel keys, sampling bounds |
+| DeviceIotConfig | `device_iot_config_table` | config and OTP URLs, channel keys, device key size, sampling bounds |
 | SerialConfig | — | mode, baud, interface selection |
 | StorageConfig | — | mount point, path limits |
 | SshConfig | — | key algorithms, RSA key bits, session pool size and pool-full grace, auth policy, host-key and config paths |
@@ -1327,7 +1327,7 @@ Polls for a firmware update on the interval stored in the OTA table:
         └─ or hand the URL to the SDK's own updater          (fallback)
 ```
 
-Requests carry HTTP basic auth and a `pdistack` user agent, and run over TLS when the TLS service is on. Which of the three upgrade strategies applies is a compile-time choice.
+Requests carry HTTP basic auth and a `pdistack` user agent, and run over TLS when the TLS service is on. With Device-IoT on, the auth is the device key ([§6.2.10](#6210-deviceiotserviceprovider--__device_iot_service)); without it, `ota:<device-mac>`. Where they go comes from the host URL alone — its scheme or an explicit `:port` picks the port. Which of the three upgrade strategies applies is a compile-time choice.
 
 A build can also be flashed without any update server. `collectLocalImages()` lists the firmware images sitting on the filesystem and `flashFromFile()` writes one of them, checking the image magic byte before it commits and reporting through the same `upgrade_status_t` as a server-driven update. That is what backs the **Flash From Storage** form on the OTA page: upload a binary through the storage browser, pick it from the list, confirm, and the device flashes and restarts. Both entry points need the storage service.
 
@@ -1350,16 +1350,24 @@ Loads the email table and, if periodic mail is enabled, schedules the send. The 
 Off by default; uncomment `ENABLE_DEVICE_IOT` to build it. The service handles registration and channel setup, and the application supplies the sensor.
 
 ```
-  boot
-   ├─ GET <otp url>      →  { otp, status }
-   ├─ GET <config url>   →  { did, token, channelhost, channelport,
+  portal: host + duid, Request OTP
+   └─ GET <otp url>      →  { otp, status }         shown on the page; entering it on
+                                                     the server registers this device
+  config request (repeats until configured)
+   ├─ GET <config url>   →  { did, channelhost, channelport, channelsecure,
    │                          channelread, channelwrite, datarate,
    │                          samplerate, keepalive, reconfig, … }
    ├─ configureMQTT()    →  writes those values into the MQTT tables
    └─ sample loop        →  sampleHook() × samplerate  ──▶ dataHook(payload) ──▶ publish
 ```
 
-Both URLs are templates that substitute the MAC and the device unique id at request time. The MQTT identity it builds is worth knowing: the client id is a base64 of `mac:<device-mac>` rather than the raw MAC, the username is the device unique id from the IoT table, and the password is the token the server returned. The last-will topic is the read channel with a payload carrying the device id.
+Both URLs are templates that substitute the MAC and the device unique id at request time.
+
+**The device proves who it is with its own key.** The first OTP request generates a random 32-byte key, kept as hex in the IoT table, which is sealed. The OTP the server answers with is bound to that key: once the user enters it on the server, the server accepts that device by its key and by nothing else. Every request to the server then carries `key:<key>` as its basic auth — the OTP and config requests, the GPIO event posts and the OTA checks and downloads. Before a key exists the requests carry `mac:<device-mac>` instead, and without `ENABLE_DEVICE_IOT` the GPIO and OTA services keep their own credentials.
+
+The key belongs to one server and one device unique id. Changing the host or the unique id — from the portal, `iot sethost` / `iot setid`, or by writing the table — drops it, and the next OTP request generates a new one, so the device is registered again. A factory reset drops it with the rest of the table.
+
+The MQTT identity: the client id is a base64 of `mac:<device-mac>` rather than the raw MAC, the username is the device unique id, and the password is the device key. The connection runs over TLS when the config answers `channelsecure` true. The last-will topic is the read channel with a payload carrying the device id.
 
 Because `configureMQTT()` writes the MQTT tables, Device-IoT's server-supplied broker settings replace whatever the portal had for MQTT when both are in use.
 
@@ -1808,7 +1816,7 @@ Each session carries a small descriptor table — `stdin`, `stdout`, `stderr` �
 | `&&` | run the next command only if this one succeeded |
 | `\|\|` | run the next command only if this one failed |
 
-`cat`, `head`, `tail`, `wc` and `grep` read the input descriptor when no filename is given, which is what makes them useful on the right of a pipe. Everything else keeps writing to `stdout` without a line of its own changing.
+`cat`, `head`, `tail`, `wc`, `grep` and `read` read the input descriptor when no filename is given, which is what makes them useful on the right of a pipe. Everything else keeps writing to `stdout` without a line of its own changing.
 
 Two limits are worth knowing. A pipe is a fixed buffer of `PDI_PIPE_CAPACITY` bytes (1024 by default), the way a real one is; a stage that outruns it marks the pipe overflowed instead of growing until the heap is gone. And a write the filesystem refuses — a redirect into read-only `/proc`, or a full disk — is reported as `cannot write <path>` rather than passing silently, because the answer only arrives when the last block is committed.
 
@@ -1869,10 +1877,11 @@ Two limits are worth knowing. A pipe is a fixed buffer of `PDI_PIPE_CAPACITY` by
 | reboot | | Reboot. |
 | watch | c=, i=, n= | Run a command repeatedly. Options are comma separated, as every other command's are, so `;` stays the shell's own command separator. e.g. **watch c=net ip,i=3000,n=10**. Quote the inner command when it carries a comma of its own — **watch c="login u=a,p=b",i=3000** — and the quotes bound the value rather than ending it |
 | db status \| list \| verify \| save \| restore | positional | Inspect the config record store: which medium is live and how full it is, one line per record, a checksum pass over all of them, and saving or restoring the defaults tier. Never prints a record's contents. See [§5.10](#510-from-the-terminal). |
-| iot \<option> | setid, getid, sethost, gethost | Device unique id and IoT host. |
+| iot \<option> | setid, getid, sethost, gethost | Device unique id and IoT host. Changing either drops the device key; the next OTP request generates a new one. |
 | env | | Every variable this session can see, one `NAME=value` per line, each from the tier that wins. See [§7.14](#714-environment-variables). |
 | export \<name>=\<value> | | Set a variable for this session. Names the session answers for itself are refused. e.g. **export GREETING=hello** |
 | unset \<name> | | Drop a variable from this session, leaving `/.env` alone. |
+| read \<name> [\<name>..] | positional | Take one line of input and put it in variables, so a command's output can be used on the following lines. Needs a pipe or a file to read from. e.g. **date \| read TODAY** then **echo $TODAY**. See [§7.14](#714-environment-variables). |
 | source \<file> | | Run each line of a file in this session, so a `cd` or an `export` it performs is still in force afterwards. See [§7.15](#715-shell-scripts-and-etcrclocal). |
 | test \<a> \<op> \<b> | | Answer a question through `$?` and print nothing either way: `=` `!=` on strings, `-eq -ne -lt -le -gt -ge` on numbers, `-z` `-n` on emptiness, `-e` `-f` `-d` on paths. e.g. **test $MODE = debug && echo debugging** |
 | crontab | | List the scheduled jobs `/etc/crontab` holds, as the device parsed them, and what is due this minute. See [§7.16](#716-scheduled-jobs-and-etccrontab). |
@@ -2077,7 +2086,22 @@ pdiStack@12580169:(/): echo '$GREETING'
 $GREETING
 ```
 
-A name is a letter or underscore followed by letters, digits or underscores. A session holds `ENV_SESSION_MAX` variables, eight by default; names and values are bounded by `ENV_NAME_MAX` and `ENV_VALUE_MAX`. The base file needs storage, so a board without a filesystem keeps the first two tiers and simply has none.
+**A command's answer can go into a variable.** `read` takes one line from wherever the input descriptor points — the left of a pipe, or a file — and binds it to the names given:
+
+```
+pdiStack@12580169:(/): date | read TODAY
+pdiStack@12580169:(/): echo backed up on $TODAY
+backed up on Sat Sep 27 11:04:18 2026
+pdiStack@12580169:(/): read HOSTLINE < /etc/hostname
+```
+
+The line arrives as text and nothing else — the blank line a command opens with and the carriage return it ends with are both gone before the bytes leave the pipe, so the value runs together with whatever is printed around it.
+
+Give it more than one name and the line is split on spaces, a field each, with the last name taking whatever is left: `echo one two three | read A B` leaves `A` as `one` and `B` as `two three`. Three names is the most it takes, and a name the line has nothing left for is set to empty.
+
+Two things it will not do. It needs something feeding it, so `read NAME` on its own says so rather than waiting for a line to be typed at it. And when the input has already run out it leaves the names as they were and answers no through `$?`, so a script can tell the end of the input from a failure.
+
+A name is a letter or underscore followed by letters, digits or underscores. A session holds `ENV_SESSION_MAX` variables, eight by default; names are bounded by `ENV_NAME_MAX`, and `read` stops a value at `ENV_VALUE_MAX` so a long line cannot become a long variable. The base file needs storage, so a board without a filesystem keeps the first two tiers and simply has none.
 
 The session tier ends with the login. `logout` and `su` both clear it, which matters most on the serial console: telnet and SSH close their channel and release the session with it, while the serial terminal outlives every login on it, so without an explicit reset one user's variables would follow the next one in. Only the session tier is dropped — the base file is untouched, so clearing uncovers `/.env` rather than deleting from it.
 

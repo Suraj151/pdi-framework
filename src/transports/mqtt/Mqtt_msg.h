@@ -15,6 +15,8 @@ created Date    : 1st June 2019
 #include <config/Config.h>
 
 #define PROTOCOL_NAMEv311
+#define MQTT_CONNACK_ACCEPTED 0
+#define MQTT_CONNACK_MALFORMED 0xFF
 
 enum mqtt_message_type : uint8_t {
   MQTT_MSG_TYPE_CONNECT = 1,
@@ -76,6 +78,11 @@ int32_t mqtt_get_total_length(uint8_t* buffer, uint16_t length);
 const char* mqtt_get_publish_topic(uint8_t* buffer, uint16_t* length);
 const char* mqtt_get_publish_data(uint8_t* buffer, uint16_t* length);
 uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length);
+/**
+ * The return code of a CONNACK, MQTT_CONNACK_ACCEPTED when the broker took the
+ * connection and MQTT_CONNACK_MALFORMED when the packet cannot carry one.
+ */
+uint8_t mqtt_get_connect_return_code(uint8_t* buffer, uint16_t length);
 
 mqtt_message_t* mqtt_msg_connect(mqtt_connection_t* connection, mqtt_connect_info_t* info);
 mqtt_message_t* mqtt_msg_publish(mqtt_connection_t* connection, const char* topic, const char* data, size_t data_length, uint8_t qos, uint8_t retain, uint16_t* message_id);

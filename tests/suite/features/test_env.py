@@ -264,3 +264,114 @@ def environment_is_per_session(t):
     finally:
         t.run("unset TENVMINE")
         peer.close()
+
+
+@test("a piped line lands in a variable", needs=("read", "echo", "env", "unset"))
+def read_catches_a_pipe(t):
+    try:
+        t.run("echo hello | read TRDA")
+        got = env_value(t, "TRDA")
+        if got != "hello":
+            raise AssertionError("read caught %r, not 'hello'" % got)
+    finally:
+        t.run("unset TRDA")
+
+
+@test("a caught value carries no line break", needs=("read", "echo", "unset"))
+def read_catches_no_break(t):
+    """
+    The value is asserted by expanding it between two literals rather than by
+    reading env, because env prints one line per name and a stray break would be
+    trimmed away by the reader before the assertion ever saw it.
+    """
+    try:
+        t.run("echo hello | read TRDB")
+        expect_in("prehello-post", t.run("echo pre$TRDB-post"),
+                  "the caught value ran together with the text around it")
+    finally:
+        t.run("unset TRDB")
+
+
+@test("a caught value is still there on a later line",
+      needs=("read", "echo", "unset"))
+def read_value_survives(t):
+    try:
+        t.run("echo remembered | read TRDC")
+        expect_in("remembered", t.run("echo $TRDC"), "the value survived the line")
+    finally:
+        t.run("unset TRDC")
+
+
+@test("two names take a field each", needs=("read", "echo", "env", "unset"))
+def read_splits_two_names(t):
+    try:
+        t.run("echo alpha beta | read TRDD TRDE")
+        if env_value(t, "TRDD") != "alpha" or env_value(t, "TRDE") != "beta":
+            raise AssertionError("two names took %r and %r"
+                                 % (env_value(t, "TRDD"), env_value(t, "TRDE")))
+    finally:
+        t.run("unset TRDD")
+        t.run("unset TRDE")
+
+
+@test("the last name takes what is left", needs=("read", "echo", "env", "unset"))
+def read_last_name_takes_rest(t):
+    try:
+        t.run("echo alpha beta gamma | read TRDD TRDE")
+        if env_value(t, "TRDE") != "beta gamma":
+            raise AssertionError("the last name took %r, not 'beta gamma'"
+                                 % env_value(t, "TRDE"))
+    finally:
+        t.run("unset TRDD")
+        t.run("unset TRDE")
+
+
+@test("a file can feed it", needs=("read", "echo", "env", "unset"))
+def read_takes_a_file(t):
+    path = t.workspace(W + "rdfile") + "/in.txt"
+    try:
+        t.run("echo first > %s" % path)
+        t.run("echo second >> %s" % path)
+
+        t.run("read TRDF < %s" % path)
+        got = env_value(t, "TRDF")
+        if got != "first":
+            raise AssertionError("read took %r from a file, not its first line" % got)
+    finally:
+        t.run("unset TRDF")
+        t.run("rm %s" % path)
+
+
+@test("nothing to read leaves the name alone",
+      needs=("read", "touch", "env", "unset"))
+def read_on_empty_input(t):
+    path = t.workspace(W + "rdempty") + "/none.txt"
+    try:
+        t.run("unset TRDG")
+        t.run("touch %s" % path)
+
+        t.run("read TRDG < %s" % path)
+        if env_value(t, "TRDG") is not None:
+            raise AssertionError("an empty input still bound the name")
+    finally:
+        t.run("unset TRDG")
+        t.run("rm %s" % path)
+
+
+@test("read with nothing feeding it says so", needs=("read", "env", "unset"))
+def read_without_input(t):
+    try:
+        t.run("unset TRDH")
+        expect_in("pipe", t.run("read TRDH"), "it said what it wanted")
+        if env_value(t, "TRDH") is not None:
+            raise AssertionError("it bound the name with nothing to read")
+    finally:
+        t.run("unset TRDH")
+
+
+@test("read refuses a name the session answers for",
+      needs=("read", "echo", "cd", "pwd"))
+def read_refuses_a_derived_name(t):
+    t.run("cd /")
+    t.run("echo /nowhere | read PWD")
+    expect_not_in("nowhere", t.run("pwd"), "read overwrote a name the session owns")

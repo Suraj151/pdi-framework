@@ -53,6 +53,7 @@ created Date    : 1st June 2019
 #include "commands/EchoCommand.h"
 #include "commands/EnvCommand.h"
 #include "commands/ExportCommand.h"
+#include "commands/ReadCommand.h"
 #include "commands/UnsetCommand.h"
 #include "commands/TestCommand.h"
 #ifdef ENABLE_SCRIPT_RUNNER

@@ -34,13 +34,12 @@ created Date    : 1st June 2019
 // #define DEVICE_IOT_EVENTS_REQ_URL             "/api/fordevice/get-events?mac_id=[mac]&duid=[duid]"
 #define DEVICE_IOT_CONFIG_RESP_MAX_SIZE       500
 #define DEVICE_IOT_CONFIG_DEVICEID_KEY        "did"
-#define DEVICE_IOT_CONFIG_CHANNEL_TOKEN_KEY   "token"
 #define DEVICE_IOT_CONFIG_CHANNEL_HOST_KEY    "channelhost"
 #define DEVICE_IOT_CONFIG_CHANNEL_PORT_KEY    "channelport"
+#define DEVICE_IOT_CONFIG_CHANNEL_SECURE_KEY  "channelsecure"
 #define DEVICE_IOT_CONFIG_CHANNEL_READ_KEY    "channelread"
 #define DEVICE_IOT_CONFIG_CHANNEL_WRITE_KEY   "channelwrite"
 #define DEVICE_IOT_CONFIG_CHANNEL_MAX_BUFF_SIZE       DEVICE_IOT_HOST_BUF_SIZE
-#define DEVICE_IOT_CONFIG_CHANNEL_TOKEN_MAX_SIZE      100
 #define DEVICE_IOT_CONFIG_INTERFACE_READ_KEY  "ifaceread"
 #define DEVICE_IOT_CONFIG_INTERFACE_WRITE_KEY "ifacewrite"
 #define DEVICE_IOT_CONFIG_INTERFACE_EVENT_KEY "ifaceevent"
@@ -57,8 +56,13 @@ created Date    : 1st June 2019
 
 #define DEVICE_IOT_DUID_MAX_LENGTH            100
 
+#define DEVICE_IOT_KEY_BYTES                  32
+#define DEVICE_IOT_KEY_BUF_SIZE               ((DEVICE_IOT_KEY_BYTES * 2) + 1)
+#define DEVICE_IOT_AUTH_KEY_USER              "key"
+#define DEVICE_IOT_AUTH_MAC_USER              "mac"
+
 struct device_iot_configs {
-  
+
   // Default Constructor
   device_iot_configs(){
     clear();
@@ -68,10 +72,12 @@ struct device_iot_configs {
   void clear(){
     memset(device_iot_host, 0, DEVICE_IOT_HOST_BUF_SIZE);
     memset(device_iot_duid, 0, DEVICE_IOT_DUID_MAX_LENGTH);
+    memset(device_iot_key, 0, DEVICE_IOT_KEY_BUF_SIZE);
   }
 
   char device_iot_host[DEVICE_IOT_HOST_BUF_SIZE];
   char device_iot_duid[DEVICE_IOT_DUID_MAX_LENGTH];
+  char device_iot_key[DEVICE_IOT_KEY_BUF_SIZE];
 };
 
 // const device_iot_configs PROGMEM _device_iot_config_defaults = {

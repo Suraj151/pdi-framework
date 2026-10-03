@@ -104,6 +104,7 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   HeadFSCommand::RegisterCommand();
   TailFSCommand::RegisterCommand();
   GrepFSCommand::RegisterCommand();
+  ReadCommand::RegisterCommand();
 
   m_termhistoryfile = CHARPTR_WRAP_RO(CMD_TERMINAL_HISTORY_STATIC_FILEPATH);
   #endif
