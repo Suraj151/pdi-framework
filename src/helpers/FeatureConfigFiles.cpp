@@ -343,10 +343,8 @@ void otaConfigToKvs(const ota_config_table *_table, pdiutil::vector<config_kv_t>
   }
 
   pdiutil::string key_host = CHARPTR_WRAP(OTA_CONFIG_KEY_HOST);
-  pdiutil::string key_port = CHARPTR_WRAP(OTA_CONFIG_KEY_PORT);
 
   appendConfigValue(_out, key_host, pdiutil::string(_table->ota_host));
-  appendConfigValue(_out, key_port, configNumberAsValue(_table->ota_port));
 }
 
 /**
@@ -361,14 +359,8 @@ bool otaConfigFromKvs(const pdiutil::vector<config_kv_t> &_kvs, ota_config_table
   }
 
   pdiutil::string key_host = CHARPTR_WRAP(OTA_CONFIG_KEY_HOST);
-  pdiutil::string key_port = CHARPTR_WRAP(OTA_CONFIG_KEY_PORT);
 
-  bool applied = false;
-
-  applied |= takeConfigText(_kvs, key_host, _table->ota_host, OTA_HOST_BUF_SIZE);
-  applied |= takeConfigNumber(_kvs, key_port, &_table->ota_port);
-
-  return applied;
+  return takeConfigText(_kvs, key_host, _table->ota_host, OTA_HOST_BUF_SIZE);
 }
 
 /**

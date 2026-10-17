@@ -23,7 +23,7 @@ DEFAULT_PASSWORD = "pdiStack@123"
 
 # a listener the host refuses at its real port moves here, see the mock
 # TcpServerInterface
-SHADOW_PORT_BASE = 10000
+SHADOW_PORT_BASE = int(os.environ.get("PDI_PORT_BASE", "10000"))
 
 
 class HostShell(Shell):
@@ -49,6 +49,10 @@ class HostShell(Shell):
         ]
         if epoch:
             argv += ["--epoch", str(epoch)]
+        if 10000 != SHADOW_PORT_BASE:
+            argv += ["--port-base", str(SHADOW_PORT_BASE)]
+        self._gpio_input = os.path.join(self._workdir, "gpio.in")
+        argv += ["--gpio-input", self._gpio_input]
         if args:
             argv += list(args)
 
@@ -82,6 +86,18 @@ class HostShell(Shell):
     @property
     def binary(self):
         return self._binary
+
+    def set_inputs(self, levels):
+        """
+        Drives the input pins the way a wire to them would: levels is a dict of
+        pin label to level, `{"D4": 1, "A0": 512}`. The process reads the file on
+        every input sample, so a level holds until the next call replaces it.
+        """
+        temp = self._gpio_input + ".tmp"
+        with open(temp, "w") as out:
+            for label, level in levels.items():
+                out.write("%s %d\n" % (label, level))
+        os.replace(temp, self._gpio_input)
 
     def _send(self, data):
         if self._proc.poll() is not None:

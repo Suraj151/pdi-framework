@@ -74,6 +74,21 @@ def useradd_creates(t):
         drop_user(t, name)
 
 
+@test("useradd refuses a name that would not read back as one account", needs=("useradd", "userdel", "cat"))
+def useradd_refuses_bad_names(t):
+    # a separator in the name would write a passwd line whose fields after the
+    # first are the attacker's, uid included
+    for name in ("tghost:x:0:0::/:/bin/sh", '"tw words"', "t" * 40):
+        out = t.run("useradd u=%s p=x" % name)
+        if "root required" in out:
+            raise Skip("not root on this target")
+        expect_in("invalid user name", out, "useradd of %r" % name)
+
+    expect_not_in("tghost", t.run("cat /etc/passwd"), "the store after the refusals")
+    expect_not_in("tw words", t.run("cat /etc/passwd"), "the store after the refusals")
+    expect_not_in("t" * 24, t.run("cat /etc/passwd"), "a long name was not cut down and added")
+
+
 @test("userdel removes an account", needs=("useradd", "userdel", "cat"))
 def userdel_removes(t):
     name = scratch_user(t, "tdel", "tdelpass")

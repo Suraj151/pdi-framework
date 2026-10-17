@@ -89,6 +89,11 @@ class OtaServiceProvider : public ServiceProvider{
      * @var	Http_Client*|nullptr	m_http_client
      */
     Http_Client  *m_http_client;
+
+    /**
+     * @var	bool	m_unconfigured_logged	the missing ota host is logged once, again only after it was set
+     */
+    bool m_unconfigured_logged;
 };
 
 extern OtaServiceProvider __ota_service;

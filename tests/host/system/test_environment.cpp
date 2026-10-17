@@ -38,6 +38,13 @@ void clearBaseEnv()
 #endif
 }
 
+std::string envValue(const char *key)
+{
+    pdiutil::string out;
+    Environment::get(key, out);
+    return std::string(out.c_str());
+}
+
 } // namespace
 
 TEST(environment, a_name_must_look_like_a_variable)
@@ -273,6 +280,105 @@ TEST(environment, a_double_quoted_variable_still_expands)
     Environment::set("GREETING", "hello");
 
     ASSERT_TRUE(std::string(sh.run("echo \"$GREETING\"")).find("hello") != std::string::npos);
+}
+
+TEST(environment, braces_let_a_name_run_straight_into_text)
+{
+    pditest::Shell sh;
+    Environment::set("NUM", "4");
+
+    std::string out = sh.run("echo ${NUM}th");
+    ASSERT_TRUE(out.find("4th") != std::string::npos);
+}
+
+TEST(environment, a_default_stands_in_for_a_name_that_is_unset_or_empty)
+{
+    pditest::Shell sh;
+    Environment::unset("ABSENT");
+    Environment::set("EMPTY", "");
+    Environment::set("GREETING", "hello");
+
+    ASSERT_TRUE(std::string(sh.run("echo [${ABSENT:-fallback}]")).find("[fallback]") != std::string::npos);
+    ASSERT_TRUE(std::string(sh.run("echo [${EMPTY:-fallback}]")).find("[fallback]") != std::string::npos);
+    ASSERT_TRUE(std::string(sh.run("echo [${GREETING:-fallback}]")).find("[hello]") != std::string::npos);
+}
+
+TEST(environment, a_default_may_hold_blanks_and_names)
+{
+    pditest::Shell sh;
+    Environment::unset("ABSENT");
+    Environment::set("GREETING", "hello");
+
+    ASSERT_TRUE(std::string(sh.run("echo [${ABSENT:-a b}]")).find("[a b]") != std::string::npos);
+    ASSERT_TRUE(std::string(sh.run("echo [${ABSENT:-$GREETING}]")).find("[hello]") != std::string::npos);
+}
+
+TEST(environment, a_hash_gives_the_length_of_a_value)
+{
+    pditest::Shell sh;
+    Environment::set("GREETING", "hello");
+    Environment::unset("ABSENT");
+
+    ASSERT_TRUE(std::string(sh.run("echo [${#GREETING}]")).find("[5]") != std::string::npos);
+    ASSERT_TRUE(std::string(sh.run("echo [${#ABSENT}]")).find("[0]") != std::string::npos);
+}
+
+TEST(environment, braces_in_single_quotes_and_unclosed_braces_stay_as_typed)
+{
+    pditest::Shell sh;
+    Environment::set("NUM", "4");
+
+    ASSERT_TRUE(std::string(sh.run("echo '${NUM}'")).find("${NUM}") != std::string::npos);
+    ASSERT_TRUE(std::string(sh.run("echo ${NUM")).find("${NUM") != std::string::npos);
+}
+
+TEST(environment, arithmetic_follows_the_usual_precedence)
+{
+    pditest::Shell sh;
+
+    ASSERT_TRUE(std::string(sh.run("echo [$((1 + 2 * 3))]")).find("[7]") != std::string::npos);
+    ASSERT_TRUE(std::string(sh.run("echo [$(( (7 + 1) / 3 ))]")).find("[2]") != std::string::npos);
+    ASSERT_TRUE(std::string(sh.run("echo [$((-4 % 3))]")).find("[-1]") != std::string::npos);
+}
+
+TEST(environment, arithmetic_reads_names_bare_or_with_a_dollar)
+{
+    pditest::Shell sh;
+    Environment::set("NUM", "5");
+    Environment::unset("ABSENT");
+
+    ASSERT_TRUE(std::string(sh.run("echo [$((NUM - 2))]")).find("[3]") != std::string::npos);
+    ASSERT_TRUE(std::string(sh.run("echo [$(( $NUM * 2 ))]")).find("[10]") != std::string::npos);
+    ASSERT_TRUE(std::string(sh.run("echo [$((ABSENT + 1))]")).find("[1]") != std::string::npos);
+}
+
+TEST(environment, arithmetic_that_cannot_be_worked_out_stays_as_typed)
+{
+    pditest::Shell sh;
+    Environment::set("WORD", "abc");
+
+    ASSERT_TRUE(std::string(sh.run("echo [$((1 / 0))]")).find("[$((1 / 0))]") != std::string::npos);
+    ASSERT_TRUE(std::string(sh.run("echo [$((WORD + 1))]")).find("[$((WORD + 1))]") != std::string::npos);
+    ASSERT_TRUE(std::string(sh.run("echo '$((1 + 1))'")).find("$((1 + 1))") != std::string::npos);
+}
+
+TEST(environment, arithmetic_counts_a_loop_in_a_script)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+    Environment::set("I", "0");
+
+    sh.run("echo 'while test $I -lt 3' > /wt_count.sh");
+    sh.run("echo 'echo pass$I' >> /wt_count.sh");
+    sh.run("echo 'export I=$((I + 1))' >> /wt_count.sh");
+    sh.run("echo done >> /wt_count.sh");
+    std::string out = sh.run("source /wt_count.sh");
+    sh.run("rm /wt_count.sh");
+
+    ASSERT_TRUE(out.find("pass0") != std::string::npos);
+    ASSERT_TRUE(out.find("pass2") != std::string::npos);
+    ASSERT_TRUE(out.find("pass3") == std::string::npos);
+    ASSERT_STREQ(envValue("I").c_str(), "3");
 }
 
 TEST(environment, a_variable_ends_where_the_name_does)

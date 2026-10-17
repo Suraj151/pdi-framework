@@ -23,6 +23,7 @@ esp8266 or arduinouno device layers -- that needs their real toolchains.
 """
 
 import argparse
+import concurrent.futures
 import os
 import subprocess
 import sys
@@ -128,6 +129,8 @@ def main():
                         help="skip any path containing this substring, repeatable")
     parser.add_argument("--quiet", action="store_true",
                         help="report only the failures and the totals")
+    parser.add_argument("--jobs", type=int, default=os.cpu_count() or 1,
+                        help="files compiled at once (default: every cpu)")
     args = parser.parse_args()
 
     standards = args.std if args.std else list(STANDARDS)
@@ -148,10 +151,13 @@ def main():
         for profile in profiles:
             leg = "%s/%s/%s" % (port, std, profile)
             failures = []
-            for rel in files:
-                ok = check(args.compiler, std, profile, rel, failures, port)
-                if not ok and not args.quiet:
-                    say("%sFAIL%s %s [%s]" % (RED, RESET, rel, leg))
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
+                results = pool.map(lambda rel: (rel, check(args.compiler, std, profile, rel, failures, port)),
+                                   files)
+                for rel, ok in results:
+                    if not ok and not args.quiet:
+                        say("%sFAIL%s %s [%s]" % (RED, RESET, rel, leg))
+            failures.sort()
 
             if failures:
                 worst = 1

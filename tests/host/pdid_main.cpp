@@ -12,6 +12,8 @@ created Date    : 16th Aug 2026
 ******************************************************************************/
 
 #include <PdiStack.h>
+#include <devices/posix/TcpServerInterface.h>
+#include <devices/posix/DeviceControlInterface.h>
 #include <csignal>
 #include <cstdio>
 #include <cstring>
@@ -33,6 +35,8 @@ static void usage()
     printf("  --epoch <n>         start with the clock already synced to this time\n");
     printf("  --ssid <name>       associate with this network at boot\n");
     printf("  --headless          do not read the terminal from stdin\n");
+    printf("  --port-base <n>     move refused well known ports to n plus the port\n");
+    printf("  --gpio-input <file> read input pin levels from lines like 'D4 1' or 'A0 512'\n");
     printf("  --help              this text\n");
 }
 
@@ -66,6 +70,14 @@ int main(int argc, char **argv)
         else if (0 == strcmp(argv[i], "--ssid") && (i + 1) < argc)
         {
             ssid = argv[++i];
+        }
+        else if (0 == strcmp(argv[i], "--port-base") && (i + 1) < argc)
+        {
+            TcpServerInterface::setShadowPortBase((uint16_t)strtoul(argv[++i], nullptr, 10));
+        }
+        else if (0 == strcmp(argv[i], "--gpio-input") && (i + 1) < argc)
+        {
+            DeviceControlInterface::setGpioInputFile(argv[++i]);
         }
         else if (0 == strcmp(argv[i], "--headless"))
         {
@@ -131,6 +143,7 @@ int main(int argc, char **argv)
         __i_storage.flush();
     }
 
+    ServiceProvider::setTerminal(nullptr);
     printf("\npdid stopped\n");
     return 0;
 }

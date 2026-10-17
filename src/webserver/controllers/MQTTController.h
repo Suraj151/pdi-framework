@@ -84,7 +84,9 @@ public:
     strcat_ro(_page, WEB_SERVER_MENU_CARD_PAGE_WRAP_TOP);
 
     concat_svg_menu_card(_page, WEB_SERVER_MQTT_MENU_TITLE_GENERAL, SVG_ICON48_PATH_SETTINGS, WEB_SERVER_MQTT_GENERAL_CONFIG_ROUTE);
+    CONTINUE_SEND_IN_CHUNK(_page);
     concat_svg_menu_card(_page, WEB_SERVER_MQTT_MENU_TITLE_LWT, SVG_ICON48_PATH_BEENHERE, WEB_SERVER_MQTT_LWT_CONFIG_ROUTE);
+    CONTINUE_SEND_IN_CHUNK(_page);
     concat_svg_menu_card(_page, WEB_SERVER_MQTT_MENU_TITLE_PUBSUB, SVG_ICON48_PATH_IMPORT_EXPORT, WEB_SERVER_MQTT_PUBSUB_CONFIG_ROUTE);
     CONTINUE_SEND_IN_CHUNK(_page);
 
@@ -197,7 +199,7 @@ public:
     bool _is_posted = false;
 
 #ifdef ALLOW_MQTT_CONFIG_MODIFICATION
-    if (this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("hst")) && this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("prt")))
+    if (this->m_web_resource->m_server->isPostRequest() && this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("hst")) && this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("prt")))
     {
       pdiutil::string _mqtt_host = this->m_web_resource->m_server->arg(CHARPTR_WRAP("hst"));
       pdiutil::string _mqtt_port = this->m_web_resource->m_server->arg(CHARPTR_WRAP("prt"));
@@ -225,22 +227,25 @@ public:
         // mqtt_general_config_table _mqtt_general_configs;
         // this->m_db_conn->get_mqtt_general_config_table(&_mqtt_general_configs);
 
-        strncpy(_mqtt_general_configs->host, _mqtt_host.c_str(), _mqtt_host.size());
+        bool _fits = __copy_to_buffer(_mqtt_general_configs->host, sizeof(_mqtt_general_configs->host), _mqtt_host.c_str(), _mqtt_host.size()) &&
+                     __copy_to_buffer(_mqtt_general_configs->client_id, sizeof(_mqtt_general_configs->client_id), _client_id.c_str(), _client_id.size()) &&
+                     __copy_to_buffer(_mqtt_general_configs->username, sizeof(_mqtt_general_configs->username), _username.c_str(), _username.size()) &&
+                     __copy_to_buffer(_mqtt_general_configs->password, sizeof(_mqtt_general_configs->password), _password.c_str(), _password.size());
         _mqtt_general_configs->port = StringToUint16(_mqtt_port.c_str());
-        strncpy(_mqtt_general_configs->client_id, _client_id.c_str(), _client_id.size());
-        strncpy(_mqtt_general_configs->username, _username.c_str(), _username.size());
-        strncpy(_mqtt_general_configs->password, _password.c_str(), _password.size());
         _mqtt_general_configs->keepalive = StringToUint16(_keep_alive.c_str());
         pdiutil::string clean_flag = CHARPTR_WRAP("clean");
         _mqtt_general_configs->clean_session = (int)(_clean_session == clean_flag);
         pdiutil::string secure_flag = CHARPTR_WRAP("secure");
         _mqtt_general_configs->security = (int)(_security == secure_flag);
 
-        this->m_web_resource->m_db_conn->set_mqtt_general_config_table(_mqtt_general_configs);
+        if (_fits)
+        {
+          this->m_web_resource->m_db_conn->set_mqtt_general_config_table(_mqtt_general_configs);
+        }
         pdiutil::safe_delete(_mqtt_general_configs);
         __i_dvc_ctrl.yield();
 
-        _is_posted = true;
+        _is_posted = _fits;
       }
     }
 #endif
@@ -331,7 +336,7 @@ public:
     bool _is_posted = false;
 
 #ifdef ALLOW_MQTT_CONFIG_MODIFICATION
-    if (this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("wtpc")) && this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("wmsg")))
+    if (this->m_web_resource->m_server->isPostRequest() && this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("wtpc")) && this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("wmsg")))
     {
       pdiutil::string _will_topic = this->m_web_resource->m_server->arg(CHARPTR_WRAP("wtpc"));
       pdiutil::string _will_message = this->m_web_resource->m_server->arg(CHARPTR_WRAP("wmsg"));
@@ -349,15 +354,18 @@ public:
       if (nullptr != _mqtt_lwt_configs)
       {
 
-        strncpy(_mqtt_lwt_configs->will_topic, _will_topic.c_str(), _will_topic.size());
-        strncpy(_mqtt_lwt_configs->will_message, _will_message.c_str(), _will_message.size());
+        bool _fits = __copy_to_buffer(_mqtt_lwt_configs->will_topic, sizeof(_mqtt_lwt_configs->will_topic), _will_topic.c_str(), _will_topic.size()) &&
+                     __copy_to_buffer(_mqtt_lwt_configs->will_message, sizeof(_mqtt_lwt_configs->will_message), _will_message.c_str(), _will_message.size());
         _mqtt_lwt_configs->will_qos = StringToUint16(_will_qos.c_str());
         pdiutil::string retain_flag = CHARPTR_WRAP("retain");
         _mqtt_lwt_configs->will_retain = (int)(_will_retain == retain_flag);
 
-        this->m_web_resource->m_db_conn->set_mqtt_lwt_config_table(_mqtt_lwt_configs);
+        if (_fits)
+        {
+          this->m_web_resource->m_db_conn->set_mqtt_lwt_config_table(_mqtt_lwt_configs);
+        }
         pdiutil::safe_delete(_mqtt_lwt_configs);
-        _is_posted = true;
+        _is_posted = _fits;
         __i_dvc_ctrl.yield();
       }
     }
@@ -520,7 +528,7 @@ public:
     pdiutil::string _pub_topic_arg = CHARPTR_WRAP("ptpc0"), _pub_qos_arg = CHARPTR_WRAP("pqos0");
     pdiutil::string _pub_retain_arg = CHARPTR_WRAP("prtn0");
 
-    if (this->m_web_resource->m_server->hasArg(_pub_topic_arg.c_str()) && this->m_web_resource->m_server->hasArg(_pub_qos_arg.c_str()))
+    if (this->m_web_resource->m_server->isPostRequest() && this->m_web_resource->m_server->hasArg(_pub_topic_arg.c_str()) && this->m_web_resource->m_server->hasArg(_pub_qos_arg.c_str()))
     {
 
       mqtt_pubsub_config_table *_mqtt_pubsub_configs = pdiutil::safe_new<mqtt_pubsub_config_table>();
@@ -540,6 +548,7 @@ public:
         strcpy(_retain_name, _pub_retain_arg.c_str());
 
         pdiutil::string retain_flag = CHARPTR_WRAP("retain");
+        bool _fits = true;
 
         for (uint8_t i = 0; i < MQTT_MAX_PUBLISH_TOPIC; i++)
         {
@@ -552,7 +561,10 @@ public:
           pdiutil::string _qos = this->m_web_resource->m_server->arg(_qos_name);
           pdiutil::string _retain = this->m_web_resource->m_server->arg(_retain_name);
 
-          strncpy(_mqtt_pubsub_configs->publish_topics[i].topic, _topic.c_str(), _topic.size());
+          if (!__copy_to_buffer(_mqtt_pubsub_configs->publish_topics[i].topic, sizeof(_mqtt_pubsub_configs->publish_topics[i].topic), _topic.c_str(), _topic.size()))
+          {
+            _fits = false;
+          }
           _mqtt_pubsub_configs->publish_topics[i].qos = StringToUint8(_qos.c_str());
           _mqtt_pubsub_configs->publish_topics[i].retain = (int)(_retain == retain_flag);
 
@@ -573,17 +585,23 @@ public:
           pdiutil::string _topic = this->m_web_resource->m_server->arg(_topic_name);
           pdiutil::string _qos = this->m_web_resource->m_server->arg(_qos_name);
 
-          strncpy(_mqtt_pubsub_configs->subscribe_topics[i].topic, _topic.c_str(), _topic.size());
+          if (!__copy_to_buffer(_mqtt_pubsub_configs->subscribe_topics[i].topic, sizeof(_mqtt_pubsub_configs->subscribe_topics[i].topic), _topic.c_str(), _topic.size()))
+          {
+            _fits = false;
+          }
           _mqtt_pubsub_configs->subscribe_topics[i].qos = StringToUint8(_qos.c_str());
 
           LogI("%d : Topic(%s), Qos(%s), Retain(%s)\n", i, _topic.c_str(),_qos.c_str());
         }
         _mqtt_pubsub_configs->publish_frequency = StringToUint16(this->m_web_resource->m_server->arg("pfrq").c_str());
 
-        this->m_web_resource->m_db_conn->set_mqtt_pubsub_config_table(_mqtt_pubsub_configs);
+        if (_fits)
+        {
+          this->m_web_resource->m_db_conn->set_mqtt_pubsub_config_table(_mqtt_pubsub_configs);
+        }
 
         pdiutil::safe_delete(_mqtt_pubsub_configs);
-        _is_posted = true;
+        _is_posted = _fits;
         __i_dvc_ctrl.yield();
       }
     }

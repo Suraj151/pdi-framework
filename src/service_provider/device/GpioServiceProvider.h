@@ -56,6 +56,19 @@ public:
   }
 
   void enable_update_gpio_table_from_copy(void);
+
+  /**
+   * Sets a pin's mode in the working copy when it is one the service knows,
+   * leaving the pin as it was otherwise.
+   */
+  bool setGpioModeIfValid(uint8_t _pin, uint16_t _mode);
+
+  /**
+   * Sets a pin's value in the working copy when its mode can hold it, leaving
+   * the pin as it was otherwise.
+   */
+  bool setGpioValueIfValid(uint8_t _pin, uint16_t _value);
+
   bool isAllowedGpioPin(uint8_t _pin, pdiutil::vector<pdiutil::string> *allowedlist);
   void appendGpioJsonPayload(pdiutil::string &_payload, bool isEventPost = false, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);
   void applyGpioJsonPayload(char *_payload, uint16_t _payload_length, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);
@@ -87,6 +100,10 @@ public:
    * @var	bool|true m_update_gpio_table_from_copy
    */
   bool m_update_gpio_table_from_copy;
+  /**
+   * @var	int8_t|-1 m_pending_event_post
+   */
+  int8_t m_pending_event_post;
 
 protected:
 

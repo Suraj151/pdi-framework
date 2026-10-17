@@ -1,0 +1,143 @@
+/***************************** PDI STD File ***********************************
+This file is third party source, taken from the open source uClibc++ library and
+used here with modifications. Thanking to author for providing this .
+
+for the license terms of this file refer the source link below.
+
+referred from   : https://github.com/mike-matera/ArduinoSTL
+added Date      : 1st Dec 2024
+added by        : Suraj I.
+******************************************************************************/
+
+#include "basic_definitions"
+#include <string.h>
+
+#ifndef __HEADER_CHAR_TRAITS
+#define __HEADER_CHAR_TRAITS 1
+
+namespace pdistd{
+
+	typedef signed int char_traits_off_type;
+
+	template<class charT> struct char_traits { };
+
+	template<> struct char_traits<char> {
+		typedef char char_type;
+		typedef int int_type;
+		typedef char_traits_off_type off_type;
+		typedef char_traits_off_type pos_type;
+		typedef char state_type;
+
+		/**
+		 * Copies one character onto another.
+		 */
+		inline static void assign(char_type& c, const char_type& d) { c = d; }
+
+		/**
+		 * Whether two characters are the same.
+		 */
+		inline static bool eq(const char_type& c1, const char_type& c2){
+			return c1 == c2;
+		}
+
+		/**
+		 * Whether c1 orders before c2, both read as unsigned bytes.
+		 */
+		inline static bool lt(const char_type& c1, const char_type& c2){
+			return static_cast<unsigned char>(c1) < static_cast<unsigned char>(c2);
+		}
+
+		/**
+		 * Compares n characters, every one of them, embedded NULs included.
+		 */
+		inline static int compare(const char_type* s1, const char_type* s2, size_t n){
+			if(0 == n){
+				return 0;
+			}
+			return memcmp(s1, s2, n);
+		}
+
+		/**
+		 * Number of characters before the terminating NUL.
+		 */
+		inline static size_t length(const char_type* s){
+			return strlen(s);
+		}
+
+		/**
+		 * The first of the n characters at s that equals a, or null.
+		 */
+		inline static const char_type* find(const char_type* s, size_t n, const char_type& a){
+			if(0 == n){
+				return 0;
+			}
+			return static_cast<const char_type*>(memchr(s, static_cast<unsigned char>(a), n));
+		}
+
+		/**
+		 * Copies n characters where the two ranges may overlap.
+		 */
+		inline static char_type* move(char_type* s1, const char_type* s2, size_t n){
+			if(0 == n){
+				return s1;
+			}
+			return static_cast<char_type*>(memmove(s1, s2, n));
+		}
+
+		/**
+		 * Copies n characters between ranges that do not overlap.
+		 */
+		inline static char_type* copy(char_type* s1, const char_type* s2, size_t n){
+			if(0 == n){
+				return s1;
+			}
+			return static_cast<char_type*>(memcpy(s1, s2, n));
+		}
+
+		/**
+		 * Sets n characters at s to a.
+		 */
+		inline static char_type* assign(char_type* s, size_t n, char_type a){
+			if(0 == n){
+				return s;
+			}
+			return static_cast<char_type*>(memset(s, a, n));
+		}
+
+		/**
+		 * The character an int value stands for.
+		 */
+		inline static char_type to_char_type(const int_type& i){
+			return static_cast<char_type>(i);
+		}
+
+		/**
+		 * The int value a character stands for, never equal to eof.
+		 */
+		inline static int_type to_int_type(const char_type& c){
+			return static_cast<int_type>(static_cast<unsigned char>(c));
+		}
+
+		/**
+		 * Whether two int values stand for the same character or are both eof.
+		 */
+		inline static bool eq_int_type(const int_type& a, const int_type& b){
+			return a == b;
+		}
+
+		/**
+		 * The value that marks the end of input.
+		 */
+		inline static int_type eof() { return -1; }
+
+		/**
+		 * The value itself, or something other than eof when it is eof.
+		 */
+		inline static int_type not_eof(const int_type& i) {
+			return (i == eof()) ? 0 : i;
+		}
+	};
+
+}
+
+#endif

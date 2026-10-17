@@ -205,4 +205,85 @@ TEST(sequence, double_quotes_still_expand)
     ASSERT_TRUE(out.find("0") != std::string::npos);
 }
 
+TEST(sequence, a_bang_turns_a_pipeline_s_answer_around)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+
+    std::string inverted = sh.run("! test a = b && echo inverted");
+    std::string flipped = sh.run("! test a = a || echo flipped");
+    std::string kept = sh.run("! test a = a && echo wrong");
+
+    ASSERT_TRUE(inverted.find("inverted") != std::string::npos);
+    ASSERT_TRUE(flipped.find("flipped") != std::string::npos);
+    ASSERT_TRUE(kept.find("wrong") == std::string::npos);
+}
+
+TEST(sequence, a_bang_s_answer_is_what_the_question_mark_reads)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+
+    sh.run("! test a = b");
+    pdi_err_t whenFalse = sh.result();
+    sh.run("! test a = a");
+    pdi_err_t whenTrue = sh.result();
+
+    ASSERT_EQ((int)whenFalse, (int)PDI_OK);
+    ASSERT_NE((int)whenTrue, (int)PDI_OK);
+}
+
+TEST(sequence, true_and_false_answer_without_printing)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+
+    std::string yes = sh.run("true");
+    pdi_err_t yesResult = sh.result();
+    std::string no = sh.run("false");
+    pdi_err_t noResult = sh.result();
+    std::string chained = sh.run("false || true && echo chained");
+
+    ASSERT_EQ((int)yesResult, (int)PDI_OK);
+    ASSERT_EQ((int)noResult, (int)CMD_RESULT_FALSE);
+    ASSERT_TRUE(yes.find("CmdErr") == std::string::npos);
+    ASSERT_TRUE(no.find("CmdErr") == std::string::npos);
+    ASSERT_TRUE(chained.find("chained") != std::string::npos);
+}
+
+TEST(sequence, brackets_test_the_way_test_does)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+
+    ASSERT_TRUE(sh.run("[ a = a ] && echo same").find("same") != std::string::npos);
+    ASSERT_TRUE(sh.run("[ a = b ] || echo differ").find("differ") != std::string::npos);
+    ASSERT_TRUE(sh.run("[ -d / ] && echo dir").find("dir") != std::string::npos);
+    ASSERT_TRUE(sh.run("! [ a = b ] && echo negated").find("negated") != std::string::npos);
+}
+
+TEST(sequence, an_opening_bracket_without_its_close_is_refused)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+
+    std::string out = sh.run("[ a = a && echo ran");
+    std::string word = sh.run("echo [x]");
+
+    ASSERT_TRUE(out.find("ran") == std::string::npos);
+    ASSERT_TRUE(word.find("[x]") != std::string::npos);
+}
+
+TEST(sequence, a_bang_with_nothing_after_it_is_a_syntax_error_and_inside_a_word_is_text)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+
+    std::string alone = sh.run("!");
+    std::string word = sh.run("echo !x");
+
+    ASSERT_TRUE(alone.find("syntax error") != std::string::npos);
+    ASSERT_TRUE(word.find("!x") != std::string::npos);
+}
+
 #endif

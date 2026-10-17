@@ -9,6 +9,8 @@ happens when a client disappears rather than logging out — the case a network
 shell hits routinely and a serial console never does.
 """
 
+import time
+
 from .registry import test, expect_in, expect_not_in, Skip
 from ..driver.shell import PROMPT
 
@@ -98,11 +100,14 @@ def dropped_session_is_released(t):
     peer = t.peer()
     peer.close()
 
-    # the service notices the drop on its next pass rather than immediately
-    for _ in range(10):
+    # the service notices the drop on its next pass rather than immediately, and
+    # a fast target can be asked many times inside one pass, so wait on time
+    deadline = time.time() + 15.0
+    while time.time() < deadline:
         after = len([line for line in t.run("who").splitlines() if t.username in line])
         if after <= before:
             return
+        time.sleep(0.5)
 
     raise AssertionError("the session table kept the dropped client: %d before, %d after"
                          % (before, after))

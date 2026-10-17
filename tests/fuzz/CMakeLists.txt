@@ -39,6 +39,9 @@ set(PDI_FUZZ_TARGETS
   fuzz_dbrecord
   fuzz_config
   fuzz_crontab
+  fuzz_mdns
+  fuzz_json
+  fuzz_mqtt
 )
 
 foreach(target ${PDI_FUZZ_TARGETS})

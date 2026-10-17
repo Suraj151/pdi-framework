@@ -117,6 +117,43 @@ bool FsDbStore::read(uint32_t offset, uint8_t *buf, uint32_t len)
 }
 
 /**
+ * hand a byte range to fn through one open of the container, in its own chunks.
+ *
+ * @param   uint32_t  offset
+ * @param   uint32_t  len
+ * @param   function  fn
+ * @return  bool
+ */
+bool FsDbStore::read_each(uint32_t offset, uint32_t len, uint8_t *, uint16_t,
+                          pdiutil::function<void(const uint8_t *, uint32_t)> fn)
+{
+    if (!m_ready || offset + len > capacity())
+    {
+        return false;
+    }
+
+    if (0 == len)
+    {
+        return true;
+    }
+
+    pdiutil::string _file = CHARPTR_WRAP(DB_STORE_FILE);
+    uint32_t _got = 0;
+
+    __i_fs.readFile(_file.c_str(), DB_FS_IO_CHUNK_BYTES, [&](char *_data, uint32_t _size) -> bool {
+
+        uint32_t _take = (_got + _size) > len ? (len - _got) : _size;
+
+        fn((const uint8_t *)_data, _take);
+        _got += _take;
+
+        return _got < len;
+    }, offset);
+
+    return _got == len;
+}
+
+/**
  * write a byte range into the container, in place at its offset.
  *
  * @param   uint32_t        offset

@@ -70,22 +70,42 @@ for(let i=0;i<r.lst.length;i++){\
 const it=r.lst[i];\
 const ntr=tbl.insertRow();\
 ntr.insertCell().innerHTML=it.t==\"D\"?r.dsvg:r.fsvg;\
-ntr.insertCell().innerHTML=`<a href=\"${it.l}\">${it.n.substring(0,28)}</a>`;\
-ntr.insertCell().innerHTML=`<code>${it.p||''}</code>`;\
+const lk=document.createElement('a');\
+lk.href=it.l;\
+lk.textContent=it.n.substring(0,28);\
+ntr.insertCell().appendChild(lk);\
+const cd=document.createElement('code');\
+cd.textContent=it.p||'';\
+ntr.insertCell().appendChild(cd);\
 ntr.insertCell().textContent=it.o||'';\
 ntr.insertCell().textContent=it.g||'';\
 const sc=ntr.insertCell();\
 sc.className='num';\
 sc.textContent=it.t==\"D\"?'-':fsz(it.s);\
-ntr.insertCell().innerHTML=it.n==\"..\"?'':`<form method='POST' action='/storage-filedel' style='margin:0;'>\
-<input type='hidden' name='df' value=\"${it.l.replace('/storage?cp=','')}\">\
-<input type='hidden' name='loc' value=\"${location.pathname+location.search}\">\
-<input type='hidden' name='csrf' value=\"${r.csrf}\">\
-<button class='del' type='submit' title='Delete' aria-label=\"Delete ${it.n}\">\
-${r.tsvg}\
-</button>\
-</form>`;\
+ard(ntr,it,r);\
 }\
+}\
+";
+
+static const char WEB_SERVER_STORAGE_LIST_PAGE_ROW_SCRIPT[] PROG_RODT_ATTR = "\
+function ard(ntr,it,r){\
+const dc=ntr.insertCell();\
+if(it.n==\"..\")return;\
+const fm=document.createElement('form');\
+fm.method='POST';\
+fm.action='/storage-filedel';\
+fm.style.margin='0';\
+[['df',it.l.replace('/storage?cp=','')],['loc',location.pathname+location.search],['csrf',r.csrf]].forEach(function(f){\
+const h=document.createElement('input');\
+h.type='hidden';h.name=f[0];h.value=f[1];\
+fm.appendChild(h);\
+});\
+const bt=document.createElement('button');\
+bt.className='del';bt.type='submit';bt.title='Delete';\
+bt.setAttribute('aria-label','Delete '+it.n);\
+bt.innerHTML=r.tsvg;\
+fm.appendChild(bt);\
+dc.appendChild(fm);\
 }\
 rq.addEventListener('load',rql);\
 setTimeout(function(){\

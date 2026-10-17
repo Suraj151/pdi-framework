@@ -824,6 +824,135 @@ TEST(script_runner, running_the_same_loop_many_times_stays_stable)
     }
 }
 
+TEST(script_runner, elif_takes_the_first_branch_whose_condition_holds)
+{
+    pditest::Shell sh;
+
+    std::string out = runLoop("if test a = b\r\necho first >> /hostloop.txt\r\n"
+                              "elif test a = a\r\necho second >> /hostloop.txt\r\n"
+                              "elif test b = b\r\necho third >> /hostloop.txt\r\n"
+                              "else\r\necho fourth >> /hostloop.txt\r\nfi\r\n");
+
+    ASSERT_EQ(countOf(out, "second"), (size_t)1);
+    ASSERT_EQ(countOf(out, "first") + countOf(out, "third") + countOf(out, "fourth"), (size_t)0);
+}
+
+TEST(script_runner, else_runs_when_no_elif_holds_and_a_skipped_if_runs_none)
+{
+    pditest::Shell sh;
+
+    std::string none = runLoop("if test a = b\r\necho first >> /hostloop.txt\r\n"
+                               "elif test a = c\r\necho second >> /hostloop.txt\r\n"
+                               "else\r\necho fourth >> /hostloop.txt\r\nfi\r\n");
+    std::string nested = runLoop("if test a = b\r\n"
+                                 "if test a = a\r\necho inner >> /hostloop.txt\r\n"
+                                 "elif test b = b\r\necho innerelif >> /hostloop.txt\r\nfi\r\n"
+                                 "fi\r\necho after >> /hostloop.txt\r\n");
+
+    ASSERT_EQ(countOf(none, "fourth"), (size_t)1);
+    ASSERT_EQ(countOf(none, "first") + countOf(none, "second"), (size_t)0);
+    ASSERT_EQ(countOf(nested, "inner"), (size_t)0);
+    ASSERT_EQ(countOf(nested, "after"), (size_t)1);
+}
+
+TEST(script_runner, break_leaves_the_loop_it_is_in)
+{
+    pditest::Shell sh;
+
+    std::string out = runLoop("for FORVAR in a b c d\r\n"
+                              "if test $FORVAR = c\r\nbreak\r\nfi\r\n"
+                              "echo x$FORVAR >> /hostloop.txt\r\ndone\r\n"
+                              "echo end >> /hostloop.txt\r\n");
+
+    ASSERT_EQ(countOf(out, "xa"), (size_t)1);
+    ASSERT_EQ(countOf(out, "xb"), (size_t)1);
+    ASSERT_EQ(countOf(out, "xc") + countOf(out, "xd"), (size_t)0);
+    ASSERT_EQ(countOf(out, "end"), (size_t)1);
+}
+
+TEST(script_runner, break_ends_a_while_that_would_otherwise_run_on)
+{
+    pditest::Shell sh;
+    Environment::set("COUNTER", "0");
+
+    std::string out = runLoop("while test 1 = 1\r\n"
+                              "export COUNTER=$((COUNTER + 1))\r\n"
+                              "if test $COUNTER = 3\r\nbreak\r\nfi\r\n"
+                              "done\r\necho end >> /hostloop.txt\r\n");
+
+    pdiutil::string counter;
+    Environment::get("COUNTER", counter);
+    Environment::unset("COUNTER");
+
+    ASSERT_STREQ(counter.c_str(), "3");
+    ASSERT_EQ(countOf(out, "end"), (size_t)1);
+}
+
+TEST(script_runner, continue_skips_the_rest_of_one_pass)
+{
+    pditest::Shell sh;
+
+    std::string out = runLoop("for FORVAR in a b c\r\n"
+                              "if test $FORVAR = b\r\ncontinue\r\nfi\r\n"
+                              "echo x$FORVAR >> /hostloop.txt\r\ndone\r\n");
+
+    ASSERT_EQ(countOf(out, "xa"), (size_t)1);
+    ASSERT_EQ(countOf(out, "xb"), (size_t)0);
+    ASSERT_EQ(countOf(out, "xc"), (size_t)1);
+}
+
+TEST(script_runner, break_or_continue_outside_a_loop_fails_the_script)
+{
+    pditest::Shell sh;
+
+    writeScript("break\r\n");
+    pdi_err_t brk = ScriptRunner::run(SCRIPT_PATH, true);
+    writeScript("continue\r\n");
+    pdi_err_t cont = ScriptRunner::run(SCRIPT_PATH, true);
+    removeScript();
+
+    ASSERT_EQ((int)brk, (int)CMD_ERROR_FAILED);
+    ASSERT_EQ((int)cont, (int)CMD_ERROR_FAILED);
+}
+
+TEST(script_runner, exit_ends_the_script_with_the_status_it_names)
+{
+    pditest::Shell sh;
+
+    removeLoopOutput();
+    writeScript("echo before >> /hostloop.txt\r\nexit 7\r\necho after >> /hostloop.txt\r\n");
+    pdi_err_t res = ScriptRunner::run(SCRIPT_PATH, true);
+    std::string out = loopOutput();
+    removeScript();
+    removeLoopOutput();
+
+    ASSERT_EQ((int)res, 7);
+    ASSERT_EQ((int)SessionManager::getLastExit(), 7);
+    ASSERT_EQ(countOf(out, "before"), (size_t)1);
+    ASSERT_EQ(countOf(out, "after"), (size_t)0);
+}
+
+TEST(script_runner, exit_in_a_sourced_script_returns_to_the_one_that_sourced_it)
+{
+    pditest::Shell sh;
+
+    VfsDispatcher *fs = pditest::mountedVfs();
+    const char inner[] = "exit\r\necho ininner >> /hostloop.txt\r\n";
+    fs->beginPrivileged();
+    if (fs->isFileExist("/hostinner.sh")) fs->deleteFile("/hostinner.sh");
+    fs->createFile("/hostinner.sh", inner, (int64_t)strlen(inner));
+    fs->endPrivileged();
+
+    std::string out = runLoop("source /hostinner.sh\r\necho afterinner >> /hostloop.txt\r\n");
+
+    fs->beginPrivileged();
+    fs->deleteFile("/hostinner.sh");
+    fs->endPrivileged();
+
+    ASSERT_EQ(countOf(out, "ininner"), (size_t)0);
+    ASSERT_EQ(countOf(out, "afterinner"), (size_t)1);
+}
+
 TEST(script_runner, a_loop_body_that_asks_for_input_unattended_is_cancelled)
 {
     pditest::Shell sh;
@@ -853,6 +982,160 @@ TEST(script_runner, a_loop_body_that_asks_for_input_attended_keeps_its_place)
 
     removeScript();
     Environment::unset("FORVAR");
+}
+
+const char INNER_PATH[] = "/hostinner.sh";
+
+void writeInner(const char *body)
+{
+    VfsDispatcher *fs = pditest::mountedVfs();
+    fs->beginPrivileged();
+    if (fs->isFileExist(INNER_PATH)) fs->deleteFile(INNER_PATH);
+    fs->createFile(INNER_PATH, body, (int64_t)strlen(body));
+    fs->endPrivileged();
+}
+
+void removeInner()
+{
+    VfsDispatcher *fs = pditest::mountedVfs();
+    fs->beginPrivileged();
+    if (fs->isFileExist(INNER_PATH)) fs->deleteFile(INNER_PATH);
+    fs->endPrivileged();
+}
+
+TEST(script_runner, a_sourced_script_reads_the_arguments_it_was_given)
+{
+    pditest::Shell sh;
+
+    writeScript("echo [$1:$2:$#]\r\n");
+    std::string out = sh.run("source /hostscript.sh one two");
+    removeScript();
+
+    ASSERT_TRUE(out.find("[one:two:2]") != std::string::npos);
+}
+
+TEST(script_runner, an_argument_the_script_was_not_given_is_empty)
+{
+    pditest::Shell sh;
+
+    writeScript("echo [$1:$2:$#]\r\n");
+    std::string one = sh.run("source /hostscript.sh one");
+    std::string none = sh.run("source /hostscript.sh");
+    removeScript();
+
+    ASSERT_TRUE(one.find("[one::1]") != std::string::npos);
+    ASSERT_TRUE(none.find("[::0]") != std::string::npos);
+}
+
+TEST(script_runner, a_quoted_argument_is_one_argument)
+{
+    pditest::Shell sh;
+
+    writeScript("echo \"[$1:$2:$#]\"\r\n");
+    std::string out = sh.run("source /hostscript.sh \"a b\" c");
+    removeScript();
+
+    ASSERT_TRUE(out.find("[a b:c:2]") != std::string::npos);
+}
+
+TEST(script_runner, every_argument_reads_back_as_one_list)
+{
+    pditest::Shell sh;
+
+    writeScript("echo [$@]\r\n");
+    std::string out = sh.run("source /hostscript.sh one two");
+    removeScript();
+
+    ASSERT_TRUE(out.find("[one two]") != std::string::npos);
+}
+
+TEST(script_runner, more_arguments_than_the_option_limit_are_refused)
+{
+    pditest::Shell sh;
+
+    writeScript("echo ranwith$#\r\n");
+    std::string line = "source /hostscript.sh";
+    for (int i = 0; i < CMD_OPTION_MAX; i++) line += " x";
+    std::string out = sh.run(line.c_str());
+    pdi_err_t res = SessionManager::getLastExit();
+    removeScript();
+
+    ASSERT_TRUE(out.find("ranwith") == std::string::npos);
+    ASSERT_TRUE(out.find("too many arguments") != std::string::npos);
+    ASSERT_EQ((int)res, (int)CMD_ERROR_INVAL);
+}
+
+TEST(script_runner, as_many_arguments_as_the_option_limit_allows_are_taken)
+{
+    pditest::Shell sh;
+
+    writeScript("echo ranwith$#\r\n");
+    std::string line = "source /hostscript.sh";
+    for (int i = 1; i < CMD_OPTION_MAX; i++) line += " x";
+    std::string out = sh.run(line.c_str());
+    removeScript();
+
+    std::string expect = "ranwith" + std::to_string(CMD_OPTION_MAX - 1);
+    ASSERT_TRUE(out.find(expect) != std::string::npos);
+}
+
+TEST(script_runner, an_argument_goes_in_as_text_and_is_never_run)
+{
+    pditest::Shell sh;
+
+    writeScript("echo [$1]\r\n");
+    std::string out = sh.run("source /hostscript.sh 'x; echo INJ$((2 + 3))'");
+    removeScript();
+
+    ASSERT_TRUE(out.find("[x; echo INJ$((2 + 3))]") != std::string::npos);
+    ASSERT_TRUE(out.find("INJ5") == std::string::npos);
+}
+
+TEST(script_runner, single_quotes_keep_an_argument_reference_as_typed)
+{
+    pditest::Shell sh;
+
+    writeScript("echo '[$1:$#]'\r\n");
+    std::string out = sh.run("source /hostscript.sh one");
+    removeScript();
+
+    ASSERT_TRUE(out.find("[$1:$#]") != std::string::npos);
+}
+
+TEST(script_runner, a_nested_source_with_no_arguments_sees_the_callers)
+{
+    pditest::Shell sh;
+
+    writeInner("echo inner[$1:$#]\r\n");
+    writeScript("source /hostinner.sh\r\n");
+    std::string out = sh.run("source /hostscript.sh one two");
+    removeScript();
+    removeInner();
+
+    ASSERT_TRUE(out.find("inner[one:2]") != std::string::npos);
+}
+
+TEST(script_runner, a_nested_source_with_arguments_has_its_own_until_it_returns)
+{
+    pditest::Shell sh;
+
+    writeInner("echo inner[$1:$#]\r\n");
+    writeScript("source /hostinner.sh nine\r\necho outer[$1:$#]\r\n");
+    std::string out = sh.run("source /hostscript.sh one two");
+    removeScript();
+    removeInner();
+
+    ASSERT_TRUE(out.find("inner[nine:1]") != std::string::npos);
+    ASSERT_TRUE(out.find("outer[one:2]") != std::string::npos);
+}
+
+TEST(script_runner, outside_a_script_there_are_no_arguments)
+{
+    pditest::Shell sh;
+
+    std::string out = sh.run("echo [$1:$#:$@]");
+
+    ASSERT_TRUE(out.find("[:0:]") != std::string::npos);
 }
 
 #endif

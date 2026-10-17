@@ -62,6 +62,11 @@ public:
   pdiutil::task_id_t m_mail_handler_cb_id;
 
 protected:
+  /**
+   * True when no http request holds the shared client this service sends over.
+   */
+  bool isClientFree();
+
   iClientInterface *m_client;
   SMTPClient m_smtp;
 };

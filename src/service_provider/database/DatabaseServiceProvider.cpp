@@ -268,6 +268,42 @@ bool DatabaseServiceProvider::restore_defaults()
 }
 
 /**
+ * write each feature's config file from its record, so a restored record is what the next service start reads.
+ */
+void DatabaseServiceProvider::write_config_files()
+{
+#ifdef ENABLE_STORAGE_SERVICE
+#if defined(ENABLE_WIFI_SERVICE) && defined(ENABLE_WIFI_CONFIG_FILE)
+  wifi_config_table *_wifi = pdiutil::safe_new<wifi_config_table>();
+  if (nullptr != _wifi)
+  {
+    if (this->get_wifi_config_table(_wifi)) writeWifiConfigFile(_wifi);
+    pdiutil::safe_delete(_wifi);
+  }
+#endif
+#if defined(ENABLE_OTA_SERVICE) && defined(ENABLE_OTA_CONFIG_FILE)
+  ota_config_table *_ota = pdiutil::safe_new<ota_config_table>();
+  if (nullptr != _ota)
+  {
+    if (this->get_ota_config_table(_ota)) writeOtaConfigFile(_ota);
+    pdiutil::safe_delete(_ota);
+  }
+#endif
+#if defined(ENABLE_EMAIL_SERVICE) && defined(ENABLE_EMAIL_CONFIG_FILE)
+  email_config_table *_email = pdiutil::safe_new<email_config_table>();
+  if (nullptr != _email)
+  {
+    if (this->get_email_config_table(_email)) writeEmailConfigFile(_email);
+    pdiutil::safe_delete(_email);
+  }
+#endif
+#if defined(ENABLE_MQTT_SERVICE) && defined(ENABLE_MQTT_CONFIG_FILE)
+  writeMqttConfigFile();
+#endif
+#endif
+}
+
+/**
  * clear all tables to their defaults value.
  *
  * @return status

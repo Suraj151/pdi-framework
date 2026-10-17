@@ -95,7 +95,7 @@ void SMTPClient::readResponse(){
   		char nextChar = (char)this->m_client->read();
   		--availableBytes;
 		this->m_lastReceive = __i_dvc_ctrl.millis_now();
-      if(this->m_responseBufferIndex < SMTP_RESPONSE_BUFFER_SIZE) {
+      if(this->m_responseBufferIndex < SMTP_RESPONSE_BUFFER_SIZE - 1) {
   			this->m_responseBuffer[this->m_responseBufferIndex++] = nextChar;
   		}else{
         this->m_responseReaderStatus = SMTP_RESPONSE_BUFFER_FULL;
@@ -110,7 +110,7 @@ void SMTPClient::readResponse(){
   			if(++this->m_crlfFound == 1) {
 
           while ( this->m_client->available() ) {
-            if(this->m_responseBufferIndex < SMTP_RESPONSE_BUFFER_SIZE) {
+            if(this->m_responseBufferIndex < SMTP_RESPONSE_BUFFER_SIZE - 1) {
         			this->m_responseBuffer[this->m_responseBufferIndex++] = (char)this->m_client->read();
               this->m_lastReceive = __i_dvc_ctrl.millis_now();
             }else{
@@ -297,11 +297,11 @@ bool SMTPClient::sendAuthLogin( char *username, char *password ){
     pdiutil::string auth_cmd = CHARPTR_WRAP(SMTP_COMMAND_AUTH);
     respcode = this->sendCommandAndGetCode( auth_cmd.c_str() );
 
-    if( respcode < SMTP_STATUS_SERVICE_UNAVAILABLE ){
+    if( SMTP_STATUS_AUTH_CONTINUE == respcode ){
       respcode = this->sendCommandAndGetCode( _username );
     }
 
-    if( respcode < SMTP_STATUS_SERVICE_UNAVAILABLE ){
+    if( SMTP_STATUS_AUTH_CONTINUE == respcode ){
       respcode = this->sendCommandAndGetCode( _password );
     }
   }
@@ -309,7 +309,7 @@ bool SMTPClient::sendAuthLogin( char *username, char *password ){
   pdiutil::safe_delete_array( _username );
   pdiutil::safe_delete_array( _password );
 
-	return ( respcode < SMTP_STATUS_SERVICE_UNAVAILABLE );
+	return ( SMTP_STATUS_AUTH_SUCCEEDED == respcode );
 }
 
 bool SMTPClient::sendFrom( char *sender ){
@@ -382,6 +382,32 @@ void SMTPClient::sendDataHeader( char *sender, char *recipient, char *subject ){
   }
 }
 
+/**
+ * writes a message body with each line ended in CRLF and a leading dot doubled
+ */
+void SMTPClient::writeBody( const char *body, uint32_t size ){
+
+  if( nullptr == this->m_client || nullptr == body ) return;
+
+  uint32_t _start = 0;
+  for( uint32_t i = 0; i <= size; i++ ){
+
+    if( i < size && '\n' != body[i] ) continue;
+
+    uint32_t _end = ( i > _start && '\r' == body[i - 1] ) ? i - 1 : i;
+    if( _end > _start ){
+      if( '.' == body[_start] ){
+        this->m_client->write((uint8_t)'.');
+      }
+      sendPacket( this->m_client, (uint8_t*)body + _start, _end - _start );
+    }
+    if( i < size ){
+      this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
+    }
+    _start = i + 1;
+  }
+}
+
 bool SMTPClient::sendDataBody( pdiutil::string &body ){
 
   int16_t respcode = SMTP_STATUS_MAX;
@@ -389,11 +415,11 @@ bool SMTPClient::sendDataBody( pdiutil::string &body ){
 	LogI("SMTP sending data: %s\n", body.c_str());
 
   if( nullptr != this->m_client ){
-    sendPacket( this->m_client, (uint8_t*)body.c_str(), body.size() );
+    this->writeBody( body.c_str(), body.size() );
     this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
     respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA_TERMINATOR );
   }
-  return respcode < SMTP_STATUS_SERVICE_UNAVAILABLE;
+  return ( SMTP_STATUS_ACTION_COMPLETED == respcode );
 }
 
 bool SMTPClient::sendDataBody( char *body ){
@@ -403,11 +429,11 @@ bool SMTPClient::sendDataBody( char *body ){
 	LogI("SMTP sending data: %s\n", body);
 
   if( nullptr != this->m_client ){
-    sendPacket( this->m_client, (uint8_t*)body, strlen(body) );
+    this->writeBody( body, strlen(body) );
     this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
     respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA_TERMINATOR );
   }
-  return respcode < SMTP_STATUS_SERVICE_UNAVAILABLE;
+  return ( SMTP_STATUS_ACTION_COMPLETED == respcode );
 }
 
 bool SMTPClient::sendDataBody( const char * body ){
@@ -417,11 +443,11 @@ bool SMTPClient::sendDataBody( const char * body ){
 	LogI("SMTP sending data: %s\n", body);
 
   if( nullptr != this->m_client ){
-    this->m_client->write((const uint8_t*)body);
+    this->writeBody( body, strlen(body) );
     this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
     respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA_TERMINATOR );
   }
-  return respcode < SMTP_STATUS_SERVICE_UNAVAILABLE;
+  return ( SMTP_STATUS_ACTION_COMPLETED == respcode );
 }
 
 bool SMTPClient::sendQuit(){

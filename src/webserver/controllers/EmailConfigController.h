@@ -140,7 +140,7 @@ public:
 		bool _is_test_mail = false;
 		bool _is_error = true;
 
-		if (this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("ml_dmn")) && this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("ml_srvr")))
+		if (this->m_web_resource->m_server->isPostRequest() && this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("ml_dmn")) && this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("ml_srvr")))
 		{
 
 			pdiutil::string _mail_domain = this->m_web_resource->m_server->arg(CHARPTR_WRAP("ml_dmn"));
@@ -169,10 +169,10 @@ public:
 			LogI("test mail : %s\n\n",_test_mail.c_str());
 			__i_dvc_ctrl.yield();
 
-			if (_mail_domain.size() <= DEFAULT_SENDING_DOMAIN_MAX_SIZE && _mail_server.size() <= DEFAULT_MAIL_HOST_MAX_SIZE &&
-				_mail_username.size() <= DEFAULT_MAIL_USERNAME_MAX_SIZE && _mail_password.size() <= DEFAULT_MAIL_PASSWORD_MAX_SIZE &&
-				_mail_from.size() <= DEFAULT_MAIL_FROM_MAX_SIZE && _mail_from_name.size() <= DEFAULT_MAIL_FROM_NAME_MAX_SIZE &&
-				_mail_to.size() <= DEFAULT_MAIL_TO_MAX_SIZE && _mail_subject.size() <= DEFAULT_MAIL_SUBJECT_MAX_SIZE)
+			if (_mail_domain.size() < DEFAULT_SENDING_DOMAIN_MAX_SIZE && _mail_server.size() < DEFAULT_MAIL_HOST_MAX_SIZE &&
+				_mail_username.size() < DEFAULT_MAIL_USERNAME_MAX_SIZE && _mail_password.size() < DEFAULT_MAIL_PASSWORD_MAX_SIZE &&
+				_mail_from.size() < DEFAULT_MAIL_FROM_MAX_SIZE && _mail_from_name.size() < DEFAULT_MAIL_FROM_NAME_MAX_SIZE &&
+				_mail_to.size() < DEFAULT_MAIL_TO_MAX_SIZE && _mail_subject.size() < DEFAULT_MAIL_SUBJECT_MAX_SIZE)
 			{
 
 				_ClearObject(&this->email_configs);

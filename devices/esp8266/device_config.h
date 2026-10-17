@@ -42,6 +42,8 @@ created Date    : 1st Jan 2026
 
 #define PDI_NET_STACK_LWIP
 
+#define CMD_OPTION_MAX                5   ///< Maximum number of options for a command.
+
 /**
  * session table and the transport pools that draw from it
  */

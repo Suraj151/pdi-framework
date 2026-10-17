@@ -15,9 +15,6 @@ created Date    : 1st June 2019
 
 #include "MqttClient.h"
 
-#define MQTT_SEND_TIMEOUT 5
-#define MQTT_READ_TIMEOUT 10
-
 #ifndef QUEUE_BUFFER_SIZE
 #define QUEUE_BUFFER_SIZE 1536
 #endif
@@ -179,7 +176,12 @@ void MQTTClient::deliver_publish(uint8_t *message, size_t length)
   event_data.data_length = length;
   event_data.data = (char *)mqtt_get_publish_data(message, &event_data.data_length);
 
-  if (nullptr != this->m_dataCb && nullptr != event_data.topic && nullptr != event_data.data)
+  if (nullptr == event_data.topic || nullptr == event_data.data)
+  {
+    return;
+  }
+
+  if (nullptr != this->m_dataCb)
   {
     this->m_dataCb(this->m_mqttDataCallbackArgs, event_data.topic, event_data.topic_length, event_data.data, event_data.data_length);
   }
@@ -198,6 +200,22 @@ void MQTTClient::deliver_publish(uint8_t *message, size_t length)
 //     }
 // }
 
+/**
+ * Reads every packet already waiting, up to a bound, so a burst is not taken one per tick.
+ */
+void MQTTClient::mqtt_client_recv_waiting()
+{
+  for (uint8_t i = 0; i < MQTT_RECV_PACKETS_PER_TASK; i++)
+  {
+    this->mqtt_client_recv();
+
+    if (MQTT_DATA != this->m_mqttClient.connState || nullptr == this->m_client || this->m_client->available() < 1)
+    {
+      return;
+    }
+  }
+}
+
 void MQTTClient::mqtt_client_recv()
 {
   if (nullptr == this->m_mqttClient.mqtt_state.in_buffer)
@@ -205,7 +223,7 @@ void MQTTClient::mqtt_client_recv()
     return;
   }
 
-  int len = this->readFullPacket(this->m_mqttClient.mqtt_state.in_buffer, this->m_mqttClient.mqtt_state.in_buffer_length, MQTT_READ_TIMEOUT * 20);
+  int len = this->readFullPacket(this->m_mqttClient.mqtt_state.in_buffer, this->m_mqttClient.mqtt_state.in_buffer_length, MQTT_PACKET_READ_WAIT_MS);
 
   LogI("MQTT: recieved packet size : %d\n", len);
   LogI("MQTT: recieved packets : ");
@@ -228,7 +246,7 @@ void MQTTClient::mqtt_client_recv()
     {
       this->m_mqttClient.keepAliveTick = 0;
       this->m_mqttClient.readTimeout = 0;
-      this->m_mqttClient.sendTimeout = MQTT_SEND_TIMEOUT;
+      this->m_mqttClient.sendTimeout = MQTT_MS_TO_TICKS(MQTT_SEND_TIMEOUT_MS);
     }
 
     LogI("MQTT: recieved msg type(%d), qos(%d)\n", msg_type, msg_qos);
@@ -381,6 +399,7 @@ void MQTTClient::mqtt_client_recv()
 
       case MQTT_MSG_TYPE_PINGRESP:
         LogI("MQTT: MQTT_MSG_TYPE_PINGRESP recieved\n");
+        this->m_mqttClient.m_ping_awaited = false;
         break;
       default:
         LogI("MQTT: Uknown msg type received.\n");
@@ -413,7 +432,7 @@ void MQTTClient::mqtt_client_connect()
   this->m_mqttClient.mqtt_state.pending_msg_type = mqtt_get_type(this->m_mqttClient.mqtt_state.outbound_message->data);
   this->m_mqttClient.mqtt_state.pending_msg_id = mqtt_get_id(this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length);
 
-  this->m_mqttClient.sendTimeout = MQTT_SEND_TIMEOUT;
+  this->m_mqttClient.sendTimeout = MQTT_MS_TO_TICKS(MQTT_SEND_TIMEOUT_MS);
   LogI("MQTT: Sending, type: %d, id: %x\r\n", this->m_mqttClient.mqtt_state.pending_msg_type, this->m_mqttClient.mqtt_state.pending_msg_id);
   bool result = sendPacket(this->m_client, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length);
 
@@ -440,7 +459,7 @@ void MQTTClient::mqtt_client_disconnect()
   this->m_mqttClient.mqtt_state.pending_msg_type = mqtt_get_type(this->m_mqttClient.mqtt_state.outbound_message->data);
   this->m_mqttClient.mqtt_state.pending_msg_id = mqtt_get_id(this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length);
 
-  this->m_mqttClient.sendTimeout = MQTT_SEND_TIMEOUT;
+  this->m_mqttClient.sendTimeout = MQTT_MS_TO_TICKS(MQTT_SEND_TIMEOUT_MS);
   LogI("MQTT: Sending, type: %d, id: %x\r\n", this->m_mqttClient.mqtt_state.pending_msg_type, this->m_mqttClient.mqtt_state.pending_msg_id);
   bool result = sendPacket(this->m_client, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length);
 
@@ -468,7 +487,7 @@ void MQTTClient::mqtt_send_keepalive()
   this->m_mqttClient.mqtt_state.pending_msg_type = mqtt_get_type(this->m_mqttClient.mqtt_state.outbound_message->data);
   this->m_mqttClient.mqtt_state.pending_msg_id = mqtt_get_id(this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length);
 
-  this->m_mqttClient.sendTimeout = MQTT_SEND_TIMEOUT;
+  this->m_mqttClient.sendTimeout = MQTT_MS_TO_TICKS(MQTT_SEND_TIMEOUT_MS);
   LogI("MQTT: Sending, type: %d, id: %x\r\n", this->m_mqttClient.mqtt_state.pending_msg_type, this->m_mqttClient.mqtt_state.pending_msg_id);
   bool result = sendPacket(this->m_client, this->m_mqttClient.mqtt_state.outbound_message->data, this->m_mqttClient.mqtt_state.outbound_message->length);
 
@@ -476,6 +495,11 @@ void MQTTClient::mqtt_send_keepalive()
   {
     this->m_mqttClient.keepAliveTick = 0;
     this->m_mqttClient.readTimeout = 0;
+    if (!this->m_mqttClient.m_ping_awaited)
+    {
+      this->m_mqttClient.m_ping_wait_tick = 0;
+      this->m_mqttClient.m_ping_awaited = true;
+    }
     this->m_mqttClient.connState = MQTT_PING_SENT;
   }
   else
@@ -510,7 +534,7 @@ void MQTTClient::MQTT_Task()
   case MQTT_DISCONNECT_SENT:
   case MQTT_DATA_SENT:
   case MQTT_PING_SENT:
-    this->mqtt_client_recv();
+    this->mqtt_client_recv_waiting();
     break;
   case MQTT_HOST_CONNECTING:
     if (isConnected(this->m_client))
@@ -528,14 +552,21 @@ void MQTTClient::MQTT_Task()
     this->mqtt_send_keepalive();
     break;
   case MQTT_DATA:
-    // if ( QUEUE_IsEmpty(&this->m_mqttClient.msgQueue) || this->m_mqttClient.sendTimeout != 0 ) {
-    if (QUEUE_IsEmpty(&this->m_mqttClient.msgQueue))
+    if (!isConnected(this->m_client))
     {
-      this->mqtt_client_recv();
+      SysLogE("MQTT: broker closed the connection\n");
+      this->m_mqttClient.connState = MQTT_HOST_RECONNECT_REQ;
       break;
     }
-    if (QUEUE_Gets(&this->m_mqttClient.msgQueue, dataBuffer, &dataLen, MQTT_BUF_SIZE) == 0)
+    // if ( QUEUE_IsEmpty(&this->m_mqttClient.msgQueue) || this->m_mqttClient.sendTimeout != 0 ) {
+    this->mqtt_client_recv_waiting();
+    for (uint8_t _sent = 0; _sent < MQTT_SEND_PACKETS_PER_TASK && MQTT_DATA == this->m_mqttClient.connState &&
+                            !QUEUE_IsEmpty(&this->m_mqttClient.msgQueue); _sent++)
     {
+      if (QUEUE_Gets(&this->m_mqttClient.msgQueue, dataBuffer, &dataLen, MQTT_BUF_SIZE) != 0)
+      {
+        break;
+      }
       LogI("MQTT: getting queue packets :");
       for (int i = 0; i < dataLen; i++)
       {
@@ -550,13 +581,16 @@ void MQTTClient::MQTT_Task()
       this->m_mqttClient.mqtt_state.pending_msg_type = msg_type;
       this->m_mqttClient.mqtt_state.pending_msg_id = mqtt_get_id(dataBuffer, dataLen);
 
-      this->m_mqttClient.sendTimeout = MQTT_SEND_TIMEOUT;
+      this->m_mqttClient.sendTimeout = MQTT_MS_TO_TICKS(MQTT_SEND_TIMEOUT_MS);
       bool result = sendPacket(this->m_client, dataBuffer, dataLen);
 
       if (result)
       {
         LogI("MQTT: data packet sent of id: %d\n", this->m_mqttClient.mqtt_state.pending_msg_id);
-        this->m_mqttClient.connState = (MQTT_MSG_TYPE_PUBLISH == msg_type && 0 == msg_qos) ? MQTT_DATA : MQTT_DATA_SENT;
+        bool _answered = (MQTT_MSG_TYPE_PUBLISH == msg_type) ? (0 != msg_qos) :
+                         (MQTT_MSG_TYPE_PUBREL == msg_type || MQTT_MSG_TYPE_SUBSCRIBE == msg_type ||
+                          MQTT_MSG_TYPE_UNSUBSCRIBE == msg_type || MQTT_MSG_TYPE_PINGREQ == msg_type);
+        this->m_mqttClient.connState = _answered ? MQTT_DATA_SENT : MQTT_DATA;
         this->m_mqttClient.readTimeout = 0;
       }
       else
@@ -641,7 +675,7 @@ bool MQTTClient::Subscribe(char *topic, uint8_t qos)
   {
     this->add_to_subscribed_topics(topic, qos);
   }
-  this->m_mqttClient.sendTimeout = MQTT_SEND_TIMEOUT;
+  this->m_mqttClient.sendTimeout = MQTT_MS_TO_TICKS(MQTT_SEND_TIMEOUT_MS);
   return true;
 }
 
@@ -665,7 +699,7 @@ bool MQTTClient::UnSubscribe(char *topic)
   }
 
   this->remove_from_subscribed_topics(topic);
-  this->m_mqttClient.sendTimeout = MQTT_SEND_TIMEOUT;
+  this->m_mqttClient.sendTimeout = MQTT_MS_TO_TICKS(MQTT_SEND_TIMEOUT_MS);
   return true;
 }
 
@@ -697,11 +731,12 @@ bool MQTTClient::Publish(const char *topic, const char *data, size_t data_length
   {
     return false;
   }
-  this->m_mqttClient.sendTimeout = MQTT_SEND_TIMEOUT;
+  this->m_mqttClient.sendTimeout = MQTT_MS_TO_TICKS(MQTT_SEND_TIMEOUT_MS);
   return true;
 }
 
-MQTTClient::MQTTClient() : m_mqttDataCallbackArgs(reinterpret_cast<uint32_t *>(this)),
+MQTTClient::MQTTClient() : m_mqttClient(),
+                           m_mqttDataCallbackArgs(reinterpret_cast<uint32_t *>(this)),
                            m_host(nullptr),
                            m_port(0),
                            m_security(0),
@@ -792,6 +827,8 @@ void MQTTClient::InitConnection(char *host, pdiutil::net_port_t port, uint8_t se
   this->m_mqttClient.readTimeout = 0;
   this->m_mqttClient.connState = MQTT_PUBLISH_RECV;
   this->m_mqttClient.host_connect_tick = 0;
+  this->m_mqttClient.m_ping_wait_tick = 0;
+  this->m_mqttClient.m_ping_awaited = false;
   this->m_mqttClient.mqtt_connected = false;
   this->m_host = pdiutil::safe_new_array<char>(_host_len + 1);
 
@@ -916,11 +953,24 @@ void MQTTClient::mqtt_timer()
   LogI("\n");
   // if( this->m_mqttClient.connState == MQTT_DELETING ) return;
 
+  if (this->m_mqttClient.m_ping_awaited &&
+      ++this->m_mqttClient.m_ping_wait_tick > MQTT_MS_TO_TICKS(MQTT_READ_TIMEOUT_MS))
+  {
+    this->m_mqttClient.m_ping_awaited = false;
+    this->m_mqttClient.m_ping_wait_tick = 0;
+    SysLogE("MQTT: keepalive ping not answered. trying reconnect\n");
+    this->m_mqttClient.connState = MQTT_HOST_RECONNECT_REQ;
+    if (nullptr != this->m_timeoutCb)
+    {
+      this->m_timeoutCb((uint32_t *)this);
+    }
+  }
+
   if (MQTT_DATA == this->m_mqttClient.connState)
   {
     this->m_mqttClient.keepAliveTick++;
-    int _keep_alive = this->m_mqttClient.mqtt_state.connect_info->keepalive * 0.85;
-    if (this->m_mqttClient.keepAliveTick > _keep_alive)
+    uint32_t _keep_alive_ms = (uint32_t)(this->m_mqttClient.mqtt_state.connect_info->keepalive * 0.85) * MILLISECOND_DURATION_1000;
+    if (this->m_mqttClient.keepAliveTick > MQTT_MS_TO_TICKS(_keep_alive_ms))
     {
       this->m_mqttClient.connState = MQTT_KEEPALIVE_REQ;
     }
@@ -933,7 +983,7 @@ void MQTTClient::mqtt_timer()
       MQTT_DATA_SENT == this->m_mqttClient.connState)
   {
     this->m_mqttClient.readTimeout++;
-    if (this->m_mqttClient.readTimeout > MQTT_READ_TIMEOUT)
+    if (this->m_mqttClient.readTimeout > MQTT_MS_TO_TICKS(MQTT_READ_TIMEOUT_MS))
     {
       this->m_mqttClient.readTimeout = 0;
       this->m_mqttClient.connState = MQTT_HOST_RECONNECT_REQ;
@@ -957,7 +1007,7 @@ void MQTTClient::mqtt_timer()
       MQTT_DATA_FAILED == this->m_mqttClient.connState)
   {
     this->m_mqttClient.host_connect_tick++;
-    if (this->m_mqttClient.host_connect_tick > MQTT_HOST_CONNECT_TIMEOUT)
+    if (this->m_mqttClient.host_connect_tick > MQTT_MS_TO_TICKS(MQTT_HOST_CONNECT_TIMEOUT_MS))
     {
       this->m_mqttClient.host_connect_tick = 0;
       SysLogE("MQTT: host connect error. trying reconnect\n");
@@ -989,11 +1039,13 @@ void MQTTClient::Connect()
   }
   this->m_mqttClient.keepAliveTick = 0;
   this->m_mqttClient.host_connect_tick = 0;
+  this->m_mqttClient.m_ping_wait_tick = 0;
+  this->m_mqttClient.m_ping_awaited = false;
 
   this->m_mqttClient.connState = MQTT_HOST_CONNECTING;
 
   // this->connectServer();
-  connectToServer(this->m_client, this->m_host, this->m_port, 2500);
+  connectToServer(this->m_client, this->m_host, this->m_port, MQTT_CONNECT_WAIT_MS);
   this->MQTT_Task();
 }
 
@@ -1100,7 +1152,19 @@ uint16_t MQTTClient::readFullPacket(uint8_t *buffer, uint16_t maxsize, uint16_t 
   if (value > (maxsize - (pbuff - buffer) - 1))
   {
     LogW("MQTT: Packet too big for buffer\n");
-    rlen = readPacket(this->m_client, pbuff, (maxsize - (pbuff - buffer) - 1), timeout);
+    uint32_t left = value;
+    while (left > 0)
+    {
+      uint16_t room = (uint16_t)(maxsize - (pbuff - buffer) - 1);
+      rlen = readPacket(this->m_client, pbuff, left < room ? (uint16_t)left : room, timeout);
+      if (0 == rlen)
+      {
+        break;
+      }
+      left -= rlen;
+    }
+    memset(buffer, 0, maxsize);
+    return 0;
   }
   else
   {

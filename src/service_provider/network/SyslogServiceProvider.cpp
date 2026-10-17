@@ -30,6 +30,7 @@ SyslogServiceProvider::SyslogServiceProvider() : ServiceProvider(SERVICE_SYSLOG,
   , m_udp(nullptr)
   , m_port(SYSLOG_REMOTE_PORT)
   , m_resolved(false)
+  , m_listener_id(EVENT_LISTENER_ID_INVALID)
 #endif
 {
 }
@@ -48,7 +49,7 @@ bool SyslogServiceProvider::initService(void *arg) {
   m_port = SYSLOG_REMOTE_PORT;
 
   // (re)resolve the collector whenever the station acquires an IP
-  __utl_event.add_event_listener(EVENT_WIFI_STA_GOT_IP, [](void *a) {
+  m_listener_id = __utl_event.add_event_listener(EVENT_WIFI_STA_GOT_IP, [](void *a) {
     __syslog_service.resolveCollector();
   });
 
@@ -74,6 +75,9 @@ bool SyslogServiceProvider::stopService() {
   __log_manager.setSyslogSink(nullptr);
 
 #ifdef ENABLE_SYSLOG_FORWARD
+  __utl_event.remove_event_listener(m_listener_id);
+  m_listener_id = EVENT_LISTENER_ID_INVALID;
+
   if (nullptr != m_udp) {
     m_udp->close();
     pdiutil::safe_delete(m_udp);
@@ -223,7 +227,7 @@ void SyslogServiceProvider::forward(logger_type_t log_type, const char *line, ui
   int hlen;
   if (__i_ntp.is_valid_ntptime()) {
     char ts[16];
-    EpochToDateTimeString((uint32_t)__i_ntp.get_ntp_time(), ts, sizeof(ts), "%b %d %H:%M:%S");
+    EpochToDateTimeString((uint32_t)__i_ntp.get_ntp_time(), ts, sizeof(ts), "%b %e %H:%M:%S");
     hlen = __snprintf(dgram, SYSLOG_FORWARD_DGRAM_MAX, "<%d>%s %s %s: ", pri, ts, host.c_str(), SYSLOG_FORWARD_TAG);
   } else {
     hlen = __snprintf(dgram, SYSLOG_FORWARD_DGRAM_MAX, "<%d>%s %s: ", pri, host.c_str(), SYSLOG_FORWARD_TAG);

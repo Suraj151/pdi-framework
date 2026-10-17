@@ -12,6 +12,7 @@ created Date    : 1st May 2025
 #if defined(ENABLE_TELNET_SERVICE)
 
 #include "TelnetServiceProvider.h"
+#include "TelnetClientInterface.h"
 #include <service_provider/session/SessionManager.h>
 #ifdef ENABLE_CMD_SERVICE
 #include <service_provider/cmd/CommandLineServiceProvider.h>
@@ -225,8 +226,15 @@ void TelnetServiceProvider::handle() {
 
         m_poolfullsince = 0;
 
-        m_clients[slot] = m_server->accept();
+        iClientInterface* accepted = m_server->accept();
+        if (nullptr == accepted) {
+            break;
+        }
+
+        m_clients[slot] = pdiutil::safe_new<TelnetClientInterface>(static_cast<iTcpClientInterface*>(accepted));
         if (nullptr == m_clients[slot]) {
+            accepted->close();
+            pdiutil::safe_delete(accepted);
             break;
         }
 

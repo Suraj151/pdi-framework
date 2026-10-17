@@ -244,6 +244,12 @@ protected:
 			return CMD_ERROR_FAILED;
 		}
 
+		if( HTTP_ASYNC_IDLE != http->GetAsyncState() ){
+			m_terminal->putln();
+			m_terminal->write_ro(RODT_ATTR("http client busy, try again"));
+			return CMD_ERROR_FAILED;
+		}
+
 		if( __i_fs.isFileExist(destpath.c_str()) ){
 			__i_fs.deleteFile(destpath.c_str());
 		}

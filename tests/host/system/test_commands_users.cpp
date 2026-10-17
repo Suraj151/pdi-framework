@@ -128,6 +128,32 @@ TEST(cmdusers, useradd_creates_an_account_that_can_be_found)
     __user_store_service.removeUser("tess");
 }
 
+TEST(cmdusers, useradd_refuses_a_name_that_would_not_read_back_as_one_account)
+{
+    pditest::Shell shell;
+    readyStore();
+
+    ASSERT_TRUE(pditest::saw(shell.run("useradd u=ghost:x:0:0::/:/bin/sh p=x"), "invalid user name"));
+    ASSERT_TRUE(pditest::saw(shell.run("useradd u=\"two words\" p=x"), "invalid user name"));
+
+    user_record_t found;
+    ASSERT_FALSE(__user_store_service.findUserByName("ghost", found));
+    ASSERT_FALSE(__user_store_service.findUserByName("two words", found));
+}
+
+TEST(cmdusers, useradd_refuses_a_name_too_long_rather_than_cutting_it_down)
+{
+    pditest::Shell shell;
+    readyStore();
+    std::string name(USER_STORE_MAX_USERNAME_LEN + 5, 'l');
+    std::string cut(USER_STORE_MAX_USERNAME_LEN - 1, 'l');
+
+    ASSERT_TRUE(pditest::saw(shell.run(("useradd u=" + name + " p=x").c_str()), "invalid user name"));
+
+    user_record_t found;
+    ASSERT_FALSE(__user_store_service.findUserByName(cut.c_str(), found));
+}
+
 TEST(cmdusers, useradd_is_refused_to_a_user_that_is_not_root)
 {
     makeUser("ordinary", 1502, "ordinarypass");

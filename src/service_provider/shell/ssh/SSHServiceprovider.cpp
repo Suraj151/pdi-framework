@@ -54,15 +54,6 @@ bool SSHServer::start(uint16_t port) {
 
     if (m_server->begin(port) == 0) {
 
-        m_server->setOnAcceptClientEventCallback([](void* arg){
-            LWSSH::SSHServer *sshserver = reinterpret_cast<LWSSH::SSHServer*>(arg);
-
-            if(sshserver){
-
-                sshserver->handle();
-            }
-        }, this);
-
         return true;
     }
 
@@ -209,8 +200,7 @@ void SSHServer::handle() {
         return; // Server not initialized
     }
 
-    // handle() runs from both the periodic interval and the accept callback;
-    // guard against re-entrancy so the service loop can't corrupt m_session.
+    // guard against re-entrancy so a nested call can't corrupt m_session.
     if (m_handling) {
         return;
     }

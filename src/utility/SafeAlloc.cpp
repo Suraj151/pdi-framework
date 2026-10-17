@@ -22,23 +22,36 @@ void enable_heap_check() {
     s_heap_check_armed = true;
 }
 
+static uint32_t s_refusals = 0;
+
+/**
+ * @brief How many allocations the heap check has refused since boot.
+ */
+uint32_t safe_alloc_refusals() {
+    return s_refusals;
+}
+
 bool has_heap_for(size_t bytes) {
     if (!s_heap_check_armed) return true;
 
     iUtilityInterface &utility = __i_instance.getUtilityInstance();
 
-    // malloc needs the bytes in one piece, so the largest free block has to hold
-    // the request itself. A port that cannot report it answers zero.
-    uint32_t largest_block = utility.get_max_free_block();
-    if (largest_block != 0 && largest_block < bytes) {
-        return false;
-    }
-
     // the margin is headroom the rest of the system keeps once this request is
     // taken, so it belongs to the total heap and not to the block it comes from
     uint32_t free_heap = utility.get_free_heap();
     if (free_heap != 0 && free_heap < (bytes + PDI_SAFE_ALLOC_HEAP_MARGIN)) {
+        s_refusals++;
         return false;
+    }
+
+    // malloc needs the bytes in one piece, so the largest free block has to hold
+    // the request itself. A port that cannot report it answers zero.
+    if (bytes > PDI_SAFE_ALLOC_SMALL_REQUEST) {
+        uint32_t largest_block = utility.get_max_free_block();
+        if (largest_block != 0 && largest_block < bytes) {
+            s_refusals++;
+            return false;
+        }
     }
 
     return true;

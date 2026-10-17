@@ -88,7 +88,7 @@ created Date    : 1st June 2019
 #define SMTP_COMMAND_DATA_HEADER_SUBJECT "Subject: "
 #define SMTP_COMMAND_DATA_TERMINATOR "."
 #define SMTP_COMMAND_QUIT "QUIT"
-#define SMTP_COMMAND_SEPARATOR ": "
+#define SMTP_COMMAND_SEPARATOR ":"
 #define SMTP_COMMAND_OPENING_ANG_BRACKET "<"
 #define SMTP_COMMAND_CLOSING_ANG_BRACKET ">"
 #define SMTP_COMMAND_CRLF "\r\n"
@@ -99,8 +99,10 @@ enum smtp_reply_code
    SMTP_STATUS_HELP_MESSAGE = 214,
    SMTP_STATUS_SERVER_READY = 220,
    SMTP_STATUS_SERVER_ENDING_CON = 221,
+   SMTP_STATUS_AUTH_SUCCEEDED = 235,
    SMTP_STATUS_ACTION_COMPLETED = 250,
    SMTP_STATUS_USER_NOT_LOCAL_WILL_FORWARD = 251,
+   SMTP_STATUS_AUTH_CONTINUE = 334,
    SMTP_STATUS_START_MAIL_INPUT = 354,
 
    SMTP_STATUS_SERVICE_UNAVAILABLE = 421,
@@ -169,6 +171,11 @@ public:
    void end(void);
 
 protected:
+   /**
+    * writes a message body with each line ended in CRLF and a leading dot doubled
+    */
+   void writeBody(const char *body, uint32_t size);
+
    iClientInterface *m_client;
    uint16_t m_port;
    int16_t m_lastResponseCode;

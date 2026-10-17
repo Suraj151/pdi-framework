@@ -38,13 +38,23 @@ TcpServerInterface::~TcpServerInterface()
  */
 uint16_t TcpServerInterface::shadowPort(uint16_t port)
 {
-    if (0 == port || port >= PDI_POSIX_TCP_SHADOW_PORT_BASE)
+    if (0 == port || port >= s_shadow_base || (uint32_t)s_shadow_base + port > 0xFFFF)
     {
         return 0;
     }
 
-    return (uint16_t)(PDI_POSIX_TCP_SHADOW_PORT_BASE + port);
+    return (uint16_t)(s_shadow_base + port);
 }
+
+/**
+ * @brief Moves the shadow range for every listener opened after it, so two host processes do not collide.
+ */
+void TcpServerInterface::setShadowPortBase(uint16_t base)
+{
+    s_shadow_base = base;
+}
+
+uint16_t TcpServerInterface::s_shadow_base = PDI_POSIX_TCP_SHADOW_PORT_BASE;
 
 int32_t TcpServerInterface::begin(uint16_t port)
 {

@@ -218,7 +218,7 @@ extern const char __g_month_abbr[13][4];
  *          %m - 2-digit month       %b - 3-letter month name (Jan..Dec)
  *          %d - 2-digit day         %H - 2-digit hour (24h)
  *          %M - 2-digit minute      %S - 2-digit second
- *          %% - literal '%'
+ *          %e - day, space-padded   %% - literal '%'
  *        Any other characters (including unknown '%X') are copied verbatim.
  *
  * @param epoch  Unix epoch seconds to format.

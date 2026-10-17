@@ -9,8 +9,11 @@ created Date    : 16th Aug 2026
 ******************************************************************************/
 
 #include "pditest.h"
+#include <service_provider/ServiceProvider.h>
 
 int main(int argc, char **argv)
 {
-    return pditest::runAll(argc, argv);
+    int failures = pditest::runAll(argc, argv);
+    ServiceProvider::setTerminal(nullptr);
+    return failures;
 }

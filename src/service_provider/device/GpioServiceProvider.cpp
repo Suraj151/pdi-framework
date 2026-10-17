@@ -21,7 +21,7 @@ created Date    : 1st June 2019
 
 #ifndef ENABLE_GPIO_BASIC_ONLY
 __gpio_event_track_t __gpio_event_track = {
-  {false}, {0}, -1
+  {false}, {0}, -1, {0}
 };
 #endif
 
@@ -31,6 +31,7 @@ __gpio_event_track_t __gpio_event_track = {
 GpioServiceProvider::GpioServiceProvider():
   m_gpio_http_request_cb_id(0),
   m_update_gpio_table_from_copy(true),
+  m_pending_event_post(-1),
   #ifdef ENABLE_HTTP_CLIENT
   m_http_client(Http_Client::GetStaticInstance()),
   #endif
@@ -66,6 +67,7 @@ void GpioServiceProvider::resetServiceState(){
 
   this->m_gpio_http_request_cb_id = 0;
   this->m_update_gpio_table_from_copy = true;
+  this->m_pending_event_post = -1;
 }
 
 /**
@@ -144,16 +146,18 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isEventPost ){
       posturl.replace( mac_index, 5, __i_dvc_ctrl.getDeviceMac().c_str() );
     }
 
-#ifdef ENABLE_DEVICE_IOT
     pdiutil::string duid_placeholder = CHARPTR_WRAP("[duid]");
     pdiutil::string::size_type duid_index = posturl.find(duid_placeholder.c_str());
     if( pdiutil::string::npos != duid_index )
     {
+#ifdef ENABLE_DEVICE_IOT
       posturl.replace( duid_index, 6, __device_iot_service.getDeviceId() );
-    }
+#else
+      posturl.replace( duid_index, 6, "" );
 #endif
+    }
 
-    pdiutil::string *_payload = pdiutil::safe_new<pdiutil::string>();
+    pdiutil::string *_payload = this->m_http_client->Begin() ? pdiutil::safe_new<pdiutil::string>() : nullptr;
 
     if( nullptr != _payload ){
 
@@ -162,16 +166,13 @@ bool GpioServiceProvider::handleGpioHttpRequest( bool isEventPost ){
       pdiutil::string user_agent = CHARPTR_WRAP("pdistack");
       pdiutil::string content_type_json = CHARPTR_WRAP("application/json");
 
-      this->m_http_client->Begin();
-
       #ifdef ENABLE_DEVICE_IOT
       this->m_http_client->SetUserAgent(user_agent.c_str());
       __device_iot_service.setDeviceAuthorization(this->m_http_client);
       #else
-      pdiutil::string auth_user = CHARPTR_WRAP("user");
-      pdiutil::string auth_pass = CHARPTR_WRAP("password");
+      pdiutil::string auth_user = CHARPTR_WRAP("gpio");
       this->m_http_client->SetUserAgent(user_agent.c_str());
-      this->m_http_client->SetBasicAuthorization(auth_user.c_str(), auth_pass.c_str());
+      this->m_http_client->SetBasicAuthorization(auth_user.c_str(), __i_dvc_ctrl.getDeviceMac().c_str());
       #endif
 
       pdiutil::string content_type_key = CHARPTR_WRAP(HTTP_HEADER_KEY_CONTENT_TYPE);
@@ -219,7 +220,7 @@ void GpioServiceProvider::appendGpioJsonPayload( pdiutil::string &_payload, bool
     _payload += "\"";
     _payload += CHARPTR_WRAP(GPIO_PAYLOAD_DUID_KEY);
     _payload += CHARPTR_WRAP("\":\"");
-    _payload += _duid;
+    __append_json_escaped(_payload, _duid);
     _payload += CHARPTR_WRAP("\",");
   }
 #endif
@@ -367,19 +368,25 @@ void GpioServiceProvider::applyGpioJsonPayload( char* _payload, uint16_t _payloa
 
             LogI("Applying to : %s, mode : %s, value : %s\n", _pin_label_uppercase, _pin_mode, _pin_value);
 
+            uint8_t _mode_before = this->m_gpio_config_copy.gpio_mode[_pin];
+            bool _taken = true;
+
             if( !__are_arrays_equal(_pin_mode, NOT_APPLICABLE, 2) ){
 
-              uint8_t _mode = StringToUint8( _pin_mode, _pin_values_max_len );
-              this->m_gpio_config_copy.gpio_mode[_pin] = _mode < GPIO_MODE_MAX ? _mode : this->m_gpio_config_copy.gpio_mode[_pin];
-              this->m_update_gpio_table_from_copy = true;
+              _taken = this->setGpioModeIfValid( _pin, StringToUint16( _pin_mode, _pin_values_max_len ) );
             }
 
-            if( !__are_arrays_equal(_pin_value, NOT_APPLICABLE, 2) ){
+            if( _taken && !__are_arrays_equal(_pin_value, NOT_APPLICABLE, 2) ){
 
-              uint16_t _value = StringToUint16( _pin_value, _pin_values_max_len );
-              uint16_t _value_limit = this->m_gpio_config_copy.gpio_mode[_pin] == ANALOG_WRITE ? ANALOG_GPIO_RESOLUTION : this->m_gpio_config_copy.gpio_mode[_pin] == DIGITAL_BLINK ? _value+1 : GPIO_STATE_MAX;
-              this->m_gpio_config_copy.gpio_readings[_pin] = _value < _value_limit ? _value : this->m_gpio_config_copy.gpio_readings[_pin];
+              _taken = this->setGpioValueIfValid( _pin, StringToUint16( _pin_value, _pin_values_max_len ) );
+            }
+
+            if( _taken ){
+
               this->m_update_gpio_table_from_copy = true;
+            }else{
+
+              this->m_gpio_config_copy.gpio_mode[_pin] = _mode_before;
             }
           }
         }
@@ -633,9 +640,32 @@ void GpioServiceProvider::handleGpioOperations(){
   }
 
 #ifndef ENABLE_GPIO_BASIC_ONLY
+  #ifdef ENABLE_HTTP_CLIENT
+  if( this->m_pending_event_post >= 0 && nullptr != this->m_http_client &&
+      HTTP_ASYNC_IDLE == this->m_http_client->GetAsyncState() ){
+
+    uint8_t _evtidx = (uint8_t)this->m_pending_event_post;
+    this->m_pending_event_post = -1;
+    __gpio_event_track.event_gpio_pin = this->m_gpio_config_copy.gpio_events[_evtidx].gpioNumber;
+    __gpio_event_track.is_last_event_succeed[_evtidx] = this->handleGpioHttpRequest(true);
+  }
+  #endif
+
   for (uint8_t _evtidx = 0; _evtidx < MAX_GPIO_EVENTS; _evtidx++) {
 
     uint8_t _gpionumber = this->m_gpio_config_copy.gpio_events[_evtidx].gpioNumber;
+
+    const gpio_event &_rule = this->m_gpio_config_copy.gpio_events[_evtidx];
+    uint32_t _signature = ((uint32_t)_rule.gpioNumber << 20) | ((uint32_t)(_rule.eventCondition & 0x03) << 18) |
+                          ((uint32_t)(_rule.eventChannel & 0x03) << 16) | _rule.eventConditionValue;
+    if( _signature != __gpio_event_track.tracked_rule[_evtidx] ){
+      __gpio_event_track.tracked_rule[_evtidx] = _signature;
+      __gpio_event_track.last_event_millis[_evtidx] = 0;
+      __gpio_event_track.is_last_event_succeed[_evtidx] = false;
+      if( this->m_pending_event_post == (int8_t)_evtidx ){
+        this->m_pending_event_post = -1;
+      }
+    }
 
     if( !__i_dvc_ctrl.isExceptionalGpio(_gpionumber) && this->m_gpio_config_copy.gpioHasEvents(_gpionumber) ){
 
@@ -680,7 +710,11 @@ void GpioServiceProvider::handleGpioOperations(){
           #endif
           #ifdef ENABLE_HTTP_CLIENT
           case HTTP_SERVER:{
-            __gpio_event_track.is_last_event_succeed[_evtidx] = this->handleGpioHttpRequest(true);
+            if( nullptr != this->m_http_client && HTTP_ASYNC_IDLE != this->m_http_client->GetAsyncState() ){
+              this->m_pending_event_post = (int8_t)_evtidx;
+            }else{
+              __gpio_event_track.is_last_event_succeed[_evtidx] = this->handleGpioHttpRequest(true);
+            }
             break;
           }
           #endif
@@ -706,6 +740,42 @@ void GpioServiceProvider::enable_update_gpio_table_from_copy(){
 }
 
 /**
+ * Sets a pin's mode in the working copy when it is one the service knows,
+ * leaving the pin as it was otherwise.
+ */
+bool GpioServiceProvider::setGpioModeIfValid(uint8_t _pin, uint16_t _mode){
+
+  if( _pin >= MAX_GPIO_PINS || _mode >= GPIO_MODE_MAX ){
+    return false;
+  }
+
+  this->m_gpio_config_copy.gpio_mode[_pin] = (uint8_t)_mode;
+  return true;
+}
+
+/**
+ * Sets a pin's value in the working copy when its mode can hold it, leaving
+ * the pin as it was otherwise.
+ */
+bool GpioServiceProvider::setGpioValueIfValid(uint8_t _pin, uint16_t _value){
+
+  if( _pin >= MAX_GPIO_PINS ){
+    return false;
+  }
+
+  uint8_t _mode = this->m_gpio_config_copy.gpio_mode[_pin];
+  bool _fits = ANALOG_WRITE == _mode ? _value < ANALOG_GPIO_RESOLUTION :
+               DIGITAL_BLINK == _mode ? true : _value < GPIO_STATE_MAX;
+
+  if( !_fits ){
+    return false;
+  }
+
+  this->m_gpio_config_copy.gpio_readings[_pin] = _value;
+  return true;
+}
+
+/**
  * handle gpio modes for their operations.
  */
 void GpioServiceProvider::handleGpioModes( int _gpio_config_type ){
@@ -723,7 +793,7 @@ void GpioServiceProvider::handleGpioModes( int _gpio_config_type ){
   this->m_gpio_config_copy = _gpio_configs;
 
 #ifdef ENABLE_HTTP_CLIENT
-  if( strlen( this->m_gpio_config_copy.gpio_host ) > 5 && this->m_gpio_config_copy.gpio_port > 0 &&
+  if( strlen( this->m_gpio_config_copy.gpio_host ) > 5 &&
     this->m_gpio_config_copy.gpio_post_frequency > 0
   ){
     this->m_gpio_http_request_cb_id = this->serviceUpdateInterval(
@@ -832,8 +902,6 @@ void GpioServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
 
     terminal->writeln_ro(RODT_ATTR("GPIO Configs (server) :"));
     terminal->write(this->m_gpio_config_copy.gpio_host);
-    terminal->write_ro(RODT_ATTR("\t"));
-    terminal->write((int32_t)this->m_gpio_config_copy.gpio_port);
     terminal->write_ro(RODT_ATTR("\t"));
     terminal->writeln((int32_t)this->m_gpio_config_copy.gpio_post_frequency);
 #endif

@@ -205,8 +205,13 @@ void DeviceIotServiceProvider::handleRegistrationOtpRequest( device_iot_config_t
 
   if( otpurl.size() > 5 && nullptr != this->m_http_client ){
 
+    if( !this->m_http_client->Begin() ){
+
+      _response = CHARPTR_WRAP("{\"status\":false,\"remark\":\"Device request failed. Http client busy, try again !\"}");
+      return;
+    }
+
     pdiutil::string user_agent = CHARPTR_WRAP("pdistack");
-    this->m_http_client->Begin();
     this->m_http_client->SetUserAgent(user_agent.c_str());
     this->setDeviceAuthorization(this->m_http_client, _device_iot_configs);
     this->m_http_client->SetTimeout(2*MILLISECOND_DURATION_1000);

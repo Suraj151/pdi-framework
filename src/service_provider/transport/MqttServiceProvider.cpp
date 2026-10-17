@@ -325,7 +325,7 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
         this->m_mqtt_timer_cb_id = this->serviceUpdateInterval(
           this->m_mqtt_timer_cb_id,
           [&]() { this->m_mqtt_client.mqtt_timer(); },
-          MILLISECOND_DURATION_1000
+          MQTT_TIMER_INTERVAL_MS
         );
       }else{
         __task_scheduler.clearInterval( this->m_mqtt_timer_cb_id );
@@ -453,7 +453,7 @@ void MqttServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
     terminal->write((int32_t)_mqtt_general_configs.security); terminal->write_ro(RODT_ATTR("\t"));
     terminal->write(_mqtt_general_configs.client_id); terminal->write_ro(RODT_ATTR("\t"));
     terminal->write(_mqtt_general_configs.username); terminal->write_ro(RODT_ATTR("\t"));
-    terminal->write(_mqtt_general_configs.password); terminal->write_ro(RODT_ATTR("\t"));
+    terminal->write_ro(0 != _mqtt_general_configs.password[0] ? RODT_ATTR("********") : RODT_ATTR("-")); terminal->write_ro(RODT_ATTR("\t"));
     terminal->write((int32_t)_mqtt_general_configs.keepalive); terminal->write_ro(RODT_ATTR("\t"));
     terminal->write((int32_t)_mqtt_general_configs.clean_session); terminal->putln();
 

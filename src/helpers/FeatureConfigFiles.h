@@ -110,11 +110,10 @@ bool syncMqttConfigFile();
 
 #define OTA_CONFIG_FEATURE_NAME "ota"
 #define OTA_CONFIG_KEY_HOST "host"
-#define OTA_CONFIG_KEY_PORT "port"
 
 #define OTA_CONFIG_HEADER \
     "# PDI ota configuration" TERMINAL_NEW_LINE \
-    "# host is the update server this device asks for a new image" TERMINAL_NEW_LINE
+    "# host is the update server this device asks for a new image, as http://host:port" TERMINAL_NEW_LINE
 
 /**
  * Render an ota config record as the key/value pairs its config file carries.

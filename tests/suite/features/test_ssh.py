@@ -110,7 +110,7 @@ def generate_ed25519(tmpdir, name):
 
 def install_authorized_key(t, line):
     """Put one authorized_keys entry on the target, replacing what was there."""
-    t.run("mkdir /.ssh")
+    t.make_dir("/.ssh")
     t.run("rm %s" % AUTHORIZED_KEYS)
     t.run("echo %s > %s" % (line, AUTHORIZED_KEYS))
 

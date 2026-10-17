@@ -180,6 +180,58 @@ def crontab_seeds():
     }
 
 
+def mdns_seeds():
+    """One query packet: a header asking one or more questions, then each question."""
+
+    def name(*labels):
+        return b"".join(bytes([len(l)]) + l for l in labels) + b"\x00"
+
+    def query(*questions):
+        header = bytes([0, 0, 0, 0, 0, len(questions), 0, 0, 0, 0, 0, 0])
+        return header + b"".join(n + bytes([0, t, 0, 1]) for n, t in questions)
+
+    host = name(b"pdi-a1b2c3", b"local")
+    return {
+        "host_a": query((host, 1)),
+        "host_any": query((host, 255)),
+        "enumerate": query((name(b"_services", b"_dns-sd", b"_udp", b"local"), 12)),
+        "browse": query((name(b"_ssh", b"_tcp", b"local"), 12)),
+        "resolve": query((name(b"pdi-a1b2c3", b"_https", b"_tcp", b"local"), 33)),
+        "two_questions": query((name(b"other", b"local"), 1), (host, 1)),
+        "compressed": query((b"\xc0\x0c", 1)),
+    }
+
+
+def mqtt_seeds():
+    """What a broker sends after its CONNACK, which the harness puts in front."""
+
+    publish0 = bytes([0x30, 0x0B, 0x00, 0x03]) + b"a/b" + b'{"x":1}'
+    publish1 = bytes([0x32, 0x0D, 0x00, 0x03]) + b"a/b" + b"\x00\x05" + b'{"x":1}'
+    publish2 = bytes([0x34, 0x0D, 0x00, 0x03]) + b"a/b" + b"\x00\x06" + b'{"x":2}'
+    return {
+        "publish_qos0": publish0,
+        "publish_qos1": publish1,
+        "publish_qos2_then_release": publish2 + bytes([0x62, 0x02, 0x00, 0x06]),
+        "acks": bytes([0x40, 0x02, 0x00, 0x01, 0x50, 0x02, 0x00, 0x02, 0x70, 0x02, 0x00, 0x02]),
+        "suback": bytes([0x90, 0x03, 0x00, 0x01, 0x01]),
+        "pingresp": bytes([0xD0, 0x00]),
+        "long_length": bytes([0x30, 0x80, 0x01]) + b"\x00\x01t" + b"x" * 125,
+        "empty_payload": bytes([0x30, 0x03, 0x00, 0x01]) + b"t",
+    }
+
+
+def json_seeds():
+    """Key and buffer width first, then the payload."""
+
+    return {
+        "gpio": bytes([1, 40]) + b'{"data":{"D10":{"mode":1,"val":1},"D1":{"mode":2,"val":0}}}',
+        "version": bytes([7, 8]) + b'{"note":"latest: 9","latest":"12"}',
+        "nested": bytes([0, 63]) + b'{"data":{"a0":{"cmp":1,"val":[1,2,{"x":"}"}]}}}',
+        "escaped": bytes([8, 20]) + b'{"did":"a\\"b\\\\","channelhost" : "h"}',
+        "unterminated": bytes([3, 5]) + b'{"a0":"never closed',
+    }
+
+
 def shell_seeds():
     """Keystrokes, including the escape sequences the line editor decodes."""
 
@@ -224,6 +276,9 @@ TARGETS = {
     "fuzz_config": config_seeds,
     "fuzz_dbrecord": dbrecord_seeds,
     "fuzz_crontab": crontab_seeds,
+    "fuzz_mdns": mdns_seeds,
+    "fuzz_json": json_seeds,
+    "fuzz_mqtt": mqtt_seeds,
 }
 
 

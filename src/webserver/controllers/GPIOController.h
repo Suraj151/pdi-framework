@@ -130,7 +130,7 @@ public:
 			this->_last_monitor_point.x = x2;
 			this->_last_monitor_point.y = y2;
 			this->m_web_resource->m_server->addHeader(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_CACHE_CONTROL), CHARPTR_WRAP_RO(HTTP_HEADER_VALUE_NO_CACHE));
-			this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _response->c_str());
+			this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_APPLICATION_JSON, _response->c_str());
 
 			pdiutil::safe_delete(_response);
 		}
@@ -277,14 +277,11 @@ public:
 		strcat_ro(_page, WEB_SERVER_GPIO_SERVER_PAGE_TOP);
 		CONTINUE_SEND_IN_CHUNK(_page);
 
-		char _port[10], _freq[10];
-		memset(_port, 0, 10);
+		char _freq[10];
 		memset(_freq, 0, 10);
-		__appendUintToBuff(_port, "%d", __gpio_service.m_gpio_config_copy.gpio_port, 8);
 		__appendUintToBuff(_freq, "%d", __gpio_service.m_gpio_config_copy.gpio_post_frequency, 8);
 
-		concat_tr_input_html_tags(_page, RODT_ATTR("Host Address:"), RODT_ATTR("hst"), __gpio_service.m_gpio_config_copy.gpio_host, GPIO_HOST_BUF_SIZE - 1);
-		concat_tr_input_html_tags(_page, RODT_ATTR("Host Port:"), RODT_ATTR("prt"), _port);
+		concat_tr_input_html_tags(_page, RODT_ATTR("Server:"), RODT_ATTR("hst"), __gpio_service.m_gpio_config_copy.gpio_host, GPIO_HOST_BUF_SIZE - 1);
 		concat_tr_input_html_tags(_page, RODT_ATTR("Post Frequency:"), RODT_ATTR("frq"), _freq);
 		CONTINUE_SEND_IN_CHUNK(_page);
 
@@ -313,24 +310,23 @@ public:
 
 		bool _is_posted = false;
 
-		if (this->m_web_resource->m_server->hasArg("hst") && this->m_web_resource->m_server->hasArg("prt"))
+		if (this->m_web_resource->m_server->isPostRequest() && this->m_web_resource->m_server->hasArg("hst"))
 		{
 			pdiutil::string _gpio_host = this->m_web_resource->m_server->arg("hst");
-			pdiutil::string _gpio_port = this->m_web_resource->m_server->arg("prt");
 			pdiutil::string _post_freq = this->m_web_resource->m_server->arg("frq");
 
 			LogI("\nSubmitted info :\n");
 			LogI("gpio host : %s\n", _gpio_host.c_str());
-			LogI("gpio port : %s\n", _gpio_port.c_str());
 			LogI("post freq : %s\n\n", _post_freq.c_str());
 			__i_dvc_ctrl.yield();
 
-			strncpy(__gpio_service.m_gpio_config_copy.gpio_host, _gpio_host.c_str(), _gpio_host.size());
-			__gpio_service.m_gpio_config_copy.gpio_port = StringToUint16(_gpio_port.c_str());
-			__gpio_service.m_gpio_config_copy.gpio_post_frequency = StringToUint32(_post_freq.c_str()) < 0 ? GPIO_DATA_POST_FREQ : StringToUint32(_post_freq.c_str());
-			this->m_web_resource->m_db_conn->set_gpio_config_table(&__gpio_service.m_gpio_config_copy);
+			if (__copy_to_buffer(__gpio_service.m_gpio_config_copy.gpio_host, GPIO_HOST_BUF_SIZE, _gpio_host.c_str(), _gpio_host.size()))
+			{
+				__gpio_service.m_gpio_config_copy.gpio_post_frequency = _post_freq.empty() ? GPIO_DATA_POST_FREQ : StringToUint32(_post_freq.c_str());
+				this->m_web_resource->m_db_conn->set_gpio_config_table(&__gpio_service.m_gpio_config_copy);
 
-			_is_posted = true;
+				_is_posted = true;
+			}
 		}
 
 		char *_page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
@@ -422,7 +418,7 @@ public:
 
 		bool _is_posted = false;
 
-		if (this->m_web_resource->m_server->hasArg("d0") && this->m_web_resource->m_server->hasArg("a0"))
+		if (this->m_web_resource->m_server->isPostRequest() && this->m_web_resource->m_server->hasArg("d0") && this->m_web_resource->m_server->hasArg("a0"))
 		{
 			LogI("\nSubmitted info :\n");
 
@@ -433,8 +429,15 @@ public:
 				memset(_label, 0, 6);
 				__appendUintToBuff(_label, "d%d", _pin, 5);
 
-				uint8_t _val = StringToUint8(this->m_web_resource->m_server->arg(_label).c_str());
-				__gpio_service.m_gpio_config_copy.gpio_mode[_pin] = !__i_dvc_ctrl.isExceptionalGpio(_pin) ? _val : 0;
+				uint16_t _val = StringToUint16(this->m_web_resource->m_server->arg(_label).c_str());
+				if (__i_dvc_ctrl.isExceptionalGpio(_pin))
+				{
+					__gpio_service.m_gpio_config_copy.gpio_mode[_pin] = OFF;
+				}
+				else
+				{
+					__gpio_service.setGpioModeIfValid(_pin, _val);
+				}
 
 				LogI("Pin D%d : %d\n", _pin, _val);
 
@@ -450,7 +453,14 @@ public:
 				__appendUintToBuff(_label, "a%d", _pin, 5);
 
 				uint16_t _val = StringToUint16(this->m_web_resource->m_server->arg(_label).c_str());
-				__gpio_service.m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS + _pin] = !__i_dvc_ctrl.isExceptionalGpio(MAX_DIGITAL_GPIO_PINS + _pin) ? _val : 0;
+				if (__i_dvc_ctrl.isExceptionalGpio(MAX_DIGITAL_GPIO_PINS + _pin))
+				{
+					__gpio_service.m_gpio_config_copy.gpio_mode[MAX_DIGITAL_GPIO_PINS + _pin] = OFF;
+				}
+				else
+				{
+					__gpio_service.setGpioModeIfValid(MAX_DIGITAL_GPIO_PINS + _pin, _val);
+				}
 
 				LogI("Pin A%d : %d\n", _pin, _val);
 
@@ -569,7 +579,7 @@ public:
 
 		bool _is_posted = false;
 
-		if (true)
+		if (this->m_web_resource->m_server->isPostRequest())
 		{
 			char _label[6];
 
@@ -581,7 +591,14 @@ public:
 				uint16_t _val = StringToUint16(this->m_web_resource->m_server->arg(_label).c_str());
 				if (!this->m_web_resource->m_server->arg(_label).empty())
 				{
-					__gpio_service.m_gpio_config_copy.gpio_readings[_pin] = __i_dvc_ctrl.isExceptionalGpio(_pin) ? 0 : _val;
+					if (__i_dvc_ctrl.isExceptionalGpio(_pin))
+					{
+						__gpio_service.m_gpio_config_copy.gpio_readings[_pin] = 0;
+					}
+					else if (!__gpio_service.setGpioValueIfValid(_pin, _val))
+					{
+						continue;
+					}
 
 					LogI("Pin %d : %d\n", _pin, _val);
 					_is_posted = true;
@@ -777,7 +794,7 @@ public:
 
 		bool _is_posted = false;
 
-		if (true)
+		if (this->m_web_resource->m_server->isPostRequest())
 		{
 			if (this->m_web_resource->m_server->hasArg("ifsl")){
 

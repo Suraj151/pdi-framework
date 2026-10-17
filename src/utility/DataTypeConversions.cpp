@@ -645,7 +645,7 @@ static uint8_t EpochFmtWidth(const char *fmt)
             switch (*(fmt + 1)) {
                 case 'Y': w += 4; break;
                 case 'b': w += 3; break;
-                case 'y': case 'm': case 'd':
+                case 'y': case 'm': case 'd': case 'e':
                 case 'H': case 'M': case 'S': w += 2; break;
                 case '%': w += 1; break;
                 default:  w += 2; break; // unknown %X passes through as-is
@@ -765,6 +765,10 @@ void EpochToDateTimeString(uint32_t epoch, char *pString, uint8_t _maxlen,
                 }
                 case 'd':
                     pString[pos++] = '0' + (d / 10);
+                    pString[pos++] = '0' + (d % 10);
+                    break;
+                case 'e':
+                    pString[pos++] = (d < 10) ? ' ' : (char)('0' + (d / 10));
                     pString[pos++] = '0' + (d % 10);
                     break;
                 case 'H':

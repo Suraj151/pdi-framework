@@ -81,9 +81,26 @@ bool UserStoreService::findUserByUid(uint16_t uid, user_record_t &out)
   return scanPasswdFile(true, uid, nullptr, out);
 }
 
+/**
+ * @brief Whether a name fits its record and uses only letters, digits, dot, underscore and a non-leading dash.
+ */
+bool UserStoreService::isValidUsername(const char *username)
+{
+  if (nullptr == username || 0 == username[0] || '-' == username[0]) return false;
+
+  for (uint16_t i = 0; 0 != username[i]; i++) {
+    if (i >= USER_STORE_MAX_USERNAME_LEN - 1) return false;
+    char c = username[i];
+    bool portable = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+                    '.' == c || '_' == c || '-' == c;
+    if (!portable) return false;
+  }
+  return true;
+}
+
 bool UserStoreService::addUser(const user_record_t &record, const char *password)
 {
-  if (record.m_username.empty()) return false;
+  if (!isValidUsername(record.m_username.c_str())) return false;
 
   user_record_t existing;
   if (findUserByName(record.m_username.c_str(), existing)) return false;

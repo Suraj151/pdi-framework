@@ -64,6 +64,12 @@ void __append_padded(pdiutil::string &_out, const char *_str, uint32_t _width, b
 void __append_padded_num(pdiutil::string &_out, int64_t _value, uint32_t _width, bool _prepad = false, char _pad = ' ');
 
 /**
+ * Appends text as the body of a json string, escaping quotes, backslashes and
+ * control characters.
+ */
+void __append_json_escaped(pdiutil::string &_out, const char *_str);
+
+/**
  * @brief Whether the character is a letter.
  * @param c The character to test.
  * @return True when the character is a to z in either case.
@@ -116,6 +122,16 @@ char *__strtrim_val(char *str, char _val, uint16_t _overflow_limit = 300);
  * @return True if the strings are equal, false otherwise.
  */
 bool __are_str_equals(const char *str1, const char *str2, uint16_t _overflow_limit = 300);
+
+/**
+ * @brief Copies text into a fixed buffer, zero filling the buffer first.
+ * @param dest The buffer to copy into.
+ * @param destsize The size of the buffer in bytes.
+ * @param src The text to copy.
+ * @param srclen The number of bytes of text.
+ * @return True if the text and its terminator fit, false with the buffer untouched otherwise.
+ */
+bool __copy_to_buffer(char *dest, uint32_t destsize, const char *src, uint32_t srclen);
 
 /**
  * @brief Compares two character arrays for equality.

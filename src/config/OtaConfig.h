@@ -59,11 +59,9 @@ struct ota_configs {
   // Clear members method
   void clear(){
     memset(ota_host, 0, OTA_HOST_BUF_SIZE);
-    ota_port = 80;
   }
 
   char ota_host[OTA_HOST_BUF_SIZE];
-  pdiutil::net_port_t ota_port;
 };
 
 // const ota_configs PROGMEM _ota_config_defaults = {

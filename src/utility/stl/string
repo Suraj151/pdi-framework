@@ -1,0 +1,1290 @@
+/***************************** PDI STD File ***********************************
+This file is third party source, taken from the open source uClibc++ library and
+used here with modifications. Thanking to author for providing this .
+
+for the license terms of this file refer the source link below.
+
+referred from   : https://github.com/mike-matera/ArduinoSTL
+added Date      : 1st Dec 2024
+added by        : Suraj I.
+******************************************************************************/
+
+#include "basic_definitions"
+#include "char_traits"
+#include "charconv.h"
+#include <string.h>
+#include "func_exception"
+#include "memory"
+#include "vector"
+
+
+#ifdef __UCLIBCXX_HAS_WCHAR__
+#include "cwchar"
+#include "cwctype"
+#endif
+
+#ifndef __HEADER_PDISTD_STRING
+#define __HEADER_PDISTD_STRING 1
+
+#pragma GCC visibility push(default)
+
+namespace pdistd{
+
+	//Basic basic_string
+
+	template<class Ch, class Tr = char_traits<Ch>, class A = allocator<Ch> > class basic_string;
+
+	typedef basic_string<char> string;
+	#ifdef __UCLIBCXX_HAS_WCHAR__
+	typedef basic_string<wchar_t> wstring;
+	#endif
+
+
+
+//template<class Ch, class Tr = char_traits<Ch>, class A = allocator<Ch> > class _UCXXEXPORT basic_string
+template<class Ch, class Tr, class A> class basic_string
+	: private pdistd::vector<Ch, A>
+{
+public:
+	typedef Tr traits_type;
+	typedef typename Tr::char_type value_type;
+	typedef A allocator_type;
+	typedef typename A::size_type size_type;
+	typedef typename A::difference_type difference_type;
+
+	typedef typename A::reference reference;
+	typedef typename A::const_reference const_reference;
+	typedef typename A::pointer pointer;
+	typedef typename A::const_pointer const_pointer;
+
+	typedef typename vector<Ch, A>::iterator iterator;
+	typedef typename vector<Ch, A>::const_iterator const_iterator;
+
+	typedef typename vector<Ch, A>::reverse_iterator reverse_iterator;
+	typedef typename vector<Ch, A>::const_reverse_iterator const_reverse_iterator;
+
+	static const size_type npos = static_cast<size_type>(-1);
+
+	using vector<Ch, A>::size;
+	using vector<Ch, A>::max_size;
+	using vector<Ch, A>::empty;
+	using vector<Ch, A>::begin;
+	using vector<Ch, A>::end;
+	using vector<Ch, A>::cbegin;
+	using vector<Ch, A>::cend;
+	using vector<Ch, A>::rbegin;
+	using vector<Ch, A>::rend;
+	using vector<Ch, A>::operator[];
+	using vector<Ch, A>::at;
+	using vector<Ch, A>::front;
+	using vector<Ch, A>::back;
+
+	explicit _UCXXEXPORT basic_string(const A& al = A()) : vector<Ch, A>(al){ return; }
+
+	_UCXXEXPORT basic_string(const basic_string& str, size_type pos = 0, size_type n = npos, const A& al = A());	//Below
+
+	/**
+	 * Takes over another string's buffer, leaving that one empty.
+	 */
+	_UCXXEXPORT basic_string(basic_string&& str) noexcept
+		: vector<Ch, A>(static_cast<vector<Ch, A>&&>(str))
+	{
+	}
+
+	_UCXXEXPORT basic_string(const Ch* s, size_type n, const A& al = A())
+		: vector<Ch, A>(al)
+	{
+		if(n == npos){
+			__throw_out_of_range();
+		}
+		if (s != 0 && n > 0){
+			resize(n);
+			Tr::copy(vector<Ch, A>::data_, s, vector<Ch, A>::elements);
+		}
+	}
+
+	_UCXXEXPORT basic_string(const Ch* s, const A& al = A());		//Below
+
+	_UCXXEXPORT basic_string(size_type n, Ch c, const A& al = A())
+		: vector<Ch, A>(al)
+	{
+		resize(n, c);
+	}
+
+	template<class InputIterator> _UCXXEXPORT basic_string(InputIterator begin, InputIterator end, const A& a = A())
+		:vector<Ch, A>(a)
+	{
+		assign(begin, end);
+	}
+
+	_UCXXEXPORT ~basic_string() {
+		return;
+	}
+
+	_UCXXEXPORT basic_string& operator=(const basic_string& str);	//Below
+
+	/**
+	 * Takes over another string's buffer, releasing this one's first.
+	 */
+	_UCXXEXPORT basic_string& operator=(basic_string&& str) noexcept{
+		vector<Ch, A>::operator=(static_cast<vector<Ch, A>&&>(str));
+		return *this;
+	}
+
+	_UCXXEXPORT basic_string& operator=(const Ch* s){
+		clear();
+		if(s!=0){
+			size_type len = Tr::length(s);
+			resize(len);
+			if(vector<Ch, A>::elements == len){
+				Tr::copy( vector<Ch, A>::data_, s, len);
+			}
+		}
+		return *this;
+	}
+
+	_UCXXEXPORT basic_string& operator=(Ch c){
+		clear();
+		push_back(c);
+		return *this;
+	}
+
+	inline _UCXXEXPORT size_type length() const { return vector<Ch, A>::size(); }
+
+	/**
+	 * Makes the string n characters long, new ones copied from c; a growth the heap
+	 * refuses leaves it unchanged.
+	 */
+	void _UCXXEXPORT resize(size_type n, Ch c = Ch()){
+		if(n > vector<Ch, A>::elements && !_room(n)){
+			return;
+		}
+		vector<Ch, A>::resize(n, c);
+		_terminate();
+	}
+
+	/**
+	 * Makes room for n characters without changing the text.
+	 */
+	_UCXXEXPORT void reserve(size_type n){
+		if(n < vector<Ch, A>::data_size){
+			return;
+		}
+		vector<Ch, A>::reserve(n + 1);
+		_terminate();
+	}
+
+	/**
+	 * How many characters fit before the string has to grow.
+	 */
+	inline _UCXXEXPORT size_type capacity() const{
+		return (0 == vector<Ch, A>::data_size) ? 0 : vector<Ch, A>::data_size - 1;
+	}
+
+	/**
+	 * Empties the string, keeping its storage.
+	 */
+	_UCXXEXPORT void clear(){
+		vector<Ch, A>::clear();
+		_terminate();
+	}
+
+	/**
+	 * Appends one character; a growth the heap refuses leaves the string unchanged.
+	 */
+	_UCXXEXPORT void push_back(Ch c){
+		resize(vector<Ch, A>::elements + 1, c);
+	}
+
+	/**
+	 * Drops the last character.
+	 */
+	_UCXXEXPORT void pop_back(){
+		vector<Ch, A>::pop_back();
+		_terminate();
+	}
+
+	_UCXXEXPORT basic_string& operator+=(const basic_string& str){
+		return append(str);
+	}
+
+	_UCXXEXPORT basic_string& operator+=(const Ch * s){
+		return append(s);
+	}
+
+	_UCXXEXPORT basic_string& operator+=(Ch c){
+		push_back(c);
+		return *this;
+	}
+
+	_UCXXEXPORT basic_string& append(const basic_string& str){
+		size_t temp = vector<Ch, A>::elements;
+		resize(vector<Ch, A>::elements + str.elements);
+
+		//	resize leaves the size untouched when it cannot grow the buffer,
+		//	so nothing is appended rather than copied past the end
+		if(vector<Ch, A>::elements == temp + str.elements){
+			Tr::copy( vector<Ch, A>::data_ + temp, str.vector<Ch, A>::data_, str.elements);
+		}
+
+		return *this;
+	}
+
+	_UCXXEXPORT basic_string& append(const basic_string& str, size_type pos, size_type n){
+		if(pos > str.size()){
+			__throw_out_of_range();
+		}
+
+		size_type rlen = str.elements - pos;
+		if(rlen > n){
+			rlen = n;
+		}
+		if(vector<Ch, A>::elements > npos - rlen){
+			__throw_length_error();
+		}
+		size_t temp = vector<Ch, A>::elements;
+		resize(vector<Ch, A>::elements + rlen);
+		if(vector<Ch, A>::elements == temp + rlen){
+			Tr::copy( vector<Ch, A>::data_ + temp, str.vector<Ch, A>::data_ + pos, rlen);
+		}
+		return *this;
+	}
+
+	_UCXXEXPORT basic_string& append(const Ch* s, size_type n){
+		if(s == 0){
+			return *this;
+		}
+		size_t temp = vector<Ch, A>::elements;
+		resize(vector<Ch, A>::elements + n);
+		if(vector<Ch, A>::elements == temp + n){
+			Tr::copy( vector<Ch, A>::data_ + temp, s, n);
+		}
+		return *this;
+	}
+
+	_UCXXEXPORT basic_string& append(const Ch* s){
+		if(s == 0){
+			return *this;
+		}
+		size_type strLen = Tr::length(s);
+		size_t temp = vector<Ch, A>::elements;
+		resize(vector<Ch, A>::elements + strLen);
+		if(vector<Ch, A>::elements == temp + strLen){
+			Tr::copy( vector<Ch, A>::data_ + temp, s, strLen);
+		}
+		return *this;
+	}
+
+	_UCXXEXPORT basic_string& append(size_type n, Ch c){
+		resize(vector<Ch, A>::elements + n, c);
+		return *this;
+	}
+
+	_UCXXEXPORT basic_string& assign(const basic_string& str){
+		operator=(str);
+		return *this;
+	}
+
+	_UCXXEXPORT basic_string& assign(const basic_string& str, size_type pos, size_type n){
+		if(pos > str.elements){
+			__throw_out_of_range();
+		}
+		size_type r = str.elements - pos;
+		if(r > n){
+			r = n;
+		}
+		resize(r);
+		if(vector<Ch, A>::elements == r){
+			Tr::copy(vector<Ch, A>::data_, str.vector<Ch, A>::data_ + pos, r);
+		}
+		return *this;
+	}
+
+	_UCXXEXPORT basic_string& assign(const Ch* s, size_type n){
+		resize(n);
+		if(vector<Ch, A>::elements == n){
+			Tr::copy(vector<Ch, A>::data_, s, n);
+		}
+		return *this;
+	}
+
+	_UCXXEXPORT basic_string& assign(const Ch* s){
+		if(s == 0){
+			clear();
+			return *this;
+		}
+		size_type len = Tr::length(s);
+		return assign(s, len);
+	}
+
+	_UCXXEXPORT basic_string& assign(size_type n, Ch c){
+		clear();
+		resize(n, c);
+		return *this;
+	}
+
+	/**
+	 * Replaces the text with the characters in the range.
+	 */
+	template<class InputIterator> _UCXXEXPORT basic_string& assign(InputIterator first, InputIterator last){
+		clear();
+		while (first != last){
+			push_back(*first);
+			++first;
+		}
+		return *this;
+	}
+
+	_UCXXEXPORT basic_string& insert(size_type pos1, const basic_string& str, size_type pos2=0, size_type n=npos){
+		if(pos1 > vector<Ch, A>::elements || pos2 > str.elements){
+			__throw_out_of_range();
+		}
+		size_type r = str.elements - pos2;
+		if( r > n){
+			r = n;
+		}
+		if(vector<Ch, A>::elements > npos - r){
+			__throw_length_error();
+		}
+		size_type temp = vector<Ch, A>::elements;
+		resize(vector<Ch, A>::elements + r);
+		if(vector<Ch, A>::elements != temp + r){
+			return *this;
+		}
+		Tr::move(vector<Ch, A>::data_ + pos1 + r, vector<Ch, A>::data_ + pos1, temp - pos1);
+		Tr::copy(vector<Ch, A>::data_ + pos1, str.vector<Ch, A>::data_ + pos2, r);
+		return *this;
+	}
+
+	_UCXXEXPORT basic_string& insert(size_type pos, const Ch* s, size_type n){
+		if(pos > vector<Ch, A>::elements){
+			__throw_out_of_range();
+		}
+		if(vector<Ch, A>::elements > npos - n){
+			__throw_length_error();
+		}
+		size_type temp = vector<Ch, A>::elements;
+		resize(vector<Ch, A>::elements + n);
+		if(vector<Ch, A>::elements != temp + n){
+			return *this;
+		}
+		Tr::move(vector<Ch, A>::data_ + pos + n, vector<Ch, A>::data_ + pos, temp - pos);
+		Tr::copy(vector<Ch, A>::data_ + pos, s, n);
+		return *this;
+	}
+
+	inline _UCXXEXPORT basic_string& insert(size_type pos, const Ch* s){
+		size_type len = Tr::length(s);
+		return insert(pos, s, len);
+	}
+
+	_UCXXEXPORT basic_string& insert(size_type pos, size_type n, Ch c){
+		if(pos > vector<Ch, A>::elements){
+			__throw_out_of_range();
+		}
+		if(vector<Ch, A>::elements > npos - n){
+			__throw_length_error();
+		}
+		size_type temp = vector<Ch, A>::elements;
+		resize(vector<Ch, A>::elements + n);
+		if(vector<Ch, A>::elements != temp + n){
+			return *this;
+		}
+		Tr::move(vector<Ch, A>::data_ + pos + n, vector<Ch, A>::data_ + pos, temp - pos);
+		Tr::assign(vector<Ch, A>::data_ + pos, n, c);
+		return *this;
+	}
+
+	/**
+	 * Inserts c before p and returns where it landed.
+	 */
+	_UCXXEXPORT iterator insert(iterator p, Ch c){
+		size_type pos = p - begin();
+		insert(pos, 1, c);
+		return begin() + pos;
+	}
+
+//	void insert(iterator p, size_type n, charT c);
+//	template<class InputIterator> void insert(iterator p, InputIterator first, InputIterator last);
+
+	_UCXXEXPORT basic_string& erase(size_type pos = 0, size_type n = npos){
+		size_type xlen = vector<Ch, A>::elements - pos;
+
+		if(xlen > n){
+			xlen = n;
+		}
+		size_type temp = vector<Ch, A>::elements;
+
+		Tr::move(vector<Ch, A>::data_ + pos, vector<Ch, A>::data_ + pos + xlen, temp - pos - xlen);
+		resize(temp - xlen);
+		return *this;
+	}
+
+	_UCXXEXPORT iterator erase(iterator position){
+		if(position == vector<Ch, A>::end()){
+			return position;
+		}
+
+		++position;
+
+		iterator temp = position;
+
+		while(position != vector<Ch, A>::end()){
+			*(position-1) = *position;
+			++position;
+		}
+		pop_back();
+		return temp;
+	}
+
+	_UCXXEXPORT iterator erase(iterator first, iterator last){
+		size_t count = last - first;
+
+		iterator temp = last;
+
+		while(last != vector<Ch, A>::end()){
+			*(last - count) = *last;
+			++last;
+		}
+
+		resize(	vector<Ch, A>::elements-count);
+
+		return temp;
+	}
+
+	_UCXXEXPORT basic_string&
+		replace(size_type pos1, size_type n1, const basic_string& str, size_type pos2=0, size_type n2=npos)
+	{
+		if(pos1 > vector<Ch, A>::elements){
+			__throw_out_of_range();
+		}
+		size_type xlen = vector<Ch, A>::elements - pos1;
+		if(xlen >  n1){
+			xlen = n1;
+		}
+		size_type rlen = str.elements - pos2;
+		if(rlen > n2){
+			rlen = n2;
+		}
+		if((vector<Ch, A>::elements - xlen) >= (npos - rlen)){
+			__throw_length_error();
+		}
+
+		size_t temp = vector<Ch, A>::elements;
+
+		if(rlen > xlen){		//Only if making larger
+			resize(temp - xlen + rlen);
+			if(vector<Ch, A>::elements != temp - xlen + rlen){
+				return *this;
+			}
+		}
+
+		//Final length = vector<Ch, A>::elements - xlen + rlen
+		//Initial block is of size pos1
+		//Block 2 is of size len
+
+		Tr::move(vector<Ch, A>::data_ + pos1 + rlen, vector<Ch, A>::data_ + pos1 + xlen, temp - pos1 - xlen);
+		Tr::copy(vector<Ch, A>::data_ + pos1, str.vector<Ch, A>::data_ + pos2, rlen);
+		resize(temp - xlen + rlen);
+		return *this;
+	}
+
+	_UCXXEXPORT basic_string& replace(size_type pos, size_type n1, const Ch* s, size_type n2){
+		return replace(pos,n1,basic_string<Ch,Tr,A>(s,n2));
+
+	}
+
+	inline _UCXXEXPORT basic_string& replace(size_type pos, size_type n1, const Ch* s){
+		return replace(pos,n1,basic_string<Ch,Tr,A>(s));
+	}
+
+	_UCXXEXPORT basic_string& replace(size_type pos, size_type n1, size_type n2, Ch c){
+		return replace(pos,n1,basic_string<Ch, Tr, A>(n2,c));
+	}
+
+	_UCXXEXPORT basic_string& replace(const Ch* s, const Ch* r){
+
+		basic_string<Ch,Tr,A> searchstr(s);
+		basic_string<Ch,Tr,A> replacestr(r);
+		size_type pos = find(searchstr);
+		while (pos != npos) {
+			replace(pos, searchstr.length(), replacestr);
+			pos = find(searchstr, pos + replacestr.length()); // Continue search after the replacement
+		}
+		return *this;
+	}
+
+
+//	_UCXXEXPORT basic_string& replace(iterator i1, iterator i2, const basic_string& str);
+//	_UCXXEXPORT basic_string& replace(iterator i1, iterator i2, const Ch* s, size_type n);
+//	_UCXXEXPORT basic_string& replace(iterator i1, iterator i2, const Ch* s);
+//	_UCXXEXPORT basic_string& replace(iterator i1, iterator i2, size_type n, Ch c);
+/*	template<class InputIterator> _UCXXEXPORT basic_string& replace(iterator i1, iterator i2,
+		InputIterator j1, InputIterator j2);*/
+
+	size_type _UCXXEXPORT copy(Ch* s, size_type n, size_type pos = 0) const{
+		if(pos > vector<Ch, A>::elements){
+			__throw_out_of_range();
+		}
+		size_type r = vector<Ch, A>::elements - pos;
+		if(r > n){
+			r = n;
+		}
+		Tr::copy(s, vector<Ch, A>::data_ + pos, r);
+		return r;
+	}
+
+	_UCXXEXPORT void swap(basic_string<Ch,Tr,A>& s){
+		//Data pointers
+
+		vector<Ch, A>::swap(s);
+	}
+
+	_UCXXEXPORT const Ch* c_str() const{
+		return data();
+	}
+
+	/**
+	 * The characters, always followed by a terminator; a string with no storage gives "".
+	 */
+	_UCXXEXPORT const Ch* data() const{
+		if(0 == vector<Ch, A>::data_){
+			static const Ch empty[1] = {Ch()};
+			return empty;
+		}
+		return vector<Ch, A>::data_;
+	}
+	_UCXXEXPORT allocator_type get_allocator() const{
+		return A();
+	}
+
+	_UCXXEXPORT size_type find (const basic_string& str, size_type pos = 0) const{
+		return find(str.vector<Ch, A>::data_, pos, str.vector<Ch, A>::elements);
+	}
+
+	/**
+	 * Where the n characters at s first occur at or after pos, or npos; an empty s is found at pos.
+	 */
+	_UCXXEXPORT size_type find (const Ch* s, size_type pos, size_type n) const{
+		size_type len = vector<Ch, A>::elements;
+		if(0 == n){
+			return (pos <= len) ? pos : npos;
+		}
+		if(pos >= len || n > len - pos){
+			return npos;
+		}
+		const Ch* at = vector<Ch, A>::data_ + pos;
+		const Ch* last = vector<Ch, A>::data_ + (len - n);
+		while(at <= last){
+			at = Tr::find(at, (last - at) + 1, s[0]);
+			if(0 == at){
+				return npos;
+			}
+			if(0 == Tr::compare(at, s, n)){
+				return at - vector<Ch, A>::data_;
+			}
+			++at;
+		}
+		return npos;
+	}
+	_UCXXEXPORT size_type find (const Ch* s, size_type pos = 0) const{
+		return find(s, pos, Tr::length(s));
+	}
+	_UCXXEXPORT size_type find (Ch c, size_type pos = 0) const{
+		return find(&c, pos, 1);
+	}
+	_UCXXEXPORT size_type rfind(const basic_string& str, size_type pos = npos) const{
+		return rfind(str.vector<Ch, A>::data_, pos, str.length());
+	}
+	_UCXXEXPORT size_type rfind(const Ch* s, size_type pos, size_type n) const{
+		if(n > vector<Ch, A>::elements){
+			return npos;
+		}
+		if(0 == n){
+			return (pos < vector<Ch, A>::elements) ? pos : vector<Ch, A>::elements;
+		}
+		size_type start = vector<Ch, A>::elements - n;
+		if(pos < start){
+			start = pos;
+		}
+		while(0 != Tr::compare(vector<Ch, A>::data_ + start, s, n)){
+			if(0 == start){
+				return npos;
+			}
+			--start;
+		}
+		return start;
+	}
+	_UCXXEXPORT size_type rfind(const Ch* s, size_type pos = npos) const{
+		return rfind(s, pos, Tr::length(s));
+	}
+	_UCXXEXPORT size_type rfind(Ch c, size_type pos = npos) const{
+		return rfind(&c, pos, 1);
+	}
+
+	_UCXXEXPORT size_type find_first_of(const basic_string& str, size_type pos = 0) const{
+		return find_first_of(str.vector<Ch, A>::data_, pos, str.vector<Ch, A>::elements);
+	}
+
+	/**
+	 * The first position at or after pos holding one of the n characters at s, or npos.
+	 */
+	_UCXXEXPORT size_type find_first_of(const Ch* s, size_type pos, size_type n) const{
+		for(size_type i = pos; i < vector<Ch, A>::elements; ++i){
+			if(0 != Tr::find(s, n, vector<Ch, A>::data_[i])){
+				return i;
+			}
+		}
+		return npos;
+	}
+	_UCXXEXPORT size_type find_first_of(const Ch* s, size_type pos = 0) const{
+		return find_first_of(s, pos, Tr::length(s));
+	}
+	_UCXXEXPORT size_type find_first_of(Ch c, size_type pos = 0) const{
+		return find(&c, pos, 1);
+	}
+
+	_UCXXEXPORT size_type find_last_of (const basic_string& str, size_type pos = npos) const{
+		return find_last_of(str.vector<Ch, A>::data_, pos, str.vector<Ch, A>::elements);
+	}
+
+	/**
+	 * The last position at or before pos holding one of the n characters at s, or npos.
+	 */
+	_UCXXEXPORT size_type find_last_of (const Ch* s, size_type pos, size_type n) const{
+		size_type len = vector<Ch, A>::elements;
+		if(0 == len){
+			return npos;
+		}
+		size_type i = (pos < len) ? pos : len - 1;
+		while(true){
+			if(0 != Tr::find(s, n, vector<Ch, A>::data_[i])){
+				return i;
+			}
+			if(0 == i){
+				return npos;
+			}
+			--i;
+		}
+	}
+	_UCXXEXPORT size_type find_last_of (const Ch* s, size_type pos = npos) const{
+		return find_last_of(s, pos, Tr::length(s));
+	}
+	_UCXXEXPORT size_type find_last_of (Ch c, size_type pos = npos) const{
+		return find_last_of(&c, pos, 1);
+	}
+
+	_UCXXEXPORT size_type find_first_not_of(const basic_string& str, size_type pos = 0) const{
+		return find_first_not_of(str.vector<Ch, A>::data_, pos, str.vector<Ch, A>::elements);
+	}
+
+	/**
+	 * The first position at or after pos holding none of the n characters at s, or npos.
+	 */
+	_UCXXEXPORT size_type find_first_not_of(const Ch* s, size_type pos, size_type n) const{
+		for(size_type i = pos; i < vector<Ch, A>::elements; ++i){
+			if(0 == Tr::find(s, n, vector<Ch, A>::data_[i])){
+				return i;
+			}
+		}
+		return npos;
+	}
+	_UCXXEXPORT size_type find_first_not_of(const Ch* s, size_type pos = 0) const{
+		return find_first_not_of(s, pos, Tr::length(s));
+	}
+	_UCXXEXPORT size_type find_first_not_of(Ch c, size_type pos = 0) const{
+		return find_first_not_of(&c, pos, 1);
+	}
+	_UCXXEXPORT size_type find_last_not_of (const basic_string& str, size_type pos = npos) const{
+		return find_last_not_of(str.vector<Ch, A>::data_, pos, str.vector<Ch, A>::elements);
+	}
+
+	/**
+	 * The last position at or before pos holding none of the n characters at s, or npos.
+	 */
+	_UCXXEXPORT size_type find_last_not_of (const Ch* s, size_type pos, size_type n) const{
+		size_type len = vector<Ch, A>::elements;
+		if(0 == len){
+			return npos;
+		}
+		size_type i = (pos < len) ? pos : len - 1;
+		while(true){
+			if(0 == Tr::find(s, n, vector<Ch, A>::data_[i])){
+				return i;
+			}
+			if(0 == i){
+				return npos;
+			}
+			--i;
+		}
+	}
+	_UCXXEXPORT size_type find_last_not_of (const Ch* s, size_type pos = npos) const{
+		return find_last_not_of(s, pos, Tr::length(s));
+	}
+	_UCXXEXPORT size_type find_last_not_of (Ch c, size_type pos = npos) const{
+		return find_last_not_of(&c, pos, 1);
+	}
+
+	_UCXXEXPORT basic_string substr(size_type pos = 0, size_type n = npos) const;
+
+	_UCXXEXPORT int compare(const basic_string& str) const{
+		size_type rlen = vector<Ch, A>::elements;
+		if(rlen >  str.elements){
+			rlen = str.elements;
+		}
+		int retval = Tr::compare(vector<Ch, A>::data_, str.vector<Ch, A>::data_, rlen);
+		if(retval == 0){
+			if(vector<Ch, A>::elements < str.elements){
+				retval = -1;
+			}
+			if(vector<Ch, A>::elements > str.elements){
+				retval = 1;
+			}
+		}
+		return retval;
+	}
+
+	_UCXXEXPORT int compare(size_type pos1, size_type n1, const basic_string& str,
+		size_type pos2=0, size_type n2=npos) const{
+		size_type len1 = vector<Ch, A>::elements - pos1;
+		if(len1 > n1){
+			len1 = n1;
+		}
+		size_type len2 = str.vector<Ch, A>::elements - pos2;
+		if(len2 > n2){
+			len2 = n2;
+		}
+		size_type rlen = len1;
+		if(rlen > len2){
+			rlen = len2;
+		}
+		int retval = Tr::compare(vector<Ch, A>::data_ + pos1, str.vector<Ch, A>::data_ + pos2, rlen);
+		if(retval == 0){
+			if(len1 < len2){
+				retval = -1;
+			}
+			if(len1 > len2){
+				retval = 1;
+			}
+		}
+		return retval;
+	}
+
+	_UCXXEXPORT int compare(const Ch* s) const{
+		size_type slen = Tr::length(s);
+		size_type rlen = slen;
+		if(rlen > vector<Ch, A>::elements){
+			rlen=vector<Ch, A>::elements;
+		}
+		int retval = Tr::compare(vector<Ch, A>::data_, s, rlen);
+		if(retval==0){
+			if(vector<Ch, A>::elements < slen){
+				retval = -1;
+			}
+			if(vector<Ch, A>::elements > slen){
+				retval = 1;
+			}
+		}
+		return retval;
+	}
+
+	_UCXXEXPORT int compare(size_type pos1, size_type n1, const Ch* s, size_type n2 = npos) const{
+		size_type len1 = vector<Ch, A>::elements - pos1;
+		if(len1 > n1){
+			len1 = n1;
+		}
+		size_type slen = Tr::length(s);
+		size_type len2 = slen;
+		if(len2 > n2){
+			len2 = n2;
+		}
+		size_type rlen = len1;
+		if(rlen > len2){
+			rlen = len2;
+		}
+		int retval  = Tr::compare(vector<Ch, A>::data_ + pos1, s, rlen);
+		if(retval == 0){
+			if(len1 < len2){
+				retval = -1;
+			}
+			if(len1 > len2){
+				retval = 1;
+			}
+		}
+		return retval;
+	}
+
+private:
+
+	/**
+	 * Makes room for n characters and the terminator after them; false when the heap refuses.
+	 */
+	bool _room(size_type n){
+		if(n < vector<Ch, A>::data_size){
+			return true;
+		}
+		vector<Ch, A>::reserve(vector<Ch, A>::_grown_capacity(n + 1));
+		return n < vector<Ch, A>::data_size;
+	}
+
+	/**
+	 * Writes the terminator after the last character, once there is storage to hold it.
+	 */
+	void _terminate(){
+		if(0 != vector<Ch, A>::data_){
+			vector<Ch, A>::data_[vector<Ch, A>::elements] = Ch();
+		}
+	}
+
+};
+
+
+//Functions
+
+template<class Ch,class Tr,class A> _UCXXEXPORT basic_string<Ch,Tr,A>::basic_string(const Ch* s, const A& al)
+	: vector<Ch, A>(al)
+{
+	if(s!=0){
+		size_type temp = Tr::length(s);
+		append(s, temp);
+	}
+}
+
+template<class Ch,class Tr,class A> _UCXXEXPORT basic_string<Ch,Tr,A>::
+	basic_string(const basic_string& str, size_type pos, size_type n, const A& al)
+	: vector<Ch, A>(al)
+{
+	if(pos>str.size()){
+		__throw_out_of_range();
+	}
+	size_type rlen = str.size() - pos;
+	if( rlen > n){
+		rlen = n;
+	}
+	resize(rlen);
+	Tr::copy(vector<Ch, A>::data_, str.vector<Ch, A>::data_ + pos, vector<Ch, A>::elements);
+}
+
+template<class Ch,class Tr,class A> _UCXXEXPORT basic_string<Ch,Tr,A>&
+	basic_string<Ch,Tr,A>::operator=(const basic_string<Ch,Tr,A> & str)
+{
+	if(&str == this){	//Check if we are doing a=a
+		return *this;
+	}
+	clear();
+	resize(str.elements);
+	if(vector<Ch, A>::elements == str.elements){
+		Tr::copy( vector<Ch, A>::data_, str.vector<Ch, A>::data_, str.elements);
+	}
+	return *this;
+}
+
+
+template<class Ch,class Tr,class A>
+	_UCXXEXPORT basic_string<Ch, Tr, A> basic_string<Ch,Tr,A>::substr(size_type pos, size_type n) const
+{
+	if(pos > vector<Ch, A>::elements){
+		__throw_out_of_range();
+	}
+	size_type rlen = vector<Ch, A>::elements - pos;
+	if(rlen > n){
+		rlen = n;
+	}
+	return basic_string<Ch,Tr,A>(vector<Ch, A>::data_ + pos,rlen);
+}
+
+
+
+
+#ifdef __UCLIBCXX_EXPAND_STRING_CHAR__
+#ifndef __UCLIBCXX_COMPILE_STRING__
+
+#ifdef __UCLIBCXX_EXPAND_CONSTRUCTORS_DESTRUCTORS__
+
+	template <> _UCXXEXPORT string::basic_string(const allocator<char> &);
+	template <> _UCXXEXPORT string::basic_string(size_type n, char c, const allocator<char> & );
+	template <> _UCXXEXPORT string::basic_string(const char* s, const allocator<char>& al);
+	template <> _UCXXEXPORT string::basic_string(const basic_string& str, size_type pos, size_type n, const allocator<char>& al);
+	template <> _UCXXEXPORT string::~basic_string();
+
+#endif
+
+	template <> _UCXXEXPORT string & string::append(const char * s, size_type n);
+
+
+	template <> _UCXXEXPORT string::size_type string::find(const string & str, size_type pos) const;
+	template <> _UCXXEXPORT string::size_type string::find(const char* s, size_type pos) const;
+	template <> _UCXXEXPORT string::size_type string::find (char c, size_type pos) const;
+
+	template <> _UCXXEXPORT string::size_type string::rfind(const string & str, size_type pos) const;
+	template <> _UCXXEXPORT string::size_type string::rfind(char c, size_type pos) const;
+	template <> _UCXXEXPORT string::size_type string::rfind(const char* s, size_type pos) const;
+
+	template <> _UCXXEXPORT string::size_type string::find_first_of(const string &, size_type) const;
+	template <> _UCXXEXPORT string::size_type string::find_first_of(const char *, size_type pos, size_type n) const;
+	template <> _UCXXEXPORT string::size_type string::find_first_of(const char*, size_type pos) const;
+	template <> _UCXXEXPORT string::size_type string::find_first_of(char c, size_type pos) const;
+
+	template <> _UCXXEXPORT string::size_type string::find_last_of (const string & , size_type pos) const;
+	template <> _UCXXEXPORT string::size_type string::find_last_of (const char* s, size_type pos, size_type n) const;
+	template <> _UCXXEXPORT string::size_type string::find_last_of (const char* s, size_type pos) const;
+	template <> _UCXXEXPORT string::size_type string::find_last_of (char c, size_type pos) const;
+
+	template <> _UCXXEXPORT string::size_type string::find_first_not_of(const string &, size_type) const;
+	template <> _UCXXEXPORT string::size_type string::find_first_not_of(const char*, size_type, size_type) const;
+	template <> _UCXXEXPORT string::size_type string::find_first_not_of(const char*, size_type) const;
+	template <> _UCXXEXPORT string::size_type string::find_first_not_of(char c, size_type) const;
+
+	template <> _UCXXEXPORT int string::compare(const string & str) const;
+	template <> _UCXXEXPORT int string::compare(
+		size_type pos1, size_type n1, const string & str, size_type pos2, size_type n2) const;
+
+	template <> _UCXXEXPORT string string::substr(size_type pos, size_type n) const;
+
+	template <> _UCXXEXPORT string & string::operator=(const string & str);
+	template <> _UCXXEXPORT string & string::operator=(const char * s);
+
+#endif
+#endif
+
+
+
+
+//typedef basic_string<char> string;
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT basic_string<charT,traits,Allocator>
+	operator+(const basic_string<charT,traits,Allocator>& lhs, const basic_string<charT,traits,Allocator>& rhs)
+{
+	basic_string<charT,traits,Allocator> temp(lhs);
+	temp.append(rhs);
+	return temp;
+}
+
+/**
+ * Appends to a temporary in place and hands its buffer on.
+ */
+template<class charT, class traits, class Allocator> _UCXXEXPORT basic_string<charT,traits,Allocator>
+	operator+(basic_string<charT,traits,Allocator>&& lhs, const basic_string<charT,traits,Allocator>& rhs)
+{
+	lhs += rhs;
+	return static_cast<basic_string<charT,traits,Allocator>&&>(lhs);
+}
+
+/**
+ * Appends to a temporary in place and hands its buffer on.
+ */
+template<class charT, class traits, class Allocator> _UCXXEXPORT basic_string<charT,traits,Allocator>
+	operator+(basic_string<charT,traits,Allocator>&& lhs, const charT* rhs)
+{
+	lhs += rhs;
+	return static_cast<basic_string<charT,traits,Allocator>&&>(lhs);
+}
+
+/**
+ * Appends to a temporary in place and hands its buffer on.
+ */
+template<class charT, class traits, class Allocator> _UCXXEXPORT basic_string<charT,traits,Allocator>
+	operator+(basic_string<charT,traits,Allocator>&& lhs, charT rhs)
+{
+	lhs += rhs;
+	return static_cast<basic_string<charT,traits,Allocator>&&>(lhs);
+}
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT basic_string<charT,traits,Allocator>
+	operator+(const charT* lhs, const basic_string<charT,traits,Allocator>& rhs)
+{
+	basic_string<charT,traits,Allocator> temp(lhs);
+	temp.append(rhs);
+	return temp;
+}
+
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT basic_string<charT,traits,Allocator>
+	operator+(charT lhs, const basic_string<charT,traits,Allocator>& rhs)
+{
+	basic_string<charT,traits,Allocator> temp(1, lhs);
+	temp.append(rhs);
+	return temp;
+}
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT basic_string<charT,traits,Allocator>
+	operator+(const basic_string<charT,traits,Allocator>& lhs, const charT* rhs)
+{
+	basic_string<charT,traits,Allocator> temp(lhs);
+	temp.append(rhs);
+	return temp;
+}
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT basic_string<charT,traits,Allocator>
+	operator+(const basic_string<charT,traits,Allocator>& lhs, charT rhs)
+{
+	basic_string<charT,traits,Allocator> temp(lhs);
+	temp+=rhs;
+	return temp;
+}
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT bool
+	operator==(const basic_string<charT,traits,Allocator>& lhs, const basic_string<charT,traits,Allocator>& rhs)
+{
+	if(lhs.compare(rhs) == 0){
+		return true;
+	}
+	return false;
+}
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT bool
+	operator==(const charT* lhs, const basic_string<charT,traits,Allocator>& rhs)
+{
+	if(rhs.compare(lhs) == 0){
+		return true;
+	}
+	return false;
+}
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT bool
+	operator==(const basic_string<charT,traits,Allocator>& lhs, const charT* rhs)
+{
+	if(lhs.compare(rhs)==0){
+		return true;
+	}
+	return false;
+}
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT bool
+	operator!=(const basic_string<charT,traits,Allocator>& lhs, const basic_string<charT,traits,Allocator>& rhs)
+{
+	if(lhs.compare(rhs) !=0){
+		return true;
+	}
+	return false;
+}
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT bool
+	operator!=(const charT* lhs, const basic_string<charT,traits,Allocator>& rhs)
+{
+	basic_string<charT,traits,Allocator> temp(lhs);
+	return (temp != rhs);
+}
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT bool
+	operator!=(const basic_string<charT,traits,Allocator>& lhs, const charT* rhs)
+{
+	basic_string<charT,traits,Allocator> temp(rhs);
+	return (lhs != temp);
+}
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT bool
+	operator< (const basic_string<charT,traits,Allocator>& lhs, const basic_string<charT,traits,Allocator>& rhs)
+{
+	if(lhs.compare(rhs) < 0){
+		return true;
+	}
+	return false;
+}
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT bool
+	operator< (const basic_string<charT,traits,Allocator>& lhs, const charT* rhs)
+{
+	basic_string<charT,traits,Allocator> temp(rhs);
+	if(lhs.compare(rhs) < 0){
+		return true;
+	}
+	return false;
+}
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT bool
+	operator< (const charT* lhs, const basic_string<charT,traits,Allocator>& rhs)
+{
+	basic_string<charT,traits,Allocator> temp(lhs);
+	if(temp.compare(rhs) < 0){
+		return true;
+	}
+	return false;
+}
+
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT bool
+	operator> (const basic_string<charT,traits,Allocator>& lhs, const basic_string<charT,traits,Allocator>& rhs)
+{
+	if(lhs.compare(rhs) > 0){
+		return true;
+	}
+	return false;
+}
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT bool
+	operator> (const basic_string<charT,traits,Allocator>& lhs, const charT* rhs)
+{
+	basic_string<charT,traits,Allocator> temp(rhs);
+	if(lhs.compare(rhs) > 0){
+		return true;
+	}
+	return false;
+}
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT bool
+	operator> (const charT* lhs, const basic_string<charT,traits,Allocator>& rhs)
+{
+	basic_string<charT,traits,Allocator> temp(lhs);
+	if(temp.compare(rhs) > 0){
+		return true;
+	}
+	return false;
+}
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT bool
+	operator<=(const basic_string<charT,traits,Allocator>& lhs, const basic_string<charT,traits,Allocator>& rhs)
+{
+	if(lhs.compare(rhs) <=0){
+		return true;
+	}
+	return false;
+}
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT bool
+	operator<=(const basic_string<charT,traits,Allocator>& lhs, const charT* rhs)
+{
+	basic_string<charT,traits,Allocator> temp(rhs);
+	if(lhs.compare(temp) <=0 ){
+		return true;
+	}
+	return false;
+}
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT bool
+	operator<=(const charT* lhs, const basic_string<charT,traits,Allocator>& rhs)
+{
+	basic_string<charT,traits,Allocator> temp(lhs);
+	if(temp.compare(rhs) <= 0){
+		return true;
+	}
+	return false;
+}
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT bool
+	operator>=(const basic_string<charT,traits,Allocator>& lhs, const basic_string<charT,traits,Allocator>& rhs)
+{
+	if(lhs.compare(rhs) >=0){
+		return true;
+	}
+	return false;
+}
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT bool
+	operator>=(const basic_string<charT,traits,Allocator>& lhs, const charT* rhs)
+{
+	basic_string<charT,traits,Allocator> temp(rhs);
+	if(lhs.compare(temp) >=0 ){
+		return true;
+	}
+	return false;
+}
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT bool
+	operator>=(const charT* lhs, const basic_string<charT,traits,Allocator>& rhs)
+{
+	basic_string<charT,traits,Allocator> temp(lhs);
+	if(temp.compare(rhs) >=0 ){
+		return true;
+	}
+	return false;
+}
+
+template<class charT, class traits, class Allocator> _UCXXEXPORT void
+	swap(basic_string<charT,traits,Allocator>& lhs, basic_string<charT,traits,Allocator>& rhs)
+{
+	lhs.swap(rhs);
+}
+
+/*template<class charT, class traits, class Allocator> _UCXXEXPORT basic_ostream<charT, traits>&
+	operator<<(basic_ostream<charT, traits>& os, const basic_string<charT,traits,Allocator>& str)
+{
+	return os.write(str.data(), str.length());
+}*/
+
+#ifdef __UCLIBCXX_EXPAND_STRING_CHAR__
+#ifndef __UCLIBCXX_COMPILE_STRING__
+
+//Operators we can avoid duplication of
+
+template <> _UCXXEXPORT bool operator==(const string & lhs, const string & rhs);
+template <> _UCXXEXPORT bool operator==(const char * lhs, const string & rhs);
+template <> _UCXXEXPORT bool operator==(const string & lhs, const char * rhs);
+
+template <> _UCXXEXPORT bool operator!=(const string & lhs, const string & rhs);
+template <> _UCXXEXPORT bool operator!=(const char * lhs, const string & rhs);
+template <> _UCXXEXPORT bool operator!=(const string & lhs, const char * rhs);
+
+template <> _UCXXEXPORT string operator+(const string & lhs, const char* rhs);
+template <> _UCXXEXPORT string operator+(const char* lhs, const string & rhs);
+template <> _UCXXEXPORT string operator+(const string & lhs, const string & rhs);
+
+template <> _UCXXEXPORT bool operator> (const string & lhs, const string & rhs);
+template <> _UCXXEXPORT bool operator< (const string & lhs, const string & rhs);
+
+
+#endif
+#endif
+
+inline string to_string(int __val)
+{
+	const bool __neg = __val < 0;
+	const unsigned __uval = __neg ? (unsigned)~__val + 1u : __val;
+	const auto __len = __detail::__to_chars_len(__uval);
+	string __str(__neg + __len, '-');
+	if (__str.size() == __neg + __len)
+		__detail::__to_chars_10_impl(&__str[__neg], __len, __uval);
+	return __str;
+}
+
+inline string to_string(unsigned int __val)
+{
+	string __str(__detail::__to_chars_len(__val), '\0');
+	if (!__str.empty())
+		__detail::__to_chars_10_impl(&__str[0], __str.size(), __val);
+	return __str;
+}
+
+inline string to_string(long __val)
+{
+	const bool __neg = __val < 0;
+	const unsigned long __uval = __neg ? (unsigned long)~__val + 1ul : __val;
+	const auto __len = __detail::__to_chars_len(__uval);
+	string __str(__neg + __len, '-');
+	if (__str.size() == __neg + __len)
+		__detail::__to_chars_10_impl(&__str[__neg], __len, __uval);
+	return __str;
+}
+
+inline string to_string(unsigned long __val)
+{
+	string __str(__detail::__to_chars_len(__val), '\0');
+	if (!__str.empty())
+		__detail::__to_chars_10_impl(&__str[0], __str.size(), __val);
+	return __str;
+}
+
+inline string to_string(long long __val)
+{
+	const bool __neg = __val < 0;
+	const unsigned long long __uval = __neg ? (unsigned long long)~__val + 1ull : __val;
+	const auto __len = __detail::__to_chars_len(__uval);
+	string __str(__neg + __len, '-');
+	if (__str.size() == __neg + __len)
+		__detail::__to_chars_10_impl(&__str[__neg], __len, __uval);
+	return __str;
+}
+
+inline string to_string(unsigned long long __val)
+{
+	string __str(__detail::__to_chars_len(__val), '\0');
+	if (!__str.empty())
+		__detail::__to_chars_10_impl(&__str[0], __str.size(), __val);
+	return __str;
+}
+
+}
+
+#pragma GCC visibility pop
+
+#endif

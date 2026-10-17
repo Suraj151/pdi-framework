@@ -48,7 +48,21 @@ ScriptRunner::keyword_t ScriptRunner::keyword(const pdiutil::string &line, pdiut
     }
     case 'e': {
       pdiutil::string kwelse = CHARPTR_WRAP(SCRIPT_KEYWORD_ELSE);
-      if( word == kwelse ) found = KEYWORD_ELSE;
+      if( word == kwelse ){ found = KEYWORD_ELSE; break; }
+      pdiutil::string kwelif = CHARPTR_WRAP(SCRIPT_KEYWORD_ELIF);
+      if( word == kwelif ){ found = KEYWORD_ELIF; break; }
+      pdiutil::string kwexit = CHARPTR_WRAP(SCRIPT_KEYWORD_EXIT);
+      if( word == kwexit ) found = KEYWORD_EXIT;
+      break;
+    }
+    case 'b': {
+      pdiutil::string kwbreak = CHARPTR_WRAP(SCRIPT_KEYWORD_BREAK);
+      if( word == kwbreak ) found = KEYWORD_BREAK;
+      break;
+    }
+    case 'c': {
+      pdiutil::string kwcontinue = CHARPTR_WRAP(SCRIPT_KEYWORD_CONTINUE);
+      if( word == kwcontinue ) found = KEYWORD_CONTINUE;
       break;
     }
     case 'f': {
@@ -94,6 +108,33 @@ bool ScriptRunner::skipping(script_frame_t &frame)
     if( frame.m_blocks[i].m_skipping ) return true;
   }
   return false;
+}
+
+/**
+ * The innermost open while or for, or -1 when the line is in no loop.
+ */
+int16_t ScriptRunner::innermostLoop(script_frame_t &frame)
+{
+  for( int16_t i = (int16_t)frame.m_blocks.size() - 1; i >= 0; i-- ){
+    if( SCRIPT_BLOCK_IF != frame.m_blocks[i].m_kind ) return i;
+  }
+  return -1;
+}
+
+/**
+ * Goes back to the head of the innermost block's loop for its next pass, or
+ * fails when the loop has used every pass it is allowed.
+ */
+bool ScriptRunner::loopBack(script_frame_t &frame)
+{
+  if( frame.m_blocks.back().m_passes + 1 >= SCRIPT_LOOP_MAX ){
+    return false;
+  }
+
+  frame.m_line = frame.m_blocks.back().m_head;
+  frame.m_loop_passes = frame.m_blocks.back().m_passes + 1;
+  frame.m_blocks.pop_back();
+  return true;
 }
 
 /**
@@ -273,6 +314,7 @@ pdi_err_t ScriptRunner::drain(uint32_t floor)
 
     pdiutil::string rest;
     keyword_t word = keyword(statement, rest);
+    bool branch = false;
 
     {
       script_frame_t &frame = session->m_scripts.back();
@@ -304,7 +346,33 @@ pdi_err_t ScriptRunner::drain(uint32_t floor)
             return CMD_ERROR_FAILED;
           }
 
-          frame.m_blocks.pop_back();
+          if( frame.m_blocks.back().m_continue ){
+            if( !loopBack(frame) ){
+              session->m_scripts.clear();
+              return CMD_ERROR_FAILED;
+            }
+          }else{
+            frame.m_blocks.pop_back();
+          }
+
+        }else if( KEYWORD_ELIF == word ){
+
+          if( 0 == frame.m_blocks.size() ||
+              SCRIPT_BLOCK_IF != frame.m_blocks.back().m_kind ){
+            session->m_scripts.clear();
+            return CMD_ERROR_FAILED;
+          }
+
+          script_block_t &block = frame.m_blocks.back();
+
+          if( block.m_skipping && !block.m_taken ){
+            if( rest.empty() ){
+              session->m_scripts.clear();
+              return CMD_ERROR_FAILED;
+            }
+            statement = rest;
+            branch = true;
+          }
 
         }else if( KEYWORD_ELSE == word ){
 
@@ -322,6 +390,58 @@ pdi_err_t ScriptRunner::drain(uint32_t floor)
           }
         }
 
+        if( !branch ){
+          continue;
+        }
+      }
+
+      if( KEYWORD_ELIF == word && !branch ){
+
+        if( 0 == frame.m_blocks.size() ||
+            SCRIPT_BLOCK_IF != frame.m_blocks.back().m_kind ){
+          session->m_scripts.clear();
+          return CMD_ERROR_FAILED;
+        }
+
+        frame.m_blocks.back().m_skipping = true;
+        continue;
+      }
+
+      if( KEYWORD_BREAK == word || KEYWORD_CONTINUE == word ){
+
+        int16_t loop = innermostLoop(frame);
+        if( loop < 0 ){
+          session->m_scripts.clear();
+          return CMD_ERROR_FAILED;
+        }
+
+        frame.m_blocks[loop].m_skipping = true;
+        frame.m_blocks[loop].m_taken = true;
+        frame.m_blocks[loop].m_continue = (KEYWORD_CONTINUE == word);
+        continue;
+      }
+
+      if( KEYWORD_EXIT == word ){
+
+        if( !rest.empty() ){
+          int32_t status = 0;
+          pdiutil::string::size_type digits = 0;
+          bool number = !rest.empty();
+          for( pdiutil::string::size_type d = 0; d < rest.size(); d++ ){
+            if( 0 == d && '-' == rest[d] ) continue;
+            if( !__is_digit(rest[d]) ){ number = false; break; }
+            digits++;
+          }
+          if( !number || 0 == digits ){
+            session->m_scripts.clear();
+            return CMD_ERROR_FAILED;
+          }
+          status = StringToInt32(rest.c_str());
+          last = (pdi_err_t)status;
+        }
+
+        SessionManager::setLastExit(last);
+        session->m_scripts.pop_back();
         continue;
       }
 
@@ -350,14 +470,10 @@ pdi_err_t ScriptRunner::drain(uint32_t floor)
           return CMD_ERROR_FAILED;
         }
 
-        if( frame.m_blocks.back().m_passes + 1 >= SCRIPT_LOOP_MAX ){
+        if( !loopBack(frame) ){
           session->m_scripts.clear();
           return CMD_ERROR_FAILED;
         }
-
-        frame.m_line = frame.m_blocks.back().m_head;
-        frame.m_loop_passes = frame.m_blocks.back().m_passes + 1;
-        frame.m_blocks.pop_back();
 
         continue;
       }
@@ -395,6 +511,12 @@ pdi_err_t ScriptRunner::drain(uint32_t floor)
     bool named_noent = false;
     last = __cmd_service.runLine(statement, named_noent);
     SessionManager::setLastExit(last);
+
+    if( branch ){
+      script_block_t &block = session->m_scripts.back().m_blocks.back();
+      block.m_taken = (PDI_OK == last);
+      block.m_skipping = (PDI_OK != last);
+    }
 
     if( KEYWORD_IF == word || KEYWORD_WHILE == word ){
 
@@ -436,7 +558,8 @@ pdi_err_t ScriptRunner::drain(uint32_t floor)
  * Runs the file in the session that asked for it, so a cd or an export the
  * script performs is still in force once it returns.
  */
-pdi_err_t ScriptRunner::run(const char *path, bool exitonprompt)
+pdi_err_t ScriptRunner::run(const char *path, bool exitonprompt,
+                            const pdiutil::vector<pdiutil::string> *args)
 {
   session_t *session = SessionManager::current();
 
@@ -461,9 +584,31 @@ pdi_err_t ScriptRunner::run(const char *path, bool exitonprompt)
   script_frame_t frame;
   frame.m_path = path;
   frame.m_line = 0;
+  if( nullptr != args ){
+    frame.m_args = *args;
+  }
   session->m_scripts.push_back(frame);
 
   return drain(floor);
+}
+
+/**
+ * The arguments of the innermost script that was given any, or none outside
+ * a script; a source with no arguments sees its caller's.
+ */
+const pdiutil::vector<pdiutil::string> *ScriptRunner::arguments()
+{
+  session_t *session = SessionManager::current();
+
+  if( nullptr == session ) return nullptr;
+
+  for( uint32_t i = session->m_scripts.size(); i > 0; i-- ){
+    if( !session->m_scripts[i - 1].m_args.empty() ){
+      return &session->m_scripts[i - 1].m_args;
+    }
+  }
+
+  return nullptr;
 }
 
 /**

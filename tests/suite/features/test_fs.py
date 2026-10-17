@@ -312,26 +312,29 @@ def fedit_writes_a_file(t):
     path = "/wt_fedit.txt"
     body = "edited by fedit"
     t.run("rm %s" % path)
-
-    t.shell.send_line("fedit %s" % path)
-    t.shell.expect("ESC", t.timeout)
-    t.shell.drain(0.5)
-
-    t.shell.send_raw(body)
-    t.shell.drain(0.5)
-    t.shell.send_raw("\r")
-    t.shell.drain(0.5)
-
-    t.shell.send_raw("\x03")
-    t.shell.expect("save", t.timeout)
-    t.shell.send_line("!w")
-    t.shell.expect("saved", t.timeout)
-    t.shell.expect(PROMPT, t.timeout)
+    t.run("rm %s.tmp" % path)
 
     try:
+        t.shell.send_line("fedit %s" % path)
+        t.shell.expect("ESC", t.timeout)
+        t.shell.drain(0.5)
+
+        t.shell.send_raw(body)
+        t.shell.drain(0.5)
+        t.shell.send_raw("\r")
+        t.shell.drain(0.5)
+
+        t.shell.send_raw("\x03")
+        t.shell.expect("save", t.timeout)
+        t.shell.send_line("!w")
+        t.shell.expect("saved", t.timeout)
+        t.shell.expect(PROMPT, t.timeout)
+
         expect_in(body, t.run("cat %s" % path), "fedit saved the typed text")
     finally:
+        t.resync()
         t.run("rm %s" % path)
+        t.run("rm %s.tmp" % path)
 
 
 @test("fedit cancels an edit without changing the file",
@@ -341,25 +344,28 @@ def fedit_cancel_keeps_original(t):
 
     path = "/wt_fecancel.txt"
     t.run("rm %s" % path)
+    t.run("rm %s.tmp" % path)
     t.run("echo keepthis > %s" % path)
 
-    t.shell.send_line("fedit %s" % path)
-    t.shell.expect("ESC", t.timeout)
-    t.shell.drain(0.5)
-    t.shell.send_raw("JUNKEDIT")
-    t.shell.drain(0.5)
-    t.shell.send_raw("\x03")
-    t.shell.expect("cancel", t.timeout)
-    t.shell.send_line("!c")
-    t.shell.expect("cancelled", t.timeout)
-    t.shell.expect(PROMPT, t.timeout)
-
     try:
+        t.shell.send_line("fedit %s" % path)
+        t.shell.expect("ESC", t.timeout)
+        t.shell.drain(0.5)
+        t.shell.send_raw("JUNKEDIT")
+        t.shell.drain(0.5)
+        t.shell.send_raw("\x03")
+        t.shell.expect("cancel", t.timeout)
+        t.shell.send_line("!c")
+        t.shell.expect("cancelled", t.timeout)
+        t.shell.expect(PROMPT, t.timeout)
+
         out = t.run("cat %s" % path)
         expect_in("keepthis", out, "cancel kept the original content")
         expect_not_in("JUNKEDIT", out, "cancel discarded the edit")
     finally:
+        t.resync()
         t.run("rm %s" % path)
+        t.run("rm %s.tmp" % path)
 
 
 @test("fedit keeps the permissions of the file it saves",
@@ -374,7 +380,7 @@ def fedit_save_keeps_permissions(t):
     from ..driver.shell import PROMPT
 
     path = "feperm.txt"
-    t.workspace("/wt_feperm")
+    t.workspace(W + "feperm")
     t.run("echo secret > %s" % path)
     t.run("chmod 600 %s" % path)
 

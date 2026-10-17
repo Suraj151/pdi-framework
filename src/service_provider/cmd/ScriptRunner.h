@@ -31,7 +31,14 @@ public:
    * Runs the file in the session that asked for it, so a cd or an export the
    * script performs is still in force once it returns.
    */
-  static pdi_err_t run(const char *path, bool exitonprompt = true);
+  static pdi_err_t run(const char *path, bool exitonprompt = true,
+                       const pdiutil::vector<pdiutil::string> *args = nullptr);
+
+  /**
+   * The arguments of the innermost script that was given any, or none outside
+   * a script; a source with no arguments sees its caller's.
+   */
+  static const pdiutil::vector<pdiutil::string> *arguments();
 
   /**
    * Carries on with the script the session stopped in, once whatever asked
@@ -89,8 +96,23 @@ private:
     KEYWORD_FI,
     KEYWORD_WHILE,
     KEYWORD_DONE,
-    KEYWORD_FOR
+    KEYWORD_FOR,
+    KEYWORD_ELIF,
+    KEYWORD_BREAK,
+    KEYWORD_CONTINUE,
+    KEYWORD_EXIT
   };
+
+  /**
+   * The innermost open while or for, or -1 when the line is in no loop.
+   */
+  static int16_t innermostLoop(script_frame_t &frame);
+
+  /**
+   * Goes back to the head of the innermost block's loop for its next pass, or
+   * fails when the loop has used every pass it is allowed.
+   */
+  static bool loopBack(script_frame_t &frame);
 
   /**
    * Runs lines from the innermost open script until the stack is back down to

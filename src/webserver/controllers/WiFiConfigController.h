@@ -179,7 +179,7 @@ public:
     bool _is_error = true;
 
 #if defined(ALLOW_WIFI_CONFIG_MODIFICATION) || defined(ALLOW_WIFI_SSID_PASSKEY_CONFIG_MODIFICATION_ONLY)
-    if (this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("sta_ssid")) && this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("sta_pswd")))
+    if (this->m_web_resource->m_server->isPostRequest() && this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("sta_ssid")) && this->m_web_resource->m_server->hasArg(CHARPTR_WRAP("sta_pswd")))
     {
 
       pdiutil::string _sta_ssid = this->m_web_resource->m_server->arg(CHARPTR_WRAP("sta_ssid"));
@@ -210,40 +210,44 @@ public:
       LogI("ap subnet : %s\n\n", _ap_sip.c_str());
       __i_dvc_ctrl.yield();
 
-      if (_sta_ssid.size() <= WIFI_CONFIGS_BUF_SIZE && _sta_pswd.size() <= WIFI_CONFIGS_BUF_SIZE
+      const uint8_t _ip_max = 20;
+
+      if (_sta_ssid.size() < WIFI_CONFIGS_BUF_SIZE && _sta_pswd.size() < WIFI_CONFIGS_BUF_SIZE
 
 #ifdef ALLOW_WIFI_CONFIG_MODIFICATION
-          && _ap_ssid.size() <= WIFI_CONFIGS_BUF_SIZE && _ap_pswd.size() <= WIFI_CONFIGS_BUF_SIZE &&
-          _sta_ssid.size() > MIN_ACCEPTED_ARG_SIZE && _ap_ssid.size() > MIN_ACCEPTED_ARG_SIZE
+          && _ap_ssid.size() < WIFI_CONFIGS_BUF_SIZE && _ap_pswd.size() < WIFI_CONFIGS_BUF_SIZE &&
+          _sta_ssid.size() > MIN_ACCEPTED_ARG_SIZE && _ap_ssid.size() > MIN_ACCEPTED_ARG_SIZE &&
+          _sta_lip.size() < _ip_max && _sta_gip.size() < _ip_max && _sta_sip.size() < _ip_max &&
+          _ap_lip.size() < _ip_max && _ap_gip.size() < _ip_max && _ap_sip.size() < _ip_max
 #endif
 
       )
       {
 
-        char _ip_address[20];
-        memset(_ip_address, 0, 20);
+        char _ip_address[_ip_max];
+        memset(_ip_address, 0, _ip_max);
 
 #ifdef ALLOW_WIFI_CONFIG_MODIFICATION
 
         _ClearObject(&this->wifi_configs);
 
-        strncpy(this->wifi_configs.sta_ssid, _sta_ssid.c_str(), _sta_ssid.size());
-        strncpy(this->wifi_configs.sta_password, _sta_pswd.c_str(), _sta_pswd.size());
-        strncpy(_ip_address, _sta_lip.c_str(), _sta_lip.size());
-        __str_ip_to_int(_ip_address, this->wifi_configs.sta_local_ip, 20);
-        strncpy(_ip_address, _sta_gip.c_str(), _sta_gip.size());
-        __str_ip_to_int(_ip_address, this->wifi_configs.sta_gateway, 20);
-        strncpy(_ip_address, _sta_sip.c_str(), _sta_sip.size());
-        __str_ip_to_int(_ip_address, this->wifi_configs.sta_subnet, 20);
+        __copy_to_buffer(this->wifi_configs.sta_ssid, WIFI_CONFIGS_BUF_SIZE, _sta_ssid.c_str(), _sta_ssid.size());
+        __copy_to_buffer(this->wifi_configs.sta_password, WIFI_CONFIGS_BUF_SIZE, _sta_pswd.c_str(), _sta_pswd.size());
+        __copy_to_buffer(_ip_address, _ip_max, _sta_lip.c_str(), _sta_lip.size());
+        __str_ip_to_int(_ip_address, this->wifi_configs.sta_local_ip, _ip_max);
+        __copy_to_buffer(_ip_address, _ip_max, _sta_gip.c_str(), _sta_gip.size());
+        __str_ip_to_int(_ip_address, this->wifi_configs.sta_gateway, _ip_max);
+        __copy_to_buffer(_ip_address, _ip_max, _sta_sip.c_str(), _sta_sip.size());
+        __str_ip_to_int(_ip_address, this->wifi_configs.sta_subnet, _ip_max);
 
-        strncpy(this->wifi_configs.ap_ssid, _ap_ssid.c_str(), _ap_ssid.size());
-        strncpy(this->wifi_configs.ap_password, _ap_pswd.c_str(), _ap_pswd.size());
-        strncpy(_ip_address, _ap_lip.c_str(), _ap_lip.size());
-        __str_ip_to_int(_ip_address, this->wifi_configs.ap_local_ip, 20);
-        strncpy(_ip_address, _ap_gip.c_str(), _ap_gip.size());
-        __str_ip_to_int(_ip_address, this->wifi_configs.ap_gateway, 20);
-        strncpy(_ip_address, _ap_sip.c_str(), _ap_sip.size());
-        __str_ip_to_int(_ip_address, this->wifi_configs.ap_subnet, 20);
+        __copy_to_buffer(this->wifi_configs.ap_ssid, WIFI_CONFIGS_BUF_SIZE, _ap_ssid.c_str(), _ap_ssid.size());
+        __copy_to_buffer(this->wifi_configs.ap_password, WIFI_CONFIGS_BUF_SIZE, _ap_pswd.c_str(), _ap_pswd.size());
+        __copy_to_buffer(_ip_address, _ip_max, _ap_lip.c_str(), _ap_lip.size());
+        __str_ip_to_int(_ip_address, this->wifi_configs.ap_local_ip, _ip_max);
+        __copy_to_buffer(_ip_address, _ip_max, _ap_gip.c_str(), _ap_gip.size());
+        __str_ip_to_int(_ip_address, this->wifi_configs.ap_gateway, _ip_max);
+        __copy_to_buffer(_ip_address, _ip_max, _ap_sip.c_str(), _ap_sip.size());
+        __str_ip_to_int(_ip_address, this->wifi_configs.ap_subnet, _ip_max);
 
         pdiutil::string _enable_flag = CHARPTR_WRAP("enable");
         this->wifi_configs.sta_enable = (_sta_en == _enable_flag);
@@ -251,8 +255,8 @@ public:
 
 #else
 
-        strncpy(this->wifi_configs.sta_ssid, _sta_ssid.c_str(), _sta_ssid.size());
-        strncpy(this->wifi_configs.sta_password, _sta_pswd.c_str(), _sta_pswd.size());
+        __copy_to_buffer(this->wifi_configs.sta_ssid, WIFI_CONFIGS_BUF_SIZE, _sta_ssid.c_str(), _sta_ssid.size());
+        __copy_to_buffer(this->wifi_configs.sta_password, WIFI_CONFIGS_BUF_SIZE, _sta_pswd.c_str(), _sta_pswd.size());
 
 #endif
 

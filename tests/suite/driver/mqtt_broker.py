@@ -29,6 +29,9 @@ SUBSCRIBE = 8
 SUBACK = 9
 UNSUBSCRIBE = 10
 UNSUBACK = 11
+PUBREC = 5
+PUBREL = 6
+PUBCOMP = 7
 PINGREQ = 12
 PINGRESP = 13
 DISCONNECT = 14
@@ -42,6 +45,8 @@ class Message(object):
         self.qos = qos
         self.retain = retain
         self.at = time.time()
+        self.dup = False
+        self.packet_id = None
 
     @property
     def text(self):
@@ -103,6 +108,11 @@ class MqttBroker(object):
         self.wills_delivered = []   # wills this broker published on a drop
         self.unsubscribed = []      # topics the client asked to leave
         self.pings = 0
+        self.connack_code = 0       # what CONNACK answers; non-zero refuses
+        self.ack_publishes = True   # False withholds PUBACK / PUBREC from the client's publishes
+        self.silent = False         # True reads everything and answers nothing
+        self.acks = []              # (packet type, packet id) the client acknowledged with
+        self.unknown = []           # packet types the client sent that this broker does not know
 
         self._socket = None
         self._thread = None
@@ -221,14 +231,30 @@ class MqttBroker(object):
             time.sleep(0.5)
         return False
 
-    def publish(self, topic, payload, qos=0):
+    def send_raw(self, data):
+        """Write bytes to the connected client exactly as given, valid or not."""
+        with self._lock:
+            client = self._client
+        if client is None:
+            return False
+        try:
+            client.sendall(data)
+            return True
+        except OSError:
+            return False
+
+    def acks_of(self, kind):
+        with self._lock:
+            return [packet_id for (k, packet_id) in self.acks if k == kind]
+
+    def publish(self, topic, payload, qos=0, packet_id=1):
         """Send a PUBLISH to the connected client."""
         if isinstance(payload, str):
             payload = payload.encode()
 
         header = _encode_string(topic)
         if qos:
-            header += struct.pack(">H", 1)
+            header += struct.pack(">H", packet_id)
 
         body = header + payload
         packet = bytes([(PUBLISH << 4) | (qos << 1)]) + _encode_remaining(len(body)) + body
@@ -349,7 +375,18 @@ class MqttBroker(object):
 
             kind = first >> 4
 
-            if CONNECT == kind:
+            if self.silent and CONNECT != kind:
+                continue
+
+            if kind in (PUBACK, PUBREC, PUBCOMP, PUBREL) and len(body) >= 2:
+                packet_id = struct.unpack(">H", body[:2])[0]
+                with self._lock:
+                    self.acks.append((kind, packet_id))
+                if PUBREC == kind:
+                    client.sendall(bytes([(PUBREL << 4) | 0x02, 2]) + struct.pack(">H", packet_id))
+                elif PUBREL == kind:
+                    client.sendall(bytes([PUBCOMP << 4, 2]) + struct.pack(">H", packet_id))
+            elif CONNECT == kind:
                 self._on_connect(client, body)
             elif PUBLISH == kind:
                 self._on_publish(client, first, body)
@@ -366,6 +403,9 @@ class MqttBroker(object):
                     if self._session is not None:
                         self._session.disconnected_cleanly = True
                 return
+            elif kind not in (PUBACK, PUBREC, PUBCOMP, PUBREL):
+                with self._lock:
+                    self.unknown.append(kind)
 
     def _on_connect(self, client, body):
         offset = 0
@@ -403,7 +443,9 @@ class MqttBroker(object):
             self._session = session
             self.sessions.append(session)
 
-        client.sendall(bytes([CONNACK << 4, 2, 0, 0]))   # accepted
+        if self.silent:
+            return
+        client.sendall(bytes([CONNACK << 4, 2, 0, self.connack_code]))
 
     def _on_publish(self, client, first, body):
         qos = (first & 0x06) >> 1
@@ -418,11 +460,18 @@ class MqttBroker(object):
             packet_id = struct.unpack(">H", body[offset:offset + 2])[0]
             offset += 2
 
+        message = Message(topic, body[offset:], qos, retain)
+        message.dup = bool(first & 0x08)
+        message.packet_id = packet_id
         with self._lock:
-            self.messages.append(Message(topic, body[offset:], qos, retain))
+            self.messages.append(message)
 
-        if 1 == qos and packet_id is not None:
+        if not self.ack_publishes or packet_id is None:
+            return
+        if 1 == qos:
             client.sendall(bytes([PUBACK << 4, 2]) + struct.pack(">H", packet_id))
+        elif 2 == qos:
+            client.sendall(bytes([PUBREC << 4, 2]) + struct.pack(">H", packet_id))
 
     def _on_unsubscribe(self, client, body):
         packet_id = struct.unpack(">H", body[:2])[0]

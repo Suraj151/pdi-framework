@@ -64,6 +64,7 @@ protected:
   uint16_t        m_port;
   ipaddress_t     m_collector_ip;
   bool            m_resolved;
+  int16_t         m_listener_id;
 #endif
 };
 

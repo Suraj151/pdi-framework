@@ -95,7 +95,7 @@ public:
 			return;
 		}
 
-		if (this->m_web_resource->m_server->hasArg("dhst"))
+		if (this->m_web_resource->m_server->isPostRequest() && this->m_web_resource->m_server->hasArg("dhst"))
 		{
 			pdiutil::string _device_iot_duid = this->m_web_resource->m_server->arg("duid");
 			pdiutil::string _device_iot_host = this->m_web_resource->m_server->arg("dhst");
@@ -106,14 +106,21 @@ public:
 
 			device_iot_config_table _device_iot_configs;
 			this->m_web_resource->m_db_conn->get_device_iot_config_table(&_device_iot_configs);
-			memset(_device_iot_configs.device_iot_duid, 0, DEVICE_IOT_DUID_MAX_LENGTH);
-			strncpy(_device_iot_configs.device_iot_duid, _device_iot_duid.c_str(), _device_iot_duid.size()); 
-			memset(_device_iot_configs.device_iot_host, 0, DEVICE_IOT_HOST_BUF_SIZE);
-			strncpy(_device_iot_configs.device_iot_host, _device_iot_host.c_str(), _device_iot_host.size()); 
-			this->m_web_resource->m_db_conn->set_device_iot_config_table(&_device_iot_configs);
 
 			pdiutil::string _response = "";
-			__device_iot_service.handleRegistrationOtpRequest(&_device_iot_configs, _response);
+
+			if (_device_iot_duid.size() < DEVICE_IOT_DUID_MAX_LENGTH && _device_iot_host.size() < DEVICE_IOT_HOST_BUF_SIZE)
+			{
+				__copy_to_buffer(_device_iot_configs.device_iot_duid, DEVICE_IOT_DUID_MAX_LENGTH, _device_iot_duid.c_str(), _device_iot_duid.size());
+				__copy_to_buffer(_device_iot_configs.device_iot_host, DEVICE_IOT_HOST_BUF_SIZE, _device_iot_host.c_str(), _device_iot_host.size());
+				this->m_web_resource->m_db_conn->set_device_iot_config_table(&_device_iot_configs);
+
+				__device_iot_service.handleRegistrationOtpRequest(&_device_iot_configs, _response);
+			}
+			else
+			{
+				_response = CHARPTR_WRAP("{\"status\":false,\"remark\":\"Device id or host is too long !\"}");
+			}
 
 			this->m_web_resource->m_server->addHeader(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_CACHE_CONTROL), CHARPTR_WRAP_RO(HTTP_HEADER_VALUE_NO_CACHE));
 			this->m_web_resource->m_server->send(HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _response.c_str());

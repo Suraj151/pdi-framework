@@ -33,6 +33,30 @@ tier, and naming a `--fuzz-target` adds the fuzz tier. `--user`, `--key`, `--tim
 cycles a serial target before testing, which drops its network for a while, so it is off by
 default.
 
+### Every host stage runs in parallel
+
+`--jobs` defaults to the machine's cpu count, and every host stage spreads over it:
+
+| Stage | One process per | Order |
+|---|---|---|
+| unit | suite (`pdi_host_tests --filter <suite>`), each in a scratch working directory | longest first, from `.build/unit-suite-times.txt` |
+| system `--features` | feature suite, each with its own `pdid`, store and port range; `mdns` runs alone at the end | longest first, from `.build/feature-suite-times.txt` |
+| fuzz | harness | all at once |
+
+A suite is never split: its tests run in the order they are written, because later tests in a
+suite may build on what earlier ones did. Only whole suites run side by side. Each run records how
+long every suite took, so the slowest start first next time. Each worker's `pdid` takes its
+shadow ports (`--port-base`) from 2000 upwards in steps of 500 — below the kernel's ephemeral
+range, and checked free before use — so no other socket on the machine can be holding them.
+
+`scripts/SyntaxSweep.py` takes the same `--jobs` and compiles its files side by side. A suite's
+output is printed whole when it ends, and the totals at the bottom are the sum. `--jobs 1` runs
+everything in turn — the way to read one failure on its own. Run the stages one after another, not
+two at once: the feature suites measure timeouts and slow down under a competing load.
+
+Each suite running in a process of its own also means it starts from nothing: a suite that only
+passes after another suite has run is depending on that suite's leftovers, and it fails here.
+
 ### Several transports at once
 
 `--device` is repeatable, and `--mode` decides what that means:

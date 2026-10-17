@@ -14,6 +14,7 @@ created Date    : 30th Aug 2026
 ******************************************************************************/
 
 #include <MountedStack.h>
+#include <ShellHarness.h>
 #include <pditest.h>
 
 #include <service_provider/ServiceProvider.h>
@@ -253,6 +254,7 @@ TEST(servicetasks, a_task_can_be_given_the_deadline_policy)
 
 TEST(servicetasks, a_task_that_is_rarely_due_does_not_hold_back_one_that_is)
 {
+    pditest::readyScheduler();
     int fast = 0;
     int slow = 0;
 
@@ -279,6 +281,7 @@ TEST(servicetasks, a_task_that_is_rarely_due_does_not_hold_back_one_that_is)
 
 TEST(servicetasks, a_deadline_task_is_served_more_often_than_a_default_one)
 {
+    pditest::readyScheduler();
     int deadline_runs = 0;
     int fifo_runs = 0;
 
@@ -313,6 +316,7 @@ TEST(servicetasks, a_deadline_task_is_served_more_often_than_a_default_one)
 
 TEST(servicetasks, round_robin_ignores_priority_where_the_default_policy_does_not)
 {
+    pditest::readyScheduler();
     int low_runs = 0;
     int high_runs = 0;
 

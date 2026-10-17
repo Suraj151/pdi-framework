@@ -12,9 +12,11 @@ Tiers
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
+import time
 
 TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 HOST_DIR = os.path.join(TESTS_DIR, "host")
@@ -34,6 +36,9 @@ FUZZ_TARGETS = (
     "fuzz_dbrecord",
     "fuzz_config",
     "fuzz_crontab",
+    "fuzz_mdns",
+    "fuzz_json",
+    "fuzz_mqtt",
 )
 
 GREEN = "\033[32m"
@@ -140,8 +145,8 @@ def build_fuzz(targets):
     return True
 
 
-def run_fuzz(targets, seconds, verbose, list_only):
-    """Run each harness for a bounded time and report anything it saved."""
+def run_fuzz(targets, seconds, verbose, list_only, jobs=1):
+    """Run each harness for a bounded time, up to `jobs` at once, and report anything it saved."""
 
     if list_only:
         for target in targets:
@@ -162,13 +167,10 @@ def run_fuzz(targets, seconds, verbose, list_only):
     environment["ASAN_OPTIONS"] = "detect_leaks=0:abort_on_error=0"
     environment["UBSAN_OPTIONS"] = "halt_on_error=1:print_stacktrace=1"
 
-    failed = 0
-    for target in targets:
+    def one(target):
         binary = os.path.join(FUZZ_BUILD_DIR, "fuzz", target)
         if not os.path.exists(binary):
-            fail("%s missing at %s" % (target, binary))
-            failed += 1
-            continue
+            return target, None, binary
 
         corpus = os.path.join(FUZZ_DIR, "corpus", target)
         findings = os.path.join(FUZZ_DIR, "findings", target)
@@ -188,7 +190,20 @@ def run_fuzz(targets, seconds, verbose, list_only):
             "-artifact_prefix=%s%s" % (findings, os.sep),
         ]
 
-        result = subprocess.run(args, env=environment, capture_output=True, text=True)
+        return target, subprocess.run(args, env=environment, capture_output=True, text=True), binary
+
+    import concurrent.futures
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, jobs)) as pool:
+        runs = list(pool.map(one, targets))
+
+    failed = 0
+    for target, result, binary in runs:
+        if result is None:
+            fail("%s missing at %s" % (target, binary))
+            failed += 1
+            continue
+
         summary = [line for line in result.stderr.splitlines()
                    if line.startswith("stat::") or line.startswith("#") and "DONE" in line]
 
@@ -214,11 +229,44 @@ def run_fuzz(targets, seconds, verbose, list_only):
     return 0
 
 
-def run_unit(feature, verbose, list_only):
+UNIT_SUMMARY = re.compile(r"(?:(\d+) failed, )?(\d+) passed, (\d+) total")
+UNIT_TIMES = os.path.join(BUILD_DIR, "unit-suite-times.txt")
+FEATURE_TIMES = os.path.join(BUILD_DIR, "feature-suite-times.txt")
+SHADOW_BASE_FIRST = 2000
+SHADOW_BASE_STEP = 500
+SHADOW_PORTS = (22, 23, 80, 443)
+
+
+def load_times(path):
+    """Seconds each suite took on its last run, so the slowest can start first."""
+    taken = {}
+    if os.path.exists(path):
+        with open(path) as times:
+            for line in times:
+                parts = line.split()
+                if len(parts) == 2:
+                    taken[parts[0]] = float(parts[1])
+    return taken
+
+
+def save_times(path, taken):
+    """Keeps the suites this run did not touch, so a filtered run does not forget them."""
+    merged = load_times(path)
+    merged.update(taken)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as times:
+        for suite in sorted(merged):
+            times.write("%s %.3f\n" % (suite, merged[suite]))
+
+
+def run_unit(feature, verbose, list_only, jobs=1):
     binary = os.path.join(BUILD_DIR, "pdi_host_tests")
     if not os.path.exists(binary):
         fail("unit test binary missing at %s" % binary)
         return 1
+
+    if jobs > 1 and not list_only and (not feature or "." not in feature):
+        return run_unit_parallel(binary, feature, verbose, jobs)
 
     args = [binary]
     if list_only:
@@ -229,6 +277,74 @@ def run_unit(feature, verbose, list_only):
         args.append("--verbose")
 
     return subprocess.run(args).returncode
+
+
+def run_unit_parallel(binary, feature, verbose, jobs):
+    """
+    One process per suite, at most `jobs` at a time, each in a scratch working
+    directory of its own, its tests in the order they are written. The suites
+    that took longest last time start first, a suite's output is printed whole
+    when it ends, and the totals are added up.
+    """
+    import concurrent.futures
+    import tempfile
+
+    listing = subprocess.run([binary, "--list"] + (["--filter", feature] if feature else []),
+                             capture_output=True, text=True)
+    suites = []
+    for line in listing.stdout.splitlines():
+        name = line.strip().split(".", 1)[0]
+        if name and name not in suites:
+            suites.append(name)
+    if not suites:
+        fail("no unit suite matches %r" % feature)
+        return 1
+
+    last = load_times(UNIT_TIMES)
+    suites.sort(key=lambda s: -last.get(s, 0.0))
+
+    say("%s%d suites over %d workers%s" % (DIM, len(suites), jobs, RESET))
+    began = time.time()
+
+    def one(suite):
+        workdir = tempfile.mkdtemp(prefix="pdi-unit-%s-" % suite)
+        started = time.time()
+        try:
+            result = subprocess.run([binary, "--filter", suite] + (["--verbose"] if verbose else []),
+                                    capture_output=True, text=True, cwd=workdir)
+        finally:
+            shutil.rmtree(workdir, ignore_errors=True)
+        return suite, result, time.time() - started
+
+    totals = [0, 0, 0]
+    failures = []
+    taken = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
+        for future in concurrent.futures.as_completed([pool.submit(one, s) for s in suites]):
+            suite, result, seconds = future.result()
+            taken[suite] = seconds
+            text = result.stdout + result.stderr
+            found = UNIT_SUMMARY.findall(COLOUR.sub("", text))
+            if found:
+                failed, passed, total = found[-1]
+                totals[0] += int(passed)
+                totals[1] += int(failed or 0)
+                totals[2] += int(total)
+            if 0 != result.returncode or not found:
+                failures.append(suite)
+                sys.stdout.write(text)
+            elif verbose:
+                sys.stdout.write(text)
+
+    save_times(UNIT_TIMES, taken)
+
+    say("")
+    say("%d passed, %d failed, %d total in %.1f s over %d workers"
+        % (totals[0], totals[1], totals[2], time.time() - began, jobs))
+    if failures:
+        fail("unit suites with a failure or no result: %s" % ", ".join(sorted(failures)))
+        return 1
+    return 0
 
 
 def run_system(feature, verbose, list_only):
@@ -480,11 +596,167 @@ def run_system_features(feature, verbose, timeout, username, password):
     sys.path.insert(0, TESTS_DIR)
     from suite.driver.host_shell import HostShell
 
+    from suite.driver.connect import connect
+
+    def peer_factory(peer_password=None):
+        peer, _ = connect("telnet:127.0.0.1:23", username=username,
+                          password=peer_password or password, reset=False)
+        return peer
+
     shell = HostShell(binary)
     try:
-        return run_features(shell, feature, verbose, timeout, username, password, "pdid")
+        return run_features(shell, feature, verbose, timeout, username, password, "pdid",
+                            peer_factory)
     finally:
         shell.close()
+
+
+# suites that multicast on a fixed group and port hear every other host
+# process's traffic, so they run once nothing else is running
+SOLO_SUITES = ("mdns",)
+
+# the longest suites start first, so the run is not left waiting on one of them
+SLOW_FIRST = ("timeouts", "shell", "mqtt", "scp", "gpio_live", "sessions", "script", "shell", "portal",
+              "cron", "proc", "wget", "ssh", "sftp", "fs", "terminal")
+
+SUMMARY = re.compile(r"(?:(\d+) failed, )?(\d+) passed, (\d+) skipped, (\d+) total")
+COLOUR = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def feature_suites(feature):
+    sys.path.insert(0, TESTS_DIR)
+    from suite.features import registry
+
+    names = sorted(set(item.feature for item in registry.discover()))
+    if feature:
+        names = [n for n in names if n == feature.split(".")[0] or feature in n]
+    rank = dict((name, i) for i, name in enumerate(SLOW_FIRST))
+    last = load_times(FEATURE_TIMES)
+    return sorted(names, key=lambda n: (-last.get(n, 0.0), rank.get(n, len(SLOW_FIRST)), n))
+
+
+def shadow_bases(count):
+    """
+    One shadow port base per worker, each with its four well known ports free.
+    Bases sit below the kernel's ephemeral range, so a client socket elsewhere on
+    the machine can never be holding a worker's port when its pdid comes up.
+    """
+    import socket
+
+    bases = []
+    base = SHADOW_BASE_FIRST
+    while len(bases) < count and base + SHADOW_BASE_STEP < 32768:
+        free = True
+        for port in SHADOW_PORTS:
+            probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                probe.bind(("127.0.0.1", base + port))
+            except OSError:
+                free = False
+            finally:
+                probe.close()
+            if not free:
+                break
+        if free:
+            bases.append(base)
+        base += SHADOW_BASE_STEP
+    return bases
+
+
+def feature_jobs(suites):
+    """
+    What the parallel run hands its workers: one whole suite each, its tests in
+    the order they are written, the suites that took longest last time first.
+    Each job is (filter, label, expected seconds).
+    """
+    suite_times = load_times(FEATURE_TIMES)
+    jobs = [(suite + ".", suite, suite_times.get(suite, 0.0)) for suite in suites]
+    jobs.sort(key=lambda job: -job[2])
+    return jobs
+
+
+def run_system_features_parallel(feature, jobs, verbose, timeout, username, password):
+    """
+    One child run per suite, each with its own host process, scratch store and
+    port range, at most `jobs` at a time, the longest of the last run first. A
+    suite's tests run in the order they are written, and its output is printed
+    whole when it ends, so two suites never interleave on the screen.
+    """
+    import subprocess
+    import tempfile
+
+    suites = feature_suites(feature)
+    if not suites:
+        fail("no feature suite matches %r" % feature)
+        return 1
+
+    queue = feature_jobs([s for s in suites if s not in SOLO_SUITES])
+    solo = feature_jobs([s for s in suites if s in SOLO_SUITES])
+    say("%s%d suites over %d workers%s" % (DIM, len(suites), jobs, RESET))
+
+    bases = shadow_bases(jobs)
+    if len(bases) < jobs:
+        say("%sonly %d free shadow port ranges; running %d workers%s" % (DIM, len(bases), len(bases), RESET))
+        jobs = len(bases)
+    slots = [None] * jobs
+    totals = [0, 0, 0, 0]
+    failures = []
+    taken = {}
+    began = time.time()
+
+    def start(slot, job):
+        selector, label, _ = job
+        log = tempfile.TemporaryFile(mode="w+")
+        env = dict(os.environ)
+        env["PDI_PORT_BASE"] = str(bases[slot])
+        argv = [sys.executable, os.path.abspath(__file__), "--features-only",
+                "--feature", selector, "--timeout", str(timeout),
+                "--user", username, "--password", password]
+        if verbose:
+            argv.append("--verbose")
+        proc = subprocess.Popen(argv, stdout=log, stderr=subprocess.STDOUT, env=env)
+        slots[slot] = (job, proc, log, time.time())
+
+    def finish(slot):
+        job, proc, log, started = slots[slot]
+        selector, label, _ = job
+        slots[slot] = None
+        log.seek(0)
+        text = log.read()
+        log.close()
+        taken[label] = time.time() - started
+        say("%s── %s (%.0f s)%s" % (DIM, label, taken[label], RESET))
+        sys.stdout.write(text)
+        found = SUMMARY.findall(COLOUR.sub("", text))
+        if found:
+            failed, passed, skipped, total = found[-1]
+            totals[0] += int(passed)
+            totals[1] += int(failed or 0)
+            totals[2] += int(skipped)
+            totals[3] += int(total)
+        if 0 != proc.returncode or not found:
+            failures.append(label)
+
+    while queue or solo or any(slots):
+        for slot in range(jobs):
+            if slots[slot] is not None and slots[slot][1].poll() is not None:
+                finish(slot)
+        if queue:
+            for slot in range(jobs):
+                if slots[slot] is None and queue:
+                    start(slot, queue.pop(0))
+        elif solo and not any(slots):
+            start(0, solo.pop(0))
+        time.sleep(0.2)
+
+    save_times(FEATURE_TIMES, taken)
+    say("")
+    say("%d passed, %d failed, %d skipped, %d total in %.0f s over %d workers"
+        % (totals[0], totals[1], totals[2], totals[3], time.time() - began, jobs))
+    if failures:
+        fail("suites with a failure or no result: %s" % ", ".join(failures))
+        return 1
+    return 0
 
 
 def main():
@@ -520,7 +792,14 @@ def main():
                         help="run one fuzz harness instead of all of them. Repeatable")
     parser.add_argument("--fuzz-seconds", type=int, default=60,
                         help="seconds to spend in each fuzz harness")
+    parser.add_argument("--jobs", type=int, default=os.cpu_count() or 1,
+                        help="host processes run at once for the unit suites, the feature suites "
+                             "and the fuzz harnesses (default: every cpu; 1 runs them in turn)")
+    parser.add_argument("--features-only", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
+
+    if args.features_only:
+        return run_system_features(args.feature, args.verbose, args.timeout, args.user, args.password)
 
     tiers = args.tier if args.tier else ["unit", "system"]
     if args.device and "device" not in tiers:
@@ -541,7 +820,7 @@ def main():
         built = True
 
     if "unit" in tiers and built:
-        code = run_unit(args.feature, args.verbose, args.list)
+        code = run_unit(args.feature, args.verbose, args.list, args.jobs)
         if code != 0:
             failures.append("unit")
             if not args.keep_going:
@@ -560,8 +839,12 @@ def main():
         if args.features and not args.list:
             say("")
             say("%ssystem features%s" % (DIM, RESET))
-            code = run_system_features(args.feature, args.verbose, args.timeout,
-                                       args.user, args.password)
+            if args.jobs > 1:
+                code = run_system_features_parallel(args.feature, args.jobs, args.verbose,
+                                                    args.timeout, args.user, args.password)
+            else:
+                code = run_system_features(args.feature, args.verbose, args.timeout,
+                                           args.user, args.password)
             if code != 0:
                 failures.append("system features")
                 if not args.keep_going:
@@ -607,7 +890,7 @@ def main():
             say("")
             say("%sfuzz%s" % (DIM, RESET))
         code = run_fuzz(args.fuzz_target if args.fuzz_target else list(FUZZ_TARGETS),
-                        args.fuzz_seconds, args.verbose, args.list)
+                        args.fuzz_seconds, args.verbose, args.list, args.jobs)
         if code != 0:
             failures.append("fuzz")
             if not args.keep_going:

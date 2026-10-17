@@ -668,7 +668,7 @@ void WiFiServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
     terminal->writeln();
     terminal->writeln_ro(RODT_ATTR("Station Configs :"));
     terminal->write(_table.sta_ssid); terminal->write_ro(RODT_ATTR("\t"));
-    terminal->write(_table.sta_password); terminal->write_ro(RODT_ATTR("\t"));
+    terminal->write_ro(0 != _table.sta_password[0] ? RODT_ATTR("********") : RODT_ATTR("-")); terminal->write_ro(RODT_ATTR("\t"));
 
     __int_ip_to_str( _ip, _table.sta_local_ip, 20 ); terminal->write(_ip); terminal->write_ro(RODT_ATTR("\t"));
     __int_ip_to_str( _ip, _table.sta_gateway, 20 ); terminal->write(_ip); terminal->write_ro(RODT_ATTR("\t"));
@@ -677,7 +677,7 @@ void WiFiServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
     terminal->writeln();
     terminal->writeln_ro(RODT_ATTR("Access Configs :"));
     terminal->write(_table.ap_ssid); terminal->write_ro(RODT_ATTR("\t"));
-    terminal->write(_table.ap_password); terminal->write_ro(RODT_ATTR("\t"));
+    terminal->write_ro(0 != _table.ap_password[0] ? RODT_ATTR("********") : RODT_ATTR("-")); terminal->write_ro(RODT_ATTR("\t"));
 
     __int_ip_to_str( _ip, _table.ap_local_ip, 20 ); terminal->write(_ip); terminal->write_ro(RODT_ATTR("\t"));
     __int_ip_to_str( _ip, _table.ap_gateway, 20 ); terminal->write(_ip); terminal->write_ro(RODT_ATTR("\t"));

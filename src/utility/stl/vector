@@ -1,0 +1,777 @@
+/***************************** PDI STD File ***********************************
+This file is third party source, taken from the open source uClibc++ library and
+used here with modifications. Thanking to author for providing this .
+
+for the license terms of this file refer the source link below.
+
+referred from   : https://github.com/mike-matera/ArduinoSTL
+added Date      : 1st Dec 2024
+added by        : Suraj I.
+******************************************************************************/
+
+#include "basic_definitions"
+#include "memory"
+#include "iterator"
+#include "func_exception"
+#include "algorithm"
+#include "type_traits"
+#include "initializer_list"
+#include "move.h"
+
+#ifndef __PDISTD_HEADER_VECTOR
+#define __PDISTD_HEADER_VECTOR
+
+#pragma GCC visibility push(default)
+
+namespace pdistd{
+
+	template <class T, class Allocator = allocator<T> > class vector;
+	template <class T, class Allocator> bool operator==(const vector<T,Allocator>& x, const vector<T,Allocator>& y);
+	template <class T, class Allocator> bool operator< (const vector<T,Allocator>& x, const vector<T,Allocator>& y);
+	template <class T, class Allocator> bool operator!=(const vector<T,Allocator>& x, const vector<T,Allocator>& y);
+	template <class T, class Allocator> bool operator> (const vector<T,Allocator>& x, const vector<T,Allocator>& y);
+	template <class T, class Allocator> bool operator>=(const vector<T,Allocator>& x, const vector<T,Allocator>& y);
+	template <class T, class Allocator> bool operator<=(const vector<T,Allocator>& x, const vector<T,Allocator>& y);
+	template <class T, class Allocator> void swap(vector<T,Allocator>& x, vector<T,Allocator>& y);
+
+	template <class T, class Allocator> class vector {
+	public:
+
+		typedef typename Allocator::reference reference;
+		typedef typename Allocator::const_reference const_reference;
+		typedef typename Allocator::size_type size_type;
+		typedef typename Allocator::difference_type difference_type;
+		typedef typename Allocator::pointer pointer;
+		typedef typename Allocator::const_pointer const_pointer;
+
+		typedef T* iterator;
+		typedef const T* const_iterator;
+		typedef T value_type;
+		typedef Allocator allocator_type;
+		typedef pdistd::reverse_iterator<iterator> reverse_iterator;
+		typedef pdistd::reverse_iterator<const_iterator> const_reverse_iterator;
+
+		/**
+		 * An empty vector, which takes no memory until the first element arrives.
+		 */
+		explicit vector(const Allocator& = Allocator()) : data_(0), data_size(0), elements(0) {}
+
+		/**
+		 * A vector of n copies of value, holding exactly that many.
+		 */
+		explicit vector(size_type n, const T& value = T(), const Allocator& = Allocator())
+			: data_(0), data_size(0), elements(0)
+		{
+			resize(n, value);
+		}
+
+		/**
+		 * A vector holding a copy of every element in the range.
+		 */
+		template <class InputIterator>
+			vector(InputIterator first, InputIterator last, const Allocator& = Allocator())
+			: data_(0), data_size(0), elements(0)
+		{
+			assign(first, last);
+		}
+
+		/**
+		 * A copy of another vector, holding exactly as many elements as it does.
+		 */
+		vector(const vector<T,Allocator>& x) : data_(0), data_size(0), elements(0)
+		{
+			_copy_from(x);
+		}
+
+		/**
+		 * Takes over another vector's storage, leaving that one empty.
+		 */
+		vector(vector<T,Allocator>&& x) noexcept
+			: data_(x.data_), data_size(x.data_size), elements(x.elements)
+		{
+			x.data_ = 0;
+			x.data_size = 0;
+			x.elements = 0;
+		}
+
+		/**
+		 * A vector holding a copy of every element in the list.
+		 */
+		vector(initializer_list<T> in, const Allocator& = Allocator())
+			: data_(0), data_size(0), elements(0)
+		{
+			reserve(in.size());
+			assign(in.begin(), in.end());
+		}
+
+		/**
+		 * Destroys every element and releases the storage.
+		 */
+		~vector(){
+			_release();
+		}
+
+		/**
+		 * Replaces the contents with a copy of another vector's.
+		 */
+		vector<T,Allocator>& operator=(const vector<T,Allocator>& x){
+			if(&x == this){
+				return *this;
+			}
+
+			if(x.elements > data_size){
+				_release();
+				_copy_from(x);
+				return *this;
+			}
+
+			size_type common = (elements < x.elements) ? elements : x.elements;
+			for(size_type i = 0; i < common; ++i){
+				data_[i] = x.data_[i];
+			}
+			for(size_type i = common; i < x.elements; ++i){
+				::new(static_cast<void*>(data_ + i)) T(x.data_[i]);
+			}
+			downsize(x.elements);
+			elements = x.elements;
+			return *this;
+		}
+
+		/**
+		 * Takes over another vector's storage, releasing this one's first.
+		 */
+		vector<T,Allocator>& operator=(vector<T,Allocator>&& x) noexcept{
+			if(&x != this){
+				_release();
+				data_ = x.data_;
+				data_size = x.data_size;
+				elements = x.elements;
+				x.data_ = 0;
+				x.data_size = 0;
+				x.elements = 0;
+			}
+			return *this;
+		}
+
+		/**
+		 * Replaces the contents with a copy of every element in the list.
+		 */
+		vector<T,Allocator>& operator=(initializer_list<T> in){
+			assign(in.begin(), in.end());
+			return *this;
+		}
+
+		/**
+		 * Replaces the contents with a copy of every element in the range.
+		 */
+		template <class InputIterator> void assign(InputIterator first, InputIterator last){
+			clear();
+			insert(end(), first, last);
+		}
+
+		/**
+		 * Replaces the contents with n copies of u.
+		 */
+		template <class Size, class U> void assign(Size n, const U& u = U()){
+			clear();
+			resize(n, u);
+		}
+
+		/**
+		 * Replaces the contents with a copy of every element in the list.
+		 */
+		void assign(initializer_list<value_type> in){
+			assign(in.begin(), in.end());
+		}
+
+		/**
+		 * An allocator of the vector's type; the allocator holds no state, so none is stored.
+		 */
+		inline allocator_type get_allocator() const{
+			return Allocator();
+		}
+
+		/**
+		 * Iterator to the first element.
+		 */
+		inline iterator begin(){
+			return data_;
+		}
+
+		/**
+		 * Iterator to the first element.
+		 */
+		inline const_iterator begin() const{
+			return data_;
+		}
+
+		/**
+		 * Iterator one past the last element.
+		 */
+		inline iterator end(){
+			return (data_ + elements);
+		}
+
+		/**
+		 * Iterator one past the last element.
+		 */
+		inline const_iterator end() const{
+			return (data_ + elements);
+		}
+
+		/**
+		 * Iterator to the first element.
+		 */
+		inline const_iterator cbegin() const{
+			return data_;
+		}
+
+		/**
+		 * Iterator one past the last element.
+		 */
+		inline const_iterator cend() const{
+			return (data_ + elements);
+		}
+
+		/**
+		 * Reverse iterator to the last element.
+		 */
+		inline reverse_iterator rbegin(){
+			return reverse_iterator(end());
+		}
+
+		/**
+		 * Reverse iterator to the last element.
+		 */
+		inline const_reverse_iterator rbegin() const{
+			return const_reverse_iterator(end());
+		}
+
+		/**
+		 * Reverse iterator one before the first element.
+		 */
+		inline reverse_iterator rend(){
+			return reverse_iterator(begin());
+		}
+
+		/**
+		 * Reverse iterator one before the first element.
+		 */
+		inline const_reverse_iterator rend() const{
+			return const_reverse_iterator(begin());
+		}
+
+		/**
+		 * Number of elements held.
+		 */
+		inline size_type size() const{
+			return elements;
+		}
+
+		/**
+		 * Largest number of elements the vector could ever hold.
+		 */
+		size_type max_size() const{
+			return static_cast<size_type>(-1) / sizeof(T);
+		}
+
+		/**
+		 * Number of elements the storage holds before it has to grow.
+		 */
+		inline size_type capacity() const{
+			return data_size;
+		}
+
+		/**
+		 * Whether the vector holds no elements.
+		 */
+		inline bool empty() const{
+			return (0 == elements);
+		}
+
+		/**
+		 * The storage the elements live in, null while nothing has been stored.
+		 */
+		inline T* data() noexcept { return data_; }
+
+		/**
+		 * The storage the elements live in, null while nothing has been stored.
+		 */
+		inline const T* data() const noexcept { return data_; }
+
+		/**
+		 * Makes room for at least n elements. A failed allocation leaves the
+		 * vector exactly as it was.
+		 */
+		void reserve(size_type n){
+			if(n > data_size){
+				T* fresh = Allocator().allocate(n);
+				if(0 == fresh){
+					return;
+				}
+				_relocate(fresh, n);
+			}
+		}
+
+		/**
+		 * Gives back the storage the elements do not use, all of it once empty.
+		 */
+		void shrink_to_fit(){
+			if(elements == data_size){
+				return;
+			}
+			if(0 == elements){
+				_release();
+				return;
+			}
+			T* fresh = Allocator().allocate(elements);
+			if(0 == fresh){
+				return;
+			}
+			_relocate(fresh, elements);
+		}
+
+		/**
+		 * Makes the vector hold sz elements, new ones copied from c. A failed
+		 * allocation leaves it at its current size.
+		 */
+		void resize(size_type sz, const T& c = T()){
+			if(sz <= elements){
+				downsize(sz);
+				return;
+			}
+
+			if(sz > data_size){
+				size_type grown = _grown_capacity(sz);
+				T* fresh = Allocator().allocate(grown);
+				if(0 == fresh){
+					return;
+				}
+				for(size_type i = elements; i < sz; ++i){
+					::new(static_cast<void*>(fresh + i)) T(c);
+				}
+				_relocate(fresh, grown);
+			}else{
+				for(size_type i = elements; i < sz; ++i){
+					::new(static_cast<void*>(data_ + i)) T(c);
+				}
+			}
+			elements = sz;
+		}
+
+		/**
+		 * Destroys every element past the first sz, keeping the storage.
+		 */
+		void downsize(size_type sz){
+			if(sz < elements){
+				for(size_type i = sz; i < elements; ++i){
+					data_[i].~T();
+				}
+				elements = sz;
+			}
+		}
+
+		/**
+		 * The element at n, with no bounds check.
+		 */
+		inline reference operator[](size_type n){
+			return data_[n];
+		}
+
+		/**
+		 * The element at n, with no bounds check.
+		 */
+		inline const_reference operator[](size_type n) const{
+			return data_[n];
+		}
+
+		/**
+		 * The element at n, reported as out of range when there is none.
+		 */
+		const_reference at(size_type n) const{
+			if(n >= elements){
+				__throw_out_of_range("Invalid subscript");
+			}
+			return data_[n];
+		}
+
+		/**
+		 * The element at n, reported as out of range when there is none.
+		 */
+		reference at(size_type n){
+			if(n >= elements){
+				__throw_out_of_range("Invalid subscript");
+			}
+			return data_[n];
+		}
+
+		/**
+		 * The first element.
+		 */
+		inline reference front(){
+			return data_[0];
+		}
+
+		/**
+		 * The first element.
+		 */
+		inline const_reference front() const{
+			return data_[0];
+		}
+
+		/**
+		 * The last element.
+		 */
+		inline reference back(){
+			return data_[elements - 1];
+		}
+
+		/**
+		 * The last element.
+		 */
+		inline const_reference back() const{
+			return data_[elements - 1];
+		}
+
+		/**
+		 * Builds a new last element in place from the arguments given. A failed
+		 * allocation leaves the vector unchanged.
+		 */
+		template <class... Args> void emplace_back(Args&&... args){
+			if(elements < data_size){
+				::new(static_cast<void*>(data_ + elements)) T(pdistd::forward<Args>(args)...);
+				++elements;
+				return;
+			}
+
+			size_type grown = _grown_capacity(elements + 1);
+			T* fresh = Allocator().allocate(grown);
+			if(0 == fresh){
+				return;
+			}
+			::new(static_cast<void*>(fresh + elements)) T(pdistd::forward<Args>(args)...);
+			_relocate(fresh, grown);
+			++elements;
+		}
+
+		/**
+		 * Appends a copy of x, which may be one of this vector's own elements.
+		 */
+		inline void push_back(const T& x){
+			emplace_back(x);
+		}
+
+		/**
+		 * Appends x, taking over its contents.
+		 */
+		inline void push_back(T&& x){
+			emplace_back(pdistd::move(x));
+		}
+
+		/**
+		 * Destroys the last element.
+		 */
+		inline void pop_back(){
+			downsize(elements - 1);
+		}
+
+		/**
+		 * Inserts a copy of x before position and returns where it landed.
+		 */
+		iterator insert(iterator position, const T& x){
+			size_type index = position - data_;
+			emplace_back(x);
+			_rotate_last_to(index, 1);
+			return (data_ + index);
+		}
+
+		/**
+		 * Inserts x before position, taking over its contents, and returns
+		 * where it landed.
+		 */
+		iterator insert(iterator position, T&& x){
+			size_type index = position - data_;
+			emplace_back(pdistd::move(x));
+			_rotate_last_to(index, 1);
+			return (data_ + index);
+		}
+
+		/**
+		 * Inserts n copies of x before position.
+		 */
+		inline void insert(iterator position, size_type n, const T& x){
+			_insert_fill(position, n, x);
+		}
+
+		/**
+		 * Inserts a copy of every element in the range before position.
+		 */
+		template <class InputIterator> inline void insert(iterator position, InputIterator first, InputIterator last){
+			typedef typename __is_integer<InputIterator>::type __some_type;
+			_dispatch_insert(position, first, last, __some_type());
+		}
+
+		/**
+		 * Inserts a copy of every element in the list before position.
+		 */
+		inline void insert(iterator position, initializer_list<T> in){
+			insert(position, in.begin(), in.end());
+		}
+
+		/**
+		 * Removes the element at position and returns what now stands there.
+		 */
+		iterator erase(iterator position){
+			size_type index = position - data_;
+			for(size_type i = index; (i + 1) < elements; ++i){
+				data_[i] = pdistd::move(data_[i + 1]);
+			}
+			downsize(elements - 1);
+			return (data_ + index);
+		}
+
+		/**
+		 * Removes the elements in the range and returns what now stands at its start.
+		 */
+		iterator erase(iterator first, iterator last){
+			size_type index = first - data_;
+			size_type width = last - first;
+			if(0 == width){
+				return first;
+			}
+			for(size_type i = index; (i + width) < elements; ++i){
+				data_[i] = pdistd::move(data_[i + width]);
+			}
+			downsize(elements - width);
+			return (data_ + index);
+		}
+
+		/**
+		 * Exchanges contents with another vector without copying an element.
+		 */
+		void swap(vector<T,Allocator>& v){
+			if(this == &v){
+				return;
+			}
+			T* ptr = data_;
+			data_ = v.data_;
+			v.data_ = ptr;
+
+			size_type temp = elements;
+			elements = v.elements;
+			v.elements = temp;
+
+			temp = data_size;
+			data_size = v.data_size;
+			v.data_size = temp;
+		}
+
+		/**
+		 * Destroys every element, keeping the storage for what comes next.
+		 */
+		void clear(){
+			downsize(0);
+		}
+
+	protected:
+
+		/**
+		 * Capacity to grow to for need elements: half again what is held, never
+		 * less than one heap block's worth.
+		 */
+		size_type _grown_capacity(size_type need) const{
+			size_type grown = data_size + (data_size >> 1);
+			size_type least = (sizeof(T) >= __PDISTD_MIN_ALLOC_BYTES__) ? 1 : (__PDISTD_MIN_ALLOC_BYTES__ / sizeof(T));
+			if(grown < least){
+				grown = least;
+			}
+			if(grown < need){
+				grown = need;
+			}
+			return grown;
+		}
+
+		/**
+		 * Moves every element into fresh storage of the given capacity and
+		 * releases the old storage.
+		 */
+		void _relocate(T* fresh, size_type freshsize){
+			for(size_type i = 0; i < elements; ++i){
+				::new(static_cast<void*>(fresh + i)) T(pdistd::move(data_[i]));
+				data_[i].~T();
+			}
+			if(0 != data_){
+				Allocator().deallocate(data_, data_size);
+			}
+			data_ = fresh;
+			data_size = freshsize;
+		}
+
+		/**
+		 * Destroys every element and releases the storage, leaving the vector empty.
+		 */
+		void _release(){
+			downsize(0);
+			if(0 != data_){
+				Allocator().deallocate(data_, data_size);
+			}
+			data_ = 0;
+			data_size = 0;
+		}
+
+		/**
+		 * Copies another vector's elements into this empty one, allocating
+		 * exactly as many as it holds.
+		 */
+		void _copy_from(const vector<T,Allocator>& x){
+			if(0 == x.elements){
+				return;
+			}
+			data_ = Allocator().allocate(x.elements);
+			if(0 == data_){
+				return;
+			}
+			data_size = x.elements;
+			for(size_type i = 0; i < x.elements; ++i){
+				::new(static_cast<void*>(data_ + i)) T(x.data_[i]);
+			}
+			elements = x.elements;
+		}
+
+		/**
+		 * Moves the last count elements down to start at index, shifting what
+		 * stood there up behind them.
+		 */
+		void _rotate_last_to(size_type index, size_type count){
+			if(0 == count || index + count > elements){
+				return;
+			}
+			pdistd::rotate(data_ + index, data_ + (elements - count), data_ + elements);
+		}
+
+		/**
+		 * Inserts n copies of x before position.
+		 */
+		void _insert_fill(iterator position, size_type n, const T& x){
+			size_type index = position - data_;
+			size_type before = elements;
+			resize(elements + n, x);
+			if(elements != before + n){
+				return;
+			}
+			_rotate_last_to(index, n);
+		}
+
+		/**
+		 * Inserts a copy of every element in the range before position.
+		 */
+		template <class InputIterator>
+			void _insert_from_iterator(iterator position, InputIterator first, InputIterator last)
+		{
+			size_type index = position - data_;
+			size_type before = elements;
+			while(first != last){
+				emplace_back(*first);
+				++first;
+			}
+			_rotate_last_to(index, elements - before);
+		}
+
+		/**
+		 * Inserts count copies of a value when the range was given as two integers.
+		 */
+		template <class InputIterator>
+			inline void _dispatch_insert(iterator position, InputIterator first, InputIterator last, __true_type)
+		{
+			_insert_fill(position, first, last);
+		}
+
+		/**
+		 * Inserts a copy of every element in the range when given iterators.
+		 */
+		template <class InputIterator>
+			inline void _dispatch_insert(iterator position, InputIterator first, InputIterator last, __false_type)
+		{
+			_insert_from_iterator(position, first, last);
+		}
+
+		T* data_;
+		size_type data_size;
+		size_type elements;
+	};
+
+	/**
+	 * Whether two vectors hold equal elements in the same order.
+	 */
+	template <class T, class Allocator> bool
+		operator==(const vector<T,Allocator>& x, const vector<T,Allocator>& y)
+	{
+		if(x.size() != y.size()){
+			return false;
+		}
+		for(size_t i = 0; i < x.size(); ++i){
+			if(!(x[i] == y[i])){
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Whether x orders before y, element by element.
+	 */
+	template <class T, class Allocator> bool
+		operator< (const vector<T,Allocator>& x, const vector<T,Allocator>& y)
+	{
+		less<typename iterator_traits<typename vector<T,Allocator>::iterator >::value_type> c;
+		return lexicographical_compare(x.begin(), x.end(), y.begin(), y.end(), c);
+	}
+
+	/**
+	 * Whether two vectors differ in any element or in length.
+	 */
+	template <class T, class Allocator> bool
+		operator!=(const vector<T,Allocator>& x, const vector<T,Allocator>& y)
+	{
+		return !(x == y);
+	}
+
+	/**
+	 * Whether x orders after y, element by element.
+	 */
+	template <class T, class Allocator> bool
+		operator> (const vector<T,Allocator>& x, const vector<T,Allocator>& y)
+	{
+		return (y < x);
+	}
+
+	/**
+	 * Whether x orders after y or equals it.
+	 */
+	template <class T, class Allocator> bool
+		operator>=(const vector<T,Allocator>& x, const vector<T,Allocator>& y)
+	{
+		return !(x < y);
+	}
+
+	/**
+	 * Whether x orders before y or equals it.
+	 */
+	template <class T, class Allocator> bool
+		operator<=(const vector<T,Allocator>& x, const vector<T,Allocator>& y)
+	{
+		return !(y < x);
+	}
+
+	/**
+	 * Exchanges the contents of two vectors.
+	 */
+	template <class T, class Allocator> void swap(vector<T,Allocator>& x, vector<T,Allocator>& y){
+		x.swap(y);
+	}
+
+}
+
+#pragma GCC visibility pop
+
+#endif

@@ -56,6 +56,8 @@ created Date    : 1st June 2019
 #include "commands/ReadCommand.h"
 #include "commands/UnsetCommand.h"
 #include "commands/TestCommand.h"
+#include "commands/TrueCommand.h"
+#include "commands/FalseCommand.h"
 #ifdef ENABLE_SCRIPT_RUNNER
 #include "commands/SourceCommand.h"
 #endif
@@ -116,12 +118,20 @@ public:
 	static void startInteraction();
     bool useTerminal(iTerminalInterface *terminal);
 	void releaseSession(session_t *session);
+	void retargetTerminal(iTerminalInterface *from, iTerminalInterface *to);
 	bool isSessionBusy(session_t *session);
 	bool getCommandExecutedFromHistory(pdiutil::string &cmdExec, int16_t index, const char* pattern = nullptr);
 
 private:
 
 	friend class ScriptRunner;
+
+#ifdef ENABLE_TELNET_SERVICE
+	/**
+	 * Takes one byte through the telnet protocol, refusing every option offered; true when it was protocol, not data.
+	 */
+	bool consumeTelnetByte(session_t *session, iTerminalInterface *terminal, uint8_t c);
+#endif
 
 	/**
 	 * @var	pdiutil::vector<cmd_t>	m_cmdlist
@@ -159,16 +169,31 @@ private:
 
 	/**
 	 * Runs every stage in turn, carrying each one's output into the next
-	 * through a pipe and sending the last one to the target or the terminal.
+	 * through a pipe and sending the last one to the target, the sink or the terminal.
 	 */
-	pdi_err_t runPipeline(const char *line, const ShellParser::Line &parsed, uint16_t index);
+	pdi_err_t runPipeline(const char *line, const ShellParser::Line &parsed, uint16_t index,
+	                      iTerminalInterface *sink = nullptr, const ShellParser::Captures *captures = nullptr);
+
+	/**
+	 * Turns a command written as [ ... ] into the test it stands for, false
+	 * when it opens with [ and never closes it.
+	 */
+	bool testFromBrackets(pdiutil::string &text);
+
+	/**
+	 * Runs every $(...) one pipeline holds, before the pipeline itself, and
+	 * keeps each answer for the expansion to put in as text.
+	 */
+	pdi_err_t capturePipeline(const char *line, const ShellParser::Line &parsed, uint16_t index,
+	                          ShellParser::Captures &captures, uint8_t depth);
 
 #endif
 	/**
 	 * Parses one line and dispatches it, without the history, cleanup and
 	 * prompt that an interactively typed line carries around it.
 	 */
-	pdi_err_t runLine(pdiutil::string &line, bool &named_noent);
+	pdi_err_t runLine(pdiutil::string &line, bool &named_noent, iTerminalInterface *sink = nullptr,
+	                  uint8_t depth = 0);
 
 	/**
 	 * Releases every command that has finished, leaving the ones still waiting

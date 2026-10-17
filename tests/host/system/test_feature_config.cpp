@@ -686,11 +686,10 @@ pdiutil::string otaConfValue(const char *key)
     return value;
 }
 
-ota_config_table serverTable(const char *host, uint16_t port)
+ota_config_table serverTable(const char *host)
 {
     ota_config_table table;
     memcpy(table.ota_host, host, strlen(host));
-    table.ota_port = port;
     return table;
 }
 
@@ -698,22 +697,22 @@ ota_config_table serverTable(const char *host, uint16_t port)
 
 TEST(featureconfig, an_ota_record_renders_every_option_the_file_carries)
 {
-    ota_config_table table = serverTable("updates.local", 8080);
+    ota_config_table table = serverTable("http://updates.local:8080");
 
     pdiutil::vector<config_kv_t> kvs;
     otaConfigToKvs(&table, kvs);
 
-    ASSERT_EQ((uint32_t)kvs.size(), 2u);
+    ASSERT_EQ((uint32_t)kvs.size(), 1u);
 
     pdiutil::string value;
-    pdiutil::string key = CHARPTR_WRAP(OTA_CONFIG_KEY_PORT);
+    pdiutil::string key = CHARPTR_WRAP(OTA_CONFIG_KEY_HOST);
     ASSERT_TRUE(findConfigValue(kvs, key, value));
-    ASSERT_STREQ(value.c_str(), "8080");
+    ASSERT_STREQ(value.c_str(), "http://updates.local:8080");
 }
 
 TEST(featureconfig, an_ota_option_the_file_carries_is_taken_into_the_record)
 {
-    ota_config_table table = serverTable("fromdb", 80);
+    ota_config_table table = serverTable("fromdb");
 
     pdiutil::vector<config_kv_t> kvs;
     config_kv_t kv;
@@ -723,21 +722,20 @@ TEST(featureconfig, an_ota_option_the_file_carries_is_taken_into_the_record)
 
     ASSERT_TRUE(otaConfigFromKvs(kvs, &table));
     ASSERT_STREQ(table.ota_host, "fromfile");
-    ASSERT_EQ((uint32_t)table.ota_port, 80u);
 }
 
-TEST(featureconfig, an_ota_port_that_does_not_read_keeps_the_record_value)
+TEST(featureconfig, an_older_ota_file_with_a_port_line_is_read_for_its_host_alone)
 {
-    ota_config_table table = serverTable("updates.local", 80);
+    ota_config_table table = serverTable("fromdb");
 
     pdiutil::vector<config_kv_t> kvs;
     config_kv_t kv;
-    kv.m_key = OTA_CONFIG_KEY_PORT;
-    kv.m_value = "http";
+    kv.m_key = "port";
+    kv.m_value = "8080";
     kvs.push_back(kv);
 
     ASSERT_FALSE(otaConfigFromKvs(kvs, &table));
-    ASSERT_EQ((uint32_t)table.ota_port, 80u);
+    ASSERT_STREQ(table.ota_host, "fromdb");
 }
 
 TEST(featureconfig, a_missing_ota_file_is_seeded_from_the_record_store)
@@ -746,12 +744,12 @@ TEST(featureconfig, a_missing_ota_file_is_seeded_from_the_record_store)
     pditest::mountedDb();
     dropOtaConf(fs);
 
-    ota_config_table table = serverTable("updates.local", 8080);
+    ota_config_table table = serverTable("http://updates.local:8080");
     ASSERT_TRUE(__database_service.set_ota_config_table(&table));
 
     ASSERT_TRUE(fs->isFileExist(OTA_CONF_PATH));
-    ASSERT_STREQ(otaConfValue(OTA_CONFIG_KEY_HOST).c_str(), "updates.local");
-    ASSERT_STREQ(otaConfValue(OTA_CONFIG_KEY_PORT).c_str(), "8080");
+    ASSERT_STREQ(otaConfValue(OTA_CONFIG_KEY_HOST).c_str(), "http://updates.local:8080");
+    ASSERT_TRUE(otaConfValue("port").empty());
 
     dropOtaConf(fs);
 }
@@ -765,7 +763,6 @@ TEST(featureconfig, an_ota_sync_leaves_the_option_the_file_already_carried)
     syncOtaConfigFile();
 
     ASSERT_STREQ(otaConfValue(OTA_CONFIG_KEY_HOST).c_str(), "fromfile");
-    ASSERT_FALSE(otaConfValue(OTA_CONFIG_KEY_PORT).empty());
 
     ota_config_table table;
     __database_service.get_ota_config_table(&table);
@@ -780,7 +777,7 @@ TEST(featureconfig, a_seeded_ota_config_is_owned_by_root)
     pditest::mountedDb();
     dropOtaConf(fs);
 
-    ota_config_table table = serverTable("updates.local", 8080);
+    ota_config_table table = serverTable("http://updates.local:8080");
     __database_service.set_ota_config_table(&table);
 
     file_info_t meta;

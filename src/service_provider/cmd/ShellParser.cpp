@@ -12,6 +12,9 @@ created Date    : 26th Aug 2026
 #include <utility/DataTypeConversions.h>
 #include <utility/StringOperations.h>
 #include <service_provider/session/Environment.h>
+#ifdef ENABLE_SCRIPT_RUNNER
+#include <service_provider/cmd/ScriptRunner.h>
+#endif
 
 #if defined(ENABLE_CMD_SERVICE) && defined(ENABLE_STORAGE_SERVICE)
 
@@ -21,6 +24,148 @@ namespace {
   bool isOperatorStart(char c) {
     return '|' == c || '&' == c || ';' == c || '<' == c || '>' == c;
   }
+
+  /**
+   * A value as a whole decimal number, with an optional sign; an empty value is
+   * zero, and anything else is not a number.
+   */
+  bool wholeNumber(const char *s, int16_t len, int32_t &value) {
+
+    value = 0;
+    if (0 == len) {
+      return true;
+    }
+
+    int16_t i = 0;
+    bool negative = false;
+    if ('-' == s[0] || '+' == s[0]) {
+      negative = ('-' == s[0]);
+      i = 1;
+    }
+    if (i >= len) {
+      return false;
+    }
+
+    int64_t total = 0;
+    for (; i < len; i++) {
+      if (!__is_digit(s[i])) {
+        return false;
+      }
+      total = total * 10 + (s[i] - '0');
+      if (total > 2147483648LL) {
+        return false;
+      }
+    }
+
+    if (!negative && total > 2147483647LL) {
+      return false;
+    }
+    value = (int32_t)(negative ? -total : total);
+    return true;
+  }
+
+  /**
+   * Works out an integer expression of + - * / %, unary signs, parentheses,
+   * numbers and variable names, refusing anything it cannot read.
+   */
+  struct Arith {
+
+    Arith(const char *s, int16_t len) : m_s(s), m_len(len), m_pos(0), m_depth(0), m_ok(true) {}
+
+    void blanks() {
+      while (m_pos < m_len && __is_blank(m_s[m_pos])) m_pos++;
+    }
+
+    int32_t expr() {
+      int32_t value = term();
+      while (m_ok) {
+        blanks();
+        if (m_pos >= m_len || ('+' != m_s[m_pos] && '-' != m_s[m_pos])) break;
+        char op = m_s[m_pos++];
+        int32_t rhs = term();
+        value = (int32_t)(('+' == op) ? ((uint32_t)value + (uint32_t)rhs) : ((uint32_t)value - (uint32_t)rhs));
+      }
+      return value;
+    }
+
+    int32_t term() {
+      int32_t value = factor();
+      while (m_ok) {
+        blanks();
+        if (m_pos >= m_len || ('*' != m_s[m_pos] && '/' != m_s[m_pos] && '%' != m_s[m_pos])) break;
+        char op = m_s[m_pos++];
+        int32_t rhs = factor();
+        if ('*' == op) {
+          value = (int32_t)((uint32_t)value * (uint32_t)rhs);
+        } else if (0 == rhs || (INT32_MIN == value && -1 == rhs)) {
+          m_ok = false;
+        } else {
+          value = ('/' == op) ? (value / rhs) : (value % rhs);
+        }
+      }
+      return value;
+    }
+
+    int32_t factor() {
+      blanks();
+      if (m_pos >= m_len) {
+        m_ok = false;
+        return 0;
+      }
+
+      char c = m_s[m_pos];
+
+      if ('-' == c || '+' == c) {
+        m_pos++;
+        int32_t value = factor();
+        return ('-' == c) ? (int32_t)(0u - (uint32_t)value) : value;
+      }
+
+      if ('(' == c) {
+        if (++m_depth > SHELL_ARITH_DEPTH) {
+          m_ok = false;
+          return 0;
+        }
+        m_pos++;
+        int32_t value = expr();
+        blanks();
+        if (m_pos >= m_len || ')' != m_s[m_pos]) {
+          m_ok = false;
+          return 0;
+        }
+        m_pos++;
+        m_depth--;
+        return value;
+      }
+
+      int16_t start = m_pos;
+      int32_t value = 0;
+
+      if (__is_digit(c)) {
+        while (m_pos < m_len && __is_digit(m_s[m_pos])) m_pos++;
+        if (!wholeNumber(m_s + start, m_pos - start, value)) m_ok = false;
+        return value;
+      }
+
+      if (__is_alpha(c) || '_' == c) {
+        while (m_pos < m_len && (__is_alnum(m_s[m_pos]) || '_' == m_s[m_pos])) m_pos++;
+        pdiutil::string name(m_s + start, m_pos - start);
+        pdiutil::string text;
+        Environment::get(name.c_str(), text);
+        if (!wholeNumber(text.c_str(), (int16_t)text.size(), value)) m_ok = false;
+        return value;
+      }
+
+      m_ok = false;
+      return 0;
+    }
+
+    const char *m_s;
+    int16_t m_len;
+    int16_t m_pos;
+    uint8_t m_depth;
+    bool m_ok;
+  };
 }
 
 /**
@@ -111,6 +256,22 @@ bool ShellParser::tokenize(const char *line, int16_t len, pdiutil::vector<Token>
         continue;
       }
 
+      if ('$' == c && (i + 1) < len && '(' == line[i + 1]) {
+        int16_t end = substitutionEnd(line, len, i);
+        if (end < 0) {
+          tokens.clear();
+          return false;
+        }
+        i = end + 1;
+        continue;
+      }
+
+      if ('$' == c && (i + 1) < len && '{' == line[i + 1]) {
+        int16_t end = braceEnd(line, len, i);
+        i = (end < 0) ? i + 1 : end + 1;
+        continue;
+      }
+
       // a lone '&' belongs to the word; a doubled one ends it
       if ('&' == c) {
         if ((i + 1) < len && '&' == line[i + 1]) break;
@@ -149,11 +310,146 @@ bool ShellParser::expandable(const char *src, int16_t len) {
 }
 
 /**
+ * Where the ')' closing the $( at open sits, or -1 when nothing closes it.
+ */
+int16_t ShellParser::substitutionEnd(const char *src, int16_t len, int16_t open) {
+
+  int16_t depth = 1;
+  int16_t i = open + 2;
+
+  while (i < len) {
+
+    char c = src[i];
+
+    if ('\\' == c) {
+      i += 2;
+      continue;
+    }
+
+    if ('\'' == c || '"' == c) {
+      char quote = c;
+      i++;
+      while (i < len && src[i] != quote) {
+        if ('"' == quote && '\\' == src[i]) i++;
+        i++;
+      }
+      i++;
+      continue;
+    }
+
+    if ('(' == c) {
+      depth++;
+    } else if (')' == c) {
+      depth--;
+      if (0 == depth) {
+        return i;
+      }
+    }
+
+    i++;
+  }
+
+  return -1;
+}
+
+/**
+ * Where the '}' closing the ${ at open sits, or -1 when nothing closes it.
+ */
+int16_t ShellParser::braceEnd(const char *src, int16_t len, int16_t open) {
+
+  int16_t depth = 1;
+  int16_t i = open + 2;
+
+  while (i < len) {
+
+    char c = src[i];
+
+    if ('\\' == c) {
+      i += 2;
+      continue;
+    }
+
+    if ('$' == c && (i + 1) < len && '(' == src[i + 1]) {
+      int16_t end = substitutionEnd(src, len, i);
+      if (end < 0) {
+        return -1;
+      }
+      i = end + 1;
+      continue;
+    }
+
+    if ('$' == c && (i + 1) < len && '{' == src[i + 1]) {
+      depth++;
+      i += 2;
+      continue;
+    }
+
+    if ('}' == c) {
+      depth--;
+      if (0 == depth) {
+        return i;
+      }
+    }
+
+    i++;
+  }
+
+  return -1;
+}
+
+/**
+ * Every $(...) a span holds outside single quotes, each as the run from its
+ * '$' to its ')', in the order they appear.
+ */
+void ShellParser::substitutions(const char *src, int16_t len, pdiutil::vector<Token> &spans) {
+
+  bool insingle = false;
+  bool indouble = false;
+
+  for (int16_t i = 0; i < len; i++) {
+
+    char c = src[i];
+
+    if ('\\' == c && !insingle) {
+      i++;
+      continue;
+    }
+
+    if ('\'' == c && !indouble) {
+      insingle = !insingle;
+      continue;
+    }
+
+    if ('"' == c && !insingle) {
+      indouble = !indouble;
+      continue;
+    }
+
+    if ('$' == c && !insingle && (i + 2) < len && '(' == src[i + 1] && '(' == src[i + 2]) {
+      i += 2;
+      continue;
+    }
+
+    if ('$' == c && !insingle && (i + 1) < len && '(' == src[i + 1]) {
+      int16_t end = substitutionEnd(src, len, i);
+      if (end < 0) {
+        return;
+      }
+      Token span;
+      span.m_start = i;
+      span.m_len = end - i + 1;
+      spans.push_back(span);
+      i = end;
+    }
+  }
+}
+
+/**
  * Copies a span with expansions applied. A single quoted run is literal, so
  * nothing inside it expands; a double quoted one still does.
  */
 void ShellParser::expand(const char *src, int16_t len, pdi_err_t lastexit, pdiutil::string &out,
-                         bool unquote) {
+                         bool unquote, const Captures *captures) {
 
   char number[12] = {0};
   bool rendered = false;
@@ -183,6 +479,55 @@ void ShellParser::expand(const char *src, int16_t len, pdi_err_t lastexit, pdiut
       continue;
     }
 
+    if ('$' == c && !insingle && (i + 2) < len && '(' == src[i + 1] && '(' == src[i + 2]) {
+
+      int16_t end = substitutionEnd(src, len, i);
+      if (end > i + 3 && ')' == src[end - 1]) {
+
+        pdiutil::string text;
+        expand(src + i + 3, end - 1 - (i + 3), lastexit, text, true, captures);
+
+        Arith arith(text.c_str(), (int16_t)text.size());
+        int32_t value = arith.expr();
+        arith.blanks();
+
+        if (arith.m_ok && arith.m_pos == arith.m_len) {
+          char digits[12] = {0};
+          Int32ToString(value, digits, sizeof(digits) - 1);
+          out += digits;
+        } else {
+          out.append(src + i, (pdiutil::string::size_type)(end - i + 1));
+        }
+        i = end;
+        continue;
+      }
+    }
+
+    if ('$' == c && !insingle && (i + 1) < len && '(' == src[i + 1]) {
+
+      int16_t end = substitutionEnd(src, len, i);
+      if (end < 0) {
+        out += c;
+        continue;
+      }
+
+      const Capture *found = nullptr;
+      for (uint16_t k = 0; nullptr != captures && k < captures->size(); k++) {
+        if ((*captures)[k].m_at == src + i) {
+          found = &(*captures)[k];
+          break;
+        }
+      }
+
+      if (nullptr != found) {
+        out += found->m_value;
+      } else {
+        out.append(src + i, (pdiutil::string::size_type)(end - i + 1));
+      }
+      i = end;
+      continue;
+    }
+
     if ('$' == c && !insingle && (i + 1) < len && '?' == src[i + 1]) {
 
       if (!rendered) {
@@ -192,6 +537,75 @@ void ShellParser::expand(const char *src, int16_t len, pdi_err_t lastexit, pdiut
 
       out += number;
       i++;
+      continue;
+    }
+
+    if ('$' == c && !insingle && (i + 1) < len &&
+        (('1' <= src[i + 1] && '9' >= src[i + 1]) || '#' == src[i + 1] || '@' == src[i + 1])) {
+
+      const pdiutil::vector<pdiutil::string> *args = nullptr;
+#ifdef ENABLE_SCRIPT_RUNNER
+      args = ScriptRunner::arguments();
+#endif
+      uint32_t count = (nullptr != args) ? (uint32_t)args->size() : 0;
+      char which = src[i + 1];
+
+      if ('#' == which) {
+        char digits[12] = {0};
+        Int32ToString((int32_t)count, digits, sizeof(digits) - 1);
+        out += digits;
+      } else if ('@' == which) {
+        for (uint32_t k = 0; k < count; k++) {
+          if (k > 0) out += ' ';
+          out += (*args)[k];
+        }
+      } else if ((uint32_t)(which - '1') < count) {
+        out += (*args)[which - '1'];
+      }
+
+      i++;
+      continue;
+    }
+
+    if ('$' == c && !insingle && (i + 1) < len && '{' == src[i + 1]) {
+
+      int16_t end = braceEnd(src, len, i);
+      if (end < 0) {
+        out += c;
+        continue;
+      }
+
+      const char *inner = src + i + 2;
+      int16_t innerlen = end - (i + 2);
+      bool length = (innerlen > 0 && '#' == inner[0]);
+      int16_t namestart = length ? 1 : 0;
+      int16_t nameend = namestart;
+      while (nameend < innerlen && (__is_alnum(inner[nameend]) || '_' == inner[nameend])) nameend++;
+
+      bool named = (nameend > namestart) && !__is_digit(inner[namestart]);
+      bool fallback = !length && (nameend + 1) < innerlen && ':' == inner[nameend] && '-' == inner[nameend + 1];
+
+      if (!named || (length && nameend != innerlen) || (!length && !fallback && nameend != innerlen)) {
+        out.append(src + i, (pdiutil::string::size_type)(end - i + 1));
+        i = end;
+        continue;
+      }
+
+      pdiutil::string name(inner + namestart, nameend - namestart);
+      pdiutil::string value;
+      Environment::get(name.c_str(), value);
+
+      if (length) {
+        char digits[12] = {0};
+        Int32ToString((int32_t)value.size(), digits, sizeof(digits) - 1);
+        out += digits;
+      } else if (fallback && value.empty()) {
+        expand(inner + nameend + 2, innerlen - (nameend + 2), lastexit, out, unquote, captures);
+      } else {
+        out += value;
+      }
+
+      i = end;
       continue;
     }
 
@@ -220,7 +634,7 @@ void ShellParser::expand(const char *src, int16_t len, pdi_err_t lastexit, pdiut
  * Text of one command without its redirections, expansions applied.
  */
 bool ShellParser::Line::commandText(const char *line, int16_t index, pdiutil::string &out,
-                                    pdi_err_t lastexit) const {
+                                    pdi_err_t lastexit, const Captures *captures) const {
 
   out.clear();
 
@@ -254,14 +668,14 @@ bool ShellParser::Line::commandText(const char *line, int16_t index, pdiutil::st
   }
 
   if (contiguous) {
-    expand(line + first, last - first, lastexit, out);
+    expand(line + first, last - first, lastexit, out, false, captures);
     return true;
   }
 
   for (int16_t w = 0; w < command.m_word_count; w++) {
     const Token &word = m_words[command.m_word_start + w];
     if (w > 0) out += ' ';
-    expand(line + word.m_start, word.m_len, lastexit, out);
+    expand(line + word.m_start, word.m_len, lastexit, out, false, captures);
   }
 
   return true;
@@ -310,6 +724,11 @@ ShellParser::Line ShellParser::parse(const char *line, int16_t len) {
     pipeline.m_join = join;
     pipeline.m_command_start = (int16_t)out.m_commands.size();
     pipeline.m_command_count = 0;
+
+    if (TOKEN_WORD == tokens[at].m_type && 1 == tokens[at].m_len && '!' == line[tokens[at].m_start]) {
+      pipeline.m_negate = true;
+      at++;
+    }
 
     // a pipeline is one or more commands joined by '|'
     while (true) {

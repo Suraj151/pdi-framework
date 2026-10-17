@@ -15,7 +15,6 @@ created Date    : 1st June 2019
 #define MQTT_HOST_BUF_SIZE      50
 #define MQTT_CLIENT_ID_BUF_SIZE 100
 #define MQTT_DEFAULT_KEEPALIVE  30      /*second*/
-#define MQTT_HOST_CONNECT_TIMEOUT  5    /*second*/
 #define MQTT_DEFAULT_PORT       1883
 #define MQTT_USERNAME_BUF_SIZE  50
 #define MQTT_PASSWORD_BUF_SIZE  500
@@ -27,6 +26,45 @@ created Date    : 1st June 2019
 #define MQTT_MAX_SUBSCRIBE_TOPIC  MQTT_MAX_PUBLISH_TOPIC
 
 #define MQTT_INITIALIZE_DURATION   MILLISECOND_DURATION_5000
+
+#ifndef MQTT_TIMER_INTERVAL_MS
+#define MQTT_TIMER_INTERVAL_MS     (MILLISECOND_DURATION_1000 / 5) /* how often the mqtt client ticks; every timeout below is counted in these ticks */
+#endif
+
+#if MQTT_TIMER_INTERVAL_MS == 0
+#error "MQTT_TIMER_INTERVAL_MS must be greater than 0"
+#endif
+
+#ifndef MQTT_CONNECT_WAIT_MS
+#define MQTT_CONNECT_WAIT_MS       2500 /* time one tcp connect to the broker may block the loop */
+#endif
+
+#ifndef MQTT_HOST_CONNECT_TIMEOUT_MS
+#define MQTT_HOST_CONNECT_TIMEOUT_MS  MILLISECOND_DURATION_5000 /* time a tcp connect to the broker gets before it is retried */
+#endif
+
+#ifndef MQTT_READ_TIMEOUT_MS
+#define MQTT_READ_TIMEOUT_MS       MILLISECOND_DURATION_10000 /* time an expected broker answer gets before the client reconnects */
+#endif
+
+#ifndef MQTT_SEND_TIMEOUT_MS
+#define MQTT_SEND_TIMEOUT_MS       MILLISECOND_DURATION_5000 /* unused: counted down per tick, but nothing acts on it yet */
+#endif
+
+#ifndef MQTT_PACKET_READ_WAIT_MS
+#define MQTT_PACKET_READ_WAIT_MS   200 /* silence tolerated between the bytes of one packet being read */
+#endif
+
+/* ticks of MQTT_TIMER_INTERVAL_MS covering ms, rounded up so a timeout never ends early */
+#define MQTT_MS_TO_TICKS(ms)       (((uint32_t)(ms) + (MQTT_TIMER_INTERVAL_MS) - 1) / (MQTT_TIMER_INTERVAL_MS))
+
+#ifndef MQTT_RECV_PACKETS_PER_TASK
+#define MQTT_RECV_PACKETS_PER_TASK 3 /* packets read from the broker in one task before yielding to the rest */
+#endif
+
+#ifndef MQTT_SEND_PACKETS_PER_TASK
+#define MQTT_SEND_PACKETS_PER_TASK 3 /* queued packets sent in one task while none of them waits on an answer */
+#endif
 
 #ifndef MQTT_PAYLOAD_BUF_SIZE
 #define MQTT_PAYLOAD_BUF_SIZE 500

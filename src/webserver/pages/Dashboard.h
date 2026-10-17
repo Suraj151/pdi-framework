@@ -99,7 +99,12 @@ static const char WEB_SERVER_DASHBOARD_STORAGE[] PROG_RODT_ATTR = "\
 <div class='kv'><span>Total</span><b id='fst'>-</b></div>\
 </div>\
 </div>\
-</div>\
+</div>";
+
+/**
+ * @brief Free heap gauge with the largest block and the task count.
+ */
+static const char WEB_SERVER_DASHBOARD_MEMORY[] PROG_RODT_ATTR = "\
 <div class='crd'>\
 <h4>Memory</h4>\
 <div class='gauge'>\
@@ -165,7 +170,7 @@ static const char WEB_SERVER_DASHBOARD_NETWORK[] PROG_RODT_ATTR = "\
  * Digital pins render as state dots and the analog pin feeds a rolling trace
  * kept on the client, so the device only ever sends the current readings.
  */
-static const char WEB_SERVER_DASHBOARD_GPIO[] PROG_RODT_ATTR = "\
+static const char WEB_SERVER_DASHBOARD_GPIO_STYLE[] PROG_RODT_ATTR = "\
 <style>\
 .pin{border:1px solid var(--ln);border-radius:var(--rd);padding:6px 10px;}\
 .pinh{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;}\
@@ -177,7 +182,9 @@ static const char WEB_SERVER_DASHBOARD_GPIO[] PROG_RODT_ATTR = "\
 .gyl,.gxl{font-size:10px;color:var(--mt);}\
 .gyl{display:flex;flex-direction:column;justify-content:space-between;width:30px;text-align:right;}\
 .gxl{display:flex;justify-content:space-between;}\
-</style>\
+</style>";
+
+static const char WEB_SERVER_DASHBOARD_GPIO[] PROG_RODT_ATTR = "\
 <div class='crd wd' id='gpc' style='display:none;'>\
 <h4>GPIO</h4>\
 <div id='gpd' style='display:flex;flex-wrap:wrap;gap:8px;'></div>\
@@ -270,6 +277,13 @@ tx('hpf',bs(r.hp));\
 tx('hpb',bs(r.hb));\
 tx('tkc',r.tc);\
 }\
+</script>";
+
+/**
+ * @brief Renders the gpio card: a dot per digital pin and the analog trace.
+ */
+static const char WEB_SERVER_DASHBOARD_SCRIPT_GPIO[] PROG_RODT_ATTR = "\
+<script>\
 function rgp(g,mx){\
 var c=gi('gpc');\
 if(!g||!g.length){c.style.display='none';return;}\

@@ -22,7 +22,7 @@ created Date    : 1st June 2019
 /**
  * OtaServiceProvider constructor.
  */
-OtaServiceProvider::OtaServiceProvider() : m_http_client(Http_Client::GetStaticInstance()), ServiceProvider(SERVICE_OTA, RODT_ATTR("OTA"))
+OtaServiceProvider::OtaServiceProvider() : ServiceProvider(SERVICE_OTA, RODT_ATTR("OTA")), m_http_client(Http_Client::GetStaticInstance()), m_unconfigured_logged(false)
 {
 }
 
@@ -126,18 +126,21 @@ void OtaServiceProvider::handleOtaVersionRequest()
       firmware_url.replace(mac_index, 5, __i_dvc_ctrl.getDeviceMac().c_str());
     }
 
-#ifdef ENABLE_DEVICE_IOT
     pdiutil::string duid_placeholder = CHARPTR_WRAP("[duid]");
     pdiutil::string::size_type duid_index = firmware_url.find(duid_placeholder.c_str());
     if( pdiutil::string::npos != duid_index )
     {
+#ifdef ENABLE_DEVICE_IOT
       firmware_url.replace( duid_index, 6, __device_iot_service.getDeviceId() );
-    }
+#else
+      firmware_url.replace( duid_index, 6, "" );
 #endif
+    }
   }
 
   if (nullptr != this->m_http_client && firmware_url.size() > 0)
   {
+    this->m_unconfigured_logged = false;
     pdiutil::string user_agent = CHARPTR_WRAP("pdistack");
     this->m_http_client->Begin();
     this->m_http_client->SetUserAgent(user_agent.c_str());
@@ -152,9 +155,10 @@ void OtaServiceProvider::handleOtaVersionRequest()
       __ota_service.handleOtaVersionResponse(reinterpret_cast<Http_Client*>(arg));
     });
   }
-  else
+  else if (!this->m_unconfigured_logged)
   {
     SysLogE("Http OTA Update not initializing or failed or Not Configured Correctly\n");
+    this->m_unconfigured_logged = true;
   }
 }
 
@@ -226,14 +230,16 @@ void OtaServiceProvider::handleOtaVersionResponse( Http_Client *client )
           firmware_url.replace(mac_index, 5, __i_dvc_ctrl.getDeviceMac().c_str());
         }
 
-#ifdef ENABLE_DEVICE_IOT
         pdiutil::string duid_placeholder = CHARPTR_WRAP("[duid]");
         pdiutil::string::size_type duid_index = firmware_url.find(duid_placeholder.c_str());
         if (pdiutil::string::npos != duid_index)
         {
+#ifdef ENABLE_DEVICE_IOT
           firmware_url.replace(duid_index, 6, __device_iot_service.getDeviceId());
-        }
+#else
+          firmware_url.replace(duid_index, 6, "");
 #endif
+        }
         firmware_url += pdiutil::to_string(_firm_version);
       }
 
@@ -317,9 +323,7 @@ void OtaServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
 
     terminal->writeln();
     terminal->writeln_ro(RODT_ATTR("OTA Configs :"));
-    terminal->write(_ota_configs.ota_host);
-    terminal->write_ro(RODT_ATTR("\t"));
-    terminal->writeln((int32_t)_ota_configs.ota_port);
+    terminal->writeln(_ota_configs.ota_host);
   }
 }
 

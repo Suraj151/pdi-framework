@@ -8,7 +8,7 @@ Author          : Suraj I.
 created Date    : 1st Jul 2025
 ******************************************************************************/
 
-#include <utility/pdistl/cstring>
+#include <utility/stl/cstring>
 #include "sha256.h"
 
 #define ROTLEFT(a,b) (((a) << (b)) | ((a) >> (32-(b))))

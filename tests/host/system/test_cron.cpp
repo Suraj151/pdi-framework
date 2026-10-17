@@ -30,6 +30,21 @@ bool minuteCovers(const char *spec, uint8_t value)
     return CronServiceProvider::fieldMatches(s, value, 0, 59);
 }
 
+// a suite run on its own starts from a bare filesystem, so the directory the
+// table lives in is made here rather than left to whichever suite ran first
+void writeCrontab(const char *rows, uint32_t len)
+{
+    pdiutil::string path = CRONTAB_FILE_PATH;
+    pdiutil::string dir = path.substr(0, path.rfind('/'));
+
+    if (!dir.empty() && !__i_fs.isDirectory(dir.c_str()))
+    {
+        __i_fs.createDirectory(dir.c_str());
+    }
+
+    __i_fs.writeFile(CRONTAB_FILE_PATH, rows, len, true);
+}
+
 } // namespace
 
 TEST(cron, a_star_covers_every_value_in_the_field)
@@ -170,7 +185,7 @@ TEST(cron, the_table_is_walked_and_only_the_matching_rows_are_taken)
         "30 4 * * * echo half_past_four\n"
         "* * * * * echo always\n";
 
-    __i_fs.writeFile(CRONTAB_FILE_PATH, rows, (uint32_t)strlen(rows), true);
+    writeCrontab(rows, (uint32_t)strlen(rows));
 
     datetime_t moment;
     moment.m_valid = true;
@@ -200,7 +215,7 @@ TEST(cron, no_more_than_the_cap_is_taken_from_the_table)
         rows += "* * * * * echo row\n";
     }
 
-    __i_fs.writeFile(CRONTAB_FILE_PATH, rows.c_str(), (uint32_t)rows.size(), true);
+    writeCrontab(rows.c_str(), (uint32_t)rows.size());
 
     datetime_t moment;
     moment.m_valid = true;
@@ -220,7 +235,7 @@ TEST(cron, the_service_holds_no_jobs_while_the_clock_is_not_valid)
     pditest::mountedVfs();
 
     const char *rows = "* * * * * echo always\n";
-    __i_fs.writeFile(CRONTAB_FILE_PATH, rows, (uint32_t)strlen(rows), true);
+    writeCrontab(rows, (uint32_t)strlen(rows));
 
     datetime_t moment;
     moment.m_valid = false;
@@ -278,7 +293,7 @@ TEST(cron, a_restart_does_not_leave_a_second_listener_behind)
     const char *rows = "* * * * * echo always\n";
 
     ASSERT_TRUE(__cron_service.startService());
-    __i_fs.writeFile(CRONTAB_FILE_PATH, rows, (uint32_t)strlen(rows), true);
+    writeCrontab(rows, (uint32_t)strlen(rows));
 
     __cron_service.stopService();
     ASSERT_EQ((int)__cron_service.getServiceState(), (int)SERVICE_STATE_INACTIVE);
@@ -318,7 +333,7 @@ TEST(cron, a_job_fires_even_while_the_console_holds_a_session)
     ASSERT_TRUE(nullptr != console);
 
     const char *rows = "* * * * * echo fired > /wt_cron_fired\n";
-    __i_fs.writeFile(CRONTAB_FILE_PATH, rows, (uint32_t)strlen(rows), true);
+    writeCrontab(rows, (uint32_t)strlen(rows));
 
     datetime_t moment;
     moment.m_valid = true;

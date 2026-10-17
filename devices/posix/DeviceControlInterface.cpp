@@ -64,7 +64,8 @@ static const uint32_t PDI_POSIX_HEAP_SIZE = 4194304;
 DeviceControlInterface::DeviceControlInterface() : m_boot_micros(0),
                                                    m_virtual_micros(0),
                                                    m_virtual_clock(false),
-                                                   m_random_state(0x1F2E3D4Cu)
+                                                   m_random_state(0x1F2E3D4Cu),
+                                                   m_free_heap_cap(0)
 #ifdef MOCK_DEVICE_TEST
                                                    , m_reset_count(0)
                                                    , m_restart_count(0)
@@ -111,15 +112,6 @@ void DeviceControlInterface::gpioMode(GPIO_MODE mode, gpio_id_t pin)
 
 void DeviceControlInterface::gpioWrite(GPIO_MODE mode, gpio_id_t pin, gpio_val_t value)
 {
-    if (ANALOG_WRITE == mode)
-    {
-        if (pin < MAX_ANALOG_GPIO_PINS)
-        {
-            m_analog_value[pin] = value;
-        }
-        return;
-    }
-
     if (pin < MAX_DIGITAL_GPIO_PINS)
     {
         m_digital_value[pin] = value;
@@ -128,12 +120,66 @@ void DeviceControlInterface::gpioWrite(GPIO_MODE mode, gpio_id_t pin, gpio_val_t
 
 gpio_val_t DeviceControlInterface::gpioRead(GPIO_MODE mode, gpio_id_t pin)
 {
+    gpio_val_t injected = 0;
+
     if (ANALOG_READ == mode)
     {
+        if (readGpioInputFile('A', pin, injected))
+        {
+            return injected;
+        }
         return pin < MAX_ANALOG_GPIO_PINS ? m_analog_value[pin] : 0;
     }
 
+    if (DIGITAL_READ == mode && readGpioInputFile('D', pin, injected))
+    {
+        return injected;
+    }
+
     return pin < MAX_DIGITAL_GPIO_PINS ? m_digital_value[pin] : 0;
+}
+
+const char *DeviceControlInterface::s_gpio_input_file = nullptr;
+
+/**
+ * @brief Takes input pin levels from a file of `D4 1` / `A0 512` lines, re-read on every input sample.
+ */
+void DeviceControlInterface::setGpioInputFile(const char *path)
+{
+    s_gpio_input_file = path;
+}
+
+/**
+ * @brief The level the input file gives a pin, or false when it names none.
+ */
+bool DeviceControlInterface::readGpioInputFile(char kind, gpio_id_t pin, gpio_val_t &value)
+{
+    if (nullptr == s_gpio_input_file)
+    {
+        return false;
+    }
+
+    FILE *file = fopen(s_gpio_input_file, "r");
+    if (nullptr == file)
+    {
+        return false;
+    }
+
+    bool found = false;
+    char label = 0;
+    unsigned int number = 0;
+    unsigned int level = 0;
+    while (3 == fscanf(file, " %c%u %u", &label, &number, &level))
+    {
+        if ((label == kind || label == kind + 32) && number == pin)
+        {
+            value = (gpio_val_t)level;
+            found = true;
+        }
+    }
+
+    fclose(file);
+    return found;
 }
 
 gpio_id_t DeviceControlInterface::gpioFromPinMap(gpio_id_t pin, bool isAnalog)
@@ -344,7 +390,8 @@ uint32_t DeviceControlInterface::get_free_heap()
 {
     struct mallinfo2 info = mallinfo2();
     uint32_t used = (uint32_t)info.uordblks;
-    return used < PDI_POSIX_HEAP_SIZE ? (PDI_POSIX_HEAP_SIZE - used) : 0;
+    uint32_t free_heap = used < PDI_POSIX_HEAP_SIZE ? (PDI_POSIX_HEAP_SIZE - used) : 0;
+    return (0 != m_free_heap_cap && free_heap > m_free_heap_cap) ? m_free_heap_cap : free_heap;
 }
 
 uint32_t DeviceControlInterface::get_max_free_block()
@@ -403,6 +450,14 @@ void DeviceControlInterface::advanceVirtualClock(uint64_t microseconds)
 void DeviceControlInterface::seedRandom(uint32_t seed)
 {
     m_random_state = (0 == seed) ? 0xA5A5A5A5u : seed;
+}
+
+/**
+ * Caps the free heap this port reports, so a test can drive the heap check.
+ */
+void DeviceControlInterface::capFreeHeap(uint32_t bytes)
+{
+    m_free_heap_cap = bytes;
 }
 
 #ifdef MOCK_DEVICE_TEST

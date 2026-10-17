@@ -157,6 +157,10 @@ uint16_t readPacket(iClientInterface *client, uint8_t *buffer, uint16_t maxlen, 
           return len;
         }
       }
+      if (!client->connected() && client->available() < 1)
+      {
+        return len;
+      }
       t -= 1;
       __i_dvc_ctrl.wait(1);
     }

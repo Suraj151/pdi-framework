@@ -136,6 +136,59 @@ TEST(userstore, a_user_without_a_name_is_refused)
     ASSERT_FALSE(users->addUser(record, "somepass"));
 }
 
+TEST(userstore, a_name_carrying_the_field_separator_cannot_forge_a_record)
+{
+    UserStoreService *users = store();
+    forget("ghost");
+
+    ASSERT_FALSE(users->addUser(makeRecord("ghost:x:0:0::/:/bin/sh", 1007, 1007), "ghostpass"));
+
+    user_record_t found;
+    ASSERT_FALSE(users->findUserByName("ghost", found));
+    ASSERT_FALSE(slurp(USER_STORE_PASSWD_PATH).find("ghost") != pdiutil::string::npos);
+}
+
+TEST(userstore, a_name_outside_the_portable_set_is_refused)
+{
+    UserStoreService *users = store();
+    const char *names[] = {"two words", "line\nbreak", "quo\"te", "back\\slash", "-dash", "tab\there", "semi;colon"};
+
+    for (const char *name : names)
+    {
+        ASSERT_FALSE(users->addUser(makeRecord(name, 1008, 1008), "somepass"));
+        user_record_t found;
+        ASSERT_FALSE(users->findUserByName(name, found));
+    }
+}
+
+TEST(userstore, a_name_too_long_for_its_record_is_refused)
+{
+    UserStoreService *users = store();
+    pdiutil::string name(USER_STORE_MAX_USERNAME_LEN, 'n');
+
+    ASSERT_FALSE(users->addUser(makeRecord(name.c_str(), 1009, 1009), "somepass"));
+
+    pdiutil::string fits(USER_STORE_MAX_USERNAME_LEN - 1, 'n');
+    forget(fits.c_str());
+    ASSERT_TRUE(users->addUser(makeRecord(fits.c_str(), 1009, 1009), "somepass"));
+    forget(fits.c_str());
+}
+
+TEST(userstore, a_portable_name_with_digits_dots_and_dashes_is_accepted)
+{
+    UserStoreService *users = store();
+    const char *names[] = {"svc-1", "a.b_c", "_daemon", "User9"};
+
+    for (const char *name : names)
+    {
+        forget(name);
+        ASSERT_TRUE(users->addUser(makeRecord(name, 1010, 1010), "somepass"));
+        user_record_t found;
+        ASSERT_TRUE(users->findUserByName(name, found));
+        forget(name);
+    }
+}
+
 TEST(userstore, adding_the_same_name_twice_is_refused)
 {
     UserStoreService *users = store();

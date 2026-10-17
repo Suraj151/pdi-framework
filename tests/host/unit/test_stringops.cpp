@@ -279,6 +279,32 @@ TEST(stringops, get_from_json_reports_missing_key)
     ASSERT_FALSE(__get_from_json("{\"a\":1}", "b", value, sizeof(value)));
 }
 
+TEST(stringops, get_from_json_matches_the_whole_key_not_a_part_of_another)
+{
+    char value[32];
+    ASSERT_TRUE(__get_from_json("{\"data\":\"z\",\"a\":1}", "a", value, sizeof(value)));
+    ASSERT_STREQ(value, "1");
+
+    ASSERT_TRUE(__get_from_json("{\"D10\":7,\"D1\":3}", "D1", value, sizeof(value)));
+    ASSERT_STREQ(value, "3");
+
+    ASSERT_FALSE(__get_from_json("{\"D10\":7}", "D1", value, sizeof(value)));
+}
+
+TEST(stringops, get_from_json_skips_the_key_written_inside_a_value)
+{
+    char value[32];
+    ASSERT_TRUE(__get_from_json("{\"note\":\"latest: 9\",\"latest\":\"2\"}", "latest", value, sizeof(value)));
+    ASSERT_STREQ(value, "2");
+}
+
+TEST(stringops, get_from_json_allows_space_between_the_key_and_its_colon)
+{
+    char value[32];
+    ASSERT_TRUE(__get_from_json("{\"a\" : 5}", "a", value, sizeof(value)));
+    ASSERT_STREQ(value, "5");
+}
+
 TEST(stringops, get_from_json_rejects_null)
 {
     char value[8];
@@ -480,4 +506,88 @@ TEST(conversions, uint64_renders_past_the_32_bit_ceiling)
     ASSERT_STREQ(buf, "4294967296");
     Uint64ToString(0ULL, buf, sizeof(buf));
     ASSERT_STREQ(buf, "0");
+}
+
+TEST(stringops, copy_to_buffer_replaces_a_longer_value_whole)
+{
+    char buf[16];
+    memset(buf, 0, sizeof(buf));
+    ASSERT_TRUE(__copy_to_buffer(buf, sizeof(buf), "a-longer-value", 14));
+    ASSERT_TRUE(__copy_to_buffer(buf, sizeof(buf), "ab", 2));
+
+    ASSERT_STREQ(buf, "ab");
+    for (size_t i = 2; i < sizeof(buf); i++)
+    {
+        ASSERT_EQ(buf[i], '\0');
+    }
+}
+
+TEST(stringops, copy_to_buffer_refuses_text_that_leaves_no_room_for_the_terminator)
+{
+    char buf[8];
+    memcpy(buf, "keepme!", 8);
+
+    ASSERT_FALSE(__copy_to_buffer(buf, sizeof(buf), "12345678", 8));
+    ASSERT_FALSE(__copy_to_buffer(buf, sizeof(buf), "123456789", 9));
+    ASSERT_STREQ(buf, "keepme!");
+
+    ASSERT_TRUE(__copy_to_buffer(buf, sizeof(buf), "1234567", 7));
+    ASSERT_STREQ(buf, "1234567");
+}
+
+TEST(stringops, copy_to_buffer_clears_the_field_on_empty_text)
+{
+    char buf[8];
+    memcpy(buf, "old", 4);
+
+    ASSERT_TRUE(__copy_to_buffer(buf, sizeof(buf), "", 0));
+    ASSERT_STREQ(buf, "");
+    ASSERT_TRUE(__copy_to_buffer(buf, sizeof(buf), nullptr, 0));
+}
+
+TEST(stringops, copy_to_buffer_refuses_what_it_cannot_copy)
+{
+    char buf[8];
+    memcpy(buf, "same", 5);
+
+    ASSERT_FALSE(__copy_to_buffer(nullptr, 8, "x", 1));
+    ASSERT_FALSE(__copy_to_buffer(buf, sizeof(buf), nullptr, 3));
+    ASSERT_FALSE(__copy_to_buffer(buf, 0, "", 0));
+    ASSERT_STREQ(buf, "same");
+}
+
+TEST(stringops, json_escaped_leaves_plain_text_alone)
+{
+    pdiutil::string out = "[";
+    __append_json_escaped(out, "home-net 5G");
+    ASSERT_STREQ(out.c_str(), "[home-net 5G");
+}
+
+TEST(stringops, json_escaped_escapes_quotes_and_backslashes)
+{
+    pdiutil::string out;
+    __append_json_escaped(out, "my \"home\" \\ net");
+    ASSERT_STREQ(out.c_str(), "my \\\"home\\\" \\\\ net");
+}
+
+TEST(stringops, json_escaped_writes_control_characters_as_unicode_escapes)
+{
+    pdiutil::string out;
+    __append_json_escaped(out, "a\nb\tc\x1f");
+    ASSERT_STREQ(out.c_str(), "a\\u000ab\\u0009c\\u001f");
+}
+
+TEST(stringops, json_escaped_passes_utf8_through_whole)
+{
+    pdiutil::string out;
+    __append_json_escaped(out, "caf\xc3\xa9");
+    ASSERT_STREQ(out.c_str(), "caf\xc3\xa9");
+}
+
+TEST(stringops, json_escaped_of_nothing_appends_nothing)
+{
+    pdiutil::string out = "x";
+    __append_json_escaped(out, nullptr);
+    __append_json_escaped(out, "");
+    ASSERT_STREQ(out.c_str(), "x");
 }

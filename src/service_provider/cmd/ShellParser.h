@@ -93,12 +93,25 @@ public:
   // One pipeline, and how it attaches to the pipeline before it.
   struct Pipeline {
 
-    Pipeline() : m_command_start(0), m_command_count(0), m_join(JOIN_FIRST) {}
+    Pipeline() : m_command_start(0), m_command_count(0), m_join(JOIN_FIRST), m_negate(false) {}
 
     int16_t m_command_start; ///< first index into Line::m_commands
     int16_t m_command_count;
     join_t m_join;
+    bool m_negate;           ///< a leading '!' turns its answer around
   };
+
+  // What a $(...) answered, keyed by where its '$' sits in the line, so the
+  // answer is put in as text after parsing and never read as a line itself.
+  struct Capture {
+
+    Capture() : m_at(nullptr) {}
+
+    const char *m_at;
+    pdiutil::string m_value;
+  };
+
+  typedef pdiutil::vector<Capture> Captures;
 
   // A whole line. The tables are flat and joined by index, so nothing nests.
   struct Line {
@@ -109,14 +122,15 @@ public:
      * Whether the line needs descriptors at all.
      */
     bool isPlain() const {
-      return 1 == m_pipelines.size() && 1 == m_commands.size() && 0 == m_redirects.size();
+      return 1 == m_pipelines.size() && !m_pipelines[0].m_negate && 1 == m_commands.size() &&
+             0 == m_redirects.size();
     }
 
     /**
      * Text of one command without its redirections, expansions applied.
      */
     bool commandText(const char *line, int16_t index, pdiutil::string &out,
-                     pdi_err_t lastexit = PDI_OK) const;
+                     pdi_err_t lastexit = PDI_OK, const Captures *captures = nullptr) const;
 
     /**
      * Redirection of the given kind on one command, if it has one.
@@ -149,7 +163,23 @@ public:
    * bound an option value against its separator.
    */
   static void expand(const char *src, int16_t len, pdi_err_t lastexit, pdiutil::string &out,
-                     bool unquote = false);
+                     bool unquote = false, const Captures *captures = nullptr);
+
+  /**
+   * Where the ')' closing the $( at open sits, or -1 when nothing closes it.
+   */
+  static int16_t substitutionEnd(const char *src, int16_t len, int16_t open);
+
+  /**
+   * Where the '}' closing the ${ at open sits, or -1 when nothing closes it.
+   */
+  static int16_t braceEnd(const char *src, int16_t len, int16_t open);
+
+  /**
+   * Every $(...) a span holds outside single quotes, each as the run from its
+   * '$' to its ')', in the order they appear.
+   */
+  static void substitutions(const char *src, int16_t len, pdiutil::vector<Token> &spans);
 
   /**
    * Whether a span holds anything the expander would rewrite.

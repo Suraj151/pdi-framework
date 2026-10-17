@@ -79,6 +79,14 @@ struct UseraddCommand : public CommandBase {
 		uint16_t ulen = uOpt->optionvalsize < USER_STORE_MAX_USERNAME_LEN - 1 ? uOpt->optionvalsize : USER_STORE_MAX_USERNAME_LEN - 1;
 		memcpy(uname, uOpt->optionval, ulen);
 
+		if( ulen != uOpt->optionvalsize || !UserStoreService::isValidUsername(uname) ){
+			if( nullptr != m_terminal ){
+				m_terminal->putln();
+				m_terminal->writeln_ro(RODT_ATTR("invalid user name"));
+			}
+			return CMD_ERROR_FAILED;
+		}
+
 		user_record_t existing;
 		if( __user_store_service.findUserByName(uname, existing) ){
 			if( nullptr != m_terminal ){

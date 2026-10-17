@@ -46,6 +46,8 @@ public:
     pdi_err_t init() override;
 
     bool read(uint32_t offset, uint8_t *buf, uint32_t len) override;
+    bool read_each(uint32_t offset, uint32_t len, uint8_t *window, uint16_t window_len,
+                   pdiutil::function<void(const uint8_t *, uint32_t)> fn) override;
     bool write(uint32_t offset, const uint8_t *buf, uint32_t len) override;
     bool flush() override;
     uint32_t capacity() override;

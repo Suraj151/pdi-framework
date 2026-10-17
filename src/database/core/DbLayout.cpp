@@ -510,24 +510,11 @@ pdi_err_t DbLayout::verify_plain(db_dir_entry_t *_entry)
 {
     uint8_t _window[DB_CRC_WINDOW_BYTES];
     uint16_t _crc = 0xFFFF;
-    uint16_t _at = 0;
 
-    while (_at < _entry->m_len)
+    if (!m_store->read_each(_entry->m_offset, _entry->m_len, _window, sizeof(_window),
+                            [&](const uint8_t *_piece, uint32_t _size) { _crc = crc16CcittUpdate(_crc, _piece, _size); }))
     {
-        uint16_t _chunk = _entry->m_len - _at;
-
-        if (_chunk > DB_CRC_WINDOW_BYTES)
-        {
-            _chunk = DB_CRC_WINDOW_BYTES;
-        }
-
-        if (!m_store->read(_entry->m_offset + _at, _window, _chunk))
-        {
-            return PDI_ERR_IO;
-        }
-
-        _crc = crc16CcittUpdate(_crc, _window, _chunk);
-        _at += _chunk;
+        return PDI_ERR_IO;
     }
 
     return _crc == _entry->m_crc ? PDI_OK : PDI_ERR_CRC;
@@ -675,32 +662,12 @@ pdi_err_t DbLayout::verify_sealed(db_dir_entry_t *_entry, const uint8_t *_expect
         return PDI_ERR_NO_MEM;
     }
 
-    if (!m_store->read(_entry->m_offset, _scratch->m_window, DB_SEAL_IV_BYTES))
+    hmac_sha256_init(&_scratch->m_mac, __db_key.key(), DB_KEY_BYTES);
+
+    if (!m_store->read_each(_entry->m_offset, DB_SEAL_IV_BYTES + _entry->m_len, _scratch->m_window, sizeof(_scratch->m_window),
+                            [&](const uint8_t *_piece, uint32_t _size) { hmac_sha256_update(&_scratch->m_mac, _piece, _size); }))
     {
         return PDI_ERR_IO;
-    }
-
-    hmac_sha256_init(&_scratch->m_mac, __db_key.key(), DB_KEY_BYTES);
-    hmac_sha256_update(&_scratch->m_mac, _scratch->m_window, DB_SEAL_IV_BYTES);
-
-    uint16_t _at = 0;
-
-    while (_at < _entry->m_len)
-    {
-        uint16_t _chunk = _entry->m_len - _at;
-
-        if (_chunk > DB_SEAL_CHUNK_BYTES)
-        {
-            _chunk = DB_SEAL_CHUNK_BYTES;
-        }
-
-        if (!m_store->read(_entry->m_offset + DB_SEAL_IV_BYTES + _at, _scratch->m_window, _chunk))
-        {
-            return PDI_ERR_IO;
-        }
-
-        hmac_sha256_update(&_scratch->m_mac, _scratch->m_window, _chunk);
-        _at += _chunk;
     }
 
     hmac_sha256_final(&_scratch->m_mac, _scratch->m_tag);

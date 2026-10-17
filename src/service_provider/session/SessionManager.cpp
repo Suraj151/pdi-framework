@@ -9,6 +9,7 @@ created Date    : 18th July 2026
 ******************************************************************************/
 
 #include "SessionManager.h"
+#include <service_provider/ServiceProvider.h>
 #ifdef ENABLE_CMD_SERVICE
 #include <service_provider/cmd/CommandLineServiceProvider.h>
 #include <utility/SafeAlloc.h>
@@ -65,6 +66,11 @@ void SessionManager::detach(iTerminalInterface *terminal) {
     if (m_current == s) {
       m_current = nullptr;
     }
+  }
+
+  iTerminalInterface *console = __i_dvc_ctrl.getTerminal();
+  if (terminal == ServiceProvider::getTerminal() && terminal != console) {
+    ServiceProvider::setTerminal(console);
   }
 }
 
@@ -341,6 +347,9 @@ void SessionManager::releaseTableIfIdle(session_t *s) {
     return;
   }
 
+#ifdef ENABLE_CMD_SERVICE
+  __cmd_service.retargetTerminal(s->m_fdtable->m_stdio, s->m_terminal);
+#endif
   pdiutil::safe_delete(s->m_fdtable->m_stdio);
   pdiutil::safe_delete(s->m_fdtable);
 }

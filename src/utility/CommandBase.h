@@ -137,6 +137,7 @@ typedef struct CommandBase {
     static CommandExecutionInterface *m_cmdexecinterface;  ///< Interface for command execution.
     bool m_runinbackground;
     bool m_executing;
+    bool m_argsoverflow;                         ///< More free values were given than the options hold.
 
     /**
      * @brief The registry of every command known to the build.
@@ -598,6 +599,14 @@ typedef struct CommandBase {
                                     // next option value start index will start with last option value end index
                                     optn_val_start_index = optn_val_end_index+(m_optionseparator != nullptr ? strlen(m_optionseparator) : 1);
                                 } while ( optn_val_start_index > 0 && optn_val_end_index > 0 && optn_val_start_index < cmd_max_len && option_indx < CMD_OPTION_MAX);
+
+                                while( optn_val_start_index > 0 && optn_val_start_index < cmd_max_len ){
+                                    if( ' ' != _args[optn_val_start_index] && '\t' != _args[optn_val_start_index] ){
+                                        m_argsoverflow = true;
+                                        break;
+                                    }
+                                    optn_val_start_index++;
+                                }
                             }
 
                             // if command dont have any options by default
@@ -675,6 +684,7 @@ typedef struct CommandBase {
         for (uint8_t i = 0; i < CMD_OPTION_MAX; i++){
             m_options[i].Clear(deep);
         }
+        m_argsoverflow = false;
         if(deep)
             m_waitingoptionindx = -1;
     }

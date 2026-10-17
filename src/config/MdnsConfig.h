@@ -85,5 +85,8 @@ created Date    : 25th July 2026
 #ifndef MDNS_TX_BUFFER_SIZE
 #define MDNS_TX_BUFFER_SIZE 320
 #endif
+#ifndef MDNS_SERVICE_LABEL_MAX
+#define MDNS_SERVICE_LABEL_MAX 16 /* a service type label: the underscore and at most 15 characters (RFC 6763) */
+#endif
 
 #endif

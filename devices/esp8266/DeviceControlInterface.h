@@ -115,7 +115,7 @@ public:
                                                              m_duration(duration),
                                                              m_ticker_id(-1)
   {
-    pinMode(this->m_pin, OUTPUT);
+    __i_dvc_ctrl.gpioMode(DIGITAL_BLINK, this->m_pin);
     this->start();
   }
 

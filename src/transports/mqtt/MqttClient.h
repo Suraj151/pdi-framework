@@ -38,24 +38,7 @@ typedef enum
 	MQTT_HOST_RECONNECT,
 } tConnState;
 
-#ifndef MQTT_DEFAULT_KEEPALIVE
-#define MQTT_DEFAULT_KEEPALIVE 60 /*second*/
-#endif
-
-#ifndef MQTT_HOST_CONNECT_TIMEOUT
-#define MQTT_HOST_CONNECT_TIMEOUT 5 /*second*/
-#endif
-
-#ifndef MQTT_DEFAULT_PORT
-#define MQTT_DEFAULT_PORT 1883
-#endif
-
-#ifndef MQTT_MAX_QOS_LEVEL
-#define MQTT_MAX_QOS_LEVEL 2
-#endif
-
 #define MQTT_BUF_SIZE 640
-#define MQTT_CLIENT_READINTERVAL_MS 10
 
 typedef struct
 {
@@ -97,6 +80,8 @@ typedef struct
 	tConnState connState;
 	QUEUE msgQueue;
 	uint16_t host_connect_tick;
+	uint32_t m_ping_wait_tick;
+	bool m_ping_awaited;
 	pdiutil::vector<mqtt_subscribed_topics_t> subscribed_topics;
 	bool mqtt_connected;
 } MQTT_Client;
@@ -177,6 +162,10 @@ protected:
 	void mqtt_client_disconnect(void);
 	// void mqtt_wificlient_delete( void );
 	void mqtt_client_recv(void);
+	/**
+	 * Reads every packet already waiting, up to a bound, so a burst is not taken one per tick.
+	 */
+	void mqtt_client_recv_waiting(void);
 	void deliver_publish(uint8_t *message, size_t length);
 };
 

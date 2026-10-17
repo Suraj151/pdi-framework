@@ -270,3 +270,17 @@ TEST(dataconv, the_string_formatter_agrees_with_the_breakdown)
         ASSERT_STREQ(text, built);
     }
 }
+
+TEST(dataconv, a_space_padded_day_pads_a_single_digit_with_a_space)
+{
+    char single[24];
+    char twodigit[24];
+    char unknown[24];
+    EpochToDateTimeString(1759968000u, single, sizeof(single), "%b %e %H:%M:%S");
+    EpochToDateTimeString(1760400000u, twodigit, sizeof(twodigit), "%b %e %H:%M:%S");
+    EpochToDateTimeString(0u, unknown, sizeof(unknown), "%b %e %H:%M:%S");
+
+    ASSERT_STREQ(single, "Oct  9 00:00:00");
+    ASSERT_STREQ(twodigit, "Oct 14 00:00:00");
+    ASSERT_EQ(strlen(unknown), (size_t)15);
+}

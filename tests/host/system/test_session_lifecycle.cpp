@@ -193,3 +193,28 @@ TEST(sessionlife, an_interrupted_prompt_releases_the_session_for_ordinary_comman
     ASSERT_TRUE(saw(client->captured(), "/"));
     ASSERT_FALSE(saw(client->captured(), "Pass"));
 }
+
+/* ------------------------------------- service messages outlive the client */
+
+TEST(sessionlife, a_client_that_goes_away_stops_receiving_service_messages)
+{
+    iTerminalInterface *console = __i_dvc_ctrl.getTerminal();
+
+    Client typed;
+    feed(typed, "pwd\n");
+    iTerminalInterface *whileTyping = ServiceProvider::getTerminal();
+    iTerminalInterface *gone = typed;
+    typed.drop();
+    iTerminalInterface *afterTyped = ServiceProvider::getTerminal();
+
+    Client refused(false);
+    iTerminalInterface *refusedTerm = refused;
+    refused.drop();
+    iTerminalInterface *afterRefused = ServiceProvider::getTerminal();
+
+    ASSERT_TRUE(whileTyping == gone);
+    ASSERT_TRUE(afterTyped != gone);
+    ASSERT_TRUE(afterTyped == console);
+    ASSERT_TRUE(afterRefused != refusedTerm);
+    ASSERT_TRUE(afterRefused == console);
+}

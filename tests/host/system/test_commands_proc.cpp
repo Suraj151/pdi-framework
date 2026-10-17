@@ -41,7 +41,11 @@ static void reap()
 {
     // one pass consumes signals only up to the task it decides to run, so the
     // bound scales with how many tasks the rest of the suite has registered
-    for (uint16_t pass = 0; pass < (MAX_SCHEDULABLE_TASKS * 2) + 16; pass++)
+    // and a parked task is only due once its interval has passed, so passes run
+    // faster than that never reach it — the walk also runs for a span of time
+    uint32_t began = (uint32_t)__i_dvc_ctrl.millis_now();
+    for (uint16_t pass = 0; pass < (MAX_SCHEDULABLE_TASKS * 2) + 16 ||
+                            ((uint32_t)__i_dvc_ctrl.millis_now() - began) < 10; pass++)
     {
         __task_scheduler.run();
     }

@@ -54,7 +54,14 @@ public:
      */
     static uint16_t shadowPort(uint16_t port);
 
+    /**
+     * @brief Moves the shadow range for every listener opened after it, so two host processes do not collide.
+     */
+    static void setShadowPortBase(uint16_t base);
+
 private:
+    static uint16_t s_shadow_base;
+
     int m_socket;
     uint16_t m_port;
     uint32_t m_timeout;

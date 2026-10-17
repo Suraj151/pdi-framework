@@ -76,7 +76,7 @@ class DashboardController : public Controller {
 #ifdef ENABLE_WIFI_SERVICE
 			_response += pdiutil::to_string(__i_wifi.isConnected() ? 1 : 0);
 			_response += CHARPTR_WRAP(",\"nm\":\"");
-			_response += __i_wifi.SSID();
+			__append_json_escaped(_response, __i_wifi.SSID().c_str());
 			_response += CHARPTR_WRAP("\",\"ip\":\"");
 			_response += (pdiutil::string)__i_wifi.localIP();
 			_response += CHARPTR_WRAP("\",\"mc\":\"");
@@ -340,11 +340,15 @@ class DashboardController : public Controller {
 			CONTINUE_SEND_IN_CHUNK(_page);
 			strcat_ro(_page, WEB_SERVER_DASHBOARD_STORAGE);
 			CONTINUE_SEND_IN_CHUNK(_page);
+			strcat_ro(_page, WEB_SERVER_DASHBOARD_MEMORY);
+			CONTINUE_SEND_IN_CHUNK(_page);
 			strcat_ro(_page, WEB_SERVER_DASHBOARD_TASKS);
 			CONTINUE_SEND_IN_CHUNK(_page);
 			strcat_ro(_page, WEB_SERVER_DASHBOARD_SESSIONS);
 			CONTINUE_SEND_IN_CHUNK(_page);
 			strcat_ro(_page, WEB_SERVER_DASHBOARD_NETWORK);
+			CONTINUE_SEND_IN_CHUNK(_page);
+			strcat_ro(_page, WEB_SERVER_DASHBOARD_GPIO_STYLE);
 			CONTINUE_SEND_IN_CHUNK(_page);
 			strcat_ro(_page, WEB_SERVER_DASHBOARD_GPIO);
 			CONTINUE_SEND_IN_CHUNK(_page);
@@ -352,6 +356,8 @@ class DashboardController : public Controller {
 			strcat_ro(_page, WEB_SERVER_DASHBOARD_SCRIPT1);
 			CONTINUE_SEND_IN_CHUNK(_page);
 			strcat_ro(_page, WEB_SERVER_DASHBOARD_SCRIPT2);
+			CONTINUE_SEND_IN_CHUNK(_page);
+			strcat_ro(_page, WEB_SERVER_DASHBOARD_SCRIPT_GPIO);
 			CONTINUE_SEND_IN_CHUNK(_page);
 			strcat_ro(_page, WEB_SERVER_DASHBOARD_SCRIPT3);
 			CONTINUE_SEND_IN_CHUNK(_page);
@@ -401,7 +407,7 @@ class DashboardController : public Controller {
 			_first = false;
 
 			_response += CHARPTR_WRAP("[\"");
-			_response += (nullptr != _user && 0 != _user[0]) ? _user : "-";
+			__append_json_escaped(_response, (nullptr != _user && 0 != _user[0]) ? _user : "-");
 			_response += CHARPTR_WRAP("\",\"");
 			_response += _via;
 			_response += CHARPTR_WRAP("\",");

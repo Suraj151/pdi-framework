@@ -83,6 +83,18 @@ class Test(object):
         return "%s.%s" % (self.feature, self.name)
 
 
+def selected(only, full_name):
+    """
+    Whether a filter picks a test. A filter holding a dot is anchored at the
+    suite, so "fs." never reaches "synthfs."; a bare word matches anywhere.
+    """
+    if not only:
+        return True
+    if "." in only:
+        return full_name.startswith(only)
+    return only in full_name
+
+
 def test(name, needs=(), mounts=(), services=(), su=False, slow=False):
     """
     Register one test.
@@ -111,6 +123,7 @@ class Target(object):
         self.timeout = timeout
         self._peer_factory = peer_factory
         self._workspaces = []
+        self._made = []
         self._sync = 0
         self._portal_at = None
         self._portals = []
@@ -263,9 +276,29 @@ class Target(object):
         path = "/" + name
         self.run("cd /")
         self.run("rm %s" % path)
-        self.run("mkdir %s" % path)
+        made = self.run("mkdir %s" % path)
         self.run("cd %s" % path)
+
+        # a workspace that could not be made leaves the session in /, and every
+        # file the test goes on to write would land there and never be removed
+        if path not in self.run("pwd"):
+            raise AssertionError("could not make the workspace %s: %s" % (path, made.strip()))
+
         self._workspaces.append(path)
+        return path
+
+    def make_dir(self, path):
+        """
+        Make a directory outside the workspace, for a file the target only reads
+        from one fixed place. Cleanup removes it again with whatever it holds
+        when this test was the one that made it, and leaves one that was already
+        there; a parent that cannot be listed counts as already there.
+        """
+        parent, name = path.rstrip("/").rsplit("/", 1)
+        names = dir_names(self, parent or "/")
+        self.run("mkdir %s" % path)
+        if names is not None and name not in names:
+            self._made.append(path)
         return path
 
     def write(self, path, text):
@@ -325,6 +358,59 @@ class Target(object):
         for path in self._workspaces:
             self.run("rm %s" % path)
         self._workspaces = []
+        for path in reversed(self._made):
+            self.run("rm %s" % path)
+        self._made = []
+
+
+# names the framework keeps at the top of the root itself; the end-of-run sweep
+# never removes one, even when it first appeared during the run
+ROOT_KEEP = frozenset((".", "..", ".env", ".ssh", ".term_history", "etc", "var", "temp",
+                       "tmp", "proc", "sys", "dev"))
+
+
+def root_names(target):
+    """The names at the top of /, or None when the listing could not be read."""
+    return dir_names(target, "/")
+
+
+def dir_names(target, path):
+    """The names in a directory, or None when the listing could not be read."""
+    try:
+        out = target.run("ls %s" % path)
+    except Exception:
+        return None
+
+    names = set()
+    for line in out.splitlines():
+        cols = line.split()
+        if len(cols) >= 6 and cols[0][:1] in ("-", "d"):
+            names.add(cols[-1])
+
+    # every listing carries . and .. — one without them was not a listing, and
+    # treating it as an empty directory would sweep everything after it
+    if not {".", ".."} <= names:
+        return None
+    return names
+
+
+def sweep_root(target, before):
+    """
+    Remove what the run left at the top of /: only a name that was not there
+    when the run began and that the framework does not keep there itself. A
+    test that died before its own cleanup is the usual source.
+    """
+    if before is None:
+        return
+
+    after = root_names(target)
+    if after is None:
+        return
+
+    target.run("cd /")
+    for name in sorted(after - before - ROOT_KEEP):
+        target.run("rm /%s" % name)
+        print("       %sremoved /%s, left behind by the run%s" % (DIM, name, RESET), flush=True)
 
 
 def discover():
@@ -370,6 +456,8 @@ def run_interleaved(lanes, only=None, verbose=False):
     for lane in alive:
         lane.target.resync()
 
+    before_root = root_names(alive[0].target) if alive else None
+
     passed = 0
     failed = []
     skipped = []
@@ -379,7 +467,7 @@ def run_interleaved(lanes, only=None, verbose=False):
     declined = dict((lane.label, 0) for lane in lanes)
 
     for item in TESTS:
-        if only and only not in item.full_name:
+        if not selected(only, item.full_name):
             continue
 
         if not alive:
@@ -450,6 +538,13 @@ def run_interleaved(lanes, only=None, verbose=False):
 
     for lane in lanes:
         lane.target.finish()
+
+    for lane in alive:
+        try:
+            sweep_root(lane.target, before_root)
+            break
+        except Exception as err:
+            print("       %scould not sweep / on %s: %s%s" % (DIM, lane.label, err, RESET), flush=True)
 
     elapsed = (time.time() - started) * 1000.0
     print("")
@@ -546,6 +641,7 @@ def run(shell, caps, username, password, only=None, verbose=False, timeout=20.0,
 
     target = Target(shell, caps, username, password, timeout, peer_factory)
     target.resync()
+    before_root = root_names(target)
 
     passed = 0
     failed = []
@@ -555,7 +651,7 @@ def run(shell, caps, username, password, only=None, verbose=False, timeout=20.0,
     lost = None
     aborted = None
     for index, item in enumerate(TESTS):
-        if only and only not in item.full_name:
+        if not selected(only, item.full_name):
             continue
 
         reason = caps.why_skip(item.needs, item.mounts, item.services)
@@ -620,6 +716,12 @@ def run(shell, caps, username, password, only=None, verbose=False, timeout=20.0,
             lost = None
 
     target.finish()
+
+    if aborted is None:
+        try:
+            sweep_root(target, before_root)
+        except Exception as err:
+            print("       %scould not sweep /: %s%s" % (DIM, err, RESET), flush=True)
 
     elapsed = (time.time() - started) * 1000.0
     print("")

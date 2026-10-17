@@ -59,6 +59,18 @@ created Date    : 18th July 2026
 #define PDI_PIPE_CAPACITY 1024
 #endif
 
+#ifndef SHELL_CAPTURE_MAX
+#define SHELL_CAPTURE_MAX 256 /* bytes a $(...) may answer with; a longer answer fails the line rather than being cut */
+#endif
+
+#ifndef SHELL_CAPTURE_DEPTH
+#define SHELL_CAPTURE_DEPTH 2 /* $(...) that may open inside another $(...) */
+#endif
+
+#ifndef SHELL_ARITH_DEPTH
+#define SHELL_ARITH_DEPTH 8 /* parentheses that may nest inside one $((...)) */
+#endif
+
 /**
  * Bytes a file stream gathers before it touches storage. Writing through per
  * byte would cost one open and close per byte on the filesystem.
@@ -124,5 +136,9 @@ created Date    : 18th July 2026
 #define SCRIPT_KEYWORD_DONE "done"
 #define SCRIPT_KEYWORD_FOR "for"
 #define SCRIPT_KEYWORD_IN "in"
+#define SCRIPT_KEYWORD_ELIF "elif"
+#define SCRIPT_KEYWORD_BREAK "break"
+#define SCRIPT_KEYWORD_CONTINUE "continue"
+#define SCRIPT_KEYWORD_EXIT "exit"
 
 #endif

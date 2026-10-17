@@ -14,6 +14,7 @@ and it is the only thing that exercises TelnetServiceProvider's own client
 handling and its flush.
 """
 
+import os
 import socket
 import time
 
@@ -25,7 +26,7 @@ DEFAULT_PASSWORD = "pdiStack@123"
 
 # a listener the host refuses at its real port moves here, see the mock
 # TcpServerInterface
-SHADOW_PORT_BASE = 10000
+SHADOW_PORT_BASE = int(os.environ.get("PDI_PORT_BASE", "10000"))
 
 IAC = 0xFF
 

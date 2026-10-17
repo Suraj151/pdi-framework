@@ -65,6 +65,36 @@ public:
     virtual bool read(uint32_t offset, uint8_t *buf, uint32_t len) = 0;
 
     /**
+     * @brief Hand a byte range to fn in order, one piece at a time, read through window.
+     * @param offset First byte to read.
+     * @param len Number of bytes to read.
+     * @param window Buffer the pieces are read through.
+     * @param window_len Bytes the window holds.
+     * @param fn Receives each piece and its length.
+     * @return True when the whole range was handed over.
+     */
+    virtual bool read_each(uint32_t offset, uint32_t len, uint8_t *window, uint16_t window_len,
+                           pdiutil::function<void(const uint8_t *, uint32_t)> fn)
+    {
+        uint32_t _at = 0;
+
+        while (_at < len)
+        {
+            uint32_t _chunk = (len - _at) > window_len ? window_len : (len - _at);
+
+            if (!read(offset + _at, window, _chunk))
+            {
+                return false;
+            }
+
+            fn(window, _chunk);
+            _at += _chunk;
+        }
+
+        return true;
+    }
+
+    /**
      * @brief Stage a byte range into the store, persisted by flush().
      * @param offset First byte to write.
      * @param buf Source buffer.

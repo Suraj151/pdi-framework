@@ -769,4 +769,142 @@ TEST(capture, repeating_a_capture_holds_on_to_nothing)
     ASSERT_STREQ(envValue("CAUGHT").c_str(), "again");
 }
 
+TEST(substitution, a_command_s_answer_takes_its_place_in_the_line)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+
+    std::string out = sh.run("echo [$(echo hi)]");
+
+    ASSERT_EQ((int)sh.result(), (int)PDI_OK);
+    ASSERT_TRUE(out.find("[hi]") != std::string::npos);
+}
+
+TEST(substitution, a_quoted_one_keeps_its_blanks_in_a_single_value)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+    Environment::clearSession();
+
+    sh.run("export SUBST=\"$(echo one two)\"");
+
+    ASSERT_STREQ(envValue("SUBST").c_str(), "one two");
+}
+
+TEST(substitution, the_answer_s_closing_line_break_is_dropped)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+
+    std::string out = sh.run("echo a$(echo b)c");
+
+    ASSERT_TRUE(out.find("abc") != std::string::npos);
+}
+
+TEST(substitution, a_pipeline_inside_runs_whole_without_splitting_the_line)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+
+    std::string out = sh.run("echo x$(echo abc | cat)y");
+
+    ASSERT_EQ((int)sh.result(), (int)PDI_OK);
+    ASSERT_TRUE(out.find("xabcy") != std::string::npos);
+}
+
+TEST(substitution, a_separator_inside_belongs_to_the_inner_line)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+
+    std::string out = sh.run("echo [$(echo a ; echo b)]");
+
+    ASSERT_TRUE(out.find("syntax error") == std::string::npos);
+    ASSERT_TRUE(out.find("[a") != std::string::npos);
+    ASSERT_TRUE(out.find("b]") != std::string::npos);
+}
+
+TEST(substitution, nothing_in_single_quotes_is_run)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+
+    std::string out = sh.run("echo '$(echo hi)'");
+
+    ASSERT_TRUE(out.find("$(echo hi)") != std::string::npos);
+}
+
+TEST(substitution, one_may_open_inside_another)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+
+    std::string out = sh.run("echo [$(echo $(echo deep))]");
+
+    ASSERT_TRUE(out.find("[deep]") != std::string::npos);
+}
+
+TEST(substitution, its_answer_is_text_and_is_never_run_as_a_line)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+
+    sh.run("echo \"x; echo PWNED\" > /tmp/wt_inject.txt");
+    std::string out = sh.run("echo [$(cat /tmp/wt_inject.txt)]");
+    sh.run("rm /tmp/wt_inject.txt");
+
+    ASSERT_TRUE(out.find("[x; echo PWNED]") != std::string::npos);
+}
+
+TEST(substitution, a_redirect_target_can_be_built_from_one)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+
+    sh.run("echo kept > /tmp/wt_$(echo named).txt");
+    std::string body = slurp("/tmp/wt_named.txt");
+    sh.run("rm /tmp/wt_named.txt");
+
+    ASSERT_TRUE(body.find("kept") != std::string::npos);
+}
+
+TEST(substitution, an_answer_too_long_to_hold_fails_the_line_rather_than_being_cut)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+
+    std::string half((SHELL_CAPTURE_MAX / 2) + 8, 'A');
+    sh.run(("echo " + half + " > /tmp/wt_long.txt").c_str());
+    sh.run(("echo " + half + " >> /tmp/wt_long.txt").c_str());
+    std::string out = sh.run("echo [$(cat /tmp/wt_long.txt)]");
+    pdi_err_t result = sh.result();
+    sh.run("rm /tmp/wt_long.txt");
+
+    ASSERT_NE((int)result, (int)PDI_OK);
+    ASSERT_TRUE(out.find("[AAAA") == std::string::npos);
+}
+
+TEST(substitution, a_line_with_none_runs_as_before)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+
+    std::string out = sh.run("echo (plain) text");
+
+    ASSERT_TRUE(out.find("(plain) text") != std::string::npos);
+}
+
+TEST(pipeline, a_stage_left_waiting_for_input_answers_on_the_terminal_once_the_line_ends)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+
+    sh.run("cat /etc/hosts | passwd > /tmp/wt_waiting.txt");
+    bool tableGone = (nullptr == SessionManager::current()->m_fdtable);
+    std::string answered = sh.type("\x03");
+
+    ASSERT_TRUE(tableGone);
+    ASSERT_TRUE(answered.find("^C") != std::string::npos || answered.size() > 0);
+}
+
 #endif

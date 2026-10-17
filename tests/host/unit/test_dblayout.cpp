@@ -939,6 +939,130 @@ TEST(dbseal, sealed_defaults_restore_across_tiers)
     ASSERT_MEMEQ(readBack, secret, sizeof(secret));
 }
 
+/**
+ * A store that hands a range over in one call and in odd-sized pieces, the way
+ * a filesystem returns its own chunks, and counts how the engine reads it.
+ */
+struct StreamingDbStore : public FakeDbStore
+{
+    uint32_t m_reads;
+    uint32_t m_streams;
+
+    StreamingDbStore() : m_reads(0), m_streams(0)
+    {
+    }
+
+    bool read(uint32_t offset, uint8_t *buf, uint32_t len) override
+    {
+        m_reads++;
+        return FakeDbStore::read(offset, buf, len);
+    }
+
+    bool read_each(uint32_t offset, uint32_t len, uint8_t *, uint16_t,
+                   pdiutil::function<void(const uint8_t *, uint32_t)> fn) override
+    {
+        m_streams++;
+        if (offset + len > SIZE) return false;
+
+        for (uint32_t at = 0; at < len; at += 7)
+        {
+            fn(&m_bytes[offset + at], (len - at) > 7 ? 7 : (len - at));
+        }
+        return true;
+    }
+};
+
+TEST(dblayout, a_plain_record_is_checked_through_one_stream)
+{
+    StreamingDbStore store;
+    DbLayout layout;
+    pdiutil::vector<struct_tables> tables = twoTables(100, 32);
+    layout.mount(&store, tables);
+
+    uint8_t written[100];
+    for (uint8_t i = 0; i < sizeof(written); i++) written[i] = i;
+    layout.write_record(1, written, sizeof(written), 1);
+
+    store.m_reads = 0;
+    store.m_streams = 0;
+
+    uint8_t readBack[100];
+    memset(readBack, 0, sizeof(readBack));
+    uint16_t len = 0;
+    uint16_t version = 0;
+
+    ASSERT_EQ(layout.read_record(1, readBack, sizeof(readBack), len, version), PDI_OK);
+    ASSERT_MEMEQ(readBack, written, sizeof(written));
+    ASSERT_EQ(store.m_streams, (uint32_t)1);
+    ASSERT_EQ(store.m_reads, (uint32_t)1);
+
+    const db_dir_entry_t *entry = layout.entry_at(0);
+
+    store.m_bytes[entry->m_offset + 99] ^= 0x01;
+    ASSERT_EQ(layout.verify_record(1), PDI_ERR_CRC);
+    store.m_bytes[entry->m_offset + 99] ^= 0x01;
+    ASSERT_EQ(layout.verify_record(1), PDI_OK);
+
+    store.m_bytes[entry->m_offset + 40] ^= 0x01;
+    ASSERT_EQ(layout.verify_record(1), PDI_ERR_CRC);
+}
+
+TEST(dblayout, a_byte_past_the_first_window_is_checked_by_the_default_read)
+{
+    FakeDbStore store;
+    DbLayout layout;
+    pdiutil::vector<struct_tables> tables = twoTables(100, 32);
+    layout.mount(&store, tables);
+
+    uint8_t written[100];
+    for (uint8_t i = 0; i < sizeof(written); i++) written[i] = i;
+    layout.write_record(1, written, sizeof(written), 1);
+    ASSERT_EQ(layout.verify_record(1), PDI_OK);
+
+    const db_dir_entry_t *entry = layout.entry_at(0);
+
+    store.m_bytes[entry->m_offset + 70] ^= 0x01;
+    ASSERT_EQ(layout.verify_record(1), PDI_ERR_CRC);
+    store.m_bytes[entry->m_offset + 70] ^= 0x01;
+
+    store.m_bytes[entry->m_offset + 99] ^= 0x01;
+    ASSERT_EQ(layout.verify_record(1), PDI_ERR_CRC);
+}
+
+TEST(dbseal, a_sealed_record_is_checked_through_one_stream)
+{
+    StreamingDbStore store;
+    DbLayout layout;
+    pdiutil::vector<struct_tables> tables = sealedTables(100);
+    layout.mount(&store, tables);
+
+    uint8_t secret[100];
+    for (uint8_t i = 0; i < sizeof(secret); i++) secret[i] = (uint8_t)(0xA0 ^ i);
+    layout.write_record(1, secret, sizeof(secret), 1);
+
+    store.m_reads = 0;
+    store.m_streams = 0;
+
+    uint8_t readBack[100];
+    memset(readBack, 0, sizeof(readBack));
+    uint16_t len = 0;
+    uint16_t version = 0;
+
+    ASSERT_EQ(layout.read_record(1, readBack, sizeof(readBack), len, version), PDI_OK);
+    ASSERT_MEMEQ(readBack, secret, sizeof(secret));
+    ASSERT_EQ(store.m_streams, (uint32_t)1);
+    ASSERT_EQ(store.m_reads, (uint32_t)3);
+
+    const db_dir_entry_t *entry = layout.entry_at(0);
+
+    store.m_bytes[entry->m_offset + 3] ^= 0x01;
+    ASSERT_EQ(layout.read_record(1, readBack, sizeof(readBack), len, version), PDI_ERR_CRC);
+    store.m_bytes[entry->m_offset + 3] ^= 0x01;
+
+    store.m_bytes[entry->m_offset + DB_SEAL_IV_BYTES + 90] ^= 0x01;
+    ASSERT_EQ(layout.read_record(1, readBack, sizeof(readBack), len, version), PDI_ERR_CRC);
+}
+
 TEST(checksum, crc16_changes_with_a_single_flipped_bit)
 {
     uint8_t data[8];

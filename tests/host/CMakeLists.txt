@@ -74,11 +74,8 @@ file(GLOB_RECURSE PDI_CRYPTO_SOURCES
   ${PDI_ROOT}/src/utility/crypto/*.cpp
 )
 
-# the embedded stl supplies its own support routines. the three files that
-# define the c++ abi and unwinding symbols are left out, because the host
-# runtime already provides those and two definitions would collide.
-file(GLOB PDI_PDISTL_SOURCES ${PDI_ROOT}/src/utility/pdistl/*.cpp)
-list(FILTER PDI_PDISTL_SOURCES EXCLUDE REGEX "/(support|eh_globals|eh_alloc)\\.cpp$")
+# the embedded stl, carrying only what the framework uses
+file(GLOB PDI_PDISTL_SOURCES ${PDI_ROOT}/src/utility/stl/*.cpp)
 
 # the framework goes into an archive rather than straight into the executable,
 # so the linker pulls only the objects something actually references. that is

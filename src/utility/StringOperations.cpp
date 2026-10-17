@@ -171,6 +171,30 @@ void __append_padded_num(pdiutil::string &_out, int64_t _value, uint32_t _width,
 }
 
 /**
+ * Appends text as the body of a json string, escaping quotes, backslashes and
+ * control characters.
+ */
+void __append_json_escaped(pdiutil::string &_out, const char *_str)
+{
+    if (nullptr == _str) return;
+
+    for (const char *p = _str; 0 != *p; p++) {
+        uint8_t c = (uint8_t)*p;
+        if ('"' == c || '\\' == c) {
+            _out += '\\';
+            _out += (char)c;
+        } else if (c < 0x20) {
+            uint8_t low = c & 0x0f;
+            _out += "\\u00";
+            _out += (char)('0' + (c >> 4));
+            _out += (char)(low < 10 ? '0' + low : 'a' + low - 10);
+        } else {
+            _out += (char)c;
+        }
+    }
+}
+
+/**
  * @brief Trims a specific character from both ends of a string.
  * 
  * This function removes occurrences of a specified character from the beginning and end of a string.
@@ -305,6 +329,29 @@ bool __are_str_equals(const char *str1, const char *str2, uint16_t _overflow_lim
         {
             return false;
         }
+    }
+    return true;
+}
+
+/**
+ * @brief Copies text into a fixed buffer, zero filling the buffer first.
+ * @param dest The buffer to copy into.
+ * @param destsize The size of the buffer in bytes.
+ * @param src The text to copy.
+ * @param srclen The number of bytes of text.
+ * @return True if the text and its terminator fit, false with the buffer untouched otherwise.
+ */
+bool __copy_to_buffer(char *dest, uint32_t destsize, const char *src, uint32_t srclen)
+{
+    if (nullptr == dest || (nullptr == src && srclen > 0) || srclen >= destsize)
+    {
+        return false;
+    }
+
+    memset(dest, 0, destsize);
+    if (srclen > 0)
+    {
+        memcpy(dest, src, srclen);
     }
     return true;
 }
@@ -725,16 +772,32 @@ bool __get_from_json(const char *_str, const char *_key, char *_value, int _max_
     }
 
     int _str_len = strlen(_str);
+    int _key_len = strlen(_key);
 
-    int _key_index = __strstr(_str, _key, _str_len);
-    if (_key_index < 0 || _key_index >= _str_len)
+    const char* pos = nullptr;
+    int i = 0;
+    while (i < _str_len && nullptr == pos) {
+
+        if ('"' != _str[i]) { i++; continue; }
+
+        int _open = ++i;
+        while (i < _str_len && '"' != _str[i]) {
+            if ('\\' == _str[i] && (i + 1) < _str_len) i++;
+            i++;
+        }
+        if (i >= _str_len) return false;
+        int _close = i++;
+
+        int j = i;
+        while (j < _str_len && (' ' == _str[j] || '\t' == _str[j] || '\r' == _str[j] || '\n' == _str[j])) j++;
+
+        if (j < _str_len && ':' == _str[j] && (_close - _open) == _key_len && 0 == memcmp(_str + _open, _key, _key_len)) {
+            pos = _str + j + 1;
+        }
+    }
+    if (nullptr == pos)
         return false;
 
-    int _colon_index = __strstr(_str + _key_index, ":", (_str_len - _key_index));
-    if (_colon_index < 0)
-        return false;
-
-    const char* pos = _str + _key_index + _colon_index + 1; // skip colon
     while ((*pos == ' ' || *pos == '\t' || *pos == '\n') && (pos - _str) < _str_len ) pos++; // skip whitespace
 
     int quotes = 0, braces = 0, brackets = 0;

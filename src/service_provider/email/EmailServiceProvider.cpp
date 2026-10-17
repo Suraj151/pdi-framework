@@ -14,6 +14,9 @@ created Date    : 1st June 2019
 
 #include "EmailServiceProvider.h"
 #include <helpers/FeatureConfigFiles.h>
+#ifdef ENABLE_HTTP_CLIENT
+#include <transports/http/HTTPClient.h>
+#endif
 
 /**
  * EmailServiceProvider constructor.
@@ -158,7 +161,7 @@ bool EmailServiceProvider::sendMail(pdiutil::string &mail_body)
 
   if (
       strlen(_email_config.mail_host) > 0 && strlen(_email_config.sending_domain) > 0 &&
-      strlen(_email_config.mail_from) > 0 && strlen(_email_config.mail_to) > 0)
+      strlen(_email_config.mail_from) > 0 && strlen(_email_config.mail_to) > 0 && this->isClientFree())
   {
     ret = this->m_smtp.begin(this->m_client, _email_config.mail_host, _email_config.mail_port);
     if (ret)
@@ -214,7 +217,7 @@ bool EmailServiceProvider::sendMail(char *mail_body)
 
   if (
       strlen(_email_config.mail_host) > 0 && strlen(_email_config.sending_domain) > 0 &&
-      strlen(_email_config.mail_from) > 0 && strlen(_email_config.mail_to) > 0)
+      strlen(_email_config.mail_from) > 0 && strlen(_email_config.mail_to) > 0 && this->isClientFree())
   {
     ret = this->m_smtp.begin(this->m_client, _email_config.mail_host, _email_config.mail_port);
     if (ret)
@@ -270,7 +273,7 @@ bool EmailServiceProvider::sendMail(const char * mail_body)
 
   if (
       strlen(_email_config.mail_host) > 0 && strlen(_email_config.sending_domain) > 0 &&
-      strlen(_email_config.mail_from) > 0 && strlen(_email_config.mail_to) > 0)
+      strlen(_email_config.mail_from) > 0 && strlen(_email_config.mail_to) > 0 && this->isClientFree())
   {
     ret = this->m_smtp.begin(this->m_client, _email_config.mail_host, _email_config.mail_port);
     if (ret)
@@ -311,6 +314,19 @@ bool EmailServiceProvider::sendMail(const char * mail_body)
 }
 
 /**
+ * True when no http request holds the shared client this service sends over.
+ */
+bool EmailServiceProvider::isClientFree()
+{
+#ifdef ENABLE_HTTP_CLIENT
+  Http_Client *_http = Http_Client::GetStaticInstance();
+  return nullptr == _http || HTTP_ASYNC_IDLE == _http->GetAsyncState();
+#else
+  return true;
+#endif
+}
+
+/**
  * print Email configs to terminal
  */
 void EmailServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
@@ -327,7 +343,7 @@ void EmailServiceProvider::printConfigToTerminal(iTerminalInterface *terminal)
     terminal->write(_email_config.mail_host); terminal->write_ro(RODT_ATTR("\t"));
     terminal->write((int32_t)_email_config.mail_port); terminal->write_ro(RODT_ATTR("\t"));
     terminal->write(_email_config.mail_username); terminal->write_ro(RODT_ATTR("\t"));
-    terminal->writeln(_email_config.mail_password);
+    terminal->writeln_ro(0 != _email_config.mail_password[0] ? RODT_ATTR("********") : RODT_ATTR("-"));
 
     terminal->write(_email_config.mail_from); terminal->write_ro(RODT_ATTR("\t"));
     terminal->write(_email_config.mail_from_name); terminal->write_ro(RODT_ATTR("\t"));

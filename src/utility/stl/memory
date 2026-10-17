@@ -1,0 +1,113 @@
+/***************************** PDI STD File ***********************************
+This file is third party source, taken from the open source uClibc++ library and
+used here with modifications. Thanking to author for providing this .
+
+for the license terms of this file refer the source link below.
+
+referred from   : https://github.com/mike-matera/ArduinoSTL
+added Date      : 1st Dec 2024
+added by        : Suraj I.
+******************************************************************************/
+
+#include <new>
+#include "cstddef"
+#include "cstdlib"
+#include "iterator_base"
+#include "utility"
+#include "cstdio"
+#include "basic_definitions"
+#include "../SafeAlloc.h"
+
+#ifndef HEADER_PDISTD_MEMORY
+#define HEADER_PDISTD_MEMORY 1
+
+#pragma GCC visibility push(default)
+
+namespace pdistd{
+
+template <class T> class allocator;
+
+template <> class _UCXXEXPORT allocator<void> {
+public:
+	typedef void*       pointer;
+	typedef const void* const_pointer;
+	typedef void  value_type;
+	template <class U> struct rebind { typedef allocator<U> other; };
+};
+
+/**
+ * The storage every container builds its elements in, taken through the
+ * framework's one allocation api so a refusal reaches the container as null.
+ */
+template <class T> class _UCXXEXPORT allocator{
+public:
+	typedef T value_type;
+	typedef size_t size_type;
+	typedef ptrdiff_t difference_type;
+
+	typedef T* pointer;
+	typedef const T* const_pointer;
+
+	typedef T& reference;
+	typedef const T& const_reference;
+
+	pointer address(reference r) const { return &r; }
+	const_pointer address(const_reference r) const { return &r; }
+
+	allocator() _UCXX_USE_NOEXCEPT{}
+	template <class U> allocator(const allocator<U>& ) _UCXX_USE_NOEXCEPT{}
+	~allocator() _UCXX_USE_NOEXCEPT{}
+
+	/**
+	 * Uninitialised room for n elements, or null when the heap cannot spare it.
+	 */
+	pointer allocate(size_type n, typename allocator<void>::const_pointer = 0){
+		if(0 == n || n > max_size()){
+			return 0;
+		}
+		return static_cast<T*>(pdiutil::safe_alloc_bytes(n * sizeof(T)));
+	}
+
+	/**
+	 * Gives back room taken by allocate; null is ignored.
+	 */
+	void deallocate(pointer p, size_type){
+		pdiutil::safe_free_bytes(p);
+	}
+
+	void construct(pointer p, const T& val) { new(static_cast<void*>(p)) T(val); }
+	void destroy(pointer p){ p->~T(); }
+
+	size_type max_size() const _UCXX_USE_NOEXCEPT{ return ((size_type)-1) / sizeof(T); }
+	template<class U> struct rebind { typedef allocator<U> other; };
+
+};
+
+/**
+ * Builds one T in storage taken through the allocator, or null when the heap cannot spare it.
+ */
+template <class T, class... Args> T* allocator_new(Args&&... args){
+	T* p = allocator<T>().allocate(1);
+	if(0 == p){
+		return 0;
+	}
+	return new(static_cast<void*>(p)) T(static_cast<Args&&>(args)...);
+}
+
+/**
+ * Destroys an object built by allocator_new and gives its storage back; null is ignored.
+ */
+template <class T> void allocator_delete(T*& p){
+	if(0 == p){
+		return;
+	}
+	p->~T();
+	allocator<T>().deallocate(p, 1);
+	p = 0;
+}
+
+}	//namespace pdistd
+
+#pragma GCC visibility pop
+
+#endif

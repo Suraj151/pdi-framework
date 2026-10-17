@@ -13,6 +13,9 @@ Skipped whole when the target serves no http port, so a build without the web
 server reports that rather than a page of failures.
 """
 
+import socket
+import time
+
 from .registry import test, expect_in, expect_not_in, Skip
 
 # every settings page the portal can carry; a build without a service simply
@@ -252,6 +255,43 @@ def post_with_wrong_csrf_refused(t):
         raise AssertionError("the refused post changed the password anyway")
 
 
+@test("a settings page given its fields in a GET query saves nothing")
+def get_query_saves_nothing(t):
+    from .test_mqtt import read_form
+    from urllib.parse import urlencode
+
+    portal = t.portal()
+    tried = 0
+    for path, change in (("/gpio-server", {"hst": "http://get.example", "prt": "81", "frq": "9"}),
+                         ("/ota-config", {"hst": "http://get.example", "prt": "81"}),
+                         ("/mqtt-general-config", {"hst": "get.example", "prt": "1884"}),
+                         ("/email-config", {"ml_dmn": "get.example", "ml_srvr": "get.example"})):
+        if 404 == portal.get(path).status:
+            continue
+        before = read_form(portal, path)
+        fields = dict(before)
+        fields.update(change)
+        portal.get("%s?%s" % (path, urlencode(fields)))
+        after = read_form(portal, path)
+        if after != before:
+            raise AssertionError("a GET to %s saved the page: %r became %r" % (path, before, after))
+        tried += 1
+
+    if 0 == tried:
+        raise Skip("this build serves none of the settings pages")
+
+
+@test("a file is not deleted by a GET to the delete route", needs=("echo", "cat", "rm"))
+def get_does_not_delete(t):
+    name = "portal_get_kept.txt"
+    t.run("echo kept > /%s" % name)
+    try:
+        t.portal().get("/storage-filedel?df=/%s&loc=/storage" % name)
+        expect_in("kept", t.run("cat /%s" % name), "the file after a GET to the delete route")
+    finally:
+        t.run("rm /%s" % name)
+
+
 @test("the csrf token is not the session token")
 def csrf_is_its_own_secret(t):
     portal = t.portal()
@@ -276,6 +316,40 @@ def listing_shows_a_shell_file(t):
             raise AssertionError("the file list did not show %s:\n%s" % (name, names))
     finally:
         t.run("rm /%s" % name)
+
+
+@test("a file name carrying markup and quotes is listed as text", needs=("echo", "rm"))
+def listing_carries_an_awkward_name(t):
+    portal = t.portal()
+    name = '<i>q"x\\.txt'
+    quoted = "'/%s'" % name
+
+    t.run("rm %s" % quoted)
+    t.run("echo portal > %s" % quoted)
+
+    try:
+        if name not in t.run("ls /"):
+            raise Skip("the shell could not make %r on this target" % name)
+
+        names = [item["n"] for item in listing(portal)["lst"]]
+        if name not in names:
+            raise AssertionError("the file list did not carry %r whole:\n%s" % (name, names))
+    finally:
+        t.run("rm %s" % quoted)
+
+
+@test("the storage page writes listed names as text, never as markup")
+def storage_page_never_parses_a_name(t):
+    page = t.portal().get("/storage")
+    if 404 == page.status:
+        raise Skip("this build serves no storage browser")
+
+    # a name is the one value here a user other than the viewer chooses, so
+    # a name parsed as markup runs that user's script with the viewer's session
+    for at in [i for i in range(len(page.body)) if page.body.startswith("innerHTML=", i)]:
+        assigned = page.body[at + len("innerHTML="):at + len("innerHTML=") + 40]
+        if "it.n" in assigned or "it.l" in assigned or "location" in assigned or assigned.startswith("`"):
+            raise AssertionError("the page parses listed text as markup: innerHTML=%s" % assigned)
 
 
 @test("the storage browser reports permissions and ownership", needs=("echo", "rm"))
@@ -445,3 +519,65 @@ def delete_honours_permissions(t):
     finally:
         t.run("rm /%s" % name)
         t.run("userdel u=%s" % account)
+
+
+def drain(sock, quiet=1.0):
+    """Read until the peer has said nothing for a while, and return what came."""
+    got = b""
+    sock.settimeout(quiet)
+    while True:
+        try:
+            chunk = sock.recv(1024)
+        except socket.timeout:
+            return got
+        if not chunk:
+            return got
+        got += chunk
+
+
+@test("a plain http request is answered while a secure client idles on the server")
+def plain_http_not_starved(t):
+    """
+    The server serves one client at a time and hands an idle keep-alive client
+    over when someone else is waiting. A browser that has just loaded a secure
+    page keeps that connection open, and a request to port 80 behind it was only
+    answered once the keep-alive ran out, thirty seconds later. The secure
+    connection is held idle here, as the browser holds it, and the plain request
+    has to be answered well inside that window.
+    """
+    from ..driver.portal import _tls_context, DEFAULT_PORT
+
+    portal = t.portal(login=False)
+    if not portal.secure:
+        raise Skip("this target serves plain http, so there is no second port to wait on")
+
+    budget = 10.0
+    held = _tls_context().wrap_socket(
+        socket.create_connection((portal.host, portal.port), timeout=portal.timeout))
+    plain = None
+    try:
+        held.sendall(b"GET /login HTTP/1.1\r\nHost: %s\r\nConnection: keep-alive\r\n\r\n"
+                     % portal.host.encode())
+        if b"HTTP/1." not in drain(held):
+            raise AssertionError("the secure connection was never answered")
+
+        began = time.time()
+        plain = socket.create_connection((portal.host, DEFAULT_PORT), timeout=budget)
+        plain.sendall(b"GET / HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n"
+                      % portal.host.encode())
+        try:
+            first = plain.recv(64)
+        except socket.timeout:
+            raise AssertionError("port %d answered nothing in %.0f s while a secure client idled"
+                                 % (DEFAULT_PORT, budget))
+
+        waited = time.time() - began
+        if not first.startswith(b"HTTP/1."):
+            raise AssertionError("port %d answered %r" % (DEFAULT_PORT, first))
+        if waited >= budget:
+            raise AssertionError("port %d took %.1f s while a secure client idled"
+                                 % (DEFAULT_PORT, waited))
+    finally:
+        held.close()
+        if plain is not None:
+            plain.close()

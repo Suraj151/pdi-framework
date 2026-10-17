@@ -64,6 +64,7 @@ typedef struct {
   bool is_last_event_succeed[MAX_GPIO_EVENTS];
   uint32_t last_event_millis[MAX_GPIO_EVENTS];
   int8_t event_gpio_pin;
+  uint32_t tracked_rule[MAX_GPIO_EVENTS];
 } __gpio_event_track_t;
 
 extern __gpio_event_track_t __gpio_event_track;
@@ -180,11 +181,10 @@ struct gpio_configs {
   // Clear members method
   void clear(){
     memset(gpio_mode, OFF, MAX_GPIO_PINS);
-    memset(gpio_readings, 0, MAX_GPIO_PINS);
+    memset(gpio_readings, 0, sizeof(gpio_readings));
 #ifndef ENABLE_GPIO_BASIC_ONLY
     for (size_t i = 0; i < MAX_GPIO_EVENTS; i++) gpio_events[i].clear();
     memset(gpio_host, 0, GPIO_HOST_BUF_SIZE);
-    gpio_port = 80;
     gpio_post_frequency = GPIO_DATA_POST_FREQ;
 #endif
   }
@@ -194,7 +194,6 @@ struct gpio_configs {
 #ifndef ENABLE_GPIO_BASIC_ONLY
   gpio_event gpio_events[MAX_GPIO_EVENTS];
   char gpio_host[GPIO_HOST_BUF_SIZE];
-  pdiutil::net_port_t gpio_port;
   uint32_t gpio_post_frequency;
 
   // return true if gpio has event

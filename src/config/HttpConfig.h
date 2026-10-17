@@ -141,6 +141,7 @@ typedef enum http_method http_method_t;
 #define HTTP_HEADER_KEY_ACCESS_CONTROL_ALLOW_ORIGIN "Access-Control-Allow-Origin"
 #define HTTP_HEADER_KEY_CONTENT_DISPOSITION "Content-Disposition"
 #define HTTP_HEADER_KEY_STRICT_TRANSPORT_SECURITY "Strict-Transport-Security"
+#define HTTP_HEADER_KEY_ALLOW           "Allow"
 
 #ifndef HTTPS_HSTS_MAX_AGE_SECONDS
 // HSTS pins the origin to HTTPS-only for the configured age; with a

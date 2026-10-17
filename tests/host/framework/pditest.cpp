@@ -112,6 +112,8 @@ namespace pditest
         const char *filter = nullptr;
         bool listonly = false;
 
+        setvbuf(stdout, nullptr, _IOLBF, 0);
+
         for (int i = 1; i < argc; i++)
         {
             if (0 == strcmp(argv[i], "--filter") && (i + 1) < argc)

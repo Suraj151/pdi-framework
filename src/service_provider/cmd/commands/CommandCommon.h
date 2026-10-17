@@ -109,6 +109,8 @@ created Date    : 1st June 2019
 #define CMD_NAME_UNSET			    "unset"
 #define CMD_NAME_SOURCE			    "source"
 #define CMD_NAME_TEST			    "test"
+#define CMD_NAME_TRUE			    "true"
+#define CMD_NAME_FALSE			    "false"
 #define CMD_NAME_CRONTAB		    "crontab"
 #define CMD_NAME_WGET			    "wget"
 

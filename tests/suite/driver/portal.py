@@ -16,6 +16,7 @@ server costs nothing.
 
 import http.client
 import json
+import os
 import re
 import socket
 import ssl
@@ -27,7 +28,7 @@ DEFAULT_TLS_PORT = 443
 
 # a listener the host refuses at its real port moves here, see the mock
 # TcpServerInterface
-SHADOW_PORT_BASE = 10000
+SHADOW_PORT_BASE = int(os.environ.get("PDI_PORT_BASE", "10000"))
 
 # <input type='hidden' name='csrf' value='...'> — the page builder quotes
 # attributes with apostrophes

@@ -156,7 +156,13 @@ class Fixture(object):
         self.error = None
 
     def restore(self, target):
-        """Put the board's config back and take the broker away."""
+        """
+        Put the board's config back and take the broker away. The suite's
+        fixture is dropped with it, so a later pass over the suites in the
+        same process builds a fresh one instead of reusing one with no broker.
+        """
+        global _fixture
+
         try:
             if self.saved:
                 portal = portal_for(target)
@@ -167,6 +173,8 @@ class Fixture(object):
             if self.broker is not None:
                 self.broker.stop()
                 self.broker = None
+            if _fixture is self:
+                _fixture = None
 
 
 _fixture = None
@@ -549,7 +557,7 @@ def removed_topic_is_unsubscribed(t):
         # question. A session that has not subscribed to anything yet has not
         # answered it, and is waited on rather than counted.
         if state.broker.connect_count() > sessions_before:
-            session = state.broker.session()
+            session = state.broker.session
             if session is not None and session.subscriptions:
                 if SUB_SECOND not in [topic for topic, _ in session.subscriptions]:
                     return
@@ -608,8 +616,9 @@ def clearing_a_field_keeps_the_submission(t):
     A config page has to be able to empty a field, and emptying one must not
     quietly throw away the whole submission. Both halves are asserted in a
     single post: the host is cleared while the port and client id change, and
-    all three have to take. Runs last because clearing the host disconnects the
-    client from the test broker.
+    all three have to take. Clearing the host disconnects the client from the
+    test broker, and later suites share that broker, so the connection is
+    handed back afterwards.
     """
     state = fixture(t)
 
@@ -619,17 +628,20 @@ def clearing_a_field_keeps_the_submission(t):
         "usrn": "", "pswd": "", "kpalv": str(KEEPALIVE), "cln": "clean",
     })
 
-    stored = read_form(portal_for(t), GENERAL)
+    try:
+        stored = read_form(portal_for(t), GENERAL)
 
-    if stored.get("hst"):
-        raise AssertionError("the host was submitted empty but the page still "
-                             "reports %r" % stored.get("hst"))
+        if stored.get("hst"):
+            raise AssertionError("the host was submitted empty but the page still "
+                                 "reports %r" % stored.get("hst"))
 
-    for field, wanted in (("prt", "1999"), ("clid", "pdicleared")):
-        if stored.get(field) != wanted:
-            raise AssertionError("%s is %r, not the submitted %r — clearing one "
-                                 "field discarded the rest of the form"
-                                 % (field, stored.get(field), wanted))
+        for field, wanted in (("prt", "1999"), ("clid", "pdicleared")):
+            if stored.get(field) != wanted:
+                raise AssertionError("%s is %r, not the submitted %r — clearing one "
+                                     "field discarded the rest of the form"
+                                     % (field, stored.get(field), wanted))
+    finally:
+        hand_back(t, state)
 
 
 # --------------------------------------------------------------------- tls
@@ -654,8 +666,9 @@ def point_at(portal, host, port, secure):
 
 def hand_back(t, state):
     """Point the board at the shared plain broker again and wait for it."""
+    before = state.broker.connect_count()
     point_at(portal_for(t), state.address, state.broker.port, False)
-    state.broker.wait_for_connect(CONNECT_WAIT)
+    state.broker.wait_for_reconnect(before, CONNECT_WAIT)
 
 
 def require_secure_client(t):
@@ -735,7 +748,7 @@ def put_trust_anchors(t, certpath):
     except ImportError:
         raise Skip("paramiko is not installed, so the ca bundle cannot be placed")
 
-    t.run("mkdir /etc/ssl")
+    t.make_dir("/etc/ssl")
 
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())

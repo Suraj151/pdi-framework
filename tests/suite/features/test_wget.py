@@ -52,9 +52,17 @@ class Fixture(object):
         self.error = None
 
     def stop(self):
+        """
+        Takes the origin away and drops the suite's fixture with it, so a later
+        pass over the suites in the same process stands up a fresh one.
+        """
+        global _fixture
+
         if self.origin is not None:
             self.origin.stop()
             self.origin = None
+        if _fixture is self:
+            _fixture = None
 
 
 _fixture = None
@@ -319,11 +327,14 @@ def a_url_without_a_host_is_refused(t):
     CY on hardware. A url ending in a colon sent the parser past the end of
     its buffer, so what matters is that the shell is still there afterwards.
     """
-    out = t.run("wget /%sl.bin http:" % W)
-    expect_not_in("saved", outcome(out), "a url with no host reported a saved file")
+    try:
+        out = t.run("wget /%sl.bin http:" % W)
+        expect_not_in("saved", outcome(out), "a url with no host reported a saved file")
 
-    alive = t.run("echo wtparse")
-    expect_in("wtparse", alive, "the shell stopped answering after a malformed url")
+        alive = t.run("echo wtparse")
+        expect_in("wtparse", alive, "the shell stopped answering after a malformed url")
+    finally:
+        t.run("rm /%sl.bin" % W)
 
 
 @test("a url padded with spaces is still fetched", needs=("wget",))

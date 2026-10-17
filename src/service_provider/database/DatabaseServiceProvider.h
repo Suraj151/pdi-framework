@@ -72,6 +72,11 @@ public:
   bool restore_defaults();
 
   /**
+   * write each feature's config file from its record, so a restored record is what the next service start reads.
+   */
+  void write_config_files();
+
+  /**
    * whether the live database is the container on storage.
    */
   bool is_storage_tier() const { return m_storage_tier; }

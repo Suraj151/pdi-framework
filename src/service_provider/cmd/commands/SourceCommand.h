@@ -19,6 +19,7 @@ struct SourceCommand : public CommandBase {
 		Clear();
 		SetCommand(CMD_NAME_SOURCE);
 		setAcceptArgsOptions(true);
+		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
 
 	static void RegisterCommand(){
@@ -28,7 +29,7 @@ struct SourceCommand : public CommandBase {
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("source <file>  run each line of the file in this session");
+		return RODT_ATTR("source <file> [args]  run each line of the file in this session");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -54,6 +55,18 @@ struct SourceCommand : public CommandBase {
 			return CMD_ERROR_ARGS_MISSING;
 		}
 
+		if( m_argsoverflow ){
+			m_terminal->putln();
+			m_terminal->writeln_ro(RODT_ATTR("too many arguments"));
+			return CMD_ERROR_INVAL;
+		}
+
+		pdiutil::vector<pdiutil::string> args;
+		for( uint8_t i = 1; i < CMD_OPTION_MAX && nullptr != m_options[i].optionval &&
+			 0 < m_options[i].optionvalsize; i++ ){
+			args.push_back(pdiutil::string(m_options[i].optionval, m_options[i].optionvalsize));
+		}
+
 		pdiutil::string arg(cmdoptn->optionval, cmdoptn->optionvalsize);
 		pdiutil::string path = resolveArgPathStr(arg.c_str(), (int16_t)arg.size());
 
@@ -63,7 +76,7 @@ struct SourceCommand : public CommandBase {
 			return CMD_ERROR_FAILED;
 		}
 
-		pdi_err_t res = ScriptRunner::run(path.c_str(), false);
+		pdi_err_t res = ScriptRunner::run(path.c_str(), false, &args);
 
 		if( CMD_ERROR_FAILED == res && !ScriptRunner::pending() ){
 			m_terminal->putln();

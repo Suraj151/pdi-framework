@@ -349,6 +349,9 @@ pdiutil::string ProcFs::renderMemInfo() {
     pdiutil::string out;
     appendMemLine(out, RODT_ATTR("MemFree"), __i_dvc_ctrl.get_free_heap());
     appendMemLine(out, RODT_ATTR("MemMaxBlock"), __i_dvc_ctrl.get_max_free_block());
+    appendKey(out, RODT_ATTR("AllocRefused"));
+    appendNumber(out, (int64_t)pdiutil::safe_alloc_refusals());
+    out += TERMINAL_NEW_LINE;
     return out;
 }
 

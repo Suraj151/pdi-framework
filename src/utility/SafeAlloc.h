@@ -23,7 +23,16 @@ Created Date    : 6th June 2026
 #define PDI_SAFE_ALLOC_HEAP_MARGIN 2048
 #endif
 
+#ifndef PDI_SAFE_ALLOC_SMALL_REQUEST
+#define PDI_SAFE_ALLOC_SMALL_REQUEST 64 /* requests this size or smaller skip the largest-block query, which walks the heap */
+#endif
+
 namespace pdiutil {
+
+/**
+ * @brief How many allocations the heap check has refused since boot.
+ */
+uint32_t safe_alloc_refusals();
 
 /**
  * @brief Arms the heap check. Must be called once the device instances are
@@ -68,6 +77,24 @@ inline T* safe_new_array(size_t count) {
     if (count == 0) return nullptr;
     if (!has_heap_for(count * sizeof(T))) return nullptr;
     return new T[count]();
+}
+
+/**
+ * @brief Heap-checked raw storage of `bytes`, left uninitialised for a container to build elements in; nullptr if refused.
+ */
+inline void* safe_alloc_bytes(size_t bytes) {
+    if (bytes == 0) return nullptr;
+    if (!has_heap_for(bytes)) return nullptr;
+    return ::operator new(bytes);
+}
+
+/**
+ * @brief Releases storage taken by safe_alloc_bytes(); nullptr is ignored.
+ */
+inline void safe_free_bytes(void* p) {
+    if (p != nullptr) {
+        ::operator delete(p);
+    }
 }
 
 /**

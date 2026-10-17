@@ -137,7 +137,8 @@ class LoginController : public Controller {
 
       pdiutil::string _cpswd_arg = CHARPTR_WRAP("cpswd"), _npswd_arg = CHARPTR_WRAP("npswd"), _rpswd_arg = CHARPTR_WRAP("rpswd");
 
-      if ( this->m_web_resource->m_server->hasArg(_cpswd_arg.c_str()) &&
+      if ( this->m_web_resource->m_server->isPostRequest() &&
+           this->m_web_resource->m_server->hasArg(_cpswd_arg.c_str()) &&
            this->m_web_resource->m_server->hasArg(_npswd_arg.c_str()) &&
            this->m_web_resource->m_server->hasArg(_rpswd_arg.c_str()) ) {
 
@@ -290,7 +291,8 @@ class LoginController : public Controller {
 
       pdiutil::string _username_arg = CHARPTR_WRAP("username"), _password_arg = CHARPTR_WRAP("password");
 
-      bool _is_posted = ( this->m_web_resource->m_server->hasArg(_username_arg.c_str()) &&
+      bool _is_posted = ( this->m_web_resource->m_server->isPostRequest() &&
+                          this->m_web_resource->m_server->hasArg(_username_arg.c_str()) &&
                           this->m_web_resource->m_server->hasArg(_password_arg.c_str()) );
       pdiutil::string _message = CHARPTR_WRAP("Wrong Credentials.");
 

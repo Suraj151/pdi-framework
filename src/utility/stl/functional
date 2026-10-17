@@ -1,0 +1,670 @@
+
+/***************************** PDI STD File ***********************************
+This file is third party source, taken from the open source uClibc++ library and
+used here with modifications. Thanking to author for providing this .
+
+for the license terms of this file refer the source link below.
+
+referred from   : https://github.com/mike-matera/ArduinoSTL
+                  https://iq.opengenus.org/std-function/
+added Date      : 1st Dec 2024
+added by        : Suraj I.
+******************************************************************************/
+
+#ifndef __PDISTD_HEADER_FUNCTIONAL
+#define __PDISTD_HEADER_FUNCTIONAL 1
+
+#include "stl_function"
+#include "move.h"
+#include "memory"
+
+#ifndef __PDISTD_FUNCTION_INLINE_STORAGE__
+#define __PDISTD_FUNCTION_INLINE_STORAGE__ 0 /* 1: a small callable lives inside the function, two pointers each; 0: every callable on the heap behind one pointer */
+#endif
+
+#if __PDISTD_FUNCTION_INLINE_STORAGE__
+#ifndef __PDISTD_FUNCTION_INLINE_BYTES__
+#define __PDISTD_FUNCTION_INLINE_BYTES__ sizeof(void*) /* room inside a function for its callable before the callable goes to the heap */
+#endif
+#endif
+
+namespace pdistd
+{
+
+    template <typename T>
+    class function;
+
+    template <typename T, typename U>
+    struct __fn_is_same
+    {
+        enum { value = false };
+    };
+
+    template <typename T>
+    struct __fn_is_same<T, T>
+    {
+        enum { value = true };
+    };
+
+    template <typename T>
+    struct __fn_unqualified
+    {
+        typedef T type;
+    };
+
+    template <typename T>
+    struct __fn_unqualified<const T>
+    {
+        typedef T type;
+    };
+
+    template <typename T>
+    struct __fn_unqualified<volatile T>
+    {
+        typedef T type;
+    };
+
+    template <typename T>
+    struct __fn_unqualified<const volatile T>
+    {
+        typedef T type;
+    };
+
+    template <typename T>
+    struct __fn_decay
+    {
+        typedef typename __fn_unqualified<typename remove_reference<T>::type>::type type;
+    };
+
+    /**
+     * False for every callable but an empty one; a callable that is a value is never empty.
+     */
+    template <typename Fn>
+    inline bool __fn_is_null(const Fn &)
+    {
+        return false;
+    }
+
+    /**
+     * True for a null pointer to a function, which holds nothing to call.
+     */
+    template <typename R, typename... A>
+    inline bool __fn_is_null(R (*p)(A...))
+    {
+        return 0 == p;
+    }
+
+    /**
+     * True for an empty function of any signature, which holds nothing to call.
+     */
+    template <typename S>
+    inline bool __fn_is_null(const function<S> &f)
+    {
+        return !f;
+    }
+
+    /**
+     * Calls f and hands back what it returns.
+     */
+    template <typename R>
+    struct __fn_caller
+    {
+        template <typename Fn, typename... A>
+        static R call(Fn &f, A &&...args)
+        {
+            return f(pdistd::forward<A>(args)...);
+        }
+    };
+
+    /**
+     * Calls f and discards anything it returns, as a function returning void does.
+     */
+    template <>
+    struct __fn_caller<void>
+    {
+        template <typename Fn, typename... A>
+        static void call(Fn &f, A &&...args)
+        {
+            f(pdistd::forward<A>(args)...);
+        }
+    };
+
+#if __PDISTD_FUNCTION_INLINE_STORAGE__
+
+    union __fn_storage
+    {
+        void *m_ptr;
+        unsigned char m_bytes[__PDISTD_FUNCTION_INLINE_BYTES__];
+    };
+
+    enum __fn_op
+    {
+        __FN_GET_INVOKER,
+        __FN_COPY,
+        __FN_MOVE,
+        __FN_DESTROY
+    };
+
+    typedef bool (*__fn_manager_t)(__fn_op, void *, void *);
+
+    template <typename Fn, bool Inline>
+    struct __fn_place;
+
+    /**
+     * A callable small enough to live in the function's own storage.
+     */
+    template <typename Fn>
+    struct __fn_place<Fn, true>
+    {
+        static Fn *get(__fn_storage &s)
+        {
+            return static_cast<Fn *>(static_cast<void *>(s.m_bytes));
+        }
+
+        static bool create(__fn_storage &s, Fn &&f)
+        {
+            new (static_cast<void *>(s.m_bytes)) Fn(pdistd::move(f));
+            return true;
+        }
+
+        static bool copy(__fn_storage &dst, __fn_storage &src)
+        {
+            new (static_cast<void *>(dst.m_bytes)) Fn(*get(src));
+            return true;
+        }
+
+        static void move(__fn_storage &dst, __fn_storage &src)
+        {
+            new (static_cast<void *>(dst.m_bytes)) Fn(pdistd::move(*get(src)));
+            get(src)->~Fn();
+        }
+
+        static void destroy(__fn_storage &s)
+        {
+            get(s)->~Fn();
+        }
+    };
+
+    /**
+     * A callable kept on the heap through the allocator, so a refused allocation is reported.
+     */
+    template <typename Fn>
+    struct __fn_place<Fn, false>
+    {
+        static Fn *get(__fn_storage &s)
+        {
+            return static_cast<Fn *>(s.m_ptr);
+        }
+
+        static bool create(__fn_storage &s, Fn &&f)
+        {
+            Fn *p = pdistd::allocator_new<Fn>(pdistd::move(f));
+            s.m_ptr = p;
+            return 0 != p;
+        }
+
+        static bool copy(__fn_storage &dst, __fn_storage &src)
+        {
+            Fn *p = pdistd::allocator_new<Fn>(*get(src));
+            dst.m_ptr = p;
+            return 0 != p;
+        }
+
+        static void move(__fn_storage &dst, __fn_storage &src)
+        {
+            dst.m_ptr = src.m_ptr;
+            src.m_ptr = 0;
+        }
+
+        static void destroy(__fn_storage &s)
+        {
+            Fn *p = get(s);
+            pdistd::allocator_delete(p);
+            s.m_ptr = 0;
+        }
+    };
+
+    /**
+     * Everything a function does with one callable type, reached through a single code pointer.
+     */
+    template <typename Fn, typename R, typename... A>
+    struct __fn_manager
+    {
+        enum { s_inline = (sizeof(Fn) <= sizeof(__fn_storage)) && (alignof(Fn) <= alignof(__fn_storage)) };
+
+        typedef __fn_place<Fn, s_inline> place;
+        typedef R (*invoker_t)(__fn_storage &, A &&...);
+
+        static R invoke(__fn_storage &s, A &&...args)
+        {
+            return __fn_caller<R>::call(*place::get(s), pdistd::forward<A>(args)...);
+        }
+
+        static bool manage(__fn_op op, void *dst, void *src)
+        {
+            switch (op)
+            {
+            case __FN_GET_INVOKER:
+                *static_cast<invoker_t *>(dst) = &invoke;
+                return true;
+            case __FN_COPY:
+                return place::copy(*static_cast<__fn_storage *>(dst), *static_cast<__fn_storage *>(src));
+            case __FN_MOVE:
+                place::move(*static_cast<__fn_storage *>(dst), *static_cast<__fn_storage *>(src));
+                return true;
+            case __FN_DESTROY:
+                place::destroy(*static_cast<__fn_storage *>(dst));
+                return true;
+            }
+            return false;
+        }
+    };
+
+    template <typename R, typename... A>
+    class function<R(A...)>
+    {
+        typedef R (*invoker_t)(__fn_storage &, A &&...);
+
+    public:
+        typedef R result_type;
+
+        /**
+         * An empty function, holding nothing to call.
+         */
+        function() noexcept : m_manager(0) {}
+
+        /**
+         * An empty function, holding nothing to call.
+         */
+        function(nullptr_t) noexcept : m_manager(0) {}
+
+        /**
+         * A copy of other's callable; empty when other is, or when the heap refuses the copy.
+         */
+        function(const function &other) : m_manager(0)
+        {
+            if (0 != other.m_manager && other.m_manager(__FN_COPY, &m_storage, &other.m_storage))
+            {
+                m_manager = other.m_manager;
+            }
+        }
+
+        /**
+         * Takes over other's callable, leaving other empty.
+         */
+        function(function &&other) noexcept : m_manager(0)
+        {
+            take(other);
+        }
+
+        /**
+         * Holds f, moved in; empty when f holds nothing to call or the heap refuses it.
+         */
+        template <typename Fn, typename = typename enable_if<!__fn_is_same<typename __fn_decay<Fn>::type, function>::value>::type>
+        function(Fn f) : m_manager(0)
+        {
+            if (__fn_is_null(f))
+            {
+                return;
+            }
+            if (__fn_manager<Fn, R, A...>::place::create(m_storage, pdistd::move(f)))
+            {
+                m_manager = &__fn_manager<Fn, R, A...>::manage;
+            }
+        }
+
+        ~function()
+        {
+            reset();
+        }
+
+        /**
+         * Replaces the callable with a copy of other's.
+         */
+        function &operator=(const function &other)
+        {
+            if (this != &other)
+            {
+                function copy(other);
+                swap(copy);
+            }
+            return *this;
+        }
+
+        /**
+         * Replaces the callable with other's, leaving other empty.
+         */
+        function &operator=(function &&other) noexcept
+        {
+            if (this != &other)
+            {
+                reset();
+                take(other);
+            }
+            return *this;
+        }
+
+        /**
+         * Drops the callable, leaving the function empty.
+         */
+        function &operator=(nullptr_t) noexcept
+        {
+            reset();
+            return *this;
+        }
+
+        /**
+         * Replaces the callable with f.
+         */
+        template <typename Fn, typename = typename enable_if<!__fn_is_same<typename __fn_decay<Fn>::type, function>::value>::type>
+        function &operator=(Fn &&f)
+        {
+            function(pdistd::forward<Fn>(f)).swap(*this);
+            return *this;
+        }
+
+        /**
+         * Exchanges callables with other.
+         */
+        void swap(function &other) noexcept
+        {
+            if (this == &other)
+            {
+                return;
+            }
+            function held(pdistd::move(other));
+            other.take(*this);
+            take(held);
+        }
+
+        /**
+         * True while the function holds something to call.
+         */
+        explicit operator bool() const noexcept
+        {
+            return 0 != m_manager;
+        }
+
+        /**
+         * Calls the callable with the arguments; an empty function returns a default value.
+         */
+        R operator()(A... args) const
+        {
+            if (0 == m_manager)
+            {
+                return R();
+            }
+            invoker_t invoker = 0;
+            m_manager(__FN_GET_INVOKER, &invoker, 0);
+            return invoker(m_storage, static_cast<A &&>(args)...);
+        }
+
+        /**
+         * The held callable when it is a T, or null.
+         */
+        template <typename T>
+        T *target() noexcept
+        {
+            if (m_manager != &__fn_manager<T, R, A...>::manage)
+            {
+                return 0;
+            }
+            return __fn_manager<T, R, A...>::place::get(m_storage);
+        }
+
+        /**
+         * The held callable when it is a T, or null.
+         */
+        template <typename T>
+        const T *target() const noexcept
+        {
+            if (m_manager != &__fn_manager<T, R, A...>::manage)
+            {
+                return 0;
+            }
+            return __fn_manager<T, R, A...>::place::get(m_storage);
+        }
+
+    private:
+        /**
+         * Moves other's callable into this empty function and leaves other empty.
+         */
+        void take(function &other) noexcept
+        {
+            if (0 != other.m_manager)
+            {
+                other.m_manager(__FN_MOVE, &m_storage, &other.m_storage);
+                m_manager = other.m_manager;
+                other.m_manager = 0;
+            }
+        }
+
+        /**
+         * Destroys the callable, leaving the function empty.
+         */
+        void reset() noexcept
+        {
+            if (0 != m_manager)
+            {
+                m_manager(__FN_DESTROY, &m_storage, 0);
+                m_manager = 0;
+            }
+        }
+
+        __fn_manager_t m_manager;
+        mutable __fn_storage m_storage;
+    };
+
+#else
+
+    /**
+     * The callable behind a function, reached through its virtual table.
+     */
+    template <typename R, typename... A>
+    struct __fn_holder_base
+    {
+        virtual ~__fn_holder_base() {}
+        virtual R invoke(A &&...args) = 0;
+        virtual __fn_holder_base *clone() const = 0;
+    };
+
+    /**
+     * One callable of type Fn on the heap, moved in when built and copied once when cloned.
+     */
+    template <typename Fn, typename R, typename... A>
+    struct __fn_holder final : __fn_holder_base<R, A...>
+    {
+        explicit __fn_holder(Fn &&f) : m_fn(pdistd::move(f)) {}
+        explicit __fn_holder(const Fn &f) : m_fn(f) {}
+
+        R invoke(A &&...args) override
+        {
+            return __fn_caller<R>::call(m_fn, pdistd::forward<A>(args)...);
+        }
+
+        __fn_holder_base<R, A...> *clone() const override
+        {
+            return pdistd::allocator_new<__fn_holder>(m_fn);
+        }
+
+        Fn m_fn;
+    };
+
+    template <typename R, typename... A>
+    class function<R(A...)>
+    {
+    public:
+        typedef R result_type;
+
+        /**
+         * An empty function, holding nothing to call.
+         */
+        function() noexcept : m_holder(0) {}
+
+        /**
+         * An empty function, holding nothing to call.
+         */
+        function(nullptr_t) noexcept : m_holder(0) {}
+
+        /**
+         * A copy of other's callable; empty when other is, or when the heap refuses the copy.
+         */
+        function(const function &other) : m_holder(0)
+        {
+            if (0 != other.m_holder)
+            {
+                m_holder = other.m_holder->clone();
+            }
+        }
+
+        /**
+         * Takes over other's callable, leaving other empty.
+         */
+        function(function &&other) noexcept : m_holder(other.m_holder)
+        {
+            other.m_holder = 0;
+        }
+
+        /**
+         * Holds f, moved in; empty when f holds nothing to call or the heap refuses it.
+         */
+        template <typename Fn, typename = typename enable_if<!__fn_is_same<typename __fn_decay<Fn>::type, function>::value>::type>
+        function(Fn f) : m_holder(0)
+        {
+            if (__fn_is_null(f))
+            {
+                return;
+            }
+            m_holder = pdistd::allocator_new<__fn_holder<Fn, R, A...> >(pdistd::move(f));
+        }
+
+        ~function()
+        {
+            reset();
+        }
+
+        /**
+         * Replaces the callable with a copy of other's.
+         */
+        function &operator=(const function &other)
+        {
+            if (this != &other)
+            {
+                function copy(other);
+                swap(copy);
+            }
+            return *this;
+        }
+
+        /**
+         * Replaces the callable with other's, leaving other empty.
+         */
+        function &operator=(function &&other) noexcept
+        {
+            if (this != &other)
+            {
+                reset();
+                m_holder = other.m_holder;
+                other.m_holder = 0;
+            }
+            return *this;
+        }
+
+        /**
+         * Drops the callable, leaving the function empty.
+         */
+        function &operator=(nullptr_t) noexcept
+        {
+            reset();
+            return *this;
+        }
+
+        /**
+         * Replaces the callable with f.
+         */
+        template <typename Fn, typename = typename enable_if<!__fn_is_same<typename __fn_decay<Fn>::type, function>::value>::type>
+        function &operator=(Fn &&f)
+        {
+            function(pdistd::forward<Fn>(f)).swap(*this);
+            return *this;
+        }
+
+        /**
+         * Exchanges callables with other.
+         */
+        void swap(function &other) noexcept
+        {
+            __fn_holder_base<R, A...> *held = m_holder;
+            m_holder = other.m_holder;
+            other.m_holder = held;
+        }
+
+        /**
+         * True while the function holds something to call.
+         */
+        explicit operator bool() const noexcept
+        {
+            return 0 != m_holder;
+        }
+
+        /**
+         * Calls the callable with the arguments; an empty function returns a default value.
+         */
+        R operator()(A... args) const
+        {
+            if (0 == m_holder)
+            {
+                return R();
+            }
+            return m_holder->invoke(static_cast<A &&>(args)...);
+        }
+
+    private:
+        /**
+         * Destroys the callable, leaving the function empty.
+         */
+        void reset() noexcept
+        {
+            pdistd::allocator_delete(m_holder);
+        }
+
+        __fn_holder_base<R, A...> *m_holder;
+    };
+
+#endif
+
+    /**
+     * Exchanges the callables of two functions.
+     */
+    template <typename R, typename... A>
+    inline void swap(function<R(A...)> &a, function<R(A...)> &b) noexcept
+    {
+        a.swap(b);
+    }
+
+    template <typename R, typename... A>
+    inline bool operator==(const function<R(A...)> &f, nullptr_t) noexcept
+    {
+        return !f;
+    }
+
+    template <typename R, typename... A>
+    inline bool operator==(nullptr_t, const function<R(A...)> &f) noexcept
+    {
+        return !f;
+    }
+
+    template <typename R, typename... A>
+    inline bool operator!=(const function<R(A...)> &f, nullptr_t) noexcept
+    {
+        return static_cast<bool>(f);
+    }
+
+    template <typename R, typename... A>
+    inline bool operator!=(nullptr_t, const function<R(A...)> &f) noexcept
+    {
+        return static_cast<bool>(f);
+    }
+
+} // namespace pdistd
+#endif

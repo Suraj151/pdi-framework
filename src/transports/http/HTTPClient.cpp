@@ -201,17 +201,18 @@ Http_Client::~Http_Client()
 }
 
 /**
- * Begin Http client
+ * Begin Http client, refused while an async request or its undelivered response still holds it
  */
-void Http_Client::Begin()
+bool Http_Client::Begin()
 {
-    if (HTTP_ASYNC_RUNNING == m_async_state)
+    if (HTTP_ASYNC_IDLE != m_async_state)
     {
-        return;
+        return false;
     }
 
     End(true);
     SetKeepAlive(false);
+    return true;
 }
 
 /**
@@ -560,6 +561,7 @@ void Http_Client::watchAsyncRequest()
     // detach before the call so the callback is free to start a new request
     CallBackVoidPointerArgFn callback = m_async_callback;
     m_async_callback = nullptr;
+    m_async_state = HTTP_ASYNC_IDLE;
 
     if (nullptr != callback)
     {
@@ -902,6 +904,7 @@ int16_t Http_Client::handleResponse()
     m_response.status_code = HTTP_RESP_MAX;
 
     char* buf = m_response.response;
+    uint16_t body_cap = m_response.max_resp_length;
 
     while (m_client && Connected() && nullptr != buf && max_timeout > 0)
     {
@@ -914,7 +917,7 @@ int16_t Http_Client::handleResponse()
         // read until the next line (lf) char
         m_response.resp_length = readPacket(m_client,
                                             (uint8_t*)buf,
-                                            m_response.max_resp_length,
+                                            header_ends ? body_cap : m_response.max_resp_length,
                                             max_timeout,
                                             header_ends ? 0 : '\n');
 
@@ -1008,7 +1011,24 @@ int16_t Http_Client::handleResponse()
                         m_response.resp_length = copyLen;
                         break;
                     }
-                }                
+                }
+
+                char *contentlength = nullptr;
+                pdiutil::string content_length_key = CHARPTR_WRAP(HTTP_HEADER_KEY_CONTENT_LENGTH);
+                if (GetHeader(content_length_key.c_str(), contentlength, false) && nullptr != contentlength)
+                {
+                    uint32_t length = StringToUint32(contentlength);
+                    if (0 == length)
+                    {
+                        memset(buf, 0, m_response.max_resp_length + 1);
+                        m_response.resp_length = 0;
+                        break;
+                    }
+                    if (length < body_cap)
+                    {
+                        body_cap = (uint16_t)length;
+                    }
+                }
             }
         }
 
@@ -1022,7 +1042,7 @@ int16_t Http_Client::handleResponse()
 int64_t Http_Client::DownloadStream(const char *url, CallBackBytesArgBoolRetFn writer)
 {
     if (nullptr == url || !writer) return PDI_ERR_INVALID_ARG;
-    if (m_stream_writer) return PDI_ERR_BUSY;
+    if (m_stream_writer || HTTP_ASYNC_IDLE != m_async_state) return PDI_ERR_BUSY;
 
     m_stream_writer        = writer;
     m_stream_bytes_written = 0;

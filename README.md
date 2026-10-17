@@ -8,7 +8,7 @@ PDI is a set of libraries tied together — WiFi, storage, networking, schedulin
 
 **Small on the device, big in what it gives you.** It fits in the flash of an ordinary microcontroller and still hands you the things you would otherwise build yourself every time: remote login, file transfer, scheduled jobs, firmware updates over WiFi, a configuration UI, and an API to your own hardware. You write normal Arduino code on top, and the same sketch moves from one board to another.
 
-**Stability comes from staying inside the board's limits.** Enable the services the hardware can carry — flash and RAM are the budget — and the device keeps running without resets or dropped connections. That is what the test suite checks: 1300+ unit tests, and 425+ feature tests driven on real hardware — two different boards at once, each over serial, Telnet and SSH at the same time.
+**Stability comes from staying inside the board's limits.** Enable the services the hardware can carry — flash and RAM are the budget — and the device keeps running without resets or dropped connections. That is what the test suite checks: 1500+ unit tests, and 500+ feature tests driven on real hardware — two different boards at once, each over serial, Telnet and SSH at the same time.
 
 ## Quick Start
 
@@ -55,7 +55,7 @@ Not every board exposes every capability. An Arduino UNO has no WiFi, so the web
 
 ## What You Can Do With It
 
-**Log in to your board like a computer.** Open a serial monitor, or `ssh` in, or `telnet` in — you get the same login prompt and the same 57 commands either way. `ls`, `cat`, `grep`, `ps`, `top`, `kill`, `df`, `chmod`, `ping`, `wget` and the rest all behave the way you expect, with tab completion, command history, an in-place file editor and Ctrl+C. Commands pipe into each other and redirect to files, so `ps | grep ssh` and `cat /proc/meminfo > /tmp/mem.txt` do exactly what they look like.
+**Log in to your board like a computer.** Open a serial monitor, or `ssh` in, or `telnet` in — you get the same login prompt and the same 55+ commands either way. `ls`, `cat`, `grep`, `ps`, `top`, `kill`, `df`, `chmod`, `ping`, `wget` and the rest all behave the way you expect, with tab completion, command history, an in-place file editor and Ctrl+C. Commands pipe into each other and redirect to files, so `ps | grep ssh` and `cat /proc/meminfo > /tmp/mem.txt` do exactly what they look like.
 
 **Run it from a browser.** The device serves its own web portal: a live dashboard, a settings page for each service, GPIO switches, a file browser, MQTT and email testers, and firmware upload. Users sign in with their own accounts and see only what their permissions allow — the same rules the shell uses. It works on a phone and follows your light or dark theme.
 
@@ -86,7 +86,7 @@ Per-service reference in [§6 Service Providers](#6-service-providers).
 
 **Things the services are built on**, rather than services themselves — TLS/HTTPS · SFTP and scp · link-layer mesh.
 
-**57 shell commands** — the full list is in [§7.8 Built-in command inventory](#78-built-in-command-inventory).
+**55+ shell commands** — the full list is in [§7.8 Built-in command inventory](#78-built-in-command-inventory).
 
 **Storage** — one filesystem tree covering flash, `/proc`, `/sys`, `/dev` and `/tmp`, with Unix-style permissions and multi-user access control.
 Details in [§6.2.12](#6212-storage-interface-init-no-provider).
@@ -636,8 +636,8 @@ The struct carries no size constant of its own. A table declares `sizeof(Table)`
 | ServerConfig | `login_credential_table` | session name, cookie max age, web session slots and token size, absolute session cap, login attempt limit and lockout |
 | HttpConfig | — | client buffer size, request limits, HTTPS port, HSTS age |
 | TlsConfig | — | per-session record buffers, TLS task stack and poll interval, default cert/key paths |
-| OtaConfig | `ota_config_table` | host, port, version, check cadence, local image extension and magic byte |
-| MqttConfig | general / LWT / pub-sub tables | broker, last will, publish and subscribe slots |
+| OtaConfig | `ota_config_table` | update server url, version, check cadence, local image extension and magic byte |
+| MqttConfig | general / LWT / pub-sub tables | broker, last will, publish and subscribe slots, client tick interval and timeouts in milliseconds |
 | GpioConfig | `gpio_config_table` | pin map, modes, event conditions and channels |
 | EmailConfig | `email_config_table` | SMTP host, port, auth, default subject |
 | DeviceIotConfig | `device_iot_config_table` | config and OTP URLs, channel keys, device key size, sampling bounds |
@@ -738,7 +738,7 @@ Four features keep their settings in `/etc`:
 |---|---|---|---|
 | WiFi | `/etc/wifi/wifi.conf` | `ENABLE_WIFI_CONFIG_FILE` | station and AP credentials, addresses, and the `sta_enable` / `ap_enable` gates |
 | MQTT | `/etc/mqtt/mqtt.conf` | `ENABLE_MQTT_CONFIG_FILE` | broker host, port, whether the broker is reached over TLS, client id, credentials, keepalive, clean session, and the last will |
-| OTA | `/etc/ota/ota.conf` | `ENABLE_OTA_CONFIG_FILE` | update server host and port |
+| OTA | `/etc/ota/ota.conf` | `ENABLE_OTA_CONFIG_FILE` | update server url, as `http://host:port` |
 | Email | `/etc/email/email.conf` | `ENABLE_EMAIL_CONFIG_FILE` | SMTP host, port, credentials, sender, recipient and subject |
 
 Each gate is declared in that feature's own header under `src/config/`, inside `#ifdef ENABLE_STORAGE_SERVICE`, and ships commented out:
@@ -981,7 +981,7 @@ A freshly registered interval stamps its last-run time on first consideration, s
 
 The slot table is `MAX_SCHEDULABLE_TASKS`, 25 by default. Raising it raises every service's worst-case footprint and the factory-reset hook count along with it.
 
-Due-ness itself is an exact comparison against `millis_now()`. The 3 ms tolerance applies only in the deepest tie-break, where two tasks are equally due, level on virtual runtime and level on score, so clock jitter no longer reshuffles ordinary task order.
+Due-ness itself is an exact comparison against `millis_now()`. The 3 ms tolerance applies only in the deepest tie-break, where two tasks are equally due, level on virtual runtime and level on score, so clock jitter cannot reshuffle ordinary task order.
 
 ### 4.8 Promoting a task to a lane
 
@@ -1182,7 +1182,7 @@ Two switches shape the behaviour. `AUTO_FACTORY_RESET_ON_INVALID_CONFIGS` runs a
   db restore    put those defaults back in use
 ```
 
-`db` never prints a record's contents, so a sealed credential stays sealed.
+`db` never prints a record's contents, so a sealed credential stays sealed. `db restore` also rewrites each feature's `/etc` config file ([§3.10](#310-the-etc-config-surface)) from its restored record, so the file cannot put the old values straight back.
 
 ### 5.11 Adding a table
 
@@ -1329,6 +1329,8 @@ Polls for a firmware update on the interval stored in the OTA table:
 
 Requests carry HTTP basic auth and a `pdistack` user agent, and run over TLS when the TLS service is on. With Device-IoT on, the auth is the device key ([§6.2.10](#6210-deviceiotserviceprovider--__device_iot_service)); without it, `ota:<device-mac>`. Where they go comes from the host URL alone — its scheme or an explicit `:port` picks the port. Which of the three upgrade strategies applies is a compile-time choice.
 
+With no update server set, each check has nothing to ask. That is written to the error log once, and again only after a server has been set and taken away, so a board left unconfigured does not fill its log with the same line every interval.
+
 A build can also be flashed without any update server. `collectLocalImages()` lists the firmware images sitting on the filesystem and `flashFromFile()` writes one of them, checking the image magic byte before it commits and reporting through the same `upgrade_status_t` as a server-driven update. That is what backs the **Flash From Storage** form on the OTA page: upload a binary through the storage browser, pick it from the list, confirm, and the device flashes and restarts. Both entry points need the storage service.
 
 #### 6.2.7 `GpioServiceProvider` — `__gpio_service`
@@ -1336,6 +1338,8 @@ A build can also be flashed without any update server. `collectLocalImages()` li
 Loads the GPIO table, ticks pin modes and values, and refreshes the table every five minutes. Modes are off, digital write, digital read, digital blink, analog write and analog read.
 
 From the shell, GPIO is driven as files under `/sys` — `echo 1 > /sys/class/gpio/5/value`. The portal adds a GPIO page plus an events submenu where a pin condition can be routed to email or an HTTP endpoint.
+
+With a GPIO server url set, the service posts its pins there on the configured frequency, authorised the way OTA is: the device key with Device-IoT on, `gpio:<device-mac>` without it.
 
 #### 6.2.8 `MqttServiceProvider` — `__mqtt_service`
 
@@ -1395,7 +1399,7 @@ Mounting happens during `initialize()`, and the table is five slots by default �
 
 Each prefix is named once, in [src/config/VfsConfig.h](src/config/VfsConfig.h): `PROC_MOUNT_PREFIX`, `SYS_MOUNT_PREFIX`, `DEV_MOUNT_PREFIX` and `TMP_MOUNT_PREFIX` beside the `ENABLE_` flag for the backend that answers there, with the root at `FILE_SEPARATOR`. Code that reaches a synthetic node writes `PROC_MOUNT_PREFIX "/mounts"` rather than the path in full, so moving a mount is one edit.
 
-**procfs** nodes are all `0444` and root-owned; writes fail, and a redirect into one says `cannot write <path>` rather than appearing to succeed. `/proc/uptime` gives seconds since boot in the Linux two-number layout, `/proc/version` gives the release and config version, `/proc/meminfo` the free heap and the largest block it can still hand out, `/proc/mounts` a line per mount, and `/proc/stat` the scheduler's cumulative counters. Every running task has a directory of its own — `/proc/<pid>/{stat,cmdline,status}` — and `/proc/net/{route,dev,tcp}` describes the network: the routes each interface offers, the traffic each has carried, and every TCP endpoint the stack holds, listening and connected alike. Everything that reads files works on them — `cat`, `head`, `wc`, `grep`, `hexdump`.
+**procfs** nodes are all `0444` and root-owned; writes fail, and a redirect into one says `cannot write <path>` rather than appearing to succeed. `/proc/uptime` gives seconds since boot in the Linux two-number layout, `/proc/version` gives the release and config version, `/proc/meminfo` the free heap, the largest block it can still hand out and how many allocations the heap check has refused since boot, `/proc/mounts` a line per mount, and `/proc/stat` the scheduler's cumulative counters. Every running task has a directory of its own — `/proc/<pid>/{stat,cmdline,status}` — and `/proc/net/{route,dev,tcp}` describes the network: the routes each interface offers, the traffic each has carried, and every TCP endpoint the stack holds, listening and connected alike. Everything that reads files works on them — `cat`, `head`, `wc`, `grep`, `hexdump`.
 
 `/proc/net/route` carries one row per route rather than one per interface, in the `route -n` columns with a `Flags` field. An interface that holds a netmask contributes the network it reaches directly — destination `ip & netmask`, no gateway, flag `U` — and one that holds a gateway contributes the default route as well, `0.0.0.0/0.0.0.0` through it, flag `UG`. An access point therefore appears once, for its own subnet, and an interface that is up but has no address yet appears not at all, because it has nowhere to route.
 
@@ -1720,7 +1724,7 @@ struct TempCommand : public CommandBase {
     TempCommand() {
         Clear();
         SetCommand(CMD_NAME_TEMP);      // name, at most 8 characters
-        AddOption(CMD_OPTION_NAME_T);   // up to 3 options, names up to 3 characters
+        AddOption(CMD_OPTION_NAME_T);   // up to CMD_OPTION_MAX options, names shorter than CMD_OPTION_SIZE_MAX
     }
     const char* getUsage() const override {
         return RODT_ATTR("temp [t=C|F]  read the temperature sensor (default Celsius)");
@@ -1729,6 +1733,8 @@ struct TempCommand : public CommandBase {
     cmd_result_t execute(cmd_term_inseq_t) override { … }
 };
 ```
+
+**`CMD_OPTION_MAX` is the most options any command can have**, named `x=y` ones and positional values alike, and every command shares the one figure. A board with memory to spare defines a larger value in its `device_config.h`. It costs no static RAM, since a command's options exist only while that command runs, and a line carrying more positional values than the limit sets `m_argsoverflow` rather than passing the extra ones on, so a command such as `source` can refuse it instead of running with part of what was typed.
 
 `getUsage()` is the single source of truth for that command's help. It is what `help` prints, and what the dispatcher prints automatically whenever the command returns an argument error — so no error branch ever needs to repeat a usage string.
 
@@ -1824,7 +1830,7 @@ Two limits are worth knowing. A pipe is a fixed buffer of `PDI_PIPE_CAPACITY` by
 
 ### 7.8 Built-in command inventory
 
-`if`, `else`, `fi`, `while`, `for` and `done` are not in this table. They are read by the script runner rather than dispatched as commands, so they work in a file and not at the prompt — see [§7.15](#715-shell-scripts-and-etcrclocal).
+`if`, `elif`, `else`, `fi`, `while`, `for`, `done`, `break`, `continue` and `exit` are not in this table. They are read by the script runner rather than dispatched as commands, so they work in a file and not at the prompt — see [§7.15](#715-shell-scripts-and-etcrclocal).
 
 | Command | Options | Brief |
 |---|---|---|
@@ -1860,7 +1866,7 @@ Two limits are worth knowing. A pipe is a fixed buffer of `PDI_PIPE_CAPACITY` by
 | passwd p=\<curr> n=\<new> c=\<confirm> | p, n, c | Change your own password; prompts in three echo-suppressed phases when arguments are omitted. |
 | useradd u=\<user> p=\<pass> | u, p | Root only. Next free uid, gid equal to uid, home `/`. Writes both user files. |
 | userdel u=\<user> | u | Root only. Removes from both files; refuses root and self. |
-| service list \| status \| start \| stop \| restart \| enable \| disable | positional | Service control. `list` shows state, enabled and task count per service; `status <name>` adds tracked pids and that service's own detail; `start`/`stop`/`restart` bring a service up from cold and tear it down for real; `enable`/`disable` persist `enabled` for the next boot. Root for all but the first two. e.g. **service status MDNS** |
+| service list \| status \| start \| stop \| restart \| enable \| disable | positional | Service control. `list` shows state, enabled and task count per service; `status <name>` adds tracked pids and that service's own detail, with any password shown as `********`; `start`/`stop`/`restart` bring a service up from cold and tear it down for real; `enable`/`disable` persist `enabled` for the next boot. Root for all but the first two. e.g. **service status MDNS** |
 | ps [\<sid>] | | Tasks with owner, state, %CPU, run count, interval and name, read from `/proc`; optional owner filter. |
 | top | i=, n=, u= | The `ps` view on a repeating tick — interval, iteration bound, owner filter. Ctrl+C stops it. |
 | kill [\<sig>] \<pid> | | Signal a task: 9 KILL, 15 TERM, 18 CONT, 19 STOP. One argument is a pid, two are signal then pid. |
@@ -1882,8 +1888,10 @@ Two limits are worth knowing. A pipe is a fixed buffer of `PDI_PIPE_CAPACITY` by
 | export \<name>=\<value> | | Set a variable for this session. Names the session answers for itself are refused. e.g. **export GREETING=hello** |
 | unset \<name> | | Drop a variable from this session, leaving `/.env` alone. |
 | read \<name> [\<name>..] | positional | Take one line of input and put it in variables, so a command's output can be used on the following lines. Needs a pipe or a file to read from. e.g. **date \| read TODAY** then **echo $TODAY**. See [§7.14](#714-environment-variables). |
-| source \<file> | | Run each line of a file in this session, so a `cd` or an `export` it performs is still in force afterwards. See [§7.15](#715-shell-scripts-and-etcrclocal). |
-| test \<a> \<op> \<b> | | Answer a question through `$?` and print nothing either way: `=` `!=` on strings, `-eq -ne -lt -le -gt -ge` on numbers, `-z` `-n` on emptiness, `-e` `-f` `-d` on paths. e.g. **test $MODE = debug && echo debugging** |
+| source \<file> [args] | | Run each line of a file in this session, so a `cd` or an `export` it performs is still in force afterwards; the arguments are `$1`, `$2` and so on, up to `CMD_OPTION_MAX - 1` of them. See [§7.15](#715-shell-scripts-and-etcrclocal) and its [limits](#script-limits). |
+| test \<a> \<op> \<b> | | Answer a question through `$?` and print nothing either way: `=` `!=` on strings, `-eq -ne -lt -le -gt -ge` on numbers, `-z` `-n` on emptiness, `-e` `-f` `-d` on paths. Also written `[ ... ]`. e.g. **test $MODE = debug && echo debugging** |
+| true | | Answer yes and print nothing. e.g. **while true** |
+| false | | Answer no and print nothing. |
 | crontab | | List the scheduled jobs `/etc/crontab` holds, as the device parsed them, and what is due this minute. See [§7.16](#716-scheduled-jobs-and-etccrontab). |
 | help | | Every registered command with its usage line. Works before login. |
 | uptime | | `up Xd Yh Zm Ws`. |
@@ -2086,6 +2094,26 @@ pdiStack@12580169:(/): echo '$GREETING'
 $GREETING
 ```
 
+Braces mark where a name ends and take two forms of their own:
+
+| Form | Expands to |
+|---|---|
+| `${NAME}` | the value, so it can run straight into text: `${N}th` |
+| `${NAME:-word}` | the value, or `word` when the name is unset or empty; `word` may hold blanks, `$NAME` and `$(...)` |
+| `${#NAME}` | the length of the value, `0` for an unset name |
+
+A `${` that is never closed, or one holding anything else, is left as typed.
+
+`$(( ... ))` works out whole-number arithmetic and puts the result in its place: `+ - * / %`, unary signs and parentheses, with the usual precedence. A name can be written bare or with its `$`, and one that is unset or empty counts as `0`:
+
+```
+pdiStack@12580169:(/): export N=5
+pdiStack@12580169:(/): echo $((N * 2 + 1)) $(( (N + 1) / 4 ))
+11 1
+```
+
+Numbers are 32-bit and wrap on overflow. Anything it cannot work out — division by zero, a name holding a word, an operator it does not know — leaves the text as typed, so the mistake is visible in the output rather than turned into a number. Parentheses nest to `SHELL_ARITH_DEPTH` (8).
+
 **A command's answer can go into a variable.** `read` takes one line from wherever the input descriptor points — the left of a pipe, or a file — and binds it to the names given:
 
 ```
@@ -2097,9 +2125,22 @@ pdiStack@12580169:(/): read HOSTLINE < /etc/hostname
 
 The line arrives as text and nothing else — the blank line a command opens with and the carriage return it ends with are both gone before the bytes leave the pipe, so the value runs together with whatever is printed around it.
 
-Give it more than one name and the line is split on spaces, a field each, with the last name taking whatever is left: `echo one two three | read A B` leaves `A` as `one` and `B` as `two three`. Three names is the most it takes, and a name the line has nothing left for is set to empty.
+Give it more than one name and the line is split on spaces, a field each, with the last name taking whatever is left: `echo one two three | read A B` leaves `A` as `one` and `B` as `two three`. It takes as many names as a command takes options, `CMD_OPTION_MAX` (see [Script limits](#script-limits)), and a name the line has nothing left for is set to empty.
 
 Two things it will not do. It needs something feeding it, so `read NAME` on its own says so rather than waiting for a line to be typed at it. And when the input has already run out it leaves the names as they were and answers no through `$?`, so a script can tell the end of the input from a failure.
+
+**A command's answer can also stand in the line itself.** `$(...)` runs what is inside the parentheses as a line of its own — pipes, `;`, `&&` and further `$(...)` included — and puts what it printed in its place, with the closing line break dropped:
+
+```
+pdiStack@12580169:(/): echo backed up on $(date)
+backed up on Sat Sep 27 11:04:18 2026
+pdiStack@12580169:(/): export STAMP="$(date)"
+pdiStack@12580169:(/): echo hi > /tmp/log-$(cat /etc/hostname).txt
+```
+
+Quoting works as it does for `$NAME`: inside double quotes the answer stays one value however many blanks it holds, and inside single quotes nothing runs. The answer goes in as text after the line has been read, so it can never become part of the line — an answer holding `; reboot` is printed, not run.
+
+Each substitution runs once, just before the pipeline holding it, so `echo a > f ; echo $(cat f)` reads the file the first half wrote. An answer is bounded by `SHELL_CAPTURE_MAX` (256 bytes); a longer one fails the line rather than being cut short. A substitution may open inside another to `SHELL_CAPTURE_DEPTH` (2) levels. A command inside one that stops to ask for input is cancelled rather than left waiting. Everything a substitution uses is taken while the line runs and released after it. A `for` list does not run substitutions yet: `for X in $(...)` walks the literal words.
 
 A name is a letter or underscore followed by letters, digits or underscores. A session holds `ENV_SESSION_MAX` variables, eight by default; names are bounded by `ENV_NAME_MAX`, and `read` stops a value at `ENV_VALUE_MAX` so a long line cannot become a long variable. The base file needs storage, so a board without a filesystem keeps the first two tiers and simply has none.
 
@@ -2107,7 +2148,7 @@ The session tier ends with the login. `logout` and `su` both clear it, which mat
 
 ### 7.15 Shell scripts and `/etc/rc.local`
 
-A script is a file of shell lines, and there is no second grammar. Each line goes through the same executor a typed line goes through, so pipes, redirection, `&&` and `||`, quoting, `$NAME` and `$?` all mean inside a script exactly what they mean at the prompt. The runner reads only two things for itself: a blank line, and a `#` comment.
+A script is a file of shell lines, and there is no second grammar. Each line goes through the same executor a typed line goes through, so pipes, redirection, `&&` and `||`, quoting, `$NAME` and `$?` all mean inside a script exactly what they mean at the prompt. The runner reads only a few things for itself: a blank line, a `#` comment, and the control-flow keywords described below.
 
 ```
 pdiStack@12580169:(/): source /demo.sh
@@ -2128,9 +2169,26 @@ debug
 
 A script that fails a line keeps going, the way `rc.local` does; use `&&` for a line that must gate the next. Scripts can call scripts, bounded by `SCRIPT_MAX_DEPTH`, so a file that sources itself stops rather than recursing until the heap gives out.
 
+#### Arguments
+
+Words after the file name are the script's arguments. `$1` to `$9` read them, `$#` counts them and `$@` gives all of them separated by blanks:
+
+```
+# /blink.sh
+echo pin $1 blinks $2 times from $# arguments
+```
+```
+pdiStack@12580169:(/): source /blink.sh 13 5
+pin 13 blinks 5 times from 2 arguments
+```
+
+An argument the script was not given is empty, and outside a script `$#` is `0`. Quoting decides what one argument is, so `source /notify.sh "door open"` is one. A value goes in as text and is never read as shell again, so an argument holding `;` or `$(...)` cannot run anything. A `source` with no arguments of its own sees its caller's; one with arguments has its own until it returns.
+
+**The number of arguments is a hard limit**: `source` takes its file and arguments as command options, so it accepts `CMD_OPTION_MAX - 1` arguments and refuses a line with more with `too many arguments` rather than dropping the extra ones. A board with memory to spare defines a larger `CMD_OPTION_MAX` in its `device_config.h`, so check your port's file for the figure your board runs with. The value sets how many options every command takes, not only `source`. `$1` to `$9` reach the first nine; with a limit above that, the rest are reachable only through `$@`. Every other limit a script meets is in [Script limits](#script-limits).
+
 #### Branching and repeating
 
-`if`/`else`/`fi`, `while`/`done` and `for`/`done` are handled by the runner as a line-level state machine, not by the line parser — control flow spans lines, and the parser deliberately understands one line at a time. There is no `then` and no `do`: the runner is line based, so a keyword on a line of its own would be noise.
+`if`/`elif`/`else`/`fi`, `while`/`done` and `for`/`done` are handled by the runner as a line-level state machine, not by the line parser — control flow spans lines, and the parser deliberately understands one line at a time. There is no `then` and no `do`: the runner is line based, so a keyword on a line of its own would be noise.
 
 A close has to match what it closes. `fi` ends an `if`, `done` ends a `while` or a `for`, and a mismatched or stray one fails the script rather than quietly ending a block it does not belong to — a `for` closed by `fi` would otherwise run a single pass and read as a loop that simply had one word in its list.
 
@@ -2154,6 +2212,25 @@ export TRIES=c
 fi
 done
 ```
+
+`elif <command>` tries another condition when none before it held, and `else` runs when none did. A counter is plain arithmetic, so a loop can count its passes directly:
+
+```
+# /retry.sh
+export TRY=0
+while [ $TRY -lt 3 ]
+export TRY=$((TRY + 1))
+if wget /fw.bin http://10.0.0.5/fw.bin
+break
+elif [ $TRY = 2 ]
+echo last attempt next
+fi
+done
+```
+
+`break` leaves the innermost `while` or `for`, and `continue` skips the rest of its body and starts the next pass; either one outside a loop fails the script. `exit [n]` ends the script it is in with status `n`, or with the last command's status when no number is given, and a script that sourced it carries on from the line after its `source`. `exit` at the prompt is not a command.
+
+`!` in front of a pipeline turns its answer around, at the prompt as well as in a condition: `if ! test -f /etc/site.sh`. `true` and `false` answer yes and no and print nothing, so `while true` loops until a `break`. `[ ... ]` is `test` written with brackets — `[ $TRY -lt 3 ]` is `test $TRY -lt 3` — and an opening bracket with no closing one is refused.
 
 `test` is what makes that useful. Every other command reports success or a *fault* — `grep` returns success whether or not it matched — so without `test` a condition could only ask whether a command malfunctioned, never what a value is. It answers through `$?` and prints nothing either way, so a false condition inside a loop leaves no output:
 
@@ -2206,6 +2283,237 @@ source /etc/site.sh
 An identity that cannot be resolved is never quietly downgraded to root — a script asking to run as somebody specific and silently getting more privilege than it asked for is the wrong failure. A `UID` line below the first command is documentation, not policy, so a comment further down cannot change who the script runs as.
 
 The session `rc.local` runs in is built for it and given back afterwards. That is deliberate: reusing the console's session would leave a logged-in root shell sitting on the serial port at boot. It also means `export` inside `rc.local` does not reach your login — put anything that must outlive it in `/.env`.
+
+#### Example scripts
+
+A script gets onto the board in one of three ways: typed at the prompt a line at a time with `echo`, written in `fedit`, or copied over with `sftp`/`scp` (see [§7.10](#710-sftp-and-scp-file-transfer)). Typed lines go in single quotes, so a `$` reaches the file as written instead of expanding while you type; `>` starts the file and `>>` adds each line after it. Every example below runs as shown with `source`.
+
+**1. A status report, typed in at the prompt.**
+
+```
+pdiStack@12580169:(/): echo 'echo == $(cat /etc/hostname) at $(date) ==' > /health.sh
+pdiStack@12580169:(/): echo 'uptime' >> /health.sh
+pdiStack@12580169:(/): echo 'df' >> /health.sh
+pdiStack@12580169:(/): echo 'service list' >> /health.sh
+pdiStack@12580169:(/): cat /health.sh
+echo == $(cat /etc/hostname) at $(date) ==
+uptime
+df
+service list
+pdiStack@12580169:(/): source /health.sh
+```
+
+**2. Repeat something a given number of times**, with arguments, a `while` and a counter:
+
+```
+# /repeat.sh — source /repeat.sh <times> <text>
+export N=0
+while [ $N -lt $1 ]
+export N=$((N + 1))
+echo $N: $2
+done
+unset N
+```
+```
+pdiStack@12580169:(/): source /repeat.sh 3 hello
+1: hello
+
+2: hello
+
+3: hello
+pdiStack@12580169:(/): source /repeat.sh 2 "two words"
+1: two words
+
+2: two words
+```
+
+Each `echo` opens with a line break of its own, which is why lines printed one after another by a script come out a blank line apart.
+
+**3. Back up a file before editing it**, refusing a path that is not there. `exit 1` makes the failure visible to whoever ran it, through `$?`:
+
+```
+# /backup.sh — source /backup.sh <file>
+if ! test -f $1
+echo no such file $1
+exit 1
+fi
+cp $1 $1.bak
+echo saved $1.bak
+```
+```
+pdiStack@12580169:(/): source /backup.sh /etc/mqtt/mqtt.conf
+saved /etc/mqtt/mqtt.conf.bak
+pdiStack@12580169:(/): source /backup.sh /nothere
+no such file /nothere
+
+CmdErr : 1
+```
+
+**4. One script, several actions**: check the argument count first, then pick the action with `elif`:
+
+```
+# /svc.sh — source /svc.sh up|down <service>
+if [ $# -ne 2 ]
+echo usage: source /svc.sh up or down and a service
+exit 2
+elif [ $1 = up ]
+service start $2
+elif [ $1 = down ]
+service stop $2
+else
+echo unknown action $1
+fi
+```
+```
+pdiStack@12580169:(/): source /svc.sh down OTA
+stopped OTA, released 1 task(s)
+pdiStack@12580169:(/): source /svc.sh sideways OTA
+unknown action sideways
+```
+
+**5. Report which services are running**: a `for` over the names, with a command's answer as the condition:
+
+```
+# /states.sh
+for S in MQTT OTA Email
+if [ -n "$(service status $S | grep inactive)" ]
+echo $S is stopped
+else
+echo $S is running
+fi
+done
+```
+```
+pdiStack@12580169:(/): source /states.sh
+MQTT is running
+
+OTA is running
+
+Email is stopped
+```
+
+**6. Bring a stopped service back, and note that it happened.** On its own it does nothing while the service runs; give it a line in `/etc/crontab` and it checks every ten minutes (see [§7.16](#716-scheduled-jobs-and-etccrontab)):
+
+```
+# /keepalive.sh — source /keepalive.sh <service>
+if [ -n "$(service status $1 | grep inactive)" ]
+service start $1
+echo $(date) restarted $1 >> /var/log/keepalive.log
+fi
+```
+```
+# /etc/crontab
+*/10 * * * * source /keepalive.sh MQTT
+```
+
+**7. Download with retries**, stopping at the first one that works:
+
+```
+# /fetch.sh — source /fetch.sh <path> <url>
+export TRY=0
+while [ $TRY -lt 3 ]
+export TRY=$((TRY + 1))
+if wget $1 $2
+echo fetched $1 on attempt $TRY
+break
+fi
+done
+unset TRY
+```
+```
+pdiStack@12580169:(/): source /fetch.sh /tmp/fw.bin http://10.0.0.5/fw.bin
+```
+
+Each attempt prints `wget`'s own progress and result; the last line is `fetched /tmp/fw.bin on attempt 1`, or nothing more when all three failed.
+
+**8. Count boots**, keeping the count in a file between them. Run it from `/etc/rc.local` and every boot adds one:
+
+```
+# /bootcount.sh
+export COUNT=0
+if test -f /etc/bootcount
+read COUNT < /etc/bootcount
+fi
+export COUNT=$((COUNT + 1))
+echo $COUNT > /etc/bootcount
+echo boot number $COUNT
+unset COUNT
+```
+
+**9. Keep a log from growing**: count its lines with `wc`, take the first field with `read`, and move the file aside past a limit:
+
+```
+# /rotate.sh — source /rotate.sh <file> <lines>
+wc $1 | read LINES REST
+if [ $LINES -gt $2 ]
+mv $1 $1.old
+echo rotated $1 at $LINES lines
+fi
+unset LINES
+unset REST
+```
+```
+pdiStack@12580169:(/): source /rotate.sh /var/log/keepalive.log 100
+```
+
+**10. A one-line log entry**, the kind a cron job writes:
+
+```
+# /stamp.sh
+echo $(date) $(uptime) >> /var/log/uptime.log
+```
+```
+# /etc/crontab
+0 * * * * source /stamp.sh
+```
+
+**11. Boot-time setup**, putting the scripts above together in `/etc/rc.local`:
+
+```
+# rc.local - runs at the end of boot
+# UID 0
+source /bootcount.sh
+source /keepalive.sh MQTT
+source /stamp.sh
+```
+
+**12. Lines worth typing straight at the prompt**, no file needed:
+
+```
+pdiStack@12580169:(/): [ -f /etc/rc.local ] && echo rc.local present || echo no rc.local
+no rc.local
+pdiStack@12580169:(/): test -d /etc && echo /etc is a directory
+/etc is a directory
+pdiStack@12580169:(/): echo a day is $((60 * 60 * 24)) seconds
+a day is 86400 seconds
+pdiStack@12580169:(/): echo ${#HOSTNAME} characters in $HOSTNAME
+10 characters in pdi-abcdef
+pdiStack@12580169:(/): echo running as ${USER:-nobody} in $PWD
+running as pdiStack in /
+pdiStack@12580169:(/): export STAMP="$(date)"
+```
+
+`if`, `while` and `for` belong to scripts; at the prompt the same decisions are made with `&&`, `||` and `[ ... ]`. A variable a script sets stays in the session after it returns, which is what lets `/setup.sh` above work, and it holds one of the session's `ENV_SESSION_MAX` slots. A script that only needs a value while it runs gives the slot back with `unset` at the end, as several of the examples do.
+
+#### Script limits
+
+Every limit a script can reach, in one place. Each one is a hard limit: reaching it refuses or fails, it never quietly cuts something short. The figures are the defaults; a port can define any of them in its `device_config.h`, and some ports ship larger ones, so your port's file has the figures your board runs with.
+
+| Limit | Default | What it bounds | When it is reached |
+|---|---|---|---|
+| `CMD_OPTION_MAX` | per port | options a command takes, so a script gets `CMD_OPTION_MAX - 1` arguments | `source` prints `too many arguments` and does not run the script |
+| `SCRIPT_MAX_DEPTH` | 3 | scripts open at once, the first one and everything it sources | that `source` fails and the script that called it carries on with its next line |
+| `SCRIPT_BLOCK_MAX` | 8 | `if`, `while` and `for` blocks open inside each other | the script fails |
+| `SCRIPT_LOOP_MAX` | 1000 | passes one `while` or `for` may make | the script fails |
+| `SHELL_CAPTURE_MAX` | 256 bytes | the answer of one `$(...)` | the line fails |
+| `SHELL_CAPTURE_DEPTH` | 2 | `$(...)` open inside another | the line fails |
+| `SHELL_ARITH_DEPTH` | 8 | parentheses inside one `$((...))` | the text is left as typed |
+| `ENV_SESSION_MAX` | 8 | variables a session holds | `export` or `read` past it is refused |
+| `ENV_NAME_MAX` | 32 | length of a variable name | the name is refused |
+| `ENV_VALUE_MAX` | 128 | length of a value `read` stores | `read` stops the value there |
+| `PDI_PIPE_CAPACITY` | 1024 bytes | what one stage of a pipe passes to the next | the pipe is marked overflowed |
+
+Arguments past the ninth are reachable only through `$@`, since `$1` to `$9` are single digits.
 
 The whole of this section is behind `ENABLE_SCRIPT_RUNNER`, on by default. Comment it out and `source`, control flow and `rc.local` go with it, including the per-session state they use; the rest of the shell is unaffected.
 
@@ -2325,7 +2633,7 @@ URIs are constants in one header, so a typo is a compile error rather than a dea
 | `/dashboard` | live device summary | auth |
 | `/listen-dashboard` | one aggregated dashboard payload | api |
 | `/wifi-config` | station and AP form | auth |
-| `/ota-config` | host, port, version, and flashing an image from storage | auth |
+| `/ota-config` | update server url, version, and flashing an image from storage | auth |
 | `/email-config` | SMTP credentials | auth |
 | `/gpio-manage`, `/gpio-server`, `/gpio-config`, `/gpio-write`, `/gpio-event` | GPIO panel and its subforms | auth |
 | `/gpio-monitor` | live analog graphs | auth |
@@ -2476,6 +2784,8 @@ One header is worth a decision rather than a default: `Strict-Transport-Security
       ▼
   send(code, mime, body, chunked)  ──▶  bytes back to the client
 ```
+
+Routes answer `GET`, `POST` and `HEAD`. Any other method is refused with `405` and an `Allow: GET, POST, HEAD` header before it reaches a route, so a `PUT` or `DELETE` can never run a page's handler as if it were a `GET`.
 
 ### 8.9 Three routes worth tracing
 
@@ -2664,7 +2974,11 @@ http.GetResponse(body, len);              // borrowed buffer — copy if you nee
 http.End(/*preserve_client=*/true);
 ```
 
-Requests are synchronous. A negative return means the transport failed before there was an HTTP status to report — connect, read or timeout.
+`Get`, `Post` and `DownloadStream` are synchronous: they return once the reply is in. A negative return means the transport failed before there was an HTTP status to report — connect, read or timeout.
+
+`GetAsync(url, on_complete)` takes a callback instead. Where the board can run work beside the main loop the request goes out there; otherwise it runs inline, the way `Get` does. Either way `on_complete` is called from the main loop, with the client, once the response is in.
+
+A reply is read until it is complete, not until the line goes quiet. A reply that carries `Content-Length` ends as soon as that many bytes are in, and so does one the server closes after sending. Only a reply with no length, on a connection the server keeps open, waits out the 1.5 s of silence below.
 
 | Setting | Default | Meaning |
 |---|---|---|
@@ -2673,7 +2987,7 @@ Requests are synchronous. A negative return means the transport failed before th
 | keep-alive | 30 s | what is advertised to the peer |
 | request budget | 10 s | whole request |
 | working buffer | 640 B | used during parsing |
-| per-chunk read | 1.5 s | inside the parse loop |
+| silence before giving up on a read | 1.5 s | `HTTP_CLIENT_MAX_READ_MS`; a reply with a length, or a closed connection, ends sooner |
 | connect retries | 1 | everything above this belongs to the service |
 
 **HTTPS is the same client on a different socket.** The class never opens the connection, so making a request encrypted is a change of factory call and nothing else:
@@ -2693,7 +3007,9 @@ Handshake, verification, record framing and the same response parsing all come a
 
 **`https://` needs a board that can do TLS and a build with it switched on.** Without both there is no secure client to use, and the request fails with an error rather than going out unencrypted. `http://` works on any build with a network.
 
-Because the choice is made per request, OTA, device-IoT and GPIO posting all share one client and none of them has to pick anything, and turning TLS on no longer sends a plain `http://` address into a handshake it cannot answer.
+Because the choice is made per request, OTA, device-IoT and GPIO posting all share one client and none of them has to pick anything; with TLS on, a plain `http://` address still goes out as plain HTTP.
+
+**One shared client means one request at a time.** `Http_Client::GetStaticInstance()` is that client, and mail goes out over the same socket. While an async request is still waiting for its callback, `Begin()` returns false and `DownloadStream` returns `PDI_ERR_BUSY`, so nothing takes the socket out from under a request in flight. The built-in users take their turn: a GPIO alert raised while the client is busy goes out on the next tick, a mail is not started until the client is free and its send reports failure, and `wget` answers "http client busy, try again".
 
 There is no HTTP *server* class here. The server side lives at the interface layer with a portable default implementation, plumbed through the web server, and `begin(port, secure)` is what flips it into TLS ([§8.7.1](#871-https-wiring-and-certificates)).
 
@@ -2723,7 +3039,11 @@ Callbacks fire on whichever lane drives the MQTT service, which by default is th
 
 The encoder is usable on its own when you need a packet without owning a connection — bind a buffer, build a connect or publish record, and write its bytes to whatever stream you have.
 
-Defaults are port 1883 and a 60-second keep-alive. The service translates its three config tables into the `Init*` calls above.
+Defaults are port 1883 and a 30-second keep-alive. The service translates its three config tables into the `Init*` calls above.
+
+Every tick first reads what the broker has sent, up to `MQTT_RECV_PACKETS_PER_TASK` packets, and then sends from the queue, up to `MQTT_SEND_PACKETS_PER_TASK`, stopping after any packet the broker has to answer. A burst in either direction is taken a few packets per tick, and a message from the broker is never left waiting behind the device's own queue. Both default to 3 in [src/config/MqttConfig.h](src/config/MqttConfig.h).
+
+The tick itself runs every `MQTT_TIMER_INTERVAL_MS`, 200 by default. A shorter interval makes the client read and send sooner, at the cost of more of the loop's time while there is traffic; 1000 gives a one-second pace for a board that needs the time elsewhere. The client's own timeouts are set in milliseconds beside it (`MQTT_HOST_CONNECT_TIMEOUT_MS`, `MQTT_READ_TIMEOUT_MS`) and counted in ticks rounded up, so they last as long at any interval. `MQTT_CONNECT_WAIT_MS`, 2500 by default, is how long one connect attempt to the broker may hold the loop. The keep-alive stays in seconds, because that is how the protocol carries it. A keep-alive ping that gets no answer within `MQTT_READ_TIMEOUT_MS` makes the client reconnect, while queued messages keep going out during the wait.
 
 ### 10.3 SMTP
 
@@ -2985,7 +3305,7 @@ The framework is built to run for weeks or months between reboots, which shapes 
 
 Don't allocate after `setup()`. Anything that allocates per request, per tick or per event will fragment eventually. Reserve container sizes at init. Reuse buffers — the portal reuses one scratch buffer, transports reuse a caller-owned client, the MQTT parser uses a static ring. Where a buffer must be held across ticks, hold and then free, the way a held command option is released when the command clears.
 
-For the paths that genuinely can be skipped under pressure — a TLS handshake, a large page composition — use `pdiutil::safe_new<T>()` and `safe_new_array<T>(n)`. They refuse the allocation and return null when the free heap would fall below the configured margin, which lets the caller back out cleanly instead of failing somewhere deep inside a library.
+For the paths that genuinely can be skipped under pressure — a TLS handshake, a large page composition — use `pdiutil::safe_new<T>()` and `safe_new_array<T>(n)`. They refuse the allocation and return null when it would leave less than `PDI_SAFE_ALLOC_HEAP_MARGIN` (2 KB) of free heap, or when no single free block can hold it, which lets the caller back out cleanly instead of failing somewhere deep inside a library. The containers in [§15.7](#157-pdistl) allocate through the same check. Every refusal is counted, and `/proc/meminfo` shows the count as `AllocRefused` — a number that keeps climbing is the first sign a board is running short.
 
 When fragmentation does set in, the symptoms are recognisable: `register_task` returning -1, a transport getting null from an allocation, or a vector failing to grow.
 
@@ -3435,11 +3755,17 @@ One property worth knowing before you rely on it: constant-time behaviour holds 
 
 ### 15.7 PdiSTL
 
-A trimmed subset of the C++ standard library for targets that have no libstdc++, adopted from ArduinoSTL by way of uClibc++. Containers live under `pdiutil::` — `string`, `vector`, `function`, the smart pointers and the usual set — and algorithms under `pdistd::`. The C-library wrappers and the ABI glue come along so the framework builds on toolchains that ship neither.
+A trimmed subset of the C++ standard library for targets that have no libstdc++, in [src/utility/stl/](src/utility/stl/). It started from ArduinoSTL by way of uClibc++ and is being reworked for small heaps, one container at a time. Containers live under `pdiutil::` — `string`, `vector`, `function`, the smart pointers and the usual set — and algorithms under `pdistd::`. The C-library wrappers come along so the framework builds on toolchains that ship none.
 
 In framework code, write `pdiutil::string` and `pdiutil::vector` with the namespace spelled out, never a `using namespace`. It keeps a later swap to the host standard library mechanical.
 
-`pdiutil::string` is not `std::string` — some methods are missing or named differently, and the small-buffer and allocator behaviour differ. Check the header before assuming an API is there.
+Every allocation a container makes goes through the same heap check as `pdiutil::safe_new` ([§12](#12-memory--performance-notes)). An empty `vector` or `string` holds no memory until the first element arrives. When the heap check refuses to grow one, it is left exactly as it was — same size, same contents — so code that must not lose data checks the size after an append, insert or resize. `pdiutil::to_string` follows the same rule: on a heap too low to hold the digits it returns an empty string.
+
+`pdiutil::string` keeps room for its terminator whenever it grows, so `c_str()` and `data()` are plain reads that never touch the heap. Every search — `find`, `rfind` and the `find_*_of` family — works in place without allocating, and moving a string hands its buffer over rather than copying it, so `return` and a growing `vector` of strings cost no copies. It is built on `vector<char>` but offers only the members that keep the terminator intact; `emplace_back`, `shrink_to_fit` and a conversion to `vector<char>&` are deliberately absent.
+
+`pdiutil::function` follows `std::function`: copies, moves, captures, `swap`, `target<T>()` and comparison with `nullptr` behave as the standard says, and a function built from a null function pointer or an empty function is empty. How it stores the callable is chosen by `__PDISTD_FUNCTION_INLINE_STORAGE__` at the top of `src/utility/stl/functional`. At `0`, the default, every callable goes to the heap behind a single pointer — one pointer per function, as small in static RAM as a function can be, at the cost of an allocation per callable. At `1` a callable no bigger than `__PDISTD_FUNCTION_INLINE_BYTES__` (one pointer) — a lambda that captures nothing, `[this]`, one reference, a plain function — is held inside the function itself with no heap at all, at two pointers per function. Either way a larger callable goes to the heap through the same check as everything else, and a refusal leaves the function empty. Things that differ from the standard: calling an empty function returns a default value instead of throwing, pointers to members are not callable targets, and `target<T>()` exists only at `1`.
+
+`pdiutil::string` is not `std::string` — some methods are missing or named differently, and it has no small-string buffer, so a non-empty string is always a heap allocation. Check the header before assuming an API is there.
 
 ### 15.8 The umbrella header
 
@@ -3597,6 +3923,12 @@ python3 tests/run_tests.py --device ssh:pdiStack@<ip> --password <pw>
 python3 tests/run_tests.py --tier fuzz --fuzz-seconds 60
 ```
 
+The host tiers use every cpu. Each unit suite, each feature suite and each fuzz harness runs as a
+process of its own, the slowest suites of the previous run first, and `scripts/SyntaxSweep.py`
+compiles its files side by side. `--jobs N` caps how many run at once; `--jobs 1` runs them in turn,
+which is the way to read one failure on its own. A suite that passes only after another has run is
+a defect in that suite, and running each one alone is what shows it.
+
 The unit tier asserts on functions and runs under Address and UB sanitizers, so an out-of-bounds
 read fails the run rather than passing quietly. The middle two drive the framework the way a user
 does — a shell, an ssh channel, the web portal, an MQTT broker. The fuzz tier feeds the ssh wire,
@@ -3661,6 +3993,16 @@ def pwd_follows_cd(t):
 
 `needs`, `mounts` and `services` declare what the target must have; the runner skips with a reason
 when it does not.
+
+A test that writes files does it inside `t.workspace("wt_name")`: a directory of its own, emptied
+first and removed when the test ends, pass or fail. If the directory cannot be made — on a full
+flash, say — the test fails there instead of writing into `/`. A file the framework only reads from
+one fixed place, such as `/.ssh/authorized_keys`, goes in a directory made with
+`t.make_dir("/.ssh")`: when the test ends that directory is removed with everything in it if the
+test made it, and left alone if it was already there. Anything a test still leaves at the
+top of `/` is removed when the run ends; the runner lists `/` before the first test and takes away
+only names that were not there then, never the framework's own (`etc`, `var`, `.ssh`, `.env` and
+the like).
 
 ---
 ## 18. Troubleshooting & FAQ

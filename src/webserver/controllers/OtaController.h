@@ -75,21 +75,15 @@ public:
 		ota_config_table _ota_configs;
 		this->m_web_resource->m_db_conn->get_ota_config_table(&_ota_configs);
 
-		char _port[10];
-		memset(_port, 0, 10);
-		__appendUintToBuff(_port, "%d", _ota_configs.ota_port, 8);
-
 #ifdef ALLOW_OTA_CONFIG_MODIFICATION
 
-		concat_tr_input_html_tags(_page, RODT_ATTR("OTA Host:"), RODT_ATTR("hst"), _ota_configs.ota_host, OTA_HOST_BUF_SIZE - 1);
-		concat_tr_input_html_tags(_page, RODT_ATTR("OTA Port:"), RODT_ATTR("prt"), _port);
+		concat_tr_input_html_tags(_page, RODT_ATTR("OTA Server:"), RODT_ATTR("hst"), _ota_configs.ota_host, OTA_HOST_BUF_SIZE - 1);
 
 		concat_csrf_input_html_tag( _page );
 		strcat_ro(_page, WEB_SERVER_WIFI_CONFIG_PAGE_BOTTOM);
 #else
 
-		concat_tr_input_html_tags(_page, RODT_ATTR("OTA Host:"), RODT_ATTR("hst"), _ota_configs.ota_host, OTA_HOST_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
-		concat_tr_input_html_tags(_page, RODT_ATTR("OTA Port:"), RODT_ATTR("prt"), _port, HTML_INPUT_TAG_DEFAULT_MAXLENGTH, HTML_INPUT_TEXT_TAG_TYPE, false, true);
+		concat_tr_input_html_tags(_page, RODT_ATTR("OTA Server:"), RODT_ATTR("hst"), _ota_configs.ota_host, OTA_HOST_BUF_SIZE - 1, HTML_INPUT_TEXT_TAG_TYPE, false, true);
 
 		strcat_ro(_page, HTML_TABLE_CLOSE_TAG);
 		strcat_ro(_page, HTML_FORM_CLOSE_TAG);
@@ -167,7 +161,7 @@ public:
 		pdiutil::string _message;
 
 #ifdef ENABLE_STORAGE_SERVICE
-		if (this->m_web_resource->m_server->hasArg("img"))
+		if (this->m_web_resource->m_server->isPostRequest() && this->m_web_resource->m_server->hasArg("img"))
 		{
 			pdiutil::string _image = this->m_web_resource->m_server->arg("img");
 			pdiutil::string _path;
@@ -193,24 +187,21 @@ public:
 #endif
 
 #ifdef ALLOW_OTA_CONFIG_MODIFICATION
-		if (this->m_web_resource->m_server->hasArg("hst") && this->m_web_resource->m_server->hasArg("prt"))
+		if (this->m_web_resource->m_server->isPostRequest() && this->m_web_resource->m_server->hasArg("hst"))
 		{
 			pdiutil::string _ota_host = this->m_web_resource->m_server->arg("hst");
-			pdiutil::string _ota_port = this->m_web_resource->m_server->arg("prt");
 
 			LogI("\nSubmitted info :\n");
 			LogI("ota host : %s\n", _ota_host.c_str());
-			LogI("ota port : %s\n\n", _ota_port.c_str());
 
 			ota_config_table _ota_configs;
-			// this->m_web_resource->m_db_conn->get_ota_config_table(&_ota_configs);
 
-			strncpy(_ota_configs.ota_host, _ota_host.c_str(), _ota_host.size());
-			_ota_configs.ota_port = StringToUint16(_ota_port.c_str());
+			if (__copy_to_buffer(_ota_configs.ota_host, OTA_HOST_BUF_SIZE, _ota_host.c_str(), _ota_host.size()))
+			{
+				this->m_web_resource->m_db_conn->set_ota_config_table(&_ota_configs);
 
-			this->m_web_resource->m_db_conn->set_ota_config_table(&_ota_configs);
-
-			_is_posted = true;
+				_is_posted = true;
+			}
 		}
 #endif
 

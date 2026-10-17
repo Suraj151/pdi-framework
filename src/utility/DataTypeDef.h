@@ -22,12 +22,12 @@ Created Date    : 1st June 2019
 #include <stddef.h>
 #include <stdarg.h>
 #include <limits.h>
-#include <utility/pdistl/functional>
-#include <utility/pdistl/string>
-#include <utility/pdistl/vector>
-#include <utility/pdistl/cstdio>
-#include <utility/pdistl/cstring>
-#include <utility/pdistl/cmath>
+#include <utility/stl/functional>
+#include <utility/stl/string>
+#include <utility/stl/vector>
+#include <utility/stl/cstdio>
+#include <utility/stl/cstring>
+#include <utility/stl/cmath>
 
 // Namespace for utility types and functions
 namespace pdiutil {
@@ -1085,12 +1085,13 @@ enum script_block_kind_t : uint8_t {
 };
 
 struct script_block_t {
-    script_block_t() : m_kind(SCRIPT_BLOCK_IF), m_taken(false), m_skipping(false),
+    script_block_t() : m_kind(SCRIPT_BLOCK_IF), m_taken(false), m_skipping(false), m_continue(false),
                        m_head(0), m_passes(0) {}
 
     script_block_kind_t m_kind;
     bool m_taken;
     bool m_skipping;
+    bool m_continue;
     int32_t m_head;
     uint32_t m_passes;
 };
@@ -1102,6 +1103,7 @@ struct script_frame_t {
     int32_t m_line;
     uint32_t m_loop_passes;
     pdiutil::vector<script_block_t> m_blocks;
+    pdiutil::vector<pdiutil::string> m_args;
 };
 #endif
 
@@ -1116,6 +1118,9 @@ enum session_state_t : uint8_t {
 struct session_t {
     session_t() : m_sid(0), m_state(SESSION_STATE_FREE), m_terminal(nullptr), m_loginAt(0), m_lastActivityAt(0),
                   m_cursor(0), m_lastEol(0)
+#ifdef ENABLE_TELNET_SERVICE
+                  , m_telnetState(0), m_telnetCommand(0)
+#endif
 #ifdef ENABLE_STORAGE_SERVICE
                   , m_historyIdx(-1), m_prevHistorySize(0)
                   , m_umask(FILE_UMASK_DEFAULT)
@@ -1142,6 +1147,10 @@ struct session_t {
         m_linebuf.clear();
         m_cursor = 0;
         m_lastEol = 0;
+#ifdef ENABLE_TELNET_SERVICE
+        m_telnetState = 0;
+        m_telnetCommand = 0;
+#endif
 #ifdef ENABLE_STORAGE_SERVICE
         m_historyIdx = -1;
         m_prevHistorySize = 0;
@@ -1176,6 +1185,10 @@ struct session_t {
     pdiutil::string m_linebuf;
     uint16_t m_cursor;
     char m_lastEol;
+#ifdef ENABLE_TELNET_SERVICE
+    uint8_t m_telnetState;
+    uint8_t m_telnetCommand;
+#endif
 #ifdef ENABLE_STORAGE_SERVICE
     int16_t m_historyIdx;
     int16_t m_prevHistorySize;

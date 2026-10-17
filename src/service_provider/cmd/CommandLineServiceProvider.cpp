@@ -160,6 +160,8 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   ExportCommand::RegisterCommand();
   UnsetCommand::RegisterCommand();
   TestCommand::RegisterCommand();
+  TrueCommand::RegisterCommand();
+  FalseCommand::RegisterCommand();
   #ifdef ENABLE_SCRIPT_RUNNER
   SourceCommand::RegisterCommand();
 #ifdef ENABLE_CRON_SERVICE
@@ -217,6 +219,56 @@ bool CommandLineServiceProvider::initService(void *arg)
   return false;
 }
 
+#ifdef ENABLE_TELNET_SERVICE
+/**
+ * Takes one byte through the telnet protocol, refusing every option offered; true when it was protocol, not data.
+ */
+bool CommandLineServiceProvider::consumeTelnetByte(session_t *session, iTerminalInterface *terminal, uint8_t c)
+{
+  const uint8_t IAC = 255, DONT = 254, DO = 253, WONT = 252, WILL = 251, SB = 250, SE = 240;
+  enum { DATA = 0, COMMAND, OPTION, SUBNEGOTIATION, SUBNEGOTIATION_IAC };
+
+  if (nullptr == session) return false;
+
+  switch (session->m_telnetState)
+  {
+    case COMMAND:
+      session->m_telnetState = DATA;
+      if (IAC == c) return false;
+      if (WILL == c || WONT == c || DO == c || DONT == c) {
+        session->m_telnetCommand = c;
+        session->m_telnetState = OPTION;
+      } else if (SB == c) {
+        session->m_telnetState = SUBNEGOTIATION;
+      }
+      return true;
+
+    case OPTION:
+      session->m_telnetState = DATA;
+      if (DO == session->m_telnetCommand || WILL == session->m_telnetCommand) {
+        uint8_t refusal[3] = {IAC, (uint8_t)(DO == session->m_telnetCommand ? WONT : DONT), c};
+        terminal->write(refusal, sizeof(refusal));
+      }
+      return true;
+
+    case SUBNEGOTIATION:
+      if (IAC == c) session->m_telnetState = SUBNEGOTIATION_IAC;
+      return true;
+
+    case SUBNEGOTIATION_IAC:
+      session->m_telnetState = (SE == c) ? DATA : SUBNEGOTIATION;
+      return true;
+
+    default:
+      if (IAC == c) {
+        session->m_telnetState = COMMAND;
+        return true;
+      }
+      return false;
+  }
+}
+#endif
+
 /**
  * execute command provided or in list available
  *
@@ -254,6 +306,12 @@ pdi_err_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface *t
     while (terminal->available())
     {
       char c = terminal->read();
+
+#ifdef ENABLE_TELNET_SERVICE
+      if (TERMINAL_TYPE_TELNET == terminal->get_terminal_type() && consumeTelnetByte(session, terminal, (uint8_t)c)) {
+        continue;
+      }
+#endif
 
       bool iseol = ('\n' == c || '\r' == c);
 
@@ -557,7 +615,8 @@ void CommandLineServiceProvider::reapFinishedCommands()
  * Parses one line and dispatches it, without the history, cleanup and
  * prompt that an interactively typed line carries around it.
  */
-pdi_err_t CommandLineServiceProvider::runLine(pdiutil::string &line, bool &named_noent)
+pdi_err_t CommandLineServiceProvider::runLine(pdiutil::string &line, bool &named_noent,
+                                              iTerminalInterface *sink, uint8_t depth)
 {
   pdi_err_t res = CMD_ERROR_NOENT;
 
@@ -569,15 +628,29 @@ pdi_err_t CommandLineServiceProvider::runLine(pdiutil::string &line, bool &named
     m_terminal->writeln();
     m_terminal->writeln_ro(RODT_ATTR("syntax error"));
     res = CMD_ERROR_INVAL;
-  }else if( parsed.isPlain() && !ShellParser::expandable(line.c_str(), (int16_t)line.size()) ){
+  }else if( nullptr == sink && parsed.isPlain() && !ShellParser::expandable(line.c_str(), (int16_t)line.size()) ){
 
     // one command, nothing to wire up and nothing to expand, so run it
     // where it lies rather than copying the line
-    cmd_t* cmd_to_exec = getCommandToExecute(line.c_str());
+    if( !line.empty() && '[' == line[0] ){
 
-    res = ( nullptr != cmd_to_exec ) ?
-          cmd_to_exec->executeCommand((char*)line.c_str(), line.size()) :
-          (pdi_err_t)CMD_ERROR_NOENT;
+      pdiutil::string text = line;
+      if( !testFromBrackets(text) ){
+        res = CMD_ERROR_INVAL;
+      }else{
+        cmd_t* cmd_to_exec = getCommandToExecute(text.c_str());
+        res = ( nullptr != cmd_to_exec ) ?
+              cmd_to_exec->executeCommand((char*)text.c_str(), text.size()) :
+              (pdi_err_t)CMD_ERROR_NOENT;
+      }
+    }else{
+
+      cmd_t* cmd_to_exec = getCommandToExecute(line.c_str());
+
+      res = ( nullptr != cmd_to_exec ) ?
+            cmd_to_exec->executeCommand((char*)line.c_str(), line.size()) :
+            (pdi_err_t)CMD_ERROR_NOENT;
+    }
   }else{
 
     for( uint16_t p = 0; p < parsed.m_pipelines.size(); p++ ){
@@ -586,7 +659,16 @@ pdi_err_t CommandLineServiceProvider::runLine(pdiutil::string &line, bool &named
         continue;
       }
 
-      res = runPipeline(line.c_str(), parsed, p);
+      ShellParser::Captures captures;
+      res = capturePipeline(line.c_str(), parsed, p, captures, depth);
+
+      if( PDI_OK == res ){
+        res = runPipeline(line.c_str(), parsed, p, sink, &captures);
+      }
+
+      if( parsed.m_pipelines[p].m_negate && CMD_ERROR_AGAIN != res && CMD_ERROR_HOLD_BUFFER != res ){
+        res = ( PDI_OK == res ) ? (pdi_err_t)CMD_RESULT_FALSE : (pdi_err_t)PDI_OK;
+      }
 
       // a command that stopped for input owns the terminal, so what
       // follows on the line cannot run behind it
@@ -1015,6 +1097,26 @@ void CommandLineServiceProvider::releaseSession(session_t *session)
   }
 }
 
+/**
+ * @brief Point every command still writing through a terminal that is going away at another.
+ *
+ * A command left waiting for input keeps the terminal it was started with, so a
+ * session's redirect adapter must hand its users back before it is freed.
+ *
+ * @param from iTerminalInterface* terminal being released
+ * @param to iTerminalInterface* terminal the commands answer on from now
+ */
+void CommandLineServiceProvider::retargetTerminal(iTerminalInterface *from, iTerminalInterface *to)
+{
+  if( nullptr == from ) return;
+
+  for (int16_t i = 0; i < m_cmdlist.size(); i++){
+    if( nullptr != m_cmdlist[i] && from == m_cmdlist[i]->m_terminal ){
+      m_cmdlist[i]->SetTerminal(to);
+    }
+  }
+}
+
 bool CommandLineServiceProvider::isSessionBusy(session_t *session)
 {
   if( nullptr == session ) return false;
@@ -1130,7 +1232,8 @@ bool CommandLineServiceProvider::openSource(const pdiutil::string &source){
  * Runs every command of one pipeline in turn, carrying each one's output into
  * the next through a pipe and honouring the redirections each one carries.
  */
-pdi_err_t CommandLineServiceProvider::runPipeline(const char *line, const ShellParser::Line &parsed, uint16_t index){
+pdi_err_t CommandLineServiceProvider::runPipeline(const char *line, const ShellParser::Line &parsed, uint16_t index,
+                                                  iTerminalInterface *sink, const ShellParser::Captures *captures){
 
   if( index >= parsed.m_pipelines.size() ){
     return CMD_ERROR_INVAL;
@@ -1158,7 +1261,7 @@ pdi_err_t CommandLineServiceProvider::runPipeline(const char *line, const ShellP
     }else if( nullptr != in ){
 
       pdiutil::string inpath;
-      ShellParser::expand(line + in->m_start, in->m_len, SessionManager::getLastExit(), inpath, true);
+      ShellParser::expand(line + in->m_start, in->m_len, SessionManager::getLastExit(), inpath, true, captures);
 
       if( !openSource(inpath) ){
 
@@ -1199,12 +1302,14 @@ pdi_err_t CommandLineServiceProvider::runPipeline(const char *line, const ShellP
       if( nullptr == out ){
         SessionManager::setFd(PDI_FD_STDOUT, outpipe, false);
       }
+    }else if( nullptr != sink && nullptr == out ){
+      SessionManager::setFd(PDI_FD_STDOUT, sink, false);
     }
 
     if( nullptr != out ){
 
       outpath.clear();
-      ShellParser::expand(line + out->m_start, out->m_len, SessionManager::getLastExit(), outpath, true);
+      ShellParser::expand(line + out->m_start, out->m_len, SessionManager::getLastExit(), outpath, true, captures);
 
       if( !openRedirect(outpath, append) ){
 
@@ -1221,7 +1326,7 @@ pdi_err_t CommandLineServiceProvider::runPipeline(const char *line, const ShellP
     }
 
     pdiutil::string text;
-    if( !parsed.commandText(line, c, text, SessionManager::getLastExit()) ){
+    if( !parsed.commandText(line, c, text, SessionManager::getLastExit(), captures) || !testFromBrackets(text) ){
       pdiutil::safe_delete(carry);
       SessionManager::resetStdio();
       return CMD_ERROR_INVAL;
@@ -1267,6 +1372,129 @@ pdi_err_t CommandLineServiceProvider::runPipeline(const char *line, const ShellP
 
   SessionManager::resetStdio();
   return res;
+}
+
+/**
+ * Turns a command written as [ ... ] into the test it stands for, false when it
+ * opens with [ and never closes it.
+ */
+bool CommandLineServiceProvider::testFromBrackets(pdiutil::string &text){
+
+  if( text.empty() || '[' != text[0] || (text.size() > 1 && !__is_blank(text[1])) ){
+    return true;
+  }
+
+  pdiutil::string::size_type end = text.size();
+  while( end > 0 && __is_blank(text[end - 1]) ) end--;
+
+  if( end < 3 || ']' != text[end - 1] || !__is_blank(text[end - 2]) ){
+    m_terminal->writeln();
+    m_terminal->writeln_ro(RODT_ATTR("[: missing ]"));
+    return false;
+  }
+
+  pdiutil::string test = CHARPTR_WRAP(CMD_NAME_TEST);
+  test.append(text.c_str() + 1, end - 2);
+  text = pdistd::move(test);
+  return true;
+}
+
+/**
+ * Runs every $(...) one pipeline holds, before the pipeline itself, and keeps
+ * each answer for the expansion to put in as text.
+ */
+pdi_err_t CommandLineServiceProvider::capturePipeline(const char *line, const ShellParser::Line &parsed, uint16_t index,
+                                                      ShellParser::Captures &captures, uint8_t depth){
+
+  if( index >= parsed.m_pipelines.size() ){
+    return CMD_ERROR_INVAL;
+  }
+
+  const ShellParser::Pipeline &pipeline = parsed.m_pipelines[index];
+  int16_t first = pipeline.m_command_start;
+  int16_t last = (int16_t)(first + pipeline.m_command_count - 1);
+
+  for( int16_t c = first; c <= last; c++ ){
+
+    const ShellParser::Command &command = parsed.m_commands[c];
+    pdiutil::vector<ShellParser::Token> spans;
+
+    for( int16_t w = 0; w < command.m_word_count; w++ ){
+      const ShellParser::Token &word = parsed.m_words[command.m_word_start + w];
+      ShellParser::Token span;
+      span.m_start = word.m_start;
+      span.m_len = word.m_len;
+      spans.push_back(span);
+    }
+    for( int16_t r = 0; r < command.m_redirect_count; r++ ){
+      const ShellParser::Redirect &redirect = parsed.m_redirects[command.m_redirect_start + r];
+      ShellParser::Token span;
+      span.m_start = redirect.m_start;
+      span.m_len = redirect.m_len;
+      spans.push_back(span);
+    }
+
+    for( uint16_t s = 0; s < spans.size(); s++ ){
+
+      pdiutil::vector<ShellParser::Token> found;
+      ShellParser::substitutions(line + spans[s].m_start, spans[s].m_len, found);
+
+      for( uint16_t f = 0; f < found.size(); f++ ){
+
+        if( depth >= SHELL_CAPTURE_DEPTH ){
+          m_terminal->writeln();
+          m_terminal->writeln_ro(RODT_ATTR("$(...) nested too deep"));
+          return CMD_ERROR_INVAL;
+        }
+
+        const char *at = line + spans[s].m_start + found[f].m_start;
+        pdiutil::string inner(at + 2, (pdiutil::string::size_type)(found[f].m_len - 3));
+
+        PipeStream *answer = pdiutil::safe_new<PipeStream>(SHELL_CAPTURE_MAX);
+        if( nullptr == answer || !answer->isValid() ){
+          pdiutil::safe_delete(answer);
+          m_terminal->writeln();
+          m_terminal->writeln_ro(RODT_ATTR("cannot open pipe"));
+          return CMD_ERROR_FAILED;
+        }
+
+        bool named_noent = false;
+        runLine(inner, named_noent, answer, (uint8_t)(depth + 1));
+
+        int16_t waiting = getCommandWaitingForUserInput();
+        if( waiting >= 0 && nullptr != m_cmdlist[waiting] ){
+          m_cmdlist[waiting]->executeTermInputAction(CMD_TERM_INSEQ_CTRL_C);
+        }
+        reapFinishedCommands();
+
+        if( answer->overflowed() ){
+          pdiutil::safe_delete(answer);
+          m_terminal->writeln();
+          m_terminal->writeln_ro(RODT_ATTR("$(...) answered more than it can hold"));
+          return CMD_ERROR_FAILED;
+        }
+
+        ShellParser::Capture capture;
+        capture.m_at = at;
+        uint8_t chunk[32];
+        int32_t got;
+        while( (got = answer->read(chunk, sizeof(chunk))) > 0 ){
+          capture.m_value.append((const char *)chunk, (pdiutil::string::size_type)got);
+        }
+        pdiutil::safe_delete(answer);
+
+        while( !capture.m_value.empty() &&
+               ('\n' == capture.m_value[capture.m_value.size() - 1] ||
+                '\r' == capture.m_value[capture.m_value.size() - 1]) ){
+          capture.m_value.pop_back();
+        }
+
+        captures.push_back(pdistd::move(capture));
+      }
+    }
+  }
+
+  return PDI_OK;
 }
 #endif
 

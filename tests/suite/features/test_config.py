@@ -333,7 +333,7 @@ FEATURE_CONFS = (
      ("host", "port", "security", "client_id", "username", "password", "keepalive",
       "clean_session", "will_topic", "will_message", "will_qos", "will_retain")),
     ("ota", "/etc/ota/ota.conf",
-     ("host", "port")),
+     ("host",)),
     ("email", "/etc/email/email.conf",
      ("sending_domain", "host", "port", "username", "password", "from", "from_name",
       "to", "subject")),

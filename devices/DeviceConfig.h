@@ -335,7 +335,7 @@ created Date    : 1st June 2019
  * collector address (empty leaves it compiled but idle).
  */
 #if defined(ENABLE_SYSLOG_SERVICE) && defined(ENABLE_NETWORK_SERVICE)
-// #define ENABLE_SYSLOG_FORWARD
+#define ENABLE_SYSLOG_FORWARD
 #endif
 
 /**

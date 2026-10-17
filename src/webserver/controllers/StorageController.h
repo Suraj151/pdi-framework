@@ -203,6 +203,8 @@ public:
 
 		strcat_ro(_page, WEB_SERVER_STORAGE_LIST_PAGE_BOTTOM_SCRIPT1);
 		CONTINUE_SEND_IN_CHUNK(_page);
+		strcat_ro(_page, WEB_SERVER_STORAGE_LIST_PAGE_ROW_SCRIPT);
+		CONTINUE_SEND_IN_CHUNK(_page);
 		strcat_ro(_page, WEB_SERVER_STORAGE_LIST_PAGE_BOTTOM_FORMS1);
 		concat_csrf_input_html_tag(_page);
 		CONTINUE_SEND_IN_CHUNK(_page);
@@ -311,7 +313,7 @@ public:
 			__i_fs.appendFileSeparator(currentdir);
 		}
 
-		if(this->m_web_resource->m_server->hasArg("nf")){
+		if(this->m_web_resource->m_server->isPostRequest() && this->m_web_resource->m_server->hasArg("nf")){
 
 			pdiutil::string nf = this->m_web_resource->m_server->arg("nf");
 
@@ -343,7 +345,7 @@ public:
 			}
 		}
 
-		if(this->m_web_resource->m_server->hasArg("nd")){
+		if(this->m_web_resource->m_server->isPostRequest() && this->m_web_resource->m_server->hasArg("nd")){
 
 			pdiutil::string nd = this->m_web_resource->m_server->arg("nd");
 
@@ -470,7 +472,7 @@ public:
 				FilePermsToString(item.m_perms, item.m_type == FILE_TYPE_DIR, permbuf);
 
 				jsonresp += CHARPTR_WRAP("{\"n\":\"");
-				jsonresp += item.m_name;
+				__append_json_escaped(jsonresp, (const char*)item.m_name);
 				jsonresp += CHARPTR_WRAP("\",\"s\":\"");
 				jsonresp += pdiutil::to_string(item.m_size);
 				jsonresp += CHARPTR_WRAP("\",\"t\":\"");
@@ -481,12 +483,12 @@ public:
 				pdiutil::string owner, group;
 				__user_store_service.resolveOwnerNames(item.m_uid, item.m_gid, owner, group);
 				jsonresp += CHARPTR_WRAP("\",\"o\":\"");
-				jsonresp += owner;
+				__append_json_escaped(jsonresp, owner.c_str());
 				jsonresp += CHARPTR_WRAP("\",\"g\":\"");
-				jsonresp += group;
+				__append_json_escaped(jsonresp, group.c_str());
 #endif
 				jsonresp += CHARPTR_WRAP("\",\"l\":\"");
-				jsonresp += tempbuffer;
+				__append_json_escaped(jsonresp, tempbuffer);
 				jsonresp += CHARPTR_WRAP("\"},");
 
 				// deallocates memory for items
@@ -518,7 +520,7 @@ public:
 		}
 
 		pdiutil::string loc = WEB_SERVER_HOME_ROUTE;
-		if(!this->m_web_resource->m_server->arg("df").empty()){
+		if(this->m_web_resource->m_server->isPostRequest() && !this->m_web_resource->m_server->arg("df").empty()){
 
 			pdiutil::string df = this->m_web_resource->m_server->arg("df");
 			pdiutil::string currentdir;

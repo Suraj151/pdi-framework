@@ -320,6 +320,7 @@ TEST(procfs, meminfo_reports_free_heap_and_the_largest_block)
 
     ASSERT_TRUE(meminfo.find("MemFree:") != pdiutil::string::npos);
     ASSERT_TRUE(meminfo.find("MemMaxBlock:") != pdiutil::string::npos);
+    ASSERT_TRUE(meminfo.find("AllocRefused:") != pdiutil::string::npos);
     ASSERT_TRUE(meminfo.find(" B") != pdiutil::string::npos);
 }
 

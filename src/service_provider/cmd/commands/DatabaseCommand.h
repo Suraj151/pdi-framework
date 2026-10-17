@@ -88,6 +88,9 @@ struct DatabaseCommand : public CommandBase {
 
 		if( matches(verbOpt, RODT_ATTR("restore"), 7) ){
 			bool ok = __database_service.restore_defaults();
+			if( ok ){
+				__database_service.write_config_files();
+			}
 			m_terminal->putln();
 			m_terminal->writeln_ro(ok ? RODT_ATTR("defaults restored") : RODT_ATTR("no defaults medium to restore from"));
 			return ok ? PDI_OK : CMD_ERROR_FAILED;

@@ -1,6 +1,6 @@
 # Fuzz tier
 
-Eight libFuzzer harnesses over the parsers that read bytes nobody on this device
+Eleven libFuzzer harnesses over the parsers that read bytes nobody on this device
 chose. Most of them are reached **before any credential is checked** — everything
 else in the framework is guarded by a login, so a length field trusted there is
 trusted from an anonymous stranger. The rest read a reply, a stored table or a
@@ -30,6 +30,9 @@ instrumentation. The ordinary tiers keep using gcc and `tests/.build`.
 | `fuzz_dbrecord` | the superblock and directory a mount believes | a bad sector or another firmware's image arrives looking like this |
 | `fuzz_config` | the `/etc` key/value reader | an interrupted write leaves a file this reader still opens |
 | `fuzz_crontab` | the `/etc/crontab` row split and the field grammar — stars, numbers, ranges, steps | the table is re-read every minute and what it names runs with the scheduler's privileges |
+| `fuzz_mdns` | the responder's query reader — header, question count, labels, type — and the reply it builds in a fixed buffer | any host on the network multicasts to it, with no login |
+| `fuzz_mqtt` | the mqtt client reading a broker: fixed header, remaining length, every packet type it dispatches, topic and payload into the data callback | whoever runs the broker, or sits between it and the board, picks these bytes — one malformed PUBLISH crashed the host process (DU) |
+| `fuzz_json` | the json value reader — the key matched as a whole string token, the value copied into a fixed buffer — and the escaper | every remote payload goes through it: broker commands, the iot server's configuration, the published firmware version |
 
 ## Corpus and findings
 

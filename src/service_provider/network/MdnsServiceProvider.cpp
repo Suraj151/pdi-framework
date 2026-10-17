@@ -153,6 +153,8 @@ bool MdnsServiceProvider::addService(const char *type, const char *proto, uint16
 
   if (nullptr == type || nullptr == proto) return false;
   if (m_service_count >= MDNS_MAX_SERVICES) return false;
+  if ('_' != type[0] || cstrlen(type) < 2 || cstrlen(type) > MDNS_SERVICE_LABEL_MAX) return false;
+  if (!__are_str_equals(proto, "_tcp") && !__are_str_equals(proto, "_udp")) return false;
 
   m_services[m_service_count].m_type = type;
   m_services[m_service_count].m_proto = proto;
@@ -309,7 +311,11 @@ void MdnsServiceProvider::sendServiceEnumeration() {
   putHeader(resp, p, m_service_count, 0);
 
   const char *enumLabels[4] = { "_services", "_dns-sd", "_udp", MDNS_LOCAL_LABEL };
+  uint16_t answered = 0;
   for (uint8_t i = 0; i < m_service_count; i++) {
+    uint16_t need = 30 + 10 + 1 + cstrlen(m_services[i].m_type) + 1 + cstrlen(m_services[i].m_proto) + 1 + MDNS_LOCAL_LABEL_LEN + 1;
+    if (p + need > MDNS_TX_BUFFER_SIZE) break;
+    answered++;
     p += writeLabels(resp + p, enumLabels, 4);
     putU16(resp, p, MDNS_TYPE_PTR);
     putU16(resp, p, MDNS_CLASS_IN);
@@ -318,6 +324,8 @@ void MdnsServiceProvider::sendServiceEnumeration() {
     p += writeServiceTypeName(resp + p, i);
     backfillRdlen(resp, rdlenPos, p);
   }
+  resp[6] = (uint8_t)(answered >> 8);
+  resp[7] = (uint8_t)answered;
 
   ipaddress_t mcast(MDNS_MULTICAST_ADDR_0, MDNS_MULTICAST_ADDR_1, MDNS_MULTICAST_ADDR_2, MDNS_MULTICAST_ADDR_3);
   m_udp->send(resp, p, mcast, MDNS_PORT);

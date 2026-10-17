@@ -26,7 +26,8 @@ HttpServerInterfaceImpl::HttpServerInterfaceImpl() :
     m_server(nullptr),
     m_client(nullptr),
     m_currentclient_lastactivity_timestamp(0),
-    m_handlingclientfromcb(false)
+    m_handlingclientfromcb(false),
+    m_close_after_response(false)
 #ifdef ENABLE_TLS_SERVICE
     , m_secure(false)
 #endif
@@ -183,9 +184,18 @@ void HttpServerInterfaceImpl::handleClient(){
             }
             #endif
 
+            m_close_after_response = false;
+
+            pdiutil::string method_get = CHARPTR_WRAP("GET"), method_post = CHARPTR_WRAP("POST"), method_head = CHARPTR_WRAP("HEAD");
+            bool uriFound = !(m_clientRequest.method == method_get || m_clientRequest.method == method_post ||
+                              m_clientRequest.method == method_head);
+            if (uriFound) {
+                addHeader(CHARPTR_WRAP(HTTP_HEADER_KEY_ALLOW), CHARPTR_WRAP("GET, POST, HEAD"));
+                send(HTTP_RESP_METHOD_NOT_ALLOWED);
+            }
+
             // Handle the request based on the URI
-            bool uriFound = false;
-            for (uint16_t i = 0; i < m_uriHandlerMap.size(); i++) {
+            for (uint16_t i = 0; !uriFound && i < m_uriHandlerMap.size(); i++) {
 
                 if (m_clientRequest.uri == m_uriHandlerMap[i].uri) {
                     // Call the registered handler for the URI
@@ -204,12 +214,19 @@ void HttpServerInterfaceImpl::handleClient(){
                 }
             }
 
-            if(!m_clientRequest.isPending){
+            bool _finished = !m_clientRequest.isPending;
+            if(_finished){
                 m_clientRequest.clear();
             }
-            
+
             // Flush the client buffer
             m_client->flush(FLUSH_ALL);
+
+            if( _finished && m_close_after_response ){
+                closeClient();
+                m_currentclient_lastactivity_timestamp = 0;
+                return;
+            }
 
             // Update current client liast activity timestamp
             m_currentclient_lastactivity_timestamp = __i_instance.getUtilityInstance().millis_now();
@@ -218,7 +235,7 @@ void HttpServerInterfaceImpl::handleClient(){
         // Only one client is served at a time, so an idle keep-alive connection
         // is given up as soon as another one is waiting. Holding it would leave
         // the waiting connection to be reset by the accept that follows it.
-        else if( !m_clientRequest.isPending && m_server->hasClient() ){
+        else if( !m_clientRequest.isPending && hasWaitingClient() ){
 
             closeClient();
             m_currentclient_lastactivity_timestamp = 0;
@@ -931,7 +948,8 @@ void HttpServerInterfaceImpl::prepareResponseHeader(pdiutil::string& _header, in
     pdiutil::string connection_key = CHARPTR_WRAP(HTTP_HEADER_KEY_CONNECTION);
     pdiutil::string conn_close = CHARPTR_WRAP("close");
     pdiutil::string keepalive = header(connection_key);
-    if (keepalive.empty() || keepalive == conn_close) {
+    m_close_after_response = (keepalive.empty() || keepalive == conn_close);
+    if (m_close_after_response) {
         addHeader(connection_key, CHARPTR_WRAP("close"));
     } else {
         addHeader(connection_key, CHARPTR_WRAP("keep-alive"));
@@ -1048,6 +1066,21 @@ void HttpServerInterfaceImpl::closeClient() {
         pdiutil::safe_delete(m_client);
         m_client = nullptr;
     }
+}
+
+/**
+ * @brief whether a connection is waiting on any port this server listens on.
+ */
+bool HttpServerInterfaceImpl::hasWaitingClient() {
+    if (nullptr != m_server && m_server->hasClient()) {
+        return true;
+    }
+    #if defined(ENABLE_HTTPS_SERVER) && defined(ENABLE_TLS_SERVICE)
+    if (nullptr != m_insecure_server && m_insecure_server->hasClient()) {
+        return true;
+    }
+    #endif
+    return false;
 }
 
 #endif

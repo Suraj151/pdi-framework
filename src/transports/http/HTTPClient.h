@@ -101,8 +101,8 @@ public:
 	Http_Client();
 	~Http_Client();
 
-	// initialization api
-	void Begin();
+	// initialization api, false while an async request still holds the client
+	bool Begin();
 
 	// deinit api
 	void End(bool preserve_client = false);

@@ -70,6 +70,7 @@ protected:
   iClientInterface* m_client;
   uint64_t m_currentclient_lastactivity_timestamp;
   volatile bool m_handlingclientfromcb;
+  bool m_close_after_response;
   #ifdef ENABLE_TLS_SERVICE
   bool m_secure;
   #endif
@@ -131,6 +132,11 @@ protected:
   void prepareResponseHeader(pdiutil::string& _header, int code, const char *content_type, uint32_t content_length, bool chunk_encoding = false);
   void sendResponse(int code, mimetype_t content_type, const char *content, bool chunk_encoding = false);
   void closeClient();
+
+  /**
+   * @brief whether a connection is waiting on any port this server listens on.
+   */
+  bool hasWaitingClient();
 };
 
 #endif

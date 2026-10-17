@@ -36,6 +36,11 @@ public:
   bool setPassword(const char *username, const char *password);
 
   /**
+   * @brief Whether a name fits its record and uses only letters, digits, dot, underscore and a non-leading dash.
+   */
+  static bool isValidUsername(const char *username);
+
+  /**
    * @brief Resolves an owning uid and gid to display names.
    *
    * Falls back to the numeric id when no record matches, and reuses the owner

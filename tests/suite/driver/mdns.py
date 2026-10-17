@@ -159,8 +159,10 @@ def ask(target, name, qtype=TYPE_A, timeout=6.0, attempts=4, gap=3.0):
                 if not (data[2] & 0x80):
                     continue
 
+                # the board multicasts announcements and answers to other askers
+                # on the same group, so only a reply naming what was asked counts
                 found = parse_records(data)
-                if found:
+                if any(record["name"].rstrip(".").lower() == name.rstrip(".").lower() for record in found):
                     return found
         except OSError as err:
             raise MdnsError("cannot listen on %s:%d: %s" % (GROUP, PORT, err))

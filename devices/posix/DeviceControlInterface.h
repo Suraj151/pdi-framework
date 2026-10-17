@@ -113,6 +113,11 @@ public:
    */
   void seedRandom(uint32_t seed);
 
+  /**
+   * @brief Report at most bytes of free heap, so a test can drive the heap check; 0 reports the real figure.
+   */
+  void capFreeHeap(uint32_t bytes);
+
 #ifdef MOCK_DEVICE_TEST
   /**
    * @brief Number of resetDevice() calls since the last counter clear.
@@ -140,11 +145,24 @@ public:
    */
   GPIO_MODE getGpioMode(gpio_id_t pin) const;
 
+  /**
+   * @brief Takes input pin levels from a file of `D4 1` / `A0 512` lines, re-read on every input sample.
+   */
+  static void setGpioInputFile(const char *path);
+
 private:
+  static const char *s_gpio_input_file;
+
+  /**
+   * @brief The level the input file gives a pin, or false when it names none.
+   */
+  static bool readGpioInputFile(char kind, gpio_id_t pin, gpio_val_t &value);
+
   uint64_t m_boot_micros;
   uint64_t m_virtual_micros;
   bool m_virtual_clock;
   uint32_t m_random_state;
+  uint32_t m_free_heap_cap;
 #ifdef MOCK_DEVICE_TEST
   uint32_t m_reset_count;
   uint32_t m_restart_count;
