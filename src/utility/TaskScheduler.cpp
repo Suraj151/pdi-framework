@@ -22,7 +22,9 @@ TaskScheduler::TaskScheduler() : m_util(nullptr),
                                  m_max_tasks(MAX_SCHEDULABLE_TASKS),
                                  m_rebase_start_priotask(false),
                                  m_min_vruntime(0),
-                                 m_next_task_id(1)
+                                 m_next_task_id(1),
+                                 m_system_enter(nullptr),
+                                 m_system_leave(nullptr)
 {
     // the table is sized once and never grown or compacted after this, so a
     // slot never moves and a running task keeps the callable it is executing.
@@ -225,6 +227,31 @@ bool TaskScheduler::setTaskOwner(pdiutil::task_id_t _id, uint8_t _owner)
     this->m_tasks[_idx].m_owner = _owner;
     CRITICAL_SECTION_EXIT
     return true;
+}
+
+/**
+ * @brief Mark an already-registered task as a service's own work, so the
+ *        system hooks run around it.
+ * @return true if the task was found and updated.
+ */
+bool TaskScheduler::setTaskSystem(pdiutil::task_id_t _id)
+{
+    int16_t _idx = this->is_registered_task(_id);
+    if (_idx < 0) return false;
+    CRITICAL_SECTION_ENTER
+    this->m_tasks[_idx].m_system = true;
+    CRITICAL_SECTION_EXIT
+    return true;
+}
+
+/**
+ * @brief Hooks run before and after every task marked as a service's own work;
+ * either missing runs neither.
+ */
+void TaskScheduler::setSystemHooks(system_enter_fn_t _enter, system_leave_fn_t _leave)
+{
+    this->m_system_enter = _enter;
+    this->m_system_leave = _leave;
 }
 
 /**
@@ -619,7 +646,10 @@ void TaskScheduler::handle_tasks()
                 CRITICAL_SECTION_EXIT
                 // User task callback — must NOT run with interrupts disabled.
                 uint64_t _cb_start_us = m_util->micros_now();
+                bool _as_system = _task.m_system && nullptr != m_system_enter && nullptr != m_system_leave;
+                void *_system_ctx = _as_system ? m_system_enter() : nullptr;
                 _task.m_task();
+                if (_as_system) m_system_leave(_system_ctx);
                 uint64_t _cb_end_us = m_util->micros_now();
                 CRITICAL_SECTION_ENTER
                 _task.m_task_exec_us = (uint32_t)(_cb_end_us - _cb_start_us);

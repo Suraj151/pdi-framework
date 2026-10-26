@@ -173,9 +173,11 @@ public:
      * @brief Copies a file to a new path.
      * @param sourcePath The path of the source file.
      * @param destPath The path of the destination file.
+     * @param keepgoing Optional, asked between chunks; false stops the copy and
+     *        removes what it wrote, answered as PDI_ERR_ABORTED.
      * @return 0 on success, or a negative error code on failure.
      */
-    virtual pdi_err_t copyFile(const char* sourcePath, const char* destPath) = 0;
+    virtual pdi_err_t copyFile(const char* sourcePath, const char* destPath, CallBackVoidArgBoolRetFn keepgoing = nullptr) = 0;
 
     /**
      * @brief Moves a file to a new path.
@@ -308,6 +310,14 @@ public:
      * @return The temp directory.
      */
     virtual const char* getTempDirectory() const = 0;
+
+    /**
+     * @brief The directory a file bound for path is staged in, on the same
+     * filesystem so moving it needs no copy.
+     * @param path Where the file is bound.
+     * @return The directory, ending in a separator.
+     */
+    virtual pdiutil::string getStagingDirectory(const char* path) { return pdiutil::string(getTempDirectory()); }
 
     /**
      * @brief Sets the home directory.
@@ -449,6 +459,17 @@ public:
      * @return 0 on success, or a negative error code on failure.
      */
     virtual pdi_err_t closeFile(pdi_fhandle_t handle) { return PDI_ERR_NOT_SUPPORTED; }
+
+    /**
+     * @brief How many files the filesystem holds open, so it is not unmounted under them.
+     * @return The number of open files.
+     */
+    virtual uint16_t openCount() const { return 0; }
+
+    /**
+     * @brief Told once its mount point is gone, so it can let go of what the mount held.
+     */
+    virtual void unmounted() {}
 protected:
     /**
      * @brief Get current wall-clock time as seconds since Unix epoch, or 0

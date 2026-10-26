@@ -23,6 +23,8 @@ Created Date    : 23rd July 2026
 #include <interface/pdi/modules/storage/iFileSystemInterface.h>
 #include <interface/pdi/modules/storage/iStorageInterface.h>
 
+class iBlockDriverInterface;
+
 class DevFs : public iFileSystemInterface {
 public:
   DevFs();
@@ -30,14 +32,31 @@ public:
 
   pdi_err_t init() override { return 0; }
 
+  /**
+   * The node a path under /dev names, e.g. mmcblk0p1 for /dev/mmcblk0p1;
+   * nullptr for a path anywhere else.
+   */
+  static const char *nodeOf(const char *path);
+
+  /**
+   * The path under /dev of a node, e.g. /dev/mmcblk0p1 for mmcblk0p1.
+   */
+  static pdiutil::string pathOf(const char *node);
+
+#ifdef ENABLE_DRIVER_CORE
+  /**
+   * The disk a disk or partition node reaches and the blocks it covers, nullptr
+   * when the node names neither.
+   */
+  iBlockDriverInterface *blockWindow(const char *path, uint32_t &first, uint32_t &span) const;
+#endif
+
   int createFile(const char *path, const char *content,
                  int64_t size = -1) override {
     return PDI_ERR_NOT_SUPPORTED;
   }
   int editFile(const char *path, uint64_t offset, const char *content,
-               uint32_t size) override {
-    return PDI_ERR_NOT_SUPPORTED;
-  }
+               uint32_t size) override;
   int writeFile(const char *path, const char *content, uint32_t size,
                 bool append = false) override;
   int readFile(const char *path, uint64_t size,
@@ -64,7 +83,7 @@ public:
   pdi_err_t createDirectory(const char *path) override { return PDI_ERR_NOT_SUPPORTED; }
   pdi_err_t deleteDirectory(const char *path) override { return PDI_ERR_NOT_SUPPORTED; }
   pdi_err_t rename(const char *oldPath, const char *newPath) override { return PDI_ERR_NOT_SUPPORTED; }
-  pdi_err_t copyFile(const char *sourcePath, const char *destPath) override {
+  pdi_err_t copyFile(const char *sourcePath, const char *destPath, CallBackVoidArgBoolRetFn keepgoing = nullptr) override {
     return PDI_ERR_NOT_SUPPORTED;
   }
   pdi_err_t moveFile(const char *oldPath, const char *newPath) override { return PDI_ERR_NOT_SUPPORTED; }
@@ -120,10 +139,68 @@ private:
     DEV_NULL,
     DEV_ZERO,
     DEV_RANDOM,
-    DEV_URANDOM
+    DEV_URANDOM,
+    DEV_DRIVER_DIR,
+    DEV_DRIVER_NODE,
+    DEV_PARTITION
   };
 
   NodeKind classify(const char *path) const;
+
+#ifdef ENABLE_DRIVER_CORE
+  /**
+   * The bound device whose node the path names, or the first one under the
+   * directory it names; -1 when it names neither.
+   */
+  int16_t driverNode(const char *p, bool &isdir) const;
+
+  /**
+   * Adds the next path segment of each bound driver's node under a driver directory
+   * or the root, a directory when more follows.
+   */
+  void listDriverNodes(const char *p, pdiutil::vector<file_info_t> &items) const;
+
+  /**
+   * Delivers a bounded run of bytes read from a driver's node, capped so a reader
+   * always reaches an end.
+   */
+  int driverRead(int16_t device, uint64_t size,
+                 pdiutil::function<bool(char *, uint32_t)> readbackfn,
+                 uint64_t offset);
+
+  /**
+   * Whether the node names a disk or one of its partitions.
+   */
+  bool isDisk(const char *path) const;
+
+  /**
+   * The disk a partition node names and the partition's number, -1 when the
+   * path names none.
+   */
+  int16_t partitionNode(const char *p, uint8_t &number) const;
+
+  /**
+   * The disk a disk or partition node reaches and the blocks it covers.
+   */
+  bool diskWindow(const char *path, int16_t &device, uint32_t &first, uint32_t &span) const;
+
+  /**
+   * Delivers a disk window from the offset a block at a time.
+   */
+  int diskRead(int16_t device, uint32_t first, uint32_t span, uint64_t size,
+               pdiutil::function<bool(char *, uint32_t)> readbackfn,
+               uint64_t offset, const char *readUntilMatchStr, bool *didmatchfound);
+
+  /**
+   * Stores bytes in a disk window from the offset, a block at a time.
+   */
+  int diskWrite(int16_t device, uint32_t first, uint32_t span, uint64_t offset, const char *content, uint32_t size);
+
+  /**
+   * The bytes a disk or partition node holds, 0 for any other node.
+   */
+  uint64_t diskSize(const char *path) const;
+#endif
   const char *normalizePath(const char *path) const;
   int streamFill(bool random, uint64_t size,
                  pdiutil::function<bool(char *, uint32_t)> readbackfn,

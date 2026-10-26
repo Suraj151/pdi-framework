@@ -50,6 +50,18 @@ created Date    : 1st June 2025
 
 #ifndef SSH_CHANNEL_CLOSE_GRACE_MS
 #define SSH_CHANNEL_CLOSE_GRACE_MS 3000
+
+#ifndef SSH_SFTP_READ_MAX
+#define SSH_SFTP_READ_MAX 2048         /* most file bytes one sftp read reply carries */
+#endif
+
+#ifndef SSH_RX_CHUNK
+#define SSH_RX_CHUNK 512               /* bytes taken from the socket between two yields while a packet is read */
+#endif
+
+#ifndef SSH_CHANNEL_WINDOW
+#define SSH_CHANNEL_WINDOW 2097152     /* bytes a client may send on a channel before the server tops its window up */
+#endif
 #endif
 
 #define SSH_DEFAULT_DIR ".ssh"

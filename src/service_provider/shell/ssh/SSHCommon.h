@@ -110,6 +110,9 @@
 #define SSH_FXP_EXTENDED_REPLY    201
 
 #define SSH_SFTP_MAX_RX_PACKET    32768
+#define SSH_SFTP_READ_REPLY_HEADER 13      /* length, type, request id and data length before a read reply's bytes */
+#define SSH_SFTP_READ_PACKET_OVERHEAD 64   /* room a read reply leaves in the client's largest packet for the channel and ssh framing */
+#define SSH_CHANNEL_DATA_OVERHEAD 37       /* channel header, packet header, most padding and sequence number around channel data */
 
 // File attributes for SSH_FXP_ATTRS
 #define SSH_FILEXFER_ATTR_SIZE            0x00000001

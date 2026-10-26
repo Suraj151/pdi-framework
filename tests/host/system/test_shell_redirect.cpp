@@ -315,6 +315,60 @@ TEST(pipeline, cat_passes_its_input_straight_through)
     ASSERT_TRUE(seen.find("through") != std::string::npos);
 }
 
+/**
+ * A pipe is a fixed buffer and the stages run one after another, so a writer
+ * that fills it is cut off. A reader that went on to the end of the pipe
+ * answered on part of the output, and is told so; one that stopped early, as
+ * head does, never needed the rest.
+ */
+TEST(pipeline, a_reader_that_reached_the_end_of_a_cut_pipe_is_told)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+    std::string lines;
+    for (int i = 0; i < 400; i++)
+    {
+        lines += "line of piped text\n";
+    }
+    __i_fs.deleteFile("/w_pipe_big.txt");
+    __i_fs.createFile("/w_pipe_big.txt", lines.data(), (int64_t)lines.size());
+
+    std::string counted = sh.run("cat /w_pipe_big.txt | wc");
+    std::string headed = sh.run("cat /w_pipe_big.txt | head 2");
+    std::string small = sh.run("echo short | wc");
+
+    __i_fs.deleteFile("/w_pipe_big.txt");
+    ASSERT_TRUE(pditest::saw(counted, "pipe full"));
+    ASSERT_FALSE(pditest::saw(headed, "pipe full"));
+    ASSERT_TRUE(pditest::saw(headed, "line of piped text"));
+    ASSERT_FALSE(pditest::saw(small, "pipe full"));
+}
+
+/**
+ * cat copies a file, so its bytes reach a pipe or a file as they are; only a
+ * command's own line ends are tidied for the places a terminal is not.
+ */
+TEST(pipeline, cat_hands_on_a_files_carriage_returns_untouched)
+{
+    pditest::mountedVfs();
+    pditest::Shell sh;
+    const char crlf[] = "one\r\ntwo\r\nthree\r\n";
+    __i_fs.deleteFile("/w_crlf.txt");
+    __i_fs.deleteFile("/w_crlf_copy.txt");
+    __i_fs.createFile("/w_crlf.txt", crlf, (int64_t)strlen(crlf));
+
+    std::string counted = sh.run("cat /w_crlf.txt | wc");
+    sh.run("cat /w_crlf.txt > /w_crlf_copy.txt");
+    int64_t copied = __i_fs.getFileSize("/w_crlf_copy.txt");
+    std::string own = sh.run("echo plain | wc");
+
+    __i_fs.deleteFile("/w_crlf.txt");
+    __i_fs.deleteFile("/w_crlf_copy.txt");
+    ASSERT_TRUE(pditest::saw(counted, "3 3 17"));
+    ASSERT_EQ((int)copied, 17);
+    ASSERT_TRUE(pditest::saw(own, "1 1 6"));
+}
+
 TEST(pipeline, head_stops_at_the_count_it_was_given)
 {
     pditest::mountedVfs();

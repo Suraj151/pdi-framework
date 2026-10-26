@@ -43,6 +43,11 @@ public:
   bool overflowed() const { return m_overflowed; }
 
   /**
+   * A pipe that overflowed, or never got its buffer, takes no further write.
+   */
+  bool writeRefused() const override { return m_overflowed || !isValid(); }
+
+  /**
    * Bytes the pipe can hold between a write and the read that drains it.
    */
   uint16_t capacity() const { return m_capacity; }

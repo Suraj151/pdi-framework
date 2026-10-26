@@ -106,6 +106,7 @@ struct LoginCommand : public CommandBase {
 
 			if( strlen(_username) && strlen(_password) && __auth_service.isAuthorized(_username, _password) ){
 				__auth_service.setAuthorized(true);
+				__auth_service.enterHome();
 			}else{
 
 				result = CMD_ERROR_ACCES;

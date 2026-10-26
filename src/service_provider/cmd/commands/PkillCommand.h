@@ -102,7 +102,7 @@ struct PkillCommand : public CommandBase {
 		bool isRoot = false;
 		uint8_t cur_sid = 0;
 #if defined(ENABLE_AUTH_SERVICE) && defined(ENABLE_STORAGE_SERVICE)
-		isRoot = ( SessionManager::getCurrentUid() == USER_STORE_ROOT_UID );
+		isRoot = SessionManager::isRoot();
 		session_t *cur = SessionManager::current();
 		cur_sid = (nullptr != cur) ? cur->m_sid : 0;
 #else

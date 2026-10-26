@@ -13,13 +13,14 @@ host process can. So each works inside its own directory and puts back anything
 it changed.
 """
 
+import atexit
 import importlib
 import os
 import pkgutil
 import re
 import time
 
-from ..driver.shell import PROMPT, CTRL_C, ShellError
+from ..driver.shell import PROMPT, CTRL_C, ShellError, strip_ansi
 
 IPV4 = re.compile(r"\b(\d{1,3}(?:\.\d{1,3}){3})\b")
 
@@ -112,6 +113,22 @@ def test(name, needs=(), mounts=(), services=(), su=False, slow=False):
     return register
 
 
+_UNFINISHED = []
+
+
+def _finish_unfinished():
+    """
+    Undo what suites set up on a target whose run never reached its end, so a
+    run stopped by Ctrl+C, a kill or a lost connection still leaves the board
+    as it was found.
+    """
+    while _UNFINISHED:
+        _UNFINISHED.pop().finish()
+
+
+atexit.register(_finish_unfinished)
+
+
 class Target(object):
     """What a test is handed: a shell, what it can do, and a place to work."""
 
@@ -138,6 +155,10 @@ class Target(object):
         """
         self._finalizers = other._finalizers
         other._finalizers = []
+        if other in _UNFINISHED:
+            _UNFINISHED.remove(other)
+        if self._finalizers and self not in _UNFINISHED:
+            _UNFINISHED.append(self)
 
     def at_exit(self, fn):
         """
@@ -149,15 +170,29 @@ class Target(object):
         was found.
         """
         self._finalizers.append(fn)
+        if self not in _UNFINISHED:
+            _UNFINISHED.append(self)
 
     def finish(self):
+        import inspect
         while self._finalizers:
             fn = self._finalizers.pop()
             try:
-                fn()
+                # a cleanup that takes an argument is handed the target that is
+                # finishing, which may be a later lane than the one that set it up
+                try:
+                    takes_target = len(inspect.signature(fn).parameters) > 0
+                except (TypeError, ValueError):
+                    takes_target = False
+                if takes_target:
+                    fn(self)
+                else:
+                    fn()
             except Exception as err:
                 print("       %scould not undo a suite's setup: %s%s"
                       % (DIM, err, RESET), flush=True)
+        if self in _UNFINISHED:
+            _UNFINISHED.remove(self)
 
     def dial(self, password=None):
         """
@@ -413,6 +448,95 @@ def sweep_root(target, before):
         print("       %sremoved /%s, left behind by the run%s" % (DIM, name, RESET), flush=True)
 
 
+MEMINFO = re.compile(r"^(MemFree|MemMaxBlock|AllocRefused):\s*(\d+)", re.M)
+
+
+def meminfo(target):
+    """The heap figures /proc/meminfo reports, or None when it cannot be read."""
+    try:
+        out = target.run("cat /proc/meminfo")
+    except Exception:
+        return None
+    found = dict((key, int(value)) for key, value in MEMINFO.findall(out))
+    return found if "MemFree" in found else None
+
+
+def task_names(target):
+    """The tasks ps lists, as name(pid), or None when ps cannot be read."""
+    try:
+        out = strip_ansi(target.run("ps"))
+    except Exception:
+        return None
+    rows = [line.split() for line in out.splitlines()]
+    return set("%s(%s)" % (row[-1], row[0]) for row in rows if len(row) >= 10 and row[0].isdigit())
+
+
+class HeapWatch(object):
+    """
+    The board's heap at every suite boundary, so a suite that leaves memory
+    behind or drives the allocator into refusals shows by name. The heap moves
+    between discrete levels, so a lone reading is not a measurement: the start
+    and the end of the run take the median of three. This only reports; the
+    thresholds that fail a run come once runs have shown what is normal.
+    """
+
+    def __init__(self, target):
+        self.target = target
+        self.start = self._median()
+        self.last = self.start
+        self.refused_at_start = self.start.get("AllocRefused") if self.start else None
+        self.rows = []
+        self.tasks = task_names(target)
+
+    def _median(self):
+        readings = [r for r in (meminfo(self.target) for _ in range(3)) if r]
+        if not readings:
+            return None
+        keys = set(readings[0])
+        return dict((key, sorted(r.get(key, 0) for r in readings)[len(readings) // 2])
+                    for key in keys)
+
+    def suite_done(self, suite):
+        now = meminfo(self.target)
+        if not now or not self.last:
+            return
+        refused = now.get("AllocRefused", 0) - self.last.get("AllocRefused", 0)
+        change = now["MemFree"] - self.last["MemFree"]
+        self.rows.append((suite, now["MemFree"], change, now.get("MemMaxBlock"), refused))
+        note = ", %d allocation(s) refused" % refused if refused > 0 else ""
+        print("       %sheap after %s: %d B free (%+d), largest block %s B%s%s"
+              % (DIM, suite, now["MemFree"], change, now.get("MemMaxBlock", "?"), note, RESET),
+              flush=True)
+        tasks = task_names(self.target)
+        if tasks is not None and self.tasks is not None and tasks != self.tasks:
+            print("       %stasks after %s: started %s, ended %s%s"
+                  % (DIM, suite, " ".join(sorted(tasks - self.tasks)) or "none",
+                     " ".join(sorted(self.tasks - tasks)) or "none", RESET), flush=True)
+        self.tasks = tasks if tasks is not None else self.tasks
+        self.last = now
+
+    def summary(self):
+        if not self.start:
+            print("       %sheap: /proc/meminfo could not be read, nothing was watched%s"
+                  % (DIM, RESET), flush=True)
+            return
+        end = self._median()
+        if not end:
+            return
+        change = end["MemFree"] - self.start["MemFree"]
+        refused = end.get("AllocRefused", 0) - (self.refused_at_start or 0)
+        print("  %sheap over the run: %d -> %d B free (%+d), largest block %s -> %s B, "
+              "%d allocation(s) refused%s"
+              % (DIM, self.start["MemFree"], end["MemFree"], change,
+                 self.start.get("MemMaxBlock", "?"), end.get("MemMaxBlock", "?"), refused, RESET),
+              flush=True)
+        worst = sorted(self.rows, key=lambda row: row[2])[:3]
+        for suite, free, delta, block, ref in worst:
+            if delta < 0:
+                print("  %s  most heap left behind: %s %+d B%s" % (DIM, suite, delta, RESET),
+                      flush=True)
+
+
 def discover():
     """Import every test_*.py beside this file so its decorators run."""
     package = os.path.dirname(os.path.abspath(__file__))
@@ -453,10 +577,15 @@ def run_interleaved(lanes, only=None, verbose=False):
     discover()
 
     alive = list(lanes)
-    for lane in alive:
-        lane.target.resync()
+    for lane in list(alive):
+        try:
+            lane.target.resync()
+        except ShellError:
+            _recover(alive, lane)
 
     before_root = root_names(alive[0].target) if alive else None
+    watch = HeapWatch(alive[0].target) if alive else None
+    current = None
 
     passed = 0
     failed = []
@@ -469,6 +598,11 @@ def run_interleaved(lanes, only=None, verbose=False):
     for item in TESTS:
         if not selected(only, item.full_name):
             continue
+
+        if watch is not None and alive and current is not None and item.feature != current:
+            watch.target = alive[0].target
+            watch.suite_done(current)
+        current = item.feature
 
         if not alive:
             skipped.append((item.full_name, "not run, every connection was lost"))
@@ -536,8 +670,23 @@ def run_interleaved(lanes, only=None, verbose=False):
             print("  %sskip%s %s %s(%s)%s"
                   % (YELLOW, RESET, item.full_name, DIM, note, RESET), flush=True)
 
+    # every lane's cleanup runs on a lane that is still connected: the lane that
+    # set a fixture up may have been closed and re-dialled since
+    if alive:
+        keeper = alive[0].target
+        for lane in lanes:
+            if lane.target is not keeper and lane.target._finalizers:
+                keeper._finalizers = lane.target._finalizers + keeper._finalizers
+                lane.target._finalizers = []
+                if lane.target in _UNFINISHED:
+                    _UNFINISHED.remove(lane.target)
+        keeper.finish()
     for lane in lanes:
         lane.target.finish()
+
+    if watch is not None and alive and current is not None:
+        watch.target = alive[0].target
+        watch.suite_done(current)
 
     for lane in alive:
         try:
@@ -545,6 +694,10 @@ def run_interleaved(lanes, only=None, verbose=False):
             break
         except Exception as err:
             print("       %scould not sweep / on %s: %s%s" % (DIM, lane.label, err, RESET), flush=True)
+
+    if watch is not None and alive:
+        watch.target = alive[0].target
+        watch.summary()
 
     elapsed = (time.time() - started) * 1000.0
     print("")
@@ -642,6 +795,8 @@ def run(shell, caps, username, password, only=None, verbose=False, timeout=20.0,
     target = Target(shell, caps, username, password, timeout, peer_factory)
     target.resync()
     before_root = root_names(target)
+    watch = HeapWatch(target)
+    current = None
 
     passed = 0
     failed = []
@@ -653,6 +808,10 @@ def run(shell, caps, username, password, only=None, verbose=False, timeout=20.0,
     for index, item in enumerate(TESTS):
         if not selected(only, item.full_name):
             continue
+
+        if current is not None and item.feature != current:
+            watch.suite_done(current)
+        current = item.feature
 
         reason = caps.why_skip(item.needs, item.mounts, item.services)
         if reason:
@@ -718,10 +877,13 @@ def run(shell, caps, username, password, only=None, verbose=False, timeout=20.0,
     target.finish()
 
     if aborted is None:
+        if current is not None:
+            watch.suite_done(current)
         try:
             sweep_root(target, before_root)
         except Exception as err:
             print("       %scould not sweep /: %s%s" % (DIM, err, RESET), flush=True)
+        watch.summary()
 
     elapsed = (time.time() - started) * 1000.0
     print("")

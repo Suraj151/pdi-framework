@@ -53,6 +53,10 @@ class HostShell(Shell):
             argv += ["--port-base", str(SHADOW_PORT_BASE)]
         self._gpio_input = os.path.join(self._workdir, "gpio.in")
         argv += ["--gpio-input", self._gpio_input]
+        self._bus_input = os.path.join(self._workdir, "bus.in")
+        argv += ["--bus-input", self._bus_input]
+        self._heap_input = os.path.join(self._workdir, "heap.in")
+        argv += ["--heap-input", self._heap_input]
         if args:
             argv += list(args)
 
@@ -98,6 +102,34 @@ class HostShell(Shell):
             for label, level in levels.items():
                 out.write("%s %d\n" % (label, level))
         os.replace(temp, self._gpio_input)
+
+    def set_heap(self, free=None, block=None):
+        """
+        Squeezes the heap the process reports, the way a busy or fragmented
+        board's is: free caps the total free heap, block the largest free block,
+        both in bytes; None lifts that limit. The process re-reads the file at
+        most every 50 ms, so a caller waits a little before relying on it.
+        """
+        temp = self._heap_input + ".tmp"
+        with open(temp, "w") as out:
+            if free:
+                out.write("free %d\n" % free)
+            if block:
+                out.write("block %d\n" % block)
+        os.replace(temp, self._heap_input)
+
+    def plug_devices(self, lines):
+        """
+        Plugs devices into the simulated buses the way a cable would: lines is
+        a list such as `["i2c0 0x50 42", "usb0 2 046d c31c 03"]`. The process
+        reads the file every time it scans, so what is listed stays plugged in
+        until the next call replaces it; an empty list unplugs everything.
+        """
+        temp = self._bus_input + ".tmp"
+        with open(temp, "w") as out:
+            for line in lines:
+                out.write(line + "\n")
+        os.replace(temp, self._bus_input)
 
     def _send(self, data):
         if self._proc.poll() is not None:

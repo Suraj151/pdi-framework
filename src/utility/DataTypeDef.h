@@ -253,6 +253,9 @@ typedef pdiutil::function<void(void)> CallBackVoidArgFn;
 typedef pdiutil::function<void(void *)> CallBackVoidPointerArgFn;
 typedef pdiutil::function<void *(void *)> CallBackVoidPointerArgVoidPointerRetFn;
 typedef pdiutil::function<bool(const uint8_t *, uint32_t)> CallBackBytesArgBoolRetFn;
+typedef pdiutil::function<bool(void)> CallBackVoidArgBoolRetFn;
+typedef void *(*system_enter_fn_t)(void);   /* run before a service's own task; answers what the leave hook gets back */
+typedef void (*system_leave_fn_t)(void *);  /* run after it, given what the enter hook answered */
 
 /**
  * Logging types
@@ -608,6 +611,7 @@ struct task_t {
     uint32_t m_weight;                          ///< What that charge is divided by, held rather than recomputed every run
     uint8_t m_pending_sig;                      ///< Pending signal number to consume on next tick (SIG_NONE = idle)
     bool m_stoppable;                           ///< false = ignore SIG_STOP / SIG_CONT (e.g. exec'd programs)
+    bool m_system;                              ///< true = a service's own work, run with no session current
     CallBackVoidPointerArgFn m_finalizer;       ///< Teardown hook run once when the task is reaped (natural exit or kill), given the task itself
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
     iExecutive* m_task_exec = nullptr;          ///< Task executive
@@ -637,6 +641,7 @@ struct task_t {
         m_weight = 1;
         m_pending_sig = SIG_NONE;
         m_stoppable = true;
+        m_system = false;
         m_finalizer = nullptr;
         // #ifdef ENABLE_CONTEXTUAL_EXECUTION
         // if(m_task_exec != nullptr){
@@ -668,6 +673,7 @@ struct task_t {
         m_weight = t.m_weight;
         m_pending_sig = t.m_pending_sig;
         m_stoppable = t.m_stoppable;
+        m_system = t.m_system;
         m_finalizer = t.m_finalizer;
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
         m_task_exec = t.m_task_exec;
@@ -699,6 +705,7 @@ struct task_t {
             m_weight = t.m_weight;
             m_pending_sig = t.m_pending_sig;
             m_stoppable = t.m_stoppable;
+            m_system = t.m_system;
             m_finalizer = t.m_finalizer;
             #ifdef ENABLE_CONTEXTUAL_EXECUTION
             m_task_exec = t.m_task_exec;
@@ -878,6 +885,7 @@ enum vfs_type_t : uint8_t {
     VFS_TYPE_PROCFS,
     VFS_TYPE_SYSFS,
     VFS_TYPE_DEVFS,
+    VFS_TYPE_VFAT,
     VFS_TYPE_MAX
 };
 
@@ -907,7 +915,7 @@ struct datetime_t {
 };
 
 struct vfs_mount_t {
-    vfs_mount_t() : m_backend(nullptr), m_type(VFS_TYPE_UNKNOWN), m_prefix_len(0) {
+    vfs_mount_t() : m_backend(nullptr), m_type(VFS_TYPE_UNKNOWN), m_prefix_len(0), m_removable(false) {
         m_prefix[0] = '\0';
         m_name[0] = '\0';
     }
@@ -917,6 +925,7 @@ struct vfs_mount_t {
     iFileSystemInterface* m_backend;
     uint8_t m_prefix_len;
     vfs_type_t m_type;
+    bool m_removable;
 };
 
 /**
@@ -1129,7 +1138,7 @@ struct session_t {
                   , m_uid(0), m_gid(0)
 #endif
 #ifdef ENABLE_CMD_SERVICE
-                  , m_fdtable(nullptr), m_lastExit(PDI_OK)
+                  , m_fdtable(nullptr), m_lastExit(PDI_OK), m_interrupted(false), m_inputPolledAt(0)
 #ifdef ENABLE_SCRIPT_RUNNER
                   , m_script_exitonprompt(true)
 #endif
@@ -1169,6 +1178,9 @@ struct session_t {
         m_fdtable = nullptr;
         m_lastExit = PDI_OK;
         m_env.clear();
+        m_typeahead.clear();
+        m_interrupted = false;
+        m_inputPolledAt = 0;
 #ifdef ENABLE_SCRIPT_RUNNER
         m_scripts.clear();
         m_script_exitonprompt = true;
@@ -1213,6 +1225,15 @@ struct session_t {
     // Variables set in this session, which outrank the base environment file
     // and are gone when the session ends.
     pdiutil::vector<config_kv_t> m_env;
+
+    /** keys read off the terminal while a command looked for ctrl+c, for the shell to read first */
+    pdiutil::string m_typeahead;
+
+    /** ctrl+c reached the terminal since the line being run began */
+    bool m_interrupted;
+
+    /** when a command last looked at the terminal for ctrl+c */
+    uint32_t m_inputPolledAt;
 
 #ifdef ENABLE_SCRIPT_RUNNER
     // Scripts this session has open, innermost last, so one that stops for

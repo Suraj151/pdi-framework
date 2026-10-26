@@ -282,7 +282,7 @@ pdi_err_t TmpFs::moveFile(const char* oldPath, const char* newPath) {
     return rename(oldPath, newPath);
 }
 
-pdi_err_t TmpFs::copyFile(const char* sourcePath, const char* destPath) {
+pdi_err_t TmpFs::copyFile(const char* sourcePath, const char* destPath, CallBackVoidArgBoolRetFn keepgoing) {
     pdiutil::string src = normalize(sourcePath);
     pdiutil::string dst = normalize(destPath);
     int sidx = findNode(src);

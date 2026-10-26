@@ -87,6 +87,11 @@ struct DatabaseCommand : public CommandBase {
 		}
 
 		if( matches(verbOpt, RODT_ATTR("restore"), 7) ){
+			if( !SessionManager::isRoot() ){
+				m_terminal->putln();
+				m_terminal->writeln_ro(RODT_ATTR(CMD_MSG_ROOT_REQUIRED));
+				return CMD_ERROR_FAILED;
+			}
 			bool ok = __database_service.restore_defaults();
 			if( ok ){
 				__database_service.write_config_files();

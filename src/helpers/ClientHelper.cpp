@@ -85,6 +85,7 @@ bool sendPacket(iClientInterface *client, uint8_t *buffer, uint16_t len, uint16_
       if (_sent < 0)
       {
         SysLogE("Client: send packet - write error %d\n", _sent);
+        client->close();
         status = false;
         break;
       }
@@ -108,6 +109,7 @@ bool sendPacket(iClientInterface *client, uint8_t *buffer, uint16_t len, uint16_
       if (_sent != sendlen)
       {
         SysLogE("Client: send packet - failed to send\n");
+        client->close();
         status = false;
         break;
       }

@@ -124,7 +124,7 @@ public:
 
 			// Add current pah and stat in row
 			pdiutil::string stat;
-			stat += pdiutil::to_string(__i_fs.getFreeSize());
+			stat += pdiutil::to_string(__i_fs.getFreeSize(currentpath.c_str()));
 			stat += (char*)CHARPTR_WRAP(" Bytes Free");
 			char *_storage_path_row[] = {(char*)currentpath.c_str(), (char*)stat.c_str()};
 			const char *_storage_path_row_colspan[] = {RODT_ATTR("4"), RODT_ATTR("3' class='num")};
@@ -271,6 +271,65 @@ public:
 	}
 
 	/**
+	 * whether a path names a file staged for an upload bound for the directory,
+	 * one entry directly inside that directory's staging directory.
+	 *
+	 * @param	const pdiutil::string&	_path
+	 * @param	const pdiutil::string&	_dir
+	 * @return	bool
+	 */
+	bool isStagedUpload(const pdiutil::string &_path, const pdiutil::string &_dir)
+	{
+		pdiutil::string stagingdir = __i_fs.getStagingDirectory(_dir.c_str());
+		const char *tempdir = stagingdir.c_str();
+		size_t dirlen = stagingdir.size();
+		if( 0 == dirlen || _path.size() <= dirlen || 0 != strncmp(_path.c_str(), tempdir, dirlen) ){
+			return false;
+		}
+
+		const char *name = _path.c_str() + dirlen;
+		if( 0 == strcmp(name, ".") || 0 == strcmp(name, "..") ){
+			return false;
+		}
+		for( size_t i = 0; 0 != name[i]; i++ ){
+			if( FILE_SEPARATOR[0] == name[i] ){
+				return false;
+			}
+		}
+		return __i_fs.isFileExist(_path.c_str()) && !__i_fs.isDirectory(_path.c_str());
+	}
+
+	/**
+	 * removes an upload's staged file once moved or refused, and the staging
+	 * directory once nothing else is staged in it.
+	 *
+	 * @param	const pdiutil::string&	_path
+	 * @param	const pdiutil::string&	_dir
+	 */
+	void dropStaging(const pdiutil::string &_path, const pdiutil::string &_dir)
+	{
+		pdiutil::string stagingdir = __i_fs.getStagingDirectory(_dir.c_str());
+		__i_fs.beginPrivileged();
+		if( __i_fs.isFileExist(_path.c_str()) ){
+			__i_fs.deleteFile(_path.c_str());
+		}
+		if( stagingdir != __i_fs.getTempDirectory() ){
+			pdiutil::vector<file_info_t> left;
+			__i_fs.getDirFileList(stagingdir.c_str(), left);
+			bool empty = true;
+			for( uint32_t i = 0; i < left.size(); i++ ){
+				const char *name = left[i].m_name;
+				empty = empty && nullptr != name && (0 == strcmp(name, ".") || 0 == strcmp(name, ".."));
+				pdiutil::safe_delete_array(left[i].m_name);
+			}
+			if( empty ){
+				__i_fs.deleteDirectory(stagingdir.c_str());
+			}
+		}
+		__i_fs.endPrivileged();
+	}
+
+	/**
 	 * assign a freshly uploaded file to the logged in user.
 	 *
 	 * the staged file is created while the request body is parsed, before the
@@ -334,13 +393,21 @@ public:
 					newfilepath += __i_fs.basename(nf.c_str());
 				}
 
-				// Move file to expected path
-				pdi_err_t _result = __i_fs.rename(nf.c_str(), newfilepath.c_str());
+				pdi_err_t _result = PDI_ERR_PERM;
+				bool staged = this->isStagedUpload(nf, currentdir);
+				if( staged && __i_fs.checkAccess(currentdir.c_str(), VfsDispatcher::VFS_ACCESS_W) ){
+					__i_fs.beginPrivileged();
+					_result = __i_fs.rename(nf.c_str(), newfilepath.c_str());
+					__i_fs.endPrivileged();
+				}
 
 				if( PDI_OK == _result ){
 					this->claimUploadedFile(newfilepath.c_str());
 				}else{
 					this->appendErrorToLocation(loc, _result);
+				}
+				if( staged ){
+					this->dropStaging(nf, currentdir);
 				}
 			}
 		}

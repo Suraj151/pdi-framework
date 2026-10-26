@@ -297,7 +297,13 @@ void TelnetServiceProvider::serviceClient(uint8_t slot) {
         }
     }
 
-    if( client->available() ){
+#ifdef ENABLE_CMD_SERVICE
+    bool pending = __cmd_service.hasPendingInput(client);
+#else
+    bool pending = (client->available() > 0);
+#endif
+
+    if( pending ){
 
         m_last_activity[slot] = __i_dvc_ctrl.millis_now();
 

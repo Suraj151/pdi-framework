@@ -66,9 +66,17 @@ struct FileReadCommand : public CommandBase {
 			pdiutil::string filename = resolveArgPath(cmdoptn);
 			if( !filename.empty() || isInputRedirected() ){
 
+				session_t *session = SessionManager::current();
+				bool onterminal = (nullptr != session && m_terminal == session->m_terminal);
+				char previous = '\0';
+
 				m_terminal->putln();
 				int iStatus = readCommandInput(filename, m_terminal, [&](char* data, uint32_t size)->bool{
-					m_terminal->write(data, size);
+					if( onterminal ){
+						writeShown(data, size, previous);
+					}else{
+						m_terminal->writeData((const uint8_t *)data, size);
+					}
 					// return true to continue reading
 					return true;
 				}, 10);
@@ -76,17 +84,38 @@ struct FileReadCommand : public CommandBase {
 				if (iStatus < 0) {
 					result = CMD_ERROR_FAILED;
 					m_terminal->putln();
-					m_terminal->write_ro(RODT_ATTR("Failed : "));
-					m_terminal->write(filename.c_str());
-					m_terminal->write_ro(RODT_ATTR(" : "));
-					m_terminal->write((int32_t)iStatus);
+					writeFailure(RODT_ATTR("Failed : "), filename.c_str(), (int32_t)iStatus);
 				}
+				result = stoppedResult(result);
 			}else{
 				result = CMD_ERROR_INVAL;
 			}
 		}
 
 		return result;
+	}
+
+private:
+
+	/**
+	 * Writes file bytes to the terminal, a bare newline sent as a line end; previous
+	 * carries the last byte across reads.
+	 */
+	void writeShown(const char *data, uint32_t size, char &previous){
+		uint32_t from = 0;
+		for( uint32_t i = 0; i < size; i++ ){
+			if( '\n' == data[i] && '\r' != previous ){
+				if( i > from ){
+					m_terminal->write(data + from, i - from);
+				}
+				m_terminal->putln();
+				from = i + 1;
+			}
+			previous = data[i];
+		}
+		if( size > from ){
+			m_terminal->write(data + from, size - from);
+		}
 	}
 };
 

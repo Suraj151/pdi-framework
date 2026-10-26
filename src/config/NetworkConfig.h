@@ -42,4 +42,9 @@ created Date    : 1st June 2019
 #define NETIF_NAME_MAX 8
 #endif
 
+/* most bytes sendPacket hands a connection in one write */
+#ifndef TCP_WRITE_CHUNK_MAX
+#define TCP_WRITE_CHUNK_MAX 250
+#endif
+
 #endif

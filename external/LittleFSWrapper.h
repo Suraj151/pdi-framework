@@ -15,6 +15,7 @@ created Date    : 6th Apr 2025
 // pulled in directly because Config.h only reaches the vfs settings when the
 // storage service is enabled, and this header is parsed either way
 #include "config/VfsConfig.h"
+#include "config/StorageConfig.h"
 
 // Include the LittleFS library.
 #define LFS_NAME_MAX FILE_NAME_MAX_SIZE
@@ -67,9 +68,17 @@ public:
     /**
      * @brief Initialize and mount the file system.
      * @param lfscnfg Pointer to the LittleFS configuration.
+     * @param formatOnFailure Formats the storage when it holds no filesystem to mount.
      * @return 0 on success, or a negative error code on failure.
      */
-    int initLFSConfig(lfs_config* lfscnfg = nullptr);
+    int initLFSConfig(lfs_config* lfscnfg = nullptr, bool formatOnFailure = true);
+
+    /**
+     * @brief Makes a fresh, empty file system across the whole storage.
+     * @param lfscnfg Pointer to the LittleFS configuration.
+     * @return 0 on success, or a negative error code on failure.
+     */
+    int formatLFS(lfs_config* lfscnfg);
 
     /**
      * @brief Creates a file and writes content to it.
@@ -191,9 +200,11 @@ public:
      * @brief Copies a file to a new path.
      * @param sourcePath The path of the source file.
      * @param destPath The path of the destination file.
+     * @param keepgoing Optional, asked between chunks; false stops the copy and
+     *        removes what it wrote, answered as PDI_ERR_ABORTED.
      * @return 0 on success, or a negative error code on failure.
      */
-    pdi_err_t copyFile(const char* sourcePath, const char* destPath) override;
+    pdi_err_t copyFile(const char* sourcePath, const char* destPath, CallBackVoidArgBoolRetFn keepgoing = nullptr) override;
 
     /**
      * @brief Deletes a file.
@@ -348,6 +359,11 @@ public:
      */
     pdi_err_t closeFile(pdi_fhandle_t handle) override;
 
+    /**
+     * @brief How many files the filesystem holds open.
+     */
+    uint16_t openCount() const override;
+
 protected:
     // Stamp ctime + mtime + perms + uid/gid on a freshly created entry. Uses
     // nowEpoch() + currentOwner() (implemented by the policy layer).
@@ -356,12 +372,39 @@ protected:
     // Refresh mtime on an existing entry.
     void stampModify(const char *path);
 
+    /**
+     * @brief Milliseconds from a free running clock, for timing a long run of
+     *        flash work; a backend with no clock gives 0 and is never paused.
+     */
+    virtual uint32_t busyMillis() { return 0; }
+
+    /**
+     * @brief Gives the system its turn part way through a long run of flash
+     *        work, such as a block being moved for wear levelling.
+     */
+    virtual void busyYield() {}
+
+    /**
+     * @brief Called from every flash access: after LFS_BUSY_YIELD_MS of back to
+     * back accesses, gives the system its turn.
+     */
+    void keepAlive();
+
+    /**
+     * Unmounts what is mounted and takes the configuration given, or the minimal
+     * default one, sized to the whole storage.
+     */
+    void fillLFSConfig(lfs_config* lfscnfg);
+
 private:
     lfs_t m_lfs;
     lfs_config m_lfscfg;
 
     // set once a mount succeeds.
     bool m_mounted;
+
+    uint32_t m_busy_from;
+    uint32_t m_busy_last;
 
     // One open handle. Allocated on open and released on close, so an idle
     // table costs one pointer per slot. The path is kept because the close

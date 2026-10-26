@@ -28,7 +28,7 @@ SSH_FXP_REALPATH = 16
 SSH_FXP_STAT = 17
 
 
-def sftp_open(t, attempts=3):
+def sftp_open(t, attempts=3, username=None, password=None):
     """
     An sftp session on the target, on its own ssh connection.
 
@@ -51,8 +51,8 @@ def sftp_open(t, attempts=3):
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         try:
-            client.connect(t.address(), port=ssh_port(t), username=t.username,
-                           password=t.password, timeout=45, banner_timeout=45,
+            client.connect(t.address(), port=ssh_port(t), username=username or t.username,
+                           password=password or t.password, timeout=45, banner_timeout=45,
                            auth_timeout=45, allow_agent=False, look_for_keys=False)
         except Exception as err:
             last = err
@@ -68,6 +68,21 @@ def sftp_open(t, attempts=3):
             raise Skip("the target has no sftp subsystem: %s" % err)
 
     raise Skip("the target has no reachable ssh server: %s" % last)
+
+
+def need_room(t, size):
+    """
+    Skips when the root filesystem cannot hold a file of size bytes, counted in
+    whole 4 KB blocks with one more for its metadata.
+    """
+    for line in t.run("df").splitlines():
+        parts = line.split()
+        if len(parts) >= 5 and parts[0] == "/" and parts[4].isdigit():
+            room = int(parts[4])
+            wanted = ((size + 4095) // 4096 + 1) * 4096
+            if room < wanted:
+                raise Skip("the root filesystem has %d bytes free, this needs %d" % (room, wanted))
+            return
 
 
 def patterned(size):
@@ -225,6 +240,109 @@ def sftp_reassembly(t):
         sftp.close()
         client.close()
         t.run("rm /%s" % name)
+
+
+@test("a read deep in a file returns the bytes at that offset", needs=("rm",))
+def sftp_read_at_offset(t):
+    name = "sftp_offset.bin"
+    body = patterned(20000)
+
+    t.run("rm /%s" % name)
+    need_room(t, len(body))
+    client, sftp = sftp_open(t)
+    try:
+        with sftp.open("/%s" % name, "wb") as fh:
+            fh.write(body)
+
+        with sftp.open("/%s" % name, "rb") as fh:
+            for offset in (0, 5000, 12345, 19990):
+                fh.seek(offset)
+                got = fh.read(64)
+                if got != body[offset:offset + 64]:
+                    raise AssertionError("a read at %d returned %r, expected %r"
+                                         % (offset, got[:16], body[offset:offset + 16]))
+    finally:
+        sftp.close()
+        client.close()
+        t.run("rm /%s" % name)
+
+
+@test("one read answers with more than a kilobyte", needs=("rm",))
+def sftp_read_answers_in_large_pieces(t):
+    name = "sftp_piece.bin"
+    body = patterned(SPLIT_SIZE)
+
+    t.run("rm /%s" % name)
+    need_room(t, len(body))
+    client, sftp = sftp_open(t)
+    try:
+        with sftp.open("/%s" % name, "wb") as fh:
+            fh.write(body)
+
+        with sftp.open("/%s" % name, "rb") as fh:
+            single = getattr(fh, "_read", None)
+            if single is None:
+                raise Skip("this paramiko has no single-request read")
+            got = single(SPLIT_SIZE)
+
+        if len(got) <= 1024:
+            raise AssertionError("one read of %d bytes answered with %d" % (SPLIT_SIZE, len(got)))
+        if got != body[:len(got)]:
+            raise AssertionError("a large read answered with the wrong bytes")
+    finally:
+        sftp.close()
+        client.close()
+        t.run("rm /%s" % name)
+
+
+@test("an upload longer than the channel window arrives whole", needs=("rm",), slow=True)
+def sftp_upload_beyond_the_window(t):
+    name = "sftp_window.bin"
+    body = patterned(65536)
+
+    t.run("rm /%s" % name)
+    need_room(t, len(body))
+    client, sftp = sftp_open(t)
+    try:
+        with sftp.open("/%s" % name, "wb") as fh:
+            fh.write(body)
+
+        with sftp.open("/%s" % name, "rb") as fh:
+            got = fh.read()
+        if got != body:
+            raise AssertionError("a %d byte upload read back as %d bytes" % (len(body), len(got)))
+    finally:
+        sftp.close()
+        client.close()
+        t.run("rm /%s" % name)
+
+
+@test("a transfer dropped without closing its file does not keep the file open",
+      needs=("dd", "rm", "echo"), slow=True)
+def sftp_dropped_transfer_releases_the_file(t):
+    import time
+
+    name = "sftp_drop.bin"
+    copy = "sftp_drop.cpy"
+    t.run("rm /%s" % name)
+    t.run("rm /%s" % copy)
+    try:
+        for attempt in range(6):
+            client, sftp = sftp_open(t)
+            fh = sftp.open("/%s" % name, "wb")
+            fh.write(b"held open\n")
+            client.get_transport().sock.close()
+            client.close()
+        time.sleep(2)
+
+        t.run("echo after the drops > /sftp_drop.src")
+        out = t.run("dd if=/sftp_drop.src of=/%s" % copy)
+        expect_in("bytes copied", out, "dd once dropped sftp sessions held files open")
+        expect_in("after the drops", t.run("cat /%s" % copy), "the copy dd made")
+    finally:
+        t.run("rm /%s" % name)
+        t.run("rm /%s" % copy)
+        t.run("rm /sftp_drop.src")
 
 
 @test("a file removed over sftp is gone from the target",
@@ -420,3 +538,46 @@ def sftp_survives_garbage(t):
             client.close()
         except Exception:
             pass
+
+
+@test("an sftp user writes only where their account may, whoever typed last",
+      needs=("useradd", "userdel", "cat", "rm", "echo"))
+def sftp_runs_as_its_own_user(t):
+    """
+    An sftp request is served between lines typed on other sessions. It must
+    act as the account that logged in over ssh, not as whoever used a shell
+    last, which on a board is usually root on the console.
+    """
+    account = "sftpusr"
+    t.run("userdel u=%s" % account)
+    out = t.run("useradd u=%s p=%s" % (account, "sftpusrpw1"))
+    if "added" not in out:
+        raise Skip("this target would not make a scratch account: %s" % out)
+    t.run("rm /etc/sftp_intruder")
+
+    client, sftp = sftp_open(t, username=account, password="sftpusrpw1")
+    try:
+        t.run("echo root typed > /tmp/sftp_root_typed")
+        refused = False
+        try:
+            with sftp.open("/etc/sftp_intruder", "wb") as remote:
+                remote.write(b"written by a user\n")
+        except Exception:
+            refused = True
+
+        t.run("echo root typed > /tmp/sftp_root_typed")
+        with sftp.open("/home/%s/mine.txt" % account, "wb") as remote:
+            remote.write(b"in my own home\n")
+
+        expect_not_in("written by a user", t.run("cat /etc/sftp_intruder"),
+                      "/etc after a user wrote to it over sftp")
+        expect_in("in my own home", t.run("cat /home/%s/mine.txt" % account),
+                  "the user's home after an sftp write")
+        if not refused:
+            raise AssertionError("the sftp server accepted a write into /etc from %s" % account)
+    finally:
+        sftp.close()
+        client.close()
+        t.run("rm /etc/sftp_intruder")
+        t.run("rm /tmp/sftp_root_typed")
+        t.run("userdel u=%s" % account)

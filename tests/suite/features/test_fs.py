@@ -289,12 +289,19 @@ def long_line_round_trip(t):
 @test("a value written through sysfs keeps its value", needs=("echo", "cat"), mounts=("/sys",))
 def sysfs_value_write(t):
     # a redirect terminates its line, and a file that is really a value has to
-    # read that as the value rather than as the terminator
-    t.run("echo 1 > /sys/class/gpio/2/mode")
-    expect_in("1", t.run("cat /sys/class/gpio/2/mode"), "gpio mode after a redirect")
+    # read that as the value rather than as the terminator; a pin a declared
+    # device holds is not listed, so the first one listed is free to use
+    import re
+    pins = re.findall(r"^d\S+.*\s(\d+)\s*$", t.run("ls /sys/class/gpio"), re.M)
+    if not pins:
+        raise Skip("this target lists no gpio pin under /sys/class/gpio")
+    mode = "/sys/class/gpio/%s/mode" % pins[0]
 
-    t.run("echo 0 > /sys/class/gpio/2/mode")
-    expect_in("0", t.run("cat /sys/class/gpio/2/mode"), "gpio mode set back")
+    t.run("echo 1 > %s" % mode)
+    expect_in("1", t.run("cat %s" % mode), "gpio mode after a redirect")
+
+    t.run("echo 0 > %s" % mode)
+    expect_in("0", t.run("cat %s" % mode), "gpio mode set back")
 
 
 @test("fedit writes a new file the shell can read back",

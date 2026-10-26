@@ -61,6 +61,7 @@ public:
 
   virtual void setStoragePath(const pdiutil::string &storagepath) override;                  // set storage path for static files
   virtual bool handleStaticFileRequest() override;
+  virtual void setUploadGate(CallBackVoidArgBoolRetFn gate) override;
 
   virtual void send(int code, mimetype_t content_type = MIME_TYPE_MAX, const char *content = nullptr, bool send_in_chunks = false) override;
   virtual void sendChunk(const char *chunk = nullptr) override;
@@ -99,6 +100,7 @@ protected:
   pdiutil::string m_responseHeaders;
 
   pdiutil::string m_storagePath; // Storage path for static files
+  CallBackVoidArgBoolRetFn m_uploadGate;
 
   struct HttpRequestData{
 
@@ -137,6 +139,11 @@ protected:
    * @brief whether a connection is waiting on any port this server listens on.
    */
   bool hasWaitingClient();
+
+  /**
+   * @brief deletes every file the request staged that its route left in place.
+   */
+  void dropUnclaimedUploads();
 };
 
 #endif

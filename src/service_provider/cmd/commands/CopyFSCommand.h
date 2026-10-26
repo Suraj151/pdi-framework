@@ -79,10 +79,14 @@ struct CopyFSCommand : public CommandBase {
 						m_terminal->putln();
 						m_terminal->writeln_ro(RODT_ATTR("src not exist OR dst exist"));
 					}else{
-						iStatus = __i_fs.copyFile(srcpath.c_str(), dstpath.c_str());
+						iStatus = __i_fs.copyFile(srcpath.c_str(), dstpath.c_str(), [&]()->bool{
+							return !commandStopped(nullptr);
+						});
 					}
 
-					if (iStatus < 0) {
+					if (PDI_ERR_ABORTED == iStatus) {
+						result = CMD_ERROR_CANCELED;
+					}else if (iStatus < 0) {
 						result = CMD_ERROR_FAILED;
 						m_terminal->putln();
 						m_terminal->write_ro(RODT_ATTR("Failed to copy file: "));

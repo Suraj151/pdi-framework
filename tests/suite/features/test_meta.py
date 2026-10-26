@@ -138,3 +138,67 @@ def umask_applies(t):
         expect_not_in("-rw-r--r--", out, "no group or other bits")
     finally:
         t.run("umask %s" % (before.split()[-1] if before.split() else "022"))
+
+
+def uname_rc(t, command):
+    for line in t.run("%s; echo rc=$?" % command).splitlines():
+        if line.strip().startswith("rc="):
+            return line.strip()[3:]
+    return None
+
+
+@test("uname with no option prints the system name alone", needs=("uname",))
+def uname_system_name(t):
+    words = t.run("uname").split()
+    if 1 != len(words):
+        raise AssertionError("uname printed %r; the system name is one word" % words)
+
+
+@test("uname -n prints the host name the environment holds", needs=("uname", "echo"))
+def uname_host_matches_env(t):
+    host = t.run("echo $HOSTNAME").strip()
+    expect_in(host, t.run("uname -n"), "uname -n against $HOSTNAME")
+
+
+@test("uname -a prints every field in linux order", needs=("uname", "echo", "cat"))
+def uname_all_in_order(t):
+    words = t.run("uname -a").split()
+    if 5 != len(words):
+        raise AssertionError("uname -a printed %d fields, expected 5: %r" % (len(words), words))
+    if words[0] != t.run("uname -s").strip():
+        raise AssertionError("uname -a does not start with the system name: %r" % words)
+    if words[1] != t.run("echo $HOSTNAME").strip():
+        raise AssertionError("the second field of uname -a is not the host name: %r" % words)
+    if words[2] not in t.run("cat /proc/version"):
+        raise AssertionError("the release uname -a prints is not the one /proc/version names: %r" % words)
+
+
+@test("uname prints its fields in one order whatever order the options are given", needs=("uname",))
+def uname_order_is_fixed(t):
+    if t.run("uname -rs").split() != t.run("uname -s -r").split():
+        raise AssertionError("uname -rs and uname -s -r printed different orders")
+
+
+@test("uname refuses an option it does not know", needs=("uname", "echo"))
+def uname_unknown_option(t):
+    if "0" == uname_rc(t, "uname -x"):
+        raise AssertionError("uname -x reported success")
+
+
+@test("hostname prints the host name the environment holds", needs=("hostname", "echo"))
+def hostname_matches_env(t):
+    host = t.run("echo $HOSTNAME").strip()
+    if not host or t.run("hostname").strip() != host:
+        raise AssertionError("hostname did not print $HOSTNAME (%r)" % host)
+
+
+@test("hostname and uname -n agree", needs=("hostname", "uname"))
+def hostname_matches_uname(t):
+    if t.run("hostname").strip() != t.run("uname -n").strip():
+        raise AssertionError("hostname and uname -n named different hosts")
+
+
+@test("hostname refuses an argument it cannot act on", needs=("hostname", "echo"))
+def hostname_refuses_argument(t):
+    if "0" == uname_rc(t, "hostname newname"):
+        raise AssertionError("hostname with a name reported success but the name cannot be set")

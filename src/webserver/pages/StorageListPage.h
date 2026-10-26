@@ -140,6 +140,7 @@ input[type=file]::file-selector-button:hover{border-color:var(--bt);color:var(--
 
 static const char WEB_SERVER_STORAGE_LIST_PAGE_BOTTOM_FORMS2[] PROG_RODT_ATTR = "\
 <input id='nfl' name='loc' type='hidden'>\
+<input id='nfd' name='dir' type='hidden'>\
 <div class='frow'>\
 <input name='nf' type='file' required>\
 <button class='btn' type='submit'>\

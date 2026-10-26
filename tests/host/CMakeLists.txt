@@ -17,6 +17,8 @@ option(PDI_BUILD_FUZZ "Also build the libFuzzer harnesses for the pre-auth parse
 # the framework picks the mock device from this gate, leaving the generated
 # DeviceSetup.h that selects the user's real board untouched
 add_compile_definitions(MOCK_DEVICE_TEST)
+# a small ssh channel window, so the transfer tests cross several window top ups
+add_compile_definitions(SSH_CHANNEL_WINDOW=16384)
 
 include_directories(
   ${PDI_ROOT}
@@ -41,6 +43,7 @@ file(GLOB PDI_UTILITY_SOURCES
 # portable implementations the device adapters build on, plus the vendored
 # littlefs the storage stack runs for real on the emulated flash
 file(GLOB PDI_IMPL_SOURCES
+  ${PDI_ROOT}/src/interface/pdi/impl/drivers/*.cpp
   ${PDI_ROOT}/src/interface/pdi/impl/log/*.cpp
   ${PDI_ROOT}/src/interface/pdi/impl/middlewares/*.cpp
   ${PDI_ROOT}/src/interface/pdi/impl/modules/database/*.cpp
@@ -68,6 +71,7 @@ file(GLOB_RECURSE PDI_SERVICE_SOURCES
 set(PDI_EXTERNAL_SOURCES
   ${PDI_ROOT}/external/LittleFSWrapper.cpp
   ${PDI_ROOT}/src/interface/pdi/impl/modules/storage/FileSystemInterfaceImpl.c
+  ${PDI_ROOT}/src/interface/pdi/impl/modules/storage/FatFsInterfaceImpl.c
 )
 
 file(GLOB_RECURSE PDI_CRYPTO_SOURCES

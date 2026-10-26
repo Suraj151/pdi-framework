@@ -14,6 +14,7 @@ created Date    : 1st June 2019
 #if defined(ENABLE_MQTT_SERVICE)
 
 #include "Mqtt_msg.h"
+#include <utility/DataTypeConversions.h>
 
 #define MQTT_MAX_FIXED_HEADER_SIZE 3
 
@@ -291,7 +292,7 @@ uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length){
     	  return 0;
       }
 
-      return (buffer[i] << 8) | buffer[i + 1];
+      return BytesToUint16BE(&buffer[i]);
     }
     case MQTT_MSG_TYPE_PUBACK:
     case MQTT_MSG_TYPE_PUBREC:
@@ -305,7 +306,7 @@ uint16_t mqtt_get_id(uint8_t* buffer, uint16_t length){
       // This requires the remaining length to be encoded in 1 byte,
       // which it should be.
       if( length >= 4 && 0 == (buffer[1] & 0x80) ){
-        return (buffer[2] << 8) | buffer[3];
+        return BytesToUint16BE(&buffer[2]);
       }else{
         return 0;
       }

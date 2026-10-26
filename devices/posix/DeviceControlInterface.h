@@ -20,6 +20,27 @@ created Date    : 1st Jan 2024
 const uint8_t EXCEPTIONAL_GPIO_PINS[] = {3};
 
 /**
+ * Gpio's the I2S bus runs on when its line names none, in the order SCK, WS, SD; held only while a line uses the bus
+ */
+#if defined(ENABLE_DRIVER_CORE) && defined(ENABLE_I2S_BUS)
+const uint8_t I2S_GPIO_PINS[] = {6, 7, 8};
+#endif
+
+/**
+ * Gpio's the I2C bus runs on when no bus line names its own, in the order SDA, SCL; held only while a line uses the bus
+ */
+#if defined(ENABLE_DRIVER_CORE) && defined(ENABLE_I2C_BUS)
+const uint8_t I2C_GPIO_PINS[] = {4, 5};
+#endif
+
+/**
+ * Gpio's the SPI bus runs on when no bus line names its own, in the order SCK, MISO, MOSI; held only while a line uses the bus
+ */
+#if defined(ENABLE_DRIVER_CORE) && defined(ENABLE_SPI_BUS)
+const uint8_t SPI_GPIO_PINS[] = {9, 10, 11};
+#endif
+
+/**
  * DeviceControlInterface class
  */
 #ifndef MOCK_DEVICE_TEST
@@ -118,6 +139,11 @@ public:
    */
   void capFreeHeap(uint32_t bytes);
 
+  /**
+   * @brief Report at most bytes as the largest free block, as a fragmented heap does; 0 reports the free heap.
+   */
+  void capMaxFreeBlock(uint32_t bytes);
+
 #ifdef MOCK_DEVICE_TEST
   /**
    * @brief Number of resetDevice() calls since the last counter clear.
@@ -150,8 +176,22 @@ public:
    */
   static void setGpioInputFile(const char *path);
 
+  /**
+   * @brief Takes heap limits from a file of `free N` / `block N` lines, re-read at most every 50 ms.
+   */
+  static void setHeapInputFile(const char *path);
+
 private:
   static const char *s_gpio_input_file;
+  static const char *s_heap_input_file;
+  static uint32_t s_heap_file_free;
+  static uint32_t s_heap_file_block;
+  static uint64_t s_heap_file_read_at;
+
+  /**
+   * @brief Takes the heap limits the input file holds, once its re-read interval has passed.
+   */
+  static void readHeapInputFile();
 
   /**
    * @brief The level the input file gives a pin, or false when it names none.
@@ -163,6 +203,7 @@ private:
   bool m_virtual_clock;
   uint32_t m_random_state;
   uint32_t m_free_heap_cap;
+  uint32_t m_max_block_cap;
 #ifdef MOCK_DEVICE_TEST
   uint32_t m_reset_count;
   uint32_t m_restart_count;

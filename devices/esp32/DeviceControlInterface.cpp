@@ -29,6 +29,10 @@ created Date    : 1st Jan 2024
 #include "ProgramLoaderInterface.h"
 #endif
 
+#ifdef ENABLE_DRIVER_CORE
+#include <interface/pdi/impl/drivers/BuiltInDrivers.h>
+#endif
+
 /**
  * DeviceControlInterface constructor.
  */
@@ -447,6 +451,9 @@ bool DeviceControlInterface::isExceptionalGpio(gpio_id_t pin)
 
     if( EXCEPTIONAL_GPIO_PINS[j] == hw )return true;
   }
+#ifdef ENABLE_DRIVER_CORE
+  if( isDriverGpio(hw) )return true;
+#endif
   return false;
 }
 
@@ -479,6 +486,10 @@ void DeviceControlInterface::initDeviceSpecificFeatures()
 
     #ifdef ENABLE_PROGRAM_EXEC
     registerProgramLoader( &__i_program_loader );
+    #endif
+
+    #ifdef ENABLE_DRIVER_CORE
+    registerBuiltInDrivers();
     #endif
 
     #ifdef ENABLE_EXCEPTION_NOTIFIER

@@ -59,6 +59,27 @@ created Date    : 18th July 2026
 #define PDI_PIPE_CAPACITY 1024
 #endif
 
+#ifndef CMD_INTERRUPT_POLL_MS
+#define CMD_INTERRUPT_POLL_MS 50 /* how often a command in a long read looks at its terminal for ctrl+c */
+#endif
+
+#ifndef CMD_TYPEAHEAD_MAX
+#define CMD_TYPEAHEAD_MAX 128 /* keys a session keeps for the shell while a command looks for ctrl+c; more are dropped */
+#endif
+
+#define CMD_INTERRUPT_CHAR 0x03 /* the byte ctrl+c sends */
+
+#define CMD_MSG_ROOT_REQUIRED "root required" /* what a command prints when only root may run it */
+
+#define UNAME_SYSTEM_NAME "PDIStack" /* what uname prints as the system name */
+#define UNAME_UNKNOWN "unknown" /* what uname prints for a field the device cannot report */
+#define UNAME_FIELD_SYSTEM 0x01 /* uname -s */
+#define UNAME_FIELD_HOST 0x02 /* uname -n */
+#define UNAME_FIELD_RELEASE 0x04 /* uname -r */
+#define UNAME_FIELD_VERSION 0x08 /* uname -v */
+#define UNAME_FIELD_MACHINE 0x10 /* uname -m */
+#define UNAME_FIELD_ALL 0x1F /* uname -a */
+
 #ifndef SHELL_CAPTURE_MAX
 #define SHELL_CAPTURE_MAX 256 /* bytes a $(...) may answer with; a longer answer fails the line rather than being cut */
 #endif

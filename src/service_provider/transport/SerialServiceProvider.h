@@ -13,6 +13,10 @@ created Date    : 1st June 2019
 
 #include <service_provider/ServiceProvider.h>
 
+#ifdef ENABLE_DRIVER_CORE
+#include "DeviceManager.h"
+#endif
+
 /**
  * SerialServiceProvider class
  */
@@ -38,9 +42,27 @@ public:
 	void appendSerialJsonPayload(pdiutil::string &_payload, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);
 	void applySerialJsonPayload(char *_payload, uint16_t _payload_length, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);
 
+#ifdef ENABLE_DRIVER_CORE
+	/**
+	 * The devices found on the serial interfaces and the drivers bound to
+	 * them, nullptr until the service has started.
+	 */
+	DeviceManager *devices() { return m_devices; }
+
+	/**
+	 * Lets go of every device on a stop, so the next start finds them afresh
+	 * and scans again.
+	 */
+	void resetServiceState() override;
+#endif
+
 private:
 
 	bool isAllowedSerialPort(const char* serial, uint8_t _port, pdiutil::vector<pdiutil::string> *allowedlist = nullptr);
+
+#ifdef ENABLE_DRIVER_CORE
+	DeviceManager *m_devices;
+#endif
 };
 
 extern SerialServiceProvider __serial_service;

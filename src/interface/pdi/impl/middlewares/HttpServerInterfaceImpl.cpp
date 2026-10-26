@@ -175,6 +175,7 @@ void HttpServerInterfaceImpl::handleClient(){
             if( m_client && !m_client->isSecure() ){
                 sendHttpsRedirect();
                 if( !m_clientRequest.isPending ){
+                    dropUnclaimedUploads();
                     m_clientRequest.clear();
                 }
                 m_client->flush(FLUSH_ALL);
@@ -216,6 +217,7 @@ void HttpServerInterfaceImpl::handleClient(){
 
             bool _finished = !m_clientRequest.isPending;
             if(_finished){
+                dropUnclaimedUploads();
                 m_clientRequest.clear();
             }
 
@@ -433,6 +435,28 @@ void HttpServerInterfaceImpl::addHeader(const pdiutil::string &name, const pdiut
   m_responseHeaders += ": ";
   m_responseHeaders += value;
   m_responseHeaders += "\r\n";
+}
+
+/**
+ * @brief deletes every file the request staged that its route left in place.
+ */
+void HttpServerInterfaceImpl::dropUnclaimedUploads() {
+    #ifdef ENABLE_STORAGE_SERVICE
+    for (uint32_t j = 0; j < m_clientRequest.files.size(); j++) {
+        const char *path = m_clientRequest.files[j].value;
+        if (nullptr != path && 0 != path[0] && __i_instance.getFileSystemInstance().isFileExist(path)) {
+            __i_instance.getFileSystemInstance().deleteFile(path);
+        }
+    }
+    #endif
+}
+
+/**
+ * setUploadGate
+ * set the check an uploaded file must pass before any of it is stored
+ */
+void HttpServerInterfaceImpl::setUploadGate(CallBackVoidArgBoolRetFn gate) {
+    m_uploadGate = gate;
 }
 
 /**
@@ -750,12 +774,19 @@ void HttpServerInterfaceImpl::parseRequest(){
 
                         // Read the file content
                         #ifdef ENABLE_STORAGE_SERVICE
-                        const char *tempdir = __i_instance.getFileSystemInstance().getTempDirectory();
-                        if(!__i_instance.getFileSystemInstance().isDirExist(tempdir)){
-                            __i_instance.getFileSystemInstance().createDirectory(tempdir);
+                        bool stage = !m_uploadGate || m_uploadGate();
+                        pdiutil::string dirkey = CHARPTR_WRAP(HTTP_UPLOAD_DIR_ARG);
+                        pdiutil::string dirarg = arg(dirkey);
+                        pdiutil::string tempdir = __i_instance.getFileSystemInstance().getStagingDirectory(dirarg.empty() ? nullptr : dirarg.c_str());
+                        if(stage && !__i_instance.getFileSystemInstance().isDirExist(tempdir.c_str())){
+                            __i_instance.getFileSystemInstance().createDirectory(tempdir.c_str());
                         }
-                        pdiutil::string tempFilePath = pdiutil::string(tempdir) + argfilename;
-                        if(__i_instance.getFileSystemInstance().isFileExist(tempFilePath.c_str())){
+                        argfilename = __i_instance.getFileSystemInstance().basename(argfilename.c_str());
+                        if( argfilename.empty() || argfilename == "." || argfilename == ".." ){
+                            argfilename = CHARPTR_WRAP(HTTP_UPLOAD_UNNAMED_FILE);
+                        }
+                        pdiutil::string tempFilePath = tempdir + argfilename;
+                        if(stage && __i_instance.getFileSystemInstance().isFileExist(tempFilePath.c_str())){
                             // If the file already exists, delete it
                             __i_instance.getFileSystemInstance().deleteFile(tempFilePath.c_str());
                         }
@@ -855,12 +886,14 @@ void HttpServerInterfaceImpl::parseRequest(){
 
                             #ifdef ENABLE_STORAGE_SERVICE
                             if(++filewritecounter == 2){
-                                if( !held.empty() ){
+                                if( stage && !held.empty() ){
                                     __i_instance.getFileSystemInstance().writeFile(tempFilePath.c_str(), held.c_str(), held.length(), true);
                                     held.clear();
                                 }
                                 uint32_t llen = lastread.length();
-                                if( llen >= 2 ){
+                                if( !stage ){
+                                    held.clear();
+                                }else if( llen >= 2 ){
                                     held += lastread[llen - 2];
                                     held += lastread[llen - 1];
                                     __i_instance.getFileSystemInstance().writeFile(tempFilePath.c_str(), lastread.c_str(), llen - 2, true);
@@ -894,9 +927,9 @@ void HttpServerInterfaceImpl::parseRequest(){
                         // An abandoned transfer leaves a partial file, which must
                         // not be handed on as if it were the uploaded one.
                         #ifdef ENABLE_STORAGE_SERVICE
-                        if( upload_aborted ){
+                        if( stage && upload_aborted ){
                             __i_instance.getFileSystemInstance().deleteFile(tempFilePath.c_str());
-                        }else{
+                        }else if( stage ){
                             m_clientRequest.files.push_back({argname.c_str(), tempFilePath.c_str()});
                         }
                         #else

@@ -81,6 +81,65 @@ created Date    : 1st June 2019
  */
 #define ENABLE_SERIAL_SERVICE
 
+/* enable/disable the drivers the serial service binds to devices found on its interfaces */
+#ifndef PDI_NO_DRIVER_CORE
+#define ENABLE_DRIVER_CORE
+#endif
+
+#if defined(ENABLE_DRIVER_CORE) && (!defined(DEVICE_SUPPORTS_DRIVER_CORE) || !defined(ENABLE_SERIAL_SERVICE))
+#undef ENABLE_DRIVER_CORE
+#endif
+
+/* enable/disable the i2s bus and the sound drivers that sit on it */
+#ifndef PDI_NO_I2S_BUS
+#define ENABLE_I2S_BUS
+#endif
+
+#if defined(ENABLE_I2S_BUS) && (!defined(DEVICE_SUPPORTS_I2S) || !defined(ENABLE_DRIVER_CORE))
+#undef ENABLE_I2S_BUS
+#endif
+
+/* enable/disable the i2c bus and the drivers that sit on it */
+#ifndef PDI_NO_I2C_BUS
+#define ENABLE_I2C_BUS
+#endif
+
+#if defined(ENABLE_I2C_BUS) && (!defined(DEVICE_SUPPORTS_I2C) || !defined(ENABLE_DRIVER_CORE))
+#undef ENABLE_I2C_BUS
+#endif
+
+/* enable/disable the spi bus and the drivers that sit on it */
+#ifndef PDI_NO_SPI_BUS
+#define ENABLE_SPI_BUS
+#endif
+
+#if defined(ENABLE_SPI_BUS) && (!defined(DEVICE_SUPPORTS_SPI) || !defined(ENABLE_DRIVER_CORE))
+#undef ENABLE_SPI_BUS
+#endif
+
+/* enable/disable mounting the FAT filesystems found on disks */
+#ifndef PDI_NO_FAT_FS
+#define ENABLE_FAT_FS
+#endif
+
+#if defined(ENABLE_FAT_FS) && (!defined(ENABLE_STORAGE_SERVICE) || !defined(ENABLE_DRIVER_CORE))
+#undef ENABLE_FAT_FS
+#endif
+
+/* enable/disable mounting and making littlefs on disks */
+#ifndef PDI_NO_LFS_DISK
+#define ENABLE_LFS_DISK
+#endif
+
+#if defined(ENABLE_LFS_DISK) && (!defined(ENABLE_STORAGE_SERVICE) || !defined(ENABLE_DRIVER_CORE))
+#undef ENABLE_LFS_DISK
+#endif
+
+/* a filesystem on a disk can be made and mounted */
+#if defined(ENABLE_FAT_FS) || defined(ENABLE_LFS_DISK)
+#define ENABLE_DISK_FS
+#endif
+
 /**
  * enable/disable dynamic program loading — load a compiled program from the
  * filesystem into RAM and run it at runtime. Each device maps this to its own
@@ -107,7 +166,7 @@ created Date    : 1st June 2019
 #define ENABLE_CRON_SERVICE
 #endif
 
-#if defined(ENABLE_CRON_SERVICE) && (!defined(ENABLE_CMD_SERVICE) || !defined(ENABLE_STORAGE_SERVICE))
+#if defined(ENABLE_CRON_SERVICE) && (!defined(ENABLE_CMD_SERVICE) || !defined(ENABLE_STORAGE_SERVICE) || !defined(ENABLE_SCRIPT_RUNNER))
 #undef ENABLE_CRON_SERVICE
 #endif
 

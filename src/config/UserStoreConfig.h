@@ -24,6 +24,14 @@ created Date    : 18th July 2026
 #define USER_STORE_SHADOW_PATH "/etc/shadow"
 #endif
 
+#ifndef USER_STORE_HOME_BASE
+#define USER_STORE_HOME_BASE "/home"          /* each added user gets USER_STORE_HOME_BASE/<user> as home */
+#endif
+
+#ifndef USER_STORE_HOME_PERMS
+#define USER_STORE_HOME_PERMS 0755            /* mode of USER_STORE_HOME_BASE and of every home in it */
+#endif
+
 #ifndef USER_STORE_MAX_USERNAME_LEN
 #define USER_STORE_MAX_USERNAME_LEN 25
 #endif

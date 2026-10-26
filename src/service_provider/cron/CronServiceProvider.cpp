@@ -41,19 +41,7 @@ CronServiceProvider::~CronServiceProvider()
  */
 bool CronServiceProvider::parseNumber(const pdiutil::string &text, uint32_t &out)
 {
-  if( text.empty() ){
-    return false;
-  }
-
-  for( pdiutil::string::size_type i = 0; i < text.size(); i++ ){
-    if( !__is_digit(text[i]) ){
-      return false;
-    }
-  }
-
-  out = StringToUint32(text.c_str(), (uint8_t)text.size());
-
-  return true;
+  return ParseUint32(text.c_str(), (uint16_t)text.size(), out);
 }
 
 /**

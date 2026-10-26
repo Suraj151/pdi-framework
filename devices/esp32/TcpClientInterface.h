@@ -180,7 +180,8 @@ public:
     void setTimeout(uint32_t timeout) override;
 
     /**
-     * @brief Check whether available for write
+     * @brief Whether the connection takes size more bytes now, within lwIP's room
+     * and TCP_UNACKED_MAX unacknowledged bytes.
      */
     bool availableforwrite(uint32_t size) override;
 
@@ -195,7 +196,7 @@ private:
     struct pbuf* m_rxBuf;  ///< Chain of received buffers still held by lwip.
     uint32_t m_rxBufOffset; ///< Bytes already taken from the head of the chain.
     uint32_t m_timeout;    ///< Timeout value in milliseconds.
-    bool m_isLastWriteAcked;
+    uint32_t m_unacked;
 
     /**
      * @brief Drop the leading bytes of the receive buffer and open the tcp window.

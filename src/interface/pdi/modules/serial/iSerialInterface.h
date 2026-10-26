@@ -67,6 +67,44 @@ public:
   virtual ~iSerialInterface() {}
 
   /**
+   * Which kind of interface this is, so a driver handed the base can tell which
+   * protocol it may speak on it.
+   */
+  virtual serial_iface_t type() const {
+    for( uint8_t i = 0; i < SERIAL_IFACE_MAX; i++ ){
+      if( this == instances[i] ){
+        return (serial_iface_t)i;
+      }
+    }
+    return SERIAL_IFACE_MAX;
+  }
+
+  /**
+   * Picks the peer the next read, write or transfer goes to: a bus address, a
+   * chip select pin or a device endpoint.
+   */
+  virtual int16_t select(uint32_t target) { return PDI_ERR_NOT_SUPPORTED; }
+
+  /**
+   * One bounded exchange with the selected peer, sending tx then taking rx,
+   * answering how many bytes came back.
+   */
+  virtual int32_t transfer(const uint8_t *tx, uint32_t txlen, uint8_t *rx, uint32_t rxlen) {
+    return PDI_ERR_NOT_SUPPORTED;
+  }
+
+  /**
+   * Whether something answers at the target on this interface.
+   */
+  virtual bool probe(uint32_t target) { return false; }
+
+  /**
+   * The pins the port runs this bus on when /etc/devices.conf names none, in the
+   * bus's order; how many it gave.
+   */
+  virtual uint8_t defaultPins(uint8_t *out, uint8_t max) const { return 0; }
+
+  /**
    * Get instance of serial.
    * Before using this api, user must make sure of creating respective type instance
    */

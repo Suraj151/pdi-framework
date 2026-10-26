@@ -392,7 +392,7 @@ TEST(cmdmisc, help_prints_a_usage_line_for_each_command)
     std::string out = shell.run("help");
 
     ASSERT_TRUE(saw(out, "print current working directory"));
-    ASSERT_TRUE(saw(out, "list files and directories"));
+    ASSERT_TRUE(saw(out, "list a directory, or one file"));
 }
 
 TEST(cmdmisc, cls_sends_a_clear_sequence)

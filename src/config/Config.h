@@ -79,6 +79,10 @@ created Date    : 1st June 2019
 #include "SerialConfig.h"
 #endif
 
+#ifdef ENABLE_DRIVER_CORE
+#include "DriverConfig.h"
+#endif
+
 #ifdef ENABLE_EMAIL_SERVICE
 #include "EmailConfig.h"
 #endif

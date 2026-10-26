@@ -49,10 +49,10 @@ struct UserdelCommand : public CommandBase {
 
 		const char *me = __auth_service.getUsername();
 		if( nullptr == me || 0 == me[0] ) return CMD_ERROR_PERM;
-		if( SessionManager::getCurrentUid() != USER_STORE_ROOT_UID ){
+		if( !SessionManager::isRoot() ){
 			if( nullptr != m_terminal ){
 				m_terminal->putln();
-				m_terminal->writeln_ro(RODT_ATTR("root required"));
+				m_terminal->writeln_ro(RODT_ATTR(CMD_MSG_ROOT_REQUIRED));
 			}
 			return CMD_ERROR_FAILED;
 		}
@@ -100,10 +100,19 @@ struct UserdelCommand : public CommandBase {
 		}
 
 		if( __user_store_service.removeUser(uname) ){
+			pdi_err_t unhomed = __user_store_service.removeHome(target);
 			if( nullptr != m_terminal ){
 				m_terminal->putln();
 				m_terminal->write_ro(RODT_ATTR("removed "));
 				m_terminal->write(uname);
+			}
+			if( unhomed < 0 && PDI_ERR_INVALID_ARG != unhomed ){
+				if( nullptr != m_terminal ){
+					m_terminal->putln();
+					m_terminal->write_ro(RODT_ATTR("cannot remove home "));
+					m_terminal->write(target.m_home.c_str());
+				}
+				return unhomed;
 			}
 			return PDI_OK;
 		}

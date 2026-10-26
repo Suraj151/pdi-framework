@@ -129,14 +129,21 @@ struct WatchCommand : public CommandBase {
 						return;
 					}
 
-					pdi_err_t cmdres = m_cmdexecinterface->executeCommand(&m_commandtoexec);
+					pdi_err_t cmdres = PDI_OK;
+					runAsOwner(this, [&](){
+						cmdres = m_cmdexecinterface->executeCommand(&m_commandtoexec);
+					});
 
 					if( cmdres != PDI_OK ){
 						m_terminal->writeln();
 						m_terminal->write_ro(RODT_ATTR("CmdErr : "));
 						m_terminal->writeln((int32_t)cmdres);
-						__task_scheduler.remove_task(m_watchtaskid);
+						m_terminal->commit();
+						pdiutil::task_id_t running = m_watchtaskid;
 						m_watchtaskid = -1;
+						/* removing the task frees this closure, so nothing may run after it */
+						__task_scheduler.remove_task(running);
+						return;
 					}
 
 					m_terminal->commit();

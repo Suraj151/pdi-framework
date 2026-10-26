@@ -60,7 +60,7 @@ int LWSSH::parse_received_packet(LWSSHSession* session, ssh_packet &packet){
     for (int i = 0; i < 4; ++i) {
         lenbuf[i] = session->m_client->read();
     }
-    uint32_t packet_length = (lenbuf[0] << 24) | (lenbuf[1] << 16) | (lenbuf[2] << 8) | lenbuf[3];
+    uint32_t packet_length = BytesToUint32BE(&lenbuf[0]);
 
     // Read the next byte for padding length
     uint8_t padding_length = session->m_client->read();
@@ -90,6 +90,38 @@ int LWSSH::parse_received_packet(LWSSHSession* session, ssh_packet &packet){
     return bStatus ? 0 : PDI_ERR_CORRUPT;
 }
 
+namespace {
+
+/**
+ * Appends up to the bytes wanted from the socket, SSH_RX_CHUNK at a time, yielding
+ * after each piece; how many it took, or PDI_ERR_NO_MEM when out cannot grow.
+ */
+int32_t readBlock(LWSSHSession* session, pdiutil::vector<uint8_t> &out, uint32_t wanted) {
+    uint32_t taken = 0;
+    while (taken < wanted && session->m_client->available() > 0) {
+        uint32_t piece = wanted - taken;
+        uint32_t ready = (uint32_t)session->m_client->available();
+        piece = (piece > ready) ? ready : piece;
+        piece = (piece > SSH_RX_CHUNK) ? SSH_RX_CHUNK : piece;
+        size_t at = out.size();
+        out.resize(at + piece);
+        if (out.size() != at + piece) {
+            return PDI_ERR_NO_MEM;
+        }
+        int32_t got = session->m_client->read(out.data() + at, piece);
+        if (got <= 0) {
+            out.resize(at);
+            break;
+        }
+        out.resize(at + (uint32_t)got);
+        taken += (uint32_t)got;
+        __i_dvc_ctrl.yield();
+    }
+    return (int32_t)taken;
+}
+
+}
+
 /**
  * @brief Parses an encrypted SSH packet.
  * @param session Active session of ssh
@@ -108,18 +140,16 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
     }
 
     // take header part to get packet length
-    pdiutil::vector<uint8_t> header;
-    for (uint32_t i = 0; i < 4; ++i) {
-        header.push_back(session->m_client->read());
-        __i_dvc_ctrl.yield();
-    }
+    uint8_t header[4];
+    session->m_client->read(header, 4);
+    __i_dvc_ctrl.yield();
     pdiutil::vector<uint8_t> packetvec;
     for (uint32_t i = 0; i < 4; ++i) {
         packetvec.push_back(header[i]);
     }
     AES_ctx temp = session->aes_ctx_ctos;
     AES_CTR_xcrypt_buffer(&temp, packetvec.data(), packetvec.size());
-    uint32_t packet_length = (packetvec[0] << 24) | (packetvec[1] << 16) | (packetvec[2] << 8) | packetvec[3];
+    uint32_t packet_length = BytesToUint32BE(&packetvec[0]);
 
     // Once decrypt packet length reset the header part as it was received
     packetvec.clear();
@@ -141,20 +171,22 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
         uint32_t _totalBytesRead = 0;
         uint8_t padding_length = 0;
         uint32_t now = __i_dvc_ctrl.millis_now();
+        uint32_t hold = 4 + SSH_RX_CHUNK + UINT8_MAX + session->mac_len;
+        packetvec.reserve(hold);
+        if (packetvec.capacity() < hold) {
+            return PDI_ERR_NO_MEM;
+        }
 
         do{
             bool islastchunk = false;
 
             // read next chunk of data. max 512 bytes
-            for (uint32_t i = 0; i < 512 && 0 < session->m_client->available(); ++i) {
-
-                if( _totalBytesRead < (packet_length + session->mac_len) ){
-
-                    packetvec.push_back(session->m_client->read());
-                    __i_dvc_ctrl.yield();
-                    _totalBytesRead++;
-                }
+            uint32_t _left = (packet_length + session->mac_len) - _totalBytesRead;
+            int32_t _got = readBlock(session, packetvec, (_left > SSH_RX_CHUNK) ? SSH_RX_CHUNK : _left);
+            if (_got < 0) {
+                return _got;
             }
+            _totalBytesRead += (uint32_t)_got;
 
             islastchunk = _totalBytesRead == (packet_length + session->mac_len);
 
@@ -179,10 +211,7 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
 
                 // Prepare sequence number (big-endian)
                 uint8_t _packetseqbuf[4];
-                _packetseqbuf[0] = (session->packets_seq_num_ctos >> 24) & 0xFF;
-                _packetseqbuf[1] = (session->packets_seq_num_ctos >> 16) & 0xFF;
-                _packetseqbuf[2] = (session->packets_seq_num_ctos >> 8) & 0xFF;
-                _packetseqbuf[3] = (session->packets_seq_num_ctos) & 0xFF;
+                Uint32ToBytesBE(session->packets_seq_num_ctos, &_packetseqbuf[0]);
 
                 // Prepare MAC input: [packet sequence][encrypted header][encrypted rest]
                 pdiutil::vector<uint8_t> _mac_input;
@@ -229,13 +258,13 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
                 sshoffset += 4;
 
                 // Parse data len(SSH string)
-                uint32_t data_len = (packetvec[sshoffset] << 24) | (packetvec[sshoffset+1] << 16) |
-                                    (packetvec[sshoffset+2] << 8) | packetvec[sshoffset+3];
+                uint32_t data_len = BytesToUint32BE(&packetvec[sshoffset]);
                 sshoffset += 4;
 
                 // Remove headers from string from first initial paylod chunk
                 packetvec.erase(packetvec.begin(), packetvec.begin() + sshoffset);
                 _parsedInitialSSHHeader = true;
+                consume_channel_window(session, data_len);
             }
 
             if( !_parsedInitialSSHHeader ){
@@ -270,10 +299,20 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
     }
 
     // take next packet_len bytes + MAC part to form complete packet
-    for (uint32_t i = 0; session->m_client->available() && i < packet_length + session->mac_len; ++i) {
-        packetvec.push_back(session->m_client->read());
-        __i_dvc_ctrl.yield();
+    uint32_t wanted = packet_length + session->mac_len;
+    uint32_t taken = 0;
+    int32_t got = 0;
+    packetvec.reserve(packetvec.size() + wanted);
+    if (packetvec.capacity() < packetvec.size() + wanted) {
+        return PDI_ERR_NO_MEM;
     }
+    do {
+        got = readBlock(session, packetvec, wanted - taken);
+        if (got < 0) {
+            return got;
+        }
+        taken += (uint32_t)got;
+    } while (got > 0 && taken < wanted);
 
     // seperate out MAC data
     pdiutil::vector<uint8_t> recv_mac(session->mac_len);
@@ -287,10 +326,7 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
 
     // Prepare sequence number (big-endian)
     uint8_t packetseqbuf[4];
-    packetseqbuf[0] = (session->packets_seq_num_ctos >> 24) & 0xFF;
-    packetseqbuf[1] = (session->packets_seq_num_ctos >> 16) & 0xFF;
-    packetseqbuf[2] = (session->packets_seq_num_ctos >> 8) & 0xFF;
-    packetseqbuf[3] = (session->packets_seq_num_ctos) & 0xFF;
+    Uint32ToBytesBE(session->packets_seq_num_ctos, &packetseqbuf[0]);
 
     // Prepare MAC input: [packet sequence][encrypted header][encrypted rest]
     pdiutil::vector<uint8_t> mac_input;
@@ -340,17 +376,12 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
  */
 bool LWSSH::parse_name_list(const pdiutil::vector<uint8_t>& payload, uint32_t& offset, ssh_name_list& name_list) {
     if (offset + 4 > payload.size()) return false;
-    uint32_t len = (payload[offset] << 24) | (payload[offset+1] << 16) | (payload[offset+2] << 8) | payload[offset+3];
+    uint32_t len = BytesToUint32BE(&payload[offset]);
     offset += 4;
     if (len > (payload.size() - offset)) return false;
     pdiutil::string names(reinterpret_cast<const char*>(&payload[offset]), len);
     offset += len;
-    pdiutil::string::size_type start = 0, end;
-    while ((end = names.find(',', start)) != pdiutil::string::npos) {
-        name_list.push_back(names.substr(start, end - start));
-        start = end + 1;
-    }
-    if (start < names.size()) name_list.push_back(names.substr(start));
+    __split(names, ',', name_list);
     return true;
 }
 
@@ -389,7 +420,7 @@ bool LWSSH::parse_kex_init_fields(const pdiutil::vector<uint8_t>& payload, SSHKe
 
     // reserved (uint32)
     if (offset + 4 > payload.size()) return false;
-    fields.reserved = (payload[offset] << 24) | (payload[offset+1] << 16) | (payload[offset+2] << 8) | payload[offset+3];
+    fields.reserved = BytesToUint32BE(&payload[offset]);
     offset += 4;
 
     return true;
@@ -409,10 +440,7 @@ void LWSSH::append_name_list(pdiutil::vector<uint8_t>& out, const ssh_name_list&
         joined += names[i];
     }
     uint32_t len = joined.size();
-    out.push_back((len >> 24) & 0xFF);
-    out.push_back((len >> 16) & 0xFF);
-    out.push_back((len >> 8) & 0xFF);
-    out.push_back(len & 0xFF);
+    AppendUint32BE(out, len);
     out.insert(out.end(), joined.begin(), joined.end());
 }
 
@@ -470,10 +498,7 @@ void LWSSH::encrypt_ssh_payload(LWSSHSession* session, pdiutil::vector<uint8_t> 
 
     // Prepare sequence number (big-endian)
     uint8_t packetseqbuf[4];
-    packetseqbuf[0] = (session->packets_seq_num_stoc >> 24) & 0xFF;
-    packetseqbuf[1] = (session->packets_seq_num_stoc >> 16) & 0xFF;
-    packetseqbuf[2] = (session->packets_seq_num_stoc >> 8) & 0xFF;
-    packetseqbuf[3] = (session->packets_seq_num_stoc) & 0xFF;
+    Uint32ToBytesBE(session->packets_seq_num_stoc, &packetseqbuf[0]);
 
     // put packetseqbuf in payload at front. (packet sequence || ssh packet)
     payload.insert(payload.begin(), packetseqbuf, packetseqbuf + sizeof(packetseqbuf));
@@ -508,10 +533,7 @@ void LWSSH::prepare_ssh_packet(pdiutil::vector<uint8_t> &payload, int32_t block_
 
     // Write packet_length (4 bytes, big endian)
     uint8_t header[5];
-    header[0] = (packet_length >> 24) & 0xFF;
-    header[1] = (packet_length >> 16) & 0xFF;
-    header[2] = (packet_length >> 8) & 0xFF;
-    header[3] = packet_length & 0xFF;
+    Uint32ToBytesBE(packet_length, &header[0]);
     header[4] = padding_len;
 
     // put header in payload at front
@@ -557,10 +579,7 @@ bool LWSSH::send_server_ssh_packet(LWSSHSession* session, pdiutil::vector<uint8_
 
         // Write packet_length (4 bytes, big endian)
         uint8_t header[5];
-        header[0] = (packet_length >> 24) & 0xFF;
-        header[1] = (packet_length >> 16) & 0xFF;
-        header[2] = (packet_length >> 8) & 0xFF;
-        header[3] = packet_length & 0xFF;
+        Uint32ToBytesBE(packet_length, &header[0]);
         header[4] = padding_len;
 
         // Send header
@@ -599,7 +618,7 @@ bool LWSSH::parse_kex_ecdh_init(const pdiutil::vector<uint8_t> &payload, EcdhIni
 
     // Parse "string" (client public key)
     if (offset + 4 > payload.size()) return false;
-    uint32_t len = (payload[offset] << 24) | (payload[offset+1] << 16) | (payload[offset+2] << 8) | payload[offset+3];
+    uint32_t len = BytesToUint32BE(&payload[offset]);
     offset += 4;
     if (len != 32 || offset + len > payload.size()) return false;
 
@@ -616,10 +635,7 @@ bool LWSSH::parse_kex_ecdh_init(const pdiutil::vector<uint8_t> &payload, EcdhIni
  */
 void LWSSH::append_ssh_string(pdiutil::vector<uint8_t>& out, const pdiutil::vector<uint8_t>& data) {
     uint32_t len = data.size();
-    out.push_back((len >> 24) & 0xFF);
-    out.push_back((len >> 16) & 0xFF);
-    out.push_back((len >> 8) & 0xFF);
-    out.push_back(len & 0xFF);
+    AppendUint32BE(out, len);
     out.insert(out.end(), data.begin(), data.end());
 }
 
@@ -632,10 +648,7 @@ void LWSSH::append_ssh_string(pdiutil::vector<uint8_t>& out, const pdiutil::vect
  * @param length data length.
  */
 void LWSSH::append_ssh_string(pdiutil::vector<uint8_t>& out, const char* data, uint32_t length) {
-    out.push_back((length >> 24) & 0xFF);
-    out.push_back((length >> 16) & 0xFF);
-    out.push_back((length >> 8) & 0xFF);
-    out.push_back(length & 0xFF);
+    AppendUint32BE(out, length);
     out.insert(out.end(), data, data + length);
 }
 
@@ -648,7 +661,7 @@ void LWSSH::append_ssh_string(pdiutil::vector<uint8_t>& out, const char* data, u
 bool LWSSH::read_ssh_string(const pdiutil::vector<uint8_t>& payload, pdiutil::string& str, int32_t &offset){
 
     if (offset + 4 > payload.size()) return false;
-    uint32_t len = (payload[offset] << 24) | (payload[offset+1] << 16) | (payload[offset+2] << 8) | payload[offset+3];
+    uint32_t len = BytesToUint32BE(&payload[offset]);
     offset += 4;
     if (len > (payload.size() - offset)) return false;
     str.assign((const char*)&payload[offset], len);
@@ -665,7 +678,7 @@ bool LWSSH::read_ssh_string(const pdiutil::vector<uint8_t>& payload, pdiutil::st
 bool LWSSH::read_ssh_string(const pdiutil::vector<uint8_t>& payload, pdiutil::vector<uint8_t>& str, int32_t &offset){
 
     if (offset + 4 > payload.size()) return false;
-    uint32_t len = (payload[offset] << 24) | (payload[offset+1] << 16) | (payload[offset+2] << 8) | payload[offset+3];
+    uint32_t len = BytesToUint32BE(&payload[offset]);
     offset += 4;
     if (len > (payload.size() - offset)) return false;
     for (uint32_t i = 0; i < len; i++){
@@ -687,28 +700,50 @@ bool LWSSH::send_channel_open_confirmation(LWSSHSession *session, uint32_t windo
     // Build SSH2_MSG_CHANNEL_OPEN_CONFIRMATION
     pdiutil::vector<uint8_t> reply;
     reply.push_back(SSH2_MSG_CHANNEL_OPEN_CONFIRMATION);
-    reply.push_back((session->current_channel.client_channel_id >> 24) & 0xFF);
-    reply.push_back((session->current_channel.client_channel_id >> 16) & 0xFF);
-    reply.push_back((session->current_channel.client_channel_id >> 8) & 0xFF);
-    reply.push_back(session->current_channel.client_channel_id & 0xFF);
+    AppendUint32BE(reply, session->current_channel.client_channel_id);
 
-    reply.push_back((session->current_channel.server_channel_id >> 24) & 0xFF);
-    reply.push_back((session->current_channel.server_channel_id >> 16) & 0xFF);
-    reply.push_back((session->current_channel.server_channel_id >> 8) & 0xFF);
-    reply.push_back(session->current_channel.server_channel_id & 0xFF);
+    AppendUint32BE(reply, session->current_channel.server_channel_id);
 
-    reply.push_back((window_size >> 24) & 0xFF);
-    reply.push_back((window_size >> 16) & 0xFF);
-    reply.push_back((window_size >> 8) & 0xFF);
-    reply.push_back(window_size & 0xFF);
+    AppendUint32BE(reply, window_size);
 
-    reply.push_back((max_packet >> 24) & 0xFF);
-    reply.push_back((max_packet >> 16) & 0xFF);
-    reply.push_back((max_packet >> 8) & 0xFF);
-    reply.push_back(max_packet & 0xFF);
+    AppendUint32BE(reply, max_packet);
 
     // Send as SSH packet (encrypted)
     return send_server_ssh_packet(session, reply, true);
+}
+
+/**
+ * Counts the client's channel data against its window and tops the window up once
+ * half of it is used.
+ */
+bool LWSSH::consume_channel_window(LWSSHSession *session, uint32_t bytes){
+    if (nullptr == session) {
+        return false;
+    }
+    session->current_channel.window_used += bytes;
+    uint32_t used = session->current_channel.window_used;
+    if (used < (SSH_CHANNEL_WINDOW / 2)) {
+        return true;
+    }
+
+    pdiutil::vector<uint8_t> adjust;
+    adjust.push_back(SSH2_MSG_CHANNEL_WINDOW_ADJUST);
+    uint32_t channel = session->current_channel.client_channel_id;
+    AppendUint32BE(adjust, channel);
+    AppendUint32BE(adjust, used);
+    session->current_channel.window_used = 0;
+    return send_server_ssh_packet(session, adjust, true);
+}
+
+/**
+ * Closes the file the sftp handle holds open, if any.
+ */
+void LWSSHSession::closeSftpFile(){
+    pdi_fhandle_t &file = current_channel.subsystem_req.sftp.file;
+    if (file >= 0) {
+        __i_fs.closeFile(file);
+    }
+    file = -1;
 }
 
 /**
@@ -720,14 +755,16 @@ bool LWSSH::send_channel_open_confirmation(LWSSHSession *session, uint32_t windo
  */
 bool LWSSH::send_channel_data(LWSSHSession *session, const char *data, uint32_t length){
     pdiutil::vector<uint8_t> chdatapayload;
+    uint32_t whole = length + SSH_CHANNEL_DATA_OVERHEAD + session->mac_len;
+    chdatapayload.reserve(whole);
+    if (chdatapayload.capacity() < whole) {
+        return false;
+    }
     chdatapayload.push_back(SSH2_MSG_CHANNEL_DATA); // 94
 
     // Use the client's channel id as recipient
     uint32_t client_channel_id = session->current_channel.client_channel_id;
-    chdatapayload.push_back((client_channel_id >> 24) & 0xFF);
-    chdatapayload.push_back((client_channel_id >> 16) & 0xFF);
-    chdatapayload.push_back((client_channel_id >> 8) & 0xFF);
-    chdatapayload.push_back(client_channel_id & 0xFF);
+    AppendUint32BE(chdatapayload, client_channel_id);
 
     // Prepare your data as an SSH string
     append_ssh_string(chdatapayload, data, length); // This adds 4-byte length + data
@@ -752,10 +789,7 @@ void LWSSH::append_mpint(pdiutil::vector<uint8_t>& out, const uint8_t* data, int
     // If the first byte >= 0x80, prepend a zero byte
     bool prepend_zero = (mpint_len > 0 && data[first_nonzero] & 0x80);
     uint32_t total_len = mpint_len + (prepend_zero ? 1 : 0);
-    out.push_back((total_len >> 24) & 0xFF);
-    out.push_back((total_len >> 16) & 0xFF);
-    out.push_back((total_len >> 8) & 0xFF);
-    out.push_back(total_len & 0xFF);
+    AppendUint32BE(out, total_len);
     if (prepend_zero) out.push_back(0x00);
     out.insert(out.end(), data + first_nonzero, data + len);
 }
@@ -1575,28 +1609,19 @@ bool LWSSH::parse_channel_open_request(LWSSHSession *session, ssh_packet &packet
     // Parse sender channel (uint32)
     if (offset + 4 > packet.payload.size()) return false;
     session->current_channel.client_channel_id =
-        (packet.payload[offset] << 24) |
-        (packet.payload[offset+1] << 16) |
-        (packet.payload[offset+2] << 8) |
-        (packet.payload[offset+3]);
+        BytesToUint32BE(&packet.payload[offset]);
     offset += 4;
 
     // Parse initial window size (uint32)
     if (offset + 4 > packet.payload.size()) return false;
     session->current_channel.window_size =
-        (packet.payload[offset] << 24) |
-        (packet.payload[offset+1] << 16) |
-        (packet.payload[offset+2] << 8) |
-        (packet.payload[offset+3]);
+        BytesToUint32BE(&packet.payload[offset]);
     offset += 4;
 
     // Parse max packet size (uint32)
     if (offset + 4 > packet.payload.size()) return false;
     session->current_channel.max_packet_size =
-        (packet.payload[offset] << 24) |
-        (packet.payload[offset+1] << 16) |
-        (packet.payload[offset+2] << 8) |
-        (packet.payload[offset+3]);
+        BytesToUint32BE(&packet.payload[offset]);
     offset += 4;
 
     session->current_channel.server_channel_id++;
@@ -1616,14 +1641,12 @@ bool LWSSH::parse_channel_request(const pdiutil::vector<uint8_t> &payload, SSHCh
     // Parse recipient channel (uint32)
     if (offset + 4 > payload.size()) return false;
     req.recipient_channel =
-        (payload[offset] << 24) | (payload[offset+1] << 16) |
-        (payload[offset+2] << 8) | payload[offset+3];
+        BytesToUint32BE(&payload[offset]);
     offset += 4;
 
     // Parse request type (SSH string)
     if (offset + 4 > payload.size()) return false;
-    uint32_t str_len = (payload[offset] << 24) | (payload[offset+1] << 16) |
-                       (payload[offset+2] << 8) | payload[offset+3];
+    uint32_t str_len = BytesToUint32BE(&payload[offset]);
     offset += 4;
     if (str_len > (payload.size() - offset)) return false;
     req.request_type.assign((const char*)&payload[offset], str_len);
@@ -1657,25 +1680,25 @@ bool LWSSH::parse_channel_request_pty_req(LWSSHSession *session, const pdiutil::
     if (!read_ssh_string(data, req.term, offset)) return false;
     // Parse width_chars
     if (offset + 4 > data.size()) return false;
-    req.width_chars = (data[offset] << 24) | (data[offset+1] << 16) | (data[offset+2] << 8) | data[offset+3];
+    req.width_chars = BytesToUint32BE(&data[offset]);
     offset += 4;
     if (session->m_sshclient) {
         session->m_sshclient->set_column_width((uint16_t)req.width_chars);
     }
     // Parse height_rows
     if (offset + 4 > data.size()) return false;
-    req.height_rows = (data[offset] << 24) | (data[offset+1] << 16) | (data[offset+2] << 8) | data[offset+3];
+    req.height_rows = BytesToUint32BE(&data[offset]);
     offset += 4;
     if (session->m_sshclient) {
         session->m_sshclient->set_row_count((uint16_t)req.height_rows);
     }
     // Parse width_pixels
     if (offset + 4 > data.size()) return false;
-    req.width_pixels = (data[offset] << 24) | (data[offset+1] << 16) | (data[offset+2] << 8) | data[offset+3];
+    req.width_pixels = BytesToUint32BE(&data[offset]);
     offset += 4;
     // Parse height_pixels
     if (offset + 4 > data.size()) return false;
-    req.height_pixels = (data[offset] << 24) | (data[offset+1] << 16) | (data[offset+2] << 8) | data[offset+3];
+    req.height_pixels = BytesToUint32BE(&data[offset]);
     offset += 4;
     // Parse terminal modes (SSH string)
 
@@ -1694,14 +1717,12 @@ bool LWSSH::parse_channel_data_request(const pdiutil::vector<uint8_t> &payload, 
     // Parse recipient channel (uint32)
     if (offset + 4 > payload.size()) return false;
     datareq.recipient_channel =
-        (payload[offset] << 24) | (payload[offset+1] << 16) |
-        (payload[offset+2] << 8) | payload[offset+3];
+        BytesToUint32BE(&payload[offset]);
     offset += 4;
 
     // Parse data (SSH string)
     if (offset + 4 > payload.size()) return false;
-    uint32_t data_len = (payload[offset] << 24) | (payload[offset+1] << 16) |
-                        (payload[offset+2] << 8) | payload[offset+3];
+    uint32_t data_len = BytesToUint32BE(&payload[offset]);
     offset += 4;
     if (data_len > (payload.size() - offset)) return false;
     datareq.data.assign(payload.begin() + offset, payload.begin() + offset + data_len);

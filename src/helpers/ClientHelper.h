@@ -21,7 +21,7 @@ bool connectToServer( iClientInterface *client, char *host, uint16_t port, uint1
 bool disconnect( iClientInterface *client );
 bool close( iClientInterface *client );
 bool isConnected( iClientInterface *client );
-bool sendPacket( iClientInterface *client, uint8_t *buffer, uint16_t len, uint16_t max_bytes_in_one_write=250, uint32_t timeout=2000 );
+bool sendPacket( iClientInterface *client, uint8_t *buffer, uint16_t len, uint16_t max_bytes_in_one_write=TCP_WRITE_CHUNK_MAX, uint32_t timeout=2000 );
 uint16_t readPacket( iClientInterface *client, uint8_t *buffer, uint16_t maxlen, int32_t timeout, uint8_t readUntilChar=0 );
 
 #endif

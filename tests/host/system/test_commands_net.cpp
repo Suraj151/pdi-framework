@@ -224,7 +224,7 @@ TEST(cmdnet, net_connsta_leaves_the_wifi_service_reporting_active)
     ASSERT_TRUE(saw(shell.run("service status WiFi"), "state   : active"));
 }
 
-/* ------------------------------------------------------------ date, tdctl */
+/* ------------------------------------------------------ date, timedatectl */
 
 TEST(cmdnet, date_prints_a_time)
 {
@@ -259,13 +259,13 @@ TEST(cmdnet, date_in_utc_differs_from_local_when_the_zone_does)
     ASSERT_TRUE(utc.length() > 0);
 }
 
-TEST(cmdnet, tdctl_reports_the_clock_status)
+TEST(cmdnet, timedatectl_reports_the_clock_status)
 {
     pditest::Shell shell;
     networked(shell);
     __i_ntp.set_ntp_time(1755300000);
 
-    std::string out = shell.run("tdctl");
+    std::string out = shell.run("timedatectl");
     ASSERT_TRUE(out.length() > 0);
     ASSERT_EQ(shell.result(), PDI_OK);
 }

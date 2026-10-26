@@ -14,6 +14,10 @@ created Date    : 1st June 2019
 #include "CommandCommon.h"
 
 #ifdef ENABLE_STORAGE_SERVICE
+#ifdef ENABLE_AUTH_SERVICE
+#include <service_provider/user/UserStoreService.h>
+#endif
+
 /**
  * change directory file system command
  * 
@@ -68,7 +72,7 @@ struct ChangeDirFSCommand : public CommandBase {
 				// Check whether symbol was provided
 				if( cmdoptn->optionvalsize == 1 && cmdoptn->optionval[0] == '~' ){
 
-					dirname = __i_fs.getHomeDirectory();
+					homeDirectory(dirname);
 				}else if( cmdoptn->optionvalsize == 1 && cmdoptn->optionval[0] == '-' ){
 
 					dirname = SessionManager::getLastPWD();
@@ -86,17 +90,31 @@ struct ChangeDirFSCommand : public CommandBase {
 				}
 			}else{
 				// POSIX-style: bare `cd` goes to the home directory.
-				const char* homedir = __i_fs.getHomeDirectory();
-				if( nullptr != homedir && SessionManager::changeDirectory(homedir) == false ){
+				pdiutil::string homedir;
+				homeDirectory(homedir);
+				if( SessionManager::changeDirectory(homedir.c_str()) == false ){
 					result = CMD_ERROR_FAILED;
 					m_terminal->putln();
 					m_terminal->write_ro(RODT_ATTR("Failed to change directory: "));
-					m_terminal->write(homedir);
+					m_terminal->write(homedir.c_str());
 				}
 			}
 		}
 
 		return result;
+	}
+
+private:
+
+	/**
+	 * The logged in user's home, or the filesystem's own when the account
+	 * names none that exists.
+	 */
+	void homeDirectory(pdiutil::string &out){
+		out = __i_fs.getHomeDirectory();
+#ifdef ENABLE_AUTH_SERVICE
+		__user_store_service.homeOf(__auth_service.getUsername(), out);
+#endif
 	}
 };
 #endif

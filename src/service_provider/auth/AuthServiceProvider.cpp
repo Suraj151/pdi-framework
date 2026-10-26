@@ -132,6 +132,20 @@ void AuthServiceProvider::setVerifiedUsername(const char *username)
 }
 
 /**
+ * Moves the current session to its user's home, as a login does, leaving it in
+ * place when the account names none.
+ */
+void AuthServiceProvider::enterHome()
+{
+#ifdef ENABLE_STORAGE_SERVICE
+  pdiutil::string home;
+  if( __user_store_service.homeOf(getUsername(), home) ){
+    SessionManager::setPWD(home.c_str());
+  }
+#endif
+}
+
+/**
  * get authorised status
  *
  * @return bool

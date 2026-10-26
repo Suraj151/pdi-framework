@@ -66,6 +66,21 @@ TEST(ioiface, writes_a_signed_integer)
     ASSERT_STREQ(terminal.captured().c_str(), "-4096");
 }
 
+TEST(ioiface, writes_a_64_bit_integer_past_32_bits_whole)
+{
+    pditest::StringTerminal terminal;
+    terminal.write((int64_t)4018520064LL);
+    ASSERT_STREQ(terminal.captured().c_str(), "4018520064");
+
+    pditest::StringTerminal negative;
+    negative.write((int64_t)-5000000000LL);
+    ASSERT_STREQ(negative.captured().c_str(), "-5000000000");
+
+    pditest::StringTerminal line;
+    line.writeln((int64_t)9000000000LL);
+    ASSERT_STREQ(line.captured().c_str(), "9000000000\r\n");
+}
+
 TEST(ioiface, writes_an_unsigned_integer)
 {
     pditest::StringTerminal terminal;

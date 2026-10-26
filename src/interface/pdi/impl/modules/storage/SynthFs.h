@@ -66,7 +66,7 @@ public:
   pdi_err_t createDirectory(const char *path) override { return PDI_ERR_NOT_SUPPORTED; }
   pdi_err_t deleteDirectory(const char *path) override { return PDI_ERR_NOT_SUPPORTED; }
   pdi_err_t rename(const char *oldPath, const char *newPath) override { return PDI_ERR_NOT_SUPPORTED; }
-  pdi_err_t copyFile(const char *sourcePath, const char *destPath) override { return PDI_ERR_NOT_SUPPORTED; }
+  pdi_err_t copyFile(const char *sourcePath, const char *destPath, CallBackVoidArgBoolRetFn keepgoing = nullptr) override { return PDI_ERR_NOT_SUPPORTED; }
   pdi_err_t moveFile(const char *oldPath, const char *newPath) override { return PDI_ERR_NOT_SUPPORTED; }
   pdi_err_t deleteFile(const char *path) override { return PDI_ERR_NOT_SUPPORTED; }
 

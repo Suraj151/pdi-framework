@@ -54,6 +54,11 @@ PROFILES = {
     "no-seal": ["PDI_NO_DB_SEALING"],
     "no-featureconf": ["PDI_NO_FEATURE_CONFIG_FILES"],
     "no-script": ["PDI_NO_SCRIPT_RUNNER"],
+    "no-drivers": ["PDI_NO_DRIVER_CORE"],
+    "no-i2c": ["PDI_NO_I2C_BUS"],
+    "no-spi": ["PDI_NO_SPI_BUS"],
+    "no-fat": ["PDI_NO_FAT_FS"],
+    "no-lfs-disk": ["PDI_NO_LFS_DISK"],
     "minimal": [
         "PDI_NO_NETWORK_SERVICE",
         "PDI_NO_STORAGE_SERVICE",
@@ -61,6 +66,7 @@ PROFILES = {
         "PDI_NO_CMD_SERVICE",
         "PDI_NO_DB_SEALING",
         "PDI_NO_SCRIPT_RUNNER",
+        "PDI_NO_DRIVER_CORE",
     ],
 }
 

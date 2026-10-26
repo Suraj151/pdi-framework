@@ -163,6 +163,27 @@ int32_t SessionStdio::write(const uint8_t *c_str, uint32_t size) {
 }
 
 /**
+ * Writes bytes exactly as given to the output descriptor, with no line end
+ * tidied, as a copy of a file must arrive.
+ */
+int32_t SessionStdio::writeData(const uint8_t *c_str, uint32_t size) {
+
+  iTerminalInterface *t = out();
+  if (nullptr == t || nullptr == c_str) {
+    return 0;
+  }
+
+  if (m_heldcr) {
+    m_heldcr = false;
+    const uint8_t cr = '\r';
+    t->write(&cr, 1);
+  }
+  m_droplead = false;
+
+  return t->write(c_str, size);
+}
+
+/**
  * Writes a read only string to the output descriptor.
  */
 int32_t SessionStdio::write_ro(const char *c_str) {
@@ -228,6 +249,14 @@ int32_t SessionStdio::available() {
 bool SessionStdio::availableforwrite(uint32_t size) {
   iTerminalInterface *t = out();
   return (nullptr != t) ? t->availableforwrite(size) : false;
+}
+
+/**
+ * Whether the output descriptor takes no further write.
+ */
+bool SessionStdio::writeRefused() const {
+  iTerminalInterface *t = out();
+  return (nullptr != t) && t->writeRefused();
 }
 
 /**

@@ -63,7 +63,7 @@ struct DfFSCommand : public CommandBase {
 		pdiutil::string name, prefix;
 
 		readProcLines(PROC_MOUNT_PREFIX "/mounts", [&](pdiutil::string &line) -> bool {
-			if( !procLineField(line, 0, name) || !procLineField(line, 1, prefix) ) return true;
+			if( !__line_field(line, 0, name) || !__line_field(line, 1, prefix) ) return true;
 			writeUsage(prefix.c_str(), name.c_str(), __i_fs.findMountForPath(prefix.c_str()));
 			return true;
 		});

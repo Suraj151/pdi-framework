@@ -51,6 +51,11 @@ TAG = re.compile(r"<(/?)(input|select|option)\b([^>]*)>", re.I)
 ATTR = re.compile(r"([\w-]+)\s*=\s*'([^']*)'")
 
 
+# fields that ask the board to act rather than hold a setting: `img` on the ota
+# page flashes the firmware image it names and restarts the board
+ACTION_FIELDS = ("img",)
+
+
 def read_form(portal, path):
     """
     What a browser would submit from a page, as it stands now.
@@ -58,7 +63,8 @@ def read_form(portal, path):
     Checkboxes count only when checked and selects contribute the option that
     is selected, so feeding this straight back to the same path restores the
     page exactly. The csrf token is left out: it is per-session and the caller
-    fetches a fresh one.
+    fetches a fresh one. An action field is left out too, so restoring a page
+    never repeats the action.
     """
     body = portal.get(path).body
     fields = {}
@@ -83,6 +89,8 @@ def read_form(portal, path):
             else:
                 fields[name] = attrs.get("value", "")
 
+    for name in ACTION_FIELDS:
+        fields.pop(name, None)
     return fields
 
 
@@ -193,10 +201,16 @@ def build(target):
         return state
 
     state.address = local_address_towards(target.address())
+
+    # a host pointing back at this machine is a broker an interrupted run left
+    # behind, so the board is put back with no broker rather than that one
+    if state.saved[GENERAL].get("hst") == state.address:
+        state.saved[GENERAL]["hst"] = ""
+
     state.broker = MqttBroker("0.0.0.0", 0).start()
 
     # restore even if the configuration below fails half way through
-    target.at_exit(lambda: state.restore(target))
+    target.at_exit(lambda live: state.restore(live))
 
     write_form(portal, PUBSUB, pubsub_fields())
     write_form(portal, LWT, {

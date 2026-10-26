@@ -240,7 +240,7 @@ def date_custom_format(t):
         raise AssertionError("date +%%Y did not print a year: %r" % out)
 
 
-@test("tdctl reports the clock status", needs=("tdctl",))
-def tdctl_reports(t):
-    out = t.run("tdctl")
-    expect_any(("time", "Time", "zone", "NTP", "ntp", "clock"), out, "tdctl")
+@test("timedatectl reports the clock status", needs=("timedatectl",))
+def timedatectl_reports(t):
+    out = t.run("timedatectl")
+    expect_any(("time", "Time", "zone", "NTP", "ntp", "clock"), out, "timedatectl")

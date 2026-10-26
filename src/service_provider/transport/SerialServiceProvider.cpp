@@ -23,6 +23,9 @@ created Date    : 1st June 2019
  */
 SerialServiceProvider::SerialServiceProvider() : ServiceProvider(SERVICE_SERIAL, RODT_ATTR("Serial"))
 {
+#ifdef ENABLE_DRIVER_CORE
+  m_devices = nullptr;
+#endif
 }
 
 /**
@@ -30,7 +33,21 @@ SerialServiceProvider::SerialServiceProvider() : ServiceProvider(SERVICE_SERIAL,
  */
 SerialServiceProvider::~SerialServiceProvider()
 {
+#ifdef ENABLE_DRIVER_CORE
+  pdiutil::safe_delete(m_devices);
+#endif
 }
+
+#ifdef ENABLE_DRIVER_CORE
+/**
+ * Lets go of every device on a stop, so the next start finds them afresh and
+ * scans again.
+ */
+void SerialServiceProvider::resetServiceState()
+{
+  pdiutil::safe_delete(m_devices);
+}
+#endif
 
 /**
  * initialize the serial service
@@ -55,6 +72,19 @@ bool SerialServiceProvider::initService(void *arg)
       // }
     }
   });
+
+#ifdef ENABLE_DRIVER_CORE
+  if( nullptr == m_devices ){
+    m_devices = pdiutil::safe_new<DeviceManager>();
+    if( nullptr != m_devices ){
+      this->serviceSetInterval( [&]() {
+        if( nullptr != this->m_devices ){
+          this->m_devices->scan();
+        }
+      }, DEVICE_SCAN_INTERVAL_MS, __i_dvc_ctrl.millis_now() );
+    }
+  }
+#endif
 
   return ServiceProvider::initService(arg);
 }

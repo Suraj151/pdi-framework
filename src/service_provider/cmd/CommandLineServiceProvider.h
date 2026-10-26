@@ -50,6 +50,8 @@ created Date    : 1st June 2019
 #include "commands/DeviceIotCommand.h"
 #include "commands/HelpCommand.h"
 #include "commands/UptimeCommand.h"
+#include "commands/UnameCommand.h"
+#include "commands/HostnameCommand.h"
 #include "commands/EchoCommand.h"
 #include "commands/EnvCommand.h"
 #include "commands/ExportCommand.h"
@@ -66,15 +68,24 @@ created Date    : 1st June 2019
 #include "commands/HostCommand.h"
 #include "commands/PingCommand.h"
 #include "commands/HexdumpCommand.h"
+#include "commands/DdCommand.h"
 #include "commands/DfFSCommand.h"
 #include "commands/DatabaseCommand.h"
 #include "commands/MountCommand.h"
+#include "commands/UmountCommand.h"
 #include "commands/WcFSCommand.h"
 #include "commands/HeadFSCommand.h"
 #include "commands/TailFSCommand.h"
 #include "commands/GrepFSCommand.h"
 #include "commands/ExecCommand.h"
 #include "commands/CrontabCommand.h"
+#include "commands/UdevadmCommand.h"
+#include "commands/LsblkCommand.h"
+#include "commands/BlkidCommand.h"
+#include "commands/WipefsCommand.h"
+#include "commands/SfdiskCommand.h"
+#include "commands/MkfsCommand.h"
+#include "commands/ArecordCommand.h"
 #include "commands/WgetCommand.h"
 #include "ShellParser.h"
 
@@ -122,9 +133,25 @@ public:
 	bool isSessionBusy(session_t *session);
 	bool getCommandExecutedFromHistory(pdiutil::string &cmdExec, int16_t index, const char* pattern = nullptr);
 
+	/**
+	 * Whether the shell has input to take: bytes on the terminal, or keys its session
+	 * kept while looking for ctrl+c.
+	 */
+	bool hasPendingInput(iTerminalInterface *terminal);
+
 private:
 
 	friend class ScriptRunner;
+
+	/**
+	 * Whether a key waits for the shell, the session's typed ahead keys first.
+	 */
+	static bool keyWaiting(session_t *session, iTerminalInterface *terminal);
+
+	/**
+	 * The next key for the shell, the session's typed ahead keys first.
+	 */
+	static char nextKey(session_t *session, iTerminalInterface *terminal);
 
 #ifdef ENABLE_TELNET_SERVICE
 	/**

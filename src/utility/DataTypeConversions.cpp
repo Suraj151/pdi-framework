@@ -455,13 +455,13 @@ void MicrosToTimeString(uint64_t val, char *pString, uint8_t _maxlen, uint8_t _f
 
 /**
  * @brief Converts an unsigned 32-bit integer to a hexadecimal string (no "0x" prefix).
- *
  * @param val The unsigned 32-bit integer to convert.
  * @param pString The buffer to store the resulting string.
  * @param _maxlen The maximum length of the string buffer.
- * @param cap If true, uses uppercase A-F.
+ * @param cap If true, uses uppercase A-F (default is false).
+ * @param _padmin Fewest digits, zero padded on the left, up to 8 (default is 0).
  */
-void Uint32ToHexString(uint32_t val, char *pString, uint8_t _maxlen, bool cap)
+void Uint32ToHexString(uint32_t val, char *pString, uint8_t _maxlen, bool cap, uint8_t _padmin)
 {
     if (nullptr == pString || _maxlen == 0) return;
     memset(pString, 0, _maxlen);
@@ -477,6 +477,9 @@ void Uint32ToHexString(uint32_t val, char *pString, uint8_t _maxlen, bool cap)
             tmp[--tpos] = (n < 10) ? ('0' + n) : (base + (n - 10));
             val >>= 4;
         }
+    }
+    while (tpos > 1 && ((int)sizeof(tmp) - tpos) < (int)_padmin) {
+        tmp[--tpos] = '0';
     }
 
     int len = (int)sizeof(tmp) - tpos;
@@ -690,6 +693,25 @@ void EpochToDateTime(uint32_t epoch, datetime_t &out)
     out.m_year  = (uint16_t)((y < 0) ? 0 : y);
     out.m_month = (uint8_t)m;
     out.m_day   = (uint8_t)d;
+}
+
+/**
+ * The epoch the calendar fields name, the reverse of EpochToDateTime; 0 for a
+ * date before 1970 or a month outside 1-12.
+ */
+uint32_t DateTimeToEpoch(const datetime_t &in)
+{
+    if (in.m_year < 1970 || in.m_month < 1 || in.m_month > 12 || in.m_day < 1) return 0;
+
+    int32_t y = (int32_t)in.m_year - (in.m_month <= 2 ? 1 : 0);
+    int32_t era = y / 400;
+    uint32_t yoe = (uint32_t)(y - era * 400);
+    uint32_t mp = in.m_month > 2 ? in.m_month - 3u : in.m_month + 9u;
+    uint32_t doy = (153u * mp + 2u) / 5u + in.m_day - 1u;
+    uint32_t doe = yoe * 365u + yoe / 4u - yoe / 100u + doy;
+    uint32_t days = (uint32_t)(era * 146097 + (int32_t)doe - 719468);
+
+    return days * 86400u + in.m_hour * 3600u + in.m_minute * 60u + in.m_second;
 }
 
 /**
@@ -954,6 +976,231 @@ const char *VfsTypeToString(vfs_type_t type)
     case VFS_TYPE_PROCFS:   return RODT_ATTR("procfs");
     case VFS_TYPE_SYSFS:    return RODT_ATTR("sysfs");
     case VFS_TYPE_DEVFS:    return RODT_ATTR("devfs");
+    case VFS_TYPE_VFAT:     return RODT_ATTR("vfat");
     default:                return RODT_ATTR("unknown");
     }
+}
+
+/**
+ * @brief Reads a big-endian (network order) 16-bit value.
+ * @param at The first of the two bytes.
+ * @return The value.
+ */
+uint16_t BytesToUint16BE(const uint8_t *at)
+{
+    return (uint16_t)(((uint16_t)at[0] << 8) | at[1]);
+}
+
+/**
+ * @brief Reads a big-endian (network order) 32-bit value.
+ * @param at The first of the four bytes.
+ * @return The value.
+ */
+uint32_t BytesToUint32BE(const uint8_t *at)
+{
+    return ((uint32_t)at[0] << 24) | ((uint32_t)at[1] << 16) | ((uint32_t)at[2] << 8) | (uint32_t)at[3];
+}
+
+/**
+ * @brief Reads a big-endian (network order) 64-bit value.
+ * @param at The first of the eight bytes.
+ * @return The value.
+ */
+uint64_t BytesToUint64BE(const uint8_t *at)
+{
+    return ((uint64_t)BytesToUint32BE(at) << 32) | (uint64_t)BytesToUint32BE(at + 4);
+}
+
+/**
+ * @brief Reads a little-endian 16-bit value.
+ * @param at The first of the two bytes.
+ * @return The value.
+ */
+uint16_t BytesToUint16LE(const uint8_t *at)
+{
+    return (uint16_t)(at[0] | ((uint16_t)at[1] << 8));
+}
+
+/**
+ * @brief Reads a little-endian 32-bit value.
+ * @param at The first of the four bytes.
+ * @return The value.
+ */
+uint32_t BytesToUint32LE(const uint8_t *at)
+{
+    return (uint32_t)at[0] | ((uint32_t)at[1] << 8) | ((uint32_t)at[2] << 16) | ((uint32_t)at[3] << 24);
+}
+
+/**
+ * @brief Writes a 16-bit value in big-endian (network) order.
+ * @param val The value.
+ * @param at Where the two bytes go.
+ */
+void Uint16ToBytesBE(uint16_t val, uint8_t *at)
+{
+    at[0] = (uint8_t)(val >> 8);
+    at[1] = (uint8_t)val;
+}
+
+/**
+ * @brief Writes a 32-bit value in big-endian (network) order.
+ * @param val The value.
+ * @param at Where the four bytes go.
+ */
+void Uint32ToBytesBE(uint32_t val, uint8_t *at)
+{
+    at[0] = (uint8_t)(val >> 24);
+    at[1] = (uint8_t)(val >> 16);
+    at[2] = (uint8_t)(val >> 8);
+    at[3] = (uint8_t)val;
+}
+
+/**
+ * @brief Writes a 64-bit value in big-endian (network) order.
+ * @param val The value.
+ * @param at Where the eight bytes go.
+ */
+void Uint64ToBytesBE(uint64_t val, uint8_t *at)
+{
+    Uint32ToBytesBE((uint32_t)(val >> 32), at);
+    Uint32ToBytesBE((uint32_t)val, at + 4);
+}
+
+/**
+ * @brief Writes a 16-bit value in little-endian order.
+ * @param val The value.
+ * @param at Where the two bytes go.
+ */
+void Uint16ToBytesLE(uint16_t val, uint8_t *at)
+{
+    at[0] = (uint8_t)val;
+    at[1] = (uint8_t)(val >> 8);
+}
+
+/**
+ * @brief Writes a 32-bit value in little-endian order.
+ * @param val The value.
+ * @param at Where the four bytes go.
+ */
+void Uint32ToBytesLE(uint32_t val, uint8_t *at)
+{
+    at[0] = (uint8_t)val;
+    at[1] = (uint8_t)(val >> 8);
+    at[2] = (uint8_t)(val >> 16);
+    at[3] = (uint8_t)(val >> 24);
+}
+
+/**
+ * @brief Appends a 32-bit value in big-endian (network) order.
+ * @param out The bytes to append to.
+ * @param val The value.
+ */
+void AppendUint32BE(pdiutil::vector<uint8_t> &out, uint32_t val)
+{
+    uint8_t bytes[4];
+    Uint32ToBytesBE(val, bytes);
+    out.insert(out.end(), bytes, bytes + 4);
+}
+
+/**
+ * @brief Appends a 64-bit value in big-endian (network) order.
+ * @param out The bytes to append to.
+ * @param val The value.
+ */
+void AppendUint64BE(pdiutil::vector<uint8_t> &out, uint64_t val)
+{
+    uint8_t bytes[8];
+    Uint64ToBytesBE(val, bytes);
+    out.insert(out.end(), bytes, bytes + 8);
+}
+
+/**
+ * @brief Reads a whole number written as nothing but digits that fits 32 bits.
+ * @param pString The digits.
+ * @param _len How many characters to read.
+ * @param out The number, set only when the digits are one.
+ * @return Whether every character was a digit and the number fit.
+ */
+bool ParseUint32(const char *pString, uint16_t _len, uint32_t &out)
+{
+    if (nullptr == pString || 0 == _len) {
+        return false;
+    }
+    uint32_t value = 0;
+    for (uint16_t i = 0; i < _len; i++) {
+        if (pString[i] < '0' || pString[i] > '9') {
+            return false;
+        }
+        uint32_t digit = (uint32_t)(pString[i] - '0');
+        if (value > (0xFFFFFFFFUL - digit) / 10) {
+            return false;
+        }
+        value = value * 10 + digit;
+    }
+    out = value;
+    return true;
+}
+
+/**
+ * @brief Writes a size in bytes as fdisk, lsblk and df -h do: "3.7G" short, "3.75
+ * GiB" long.
+ * @param bytes The size.
+ * @param shortform One letter unit and one decimal for small values.
+ * @param out Where the text goes.
+ * @param outsize Bytes out holds.
+ */
+void BytesToSizeString(uint64_t bytes, bool shortform, char *out, uint8_t outsize)
+{
+  if( nullptr == out || 0 == outsize ){
+    return;
+  }
+  const char units[] = {'B', 'K', 'M', 'G', 'T'};
+  uint8_t unit = 0;
+  uint64_t whole = bytes;
+  while( unit < 4 && whole >= 1024 ){
+    whole /= 1024;
+    unit++;
+  }
+  uint8_t decimals = shortform ? ((whole < 10 && unit > 0) ? 1 : 0) : ((unit > 0) ? 2 : 0);
+  uint64_t scale = (1 == decimals) ? 10 : (2 == decimals) ? 100 : 1;
+  uint64_t divisor = (uint64_t)1 << (10 * unit);
+  uint64_t scaled = (bytes * scale + divisor / 2) / divisor;
+  uint64_t integer = scaled / scale;
+  uint64_t fraction = scaled % scale;
+  if( 2 == decimals && 0 == fraction % 10 ){
+    fraction /= 10;
+    decimals = 1;
+  }
+  if( 1 == decimals && 0 == fraction ){
+    decimals = 0;
+  }
+
+  char number[24];
+  uint8_t len = 0;
+  char digits[21];
+  uint8_t d = 0;
+  do {
+    digits[d++] = (char)('0' + integer % 10);
+    integer /= 10;
+  } while( integer > 0 && d < sizeof(digits) );
+  while( d > 0 ) number[len++] = digits[--d];
+  if( decimals > 0 ){
+    number[len++] = '.';
+    uint64_t power = (2 == decimals) ? 10 : 1;
+    while( power > 0 ){
+      number[len++] = (char)('0' + (fraction / power) % 10);
+      power /= 10;
+    }
+  }
+  number[len] = '\0';
+
+  uint8_t at = 0;
+  for( uint8_t i = 0; i < len && at + 1 < outsize; i++ ) out[at++] = number[i];
+  if( shortform ){
+    if( at + 1 < outsize ) out[at++] = units[unit];
+  }else{
+    const char *suffix = (0 == unit) ? " B" : (1 == unit) ? " KiB" : (2 == unit) ? " MiB" : (3 == unit) ? " GiB" : " TiB";
+    for( const char *c = suffix; '\0' != *c && at + 1 < outsize; c++ ) out[at++] = *c;
+  }
+  out[at] = '\0';
 }

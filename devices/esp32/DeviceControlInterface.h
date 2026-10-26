@@ -40,6 +40,69 @@ const uint8_t EXCEPTIONAL_GPIO_PINS[] = {};
 #endif
 
 /**
+ * Gpio's the I2S bus runs on when its line names none, in the order SCK, WS, SD; held only while a line uses the bus
+ */
+#if defined(ENABLE_DRIVER_CORE) && defined(ENABLE_I2S_BUS)
+#if defined(CONFIG_IDF_TARGET_ESP32C3)
+const uint8_t I2S_GPIO_PINS[] = { 3, 4, 5 };
+#elif defined(CONFIG_IDF_TARGET_ESP32C6)
+const uint8_t I2S_GPIO_PINS[] = { 22, 23, 14 };
+#elif defined(CONFIG_IDF_TARGET_ESP32H2)
+const uint8_t I2S_GPIO_PINS[] = { 5, 6, 7 };
+#elif defined(CONFIG_IDF_TARGET_ESP32S2)
+const uint8_t I2S_GPIO_PINS[] = { 5, 6, 7 };
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+const uint8_t I2S_GPIO_PINS[] = { 17, 18, 21 };
+#elif defined(CONFIG_IDF_TARGET_ESP32)
+const uint8_t I2S_GPIO_PINS[] = { 26, 27, 39 };
+#else
+const uint8_t I2S_GPIO_PINS[] = {};
+#endif
+#endif
+
+/**
+ * Gpio's the I2C bus runs on when no bus line names its own, in the order SDA, SCL; held only while a line uses the bus
+ */
+#if defined(ENABLE_DRIVER_CORE) && defined(ENABLE_I2C_BUS)
+#if defined(CONFIG_IDF_TARGET_ESP32C3)
+const uint8_t I2C_GPIO_PINS[] = { 8, 9 };
+#elif defined(CONFIG_IDF_TARGET_ESP32C6)
+const uint8_t I2C_GPIO_PINS[] = { 6, 7 };
+#elif defined(CONFIG_IDF_TARGET_ESP32H2)
+const uint8_t I2C_GPIO_PINS[] = { 12, 13 };
+#elif defined(CONFIG_IDF_TARGET_ESP32S2)
+const uint8_t I2C_GPIO_PINS[] = { 8, 9 };
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+const uint8_t I2C_GPIO_PINS[] = { 8, 9 };
+#elif defined(CONFIG_IDF_TARGET_ESP32)
+const uint8_t I2C_GPIO_PINS[] = { 21, 22 };
+#else
+const uint8_t I2C_GPIO_PINS[] = {};
+#endif
+#endif
+
+/**
+ * Gpio's the SPI bus runs on when no bus line names its own, in the order SCK, MISO, MOSI; held only while a line uses the bus
+ */
+#if defined(ENABLE_DRIVER_CORE) && defined(ENABLE_SPI_BUS)
+#if defined(CONFIG_IDF_TARGET_ESP32C3)
+const uint8_t SPI_GPIO_PINS[] = { 6, 1, 7 };
+#elif defined(CONFIG_IDF_TARGET_ESP32C6)
+const uint8_t SPI_GPIO_PINS[] = { 21, 20, 19 };
+#elif defined(CONFIG_IDF_TARGET_ESP32H2)
+const uint8_t SPI_GPIO_PINS[] = { 10, 11, 4 };
+#elif defined(CONFIG_IDF_TARGET_ESP32S2)
+const uint8_t SPI_GPIO_PINS[] = { 36, 37, 35 };
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+const uint8_t SPI_GPIO_PINS[] = { 12, 13, 11 };
+#elif defined(CONFIG_IDF_TARGET_ESP32)
+const uint8_t SPI_GPIO_PINS[] = { 18, 19, 23 };
+#else
+const uint8_t SPI_GPIO_PINS[] = {};
+#endif
+#endif
+
+/**
  * DeviceControlInterface class
  */
 class DeviceControlInterface: public iDeviceControlInterface

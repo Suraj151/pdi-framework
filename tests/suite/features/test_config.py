@@ -237,7 +237,7 @@ def enable_restores(t):
 
     t.run("service enable %s" % name)
     if was == "no":
-        t.at_exit(lambda: t.run("service disable %s" % name))
+        t.at_exit(lambda live: live.run("service disable %s" % name))
     after = _status(t, name)
     if _field(after, "enabled") != "yes":
         raise AssertionError("%s did not come back enabled:\n%s" % (name, after))

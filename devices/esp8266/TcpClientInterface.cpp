@@ -30,7 +30,7 @@ TcpClientInterface::TcpClientInterface() :
     m_rxBuf(nullptr),
     m_rxBufOffset(0),
     m_timeout(3000),
-    m_isLastWriteAcked(true),
+    m_unacked(0),
     m_dns{IP4_ADDRESS_NONE, false, false} {}
 
 /**
@@ -45,7 +45,7 @@ TcpClientInterface::TcpClientInterface(struct tcp_pcb* pcb):
     m_rxBuf(nullptr),
     m_rxBufOffset(0),
     m_timeout(3000),
-    m_isLastWriteAcked(true),
+    m_unacked(0),
     m_dns{IP4_ADDRESS_NONE, false, false} {
 
     if (m_pcb) {
@@ -217,15 +217,10 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
         return PDI_ERR_STATE;
     }
 
-    uint8_t flags = TCP_WRITE_FLAG_COPY;
-
-    if (!m_isLastWriteAcked){
-        flags |= TCP_WRITE_FLAG_MORE; // do not tcp-PuSH (yet)
-    }
-
     err_t err = ERR_OK;
     int32_t total_sent = 0;
     uint32_t waited = 0;
+    bool push = (0 == m_unacked) || (size >= TCP_MSS);
 
     while (total_sent < size) {
 
@@ -241,7 +236,7 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
 
         if (0 == avail || ERR_MEM == err) {
 
-            if (!m_pcb || waited >= TCP_WRITE_DRAIN_TIMEOUT_MS) {
+            if (!m_pcb || waited >= TCP_WRITE_DRAIN_TIMEOUT_MS || !__i_dvc_ctrl.canWait()) {
                 break;
             }
 
@@ -264,10 +259,7 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
         }
 
         int32_t chunk = std::min(remaining, (int32_t)avail);
-
-        // uint8_t flags = TCP_WRITE_FLAG_COPY;
-        if (chunk < remaining)
-            flags |= TCP_WRITE_FLAG_MORE; // do not tcp-PuSH (yet)
+        uint8_t flags = TCP_WRITE_FLAG_COPY | ((chunk < remaining || !push) ? TCP_WRITE_FLAG_MORE : 0);
 
         // the pcb is rechecked inside the section, a lwip callback may drop it
         // between chunks otherwise
@@ -275,6 +267,9 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
         __lwip_mutex.critical_lock();
         #endif
         err = m_pcb ? tcp_write(m_pcb, c_str + total_sent, chunk, flags) : ERR_CLSD;
+        if (ERR_OK == err) {
+            m_unacked += (uint32_t)chunk;
+        }
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
         __lwip_mutex.critical_unlock();
         #endif
@@ -291,13 +286,10 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
         waited = 0;
     }
 
-    // Ensure last write has been ackowledged
-    if (m_isLastWriteAcked){
-
+    if (push) {
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
         __lwip_mutex.critical_lock();
         #endif
-        m_isLastWriteAcked = false;
         err = m_pcb ? tcp_output(m_pcb) : ERR_CLSD; // Ensure the data is sent
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
         __lwip_mutex.critical_unlock();
@@ -306,8 +298,6 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
             return PDI_ERR_FROM_LWIP(err); // Return error code if write fails
         }
     }
-
-    // m_isLastWriteAcked = !(size > 0);
 
     __i_dvc_ctrl.yield();
 
@@ -599,7 +589,7 @@ void TcpClientInterface::onError(void* arg, err_t err) {
 err_t TcpClientInterface::onSent(void* arg, struct tcp_pcb* tpcb, u16_t len) {
     TcpClientInterface* client = static_cast<TcpClientInterface*>(arg);
     if (client) {
-        client->m_isLastWriteAcked = true;
+        client->m_unacked = (len >= client->m_unacked) ? 0 : client->m_unacked - len;
     }
     return ERR_OK;
 }
@@ -704,7 +694,8 @@ void TcpClientInterface::setTimeout(uint32_t timeout) {
 }
 
 /**
- * @brief Check whether available for write
+ * @brief Whether the connection takes size more bytes now, within lwIP's room and
+ * TCP_UNACKED_MAX unacknowledged bytes.
  */
 bool TcpClientInterface::availableforwrite(uint32_t size) {
 
@@ -740,11 +731,9 @@ bool TcpClientInterface::availableforwrite(uint32_t size) {
             err = ERR_MEM;
         }
 
-        // if(!m_isLastWriteAcked && err == ERR_OK && tcpout_err == ERR_OK){
-
-        //     m_isLastWriteAcked = true;
-        // }
     }
+
+    bool fits = (0 == m_unacked) || ((m_unacked + size) <= (uint32_t)TCP_UNACKED_MAX);
 
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
     __lwip_mutex.critical_unlock();
@@ -752,7 +741,7 @@ bool TcpClientInterface::availableforwrite(uint32_t size) {
 
     __i_dvc_ctrl.yield();
 
-    return m_isConnected && m_isLastWriteAcked && err == ERR_OK;
+    return m_isConnected && fits && err == ERR_OK;
 }
 
 /**
@@ -792,5 +781,5 @@ void TcpClientInterface::flush(int16_t flushtype) {
         tcp_output(m_pcb);
     }
 
-    m_isLastWriteAcked = true;
+    m_unacked = 0;
 }

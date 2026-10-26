@@ -427,6 +427,104 @@ void UserStoreService::resolveOwnerNames(uint16_t uid, uint16_t gid, pdiutil::st
   resolveNameByUid(gid, group);
 }
 
+#ifdef ENABLE_STORAGE_SERVICE
+
+/**
+ * @brief The home an added user is given: USER_STORE_HOME_BASE/<user>.
+ */
+void UserStoreService::homePath(const char *username, pdiutil::string &out)
+{
+  out = CHARPTR_WRAP(USER_STORE_HOME_BASE);
+  out += FILE_SEPARATOR[0];
+  if (nullptr != username) out += username;
+}
+
+/**
+ * @brief Whether the record's home is its own homePath, for a name that
+ *        cannot step out of USER_STORE_HOME_BASE.
+ */
+bool UserStoreService::isOwnHome(const user_record_t &record, pdiutil::string &home)
+{
+  const char *name = record.m_username.c_str();
+  if (!isValidUsername(name)) return false;
+
+  bool dotsonly = true;
+  for (uint16_t i = 0; 0 != name[i]; i++) {
+    if ('.' != name[i]) dotsonly = false;
+  }
+  if (dotsonly) return false;
+
+  homePath(name, home);
+  return record.m_home == home;
+}
+
+/**
+ * @brief Creates the record's own home owned by its user, and a missing base owned
+ * by root; PDI_ERR_EXISTS when there.
+ */
+pdi_err_t UserStoreService::makeHome(const user_record_t &record)
+{
+  pdiutil::string home;
+  if (!isOwnHome(record, home)) return PDI_ERR_INVALID_ARG;
+
+  pdiutil::string base = CHARPTR_WRAP(USER_STORE_HOME_BASE);
+  pdi_err_t result = PDI_OK;
+
+  __i_fs.beginPrivileged();
+  if (!__i_fs.isDirectory(base.c_str())) {
+    result = __i_fs.createDirectory(base.c_str());
+    if (result >= 0) result = (pdi_err_t)__i_fs.setFileOwner(base.c_str(), USER_STORE_ROOT_UID, USER_STORE_ROOT_GID);
+    if (result >= 0) result = (pdi_err_t)__i_fs.setFilePermissions(base.c_str(), USER_STORE_HOME_PERMS);
+  }
+
+  if (result >= 0 && __i_fs.isDirectory(home.c_str())) {
+    result = PDI_ERR_EXISTS;
+  } else if (result >= 0 && __i_fs.isFileExist(home.c_str())) {
+    result = STORAGE_ERROR_NOT_A_DIRECTORY;
+  } else if (result >= 0) {
+    result = __i_fs.createDirectory(home.c_str());
+    if (result >= 0) result = (pdi_err_t)__i_fs.setFileOwner(home.c_str(), record.m_uid, record.m_gid);
+    if (result >= 0) result = (pdi_err_t)__i_fs.setFilePermissions(home.c_str(), USER_STORE_HOME_PERMS);
+    if (result < 0) __i_fs.deleteDirectory(home.c_str());
+  }
+  __i_fs.endPrivileged();
+
+  return (result < 0) ? result : PDI_OK;
+}
+
+/**
+ * @brief Removes the record's home and everything in it, only when it is the
+ * record's own homePath.
+ */
+pdi_err_t UserStoreService::removeHome(const user_record_t &record)
+{
+  pdiutil::string home;
+  if (!isOwnHome(record, home)) return PDI_ERR_INVALID_ARG;
+
+  pdi_err_t result = PDI_OK;
+  __i_fs.beginPrivileged();
+  if (__i_fs.isDirExist(home.c_str())) {
+    result = __i_fs.deleteDirectory(home.c_str());
+  }
+  __i_fs.endPrivileged();
+
+  return (result < 0) ? result : PDI_OK;
+}
+
+/**
+ * @brief The user's home when the record names one that is a directory.
+ */
+bool UserStoreService::homeOf(const char *username, pdiutil::string &out)
+{
+  user_record_t record;
+  if (nullptr == username || !findUserByName(username, record) || record.m_home.empty()) return false;
+  if (!__i_fs.isDirectory(record.m_home.c_str())) return false;
+  out = record.m_home;
+  return true;
+}
+
+#endif
+
 void UserStoreService::generateSalt(uint8_t *salt, uint8_t saltlen)
 {
   static bool s_seeded = false;

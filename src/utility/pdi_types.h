@@ -65,6 +65,7 @@ namespace pdiutil {
 // Foreign lower-framework passthrough bands (preserve exact underlying code)
 #define PDI_ERRBASE_NET_LWIP    (-4200)
 #define PDI_ERRBASE_FS_LITTLEFS (-4500)
+#define PDI_ERRBASE_FS_FATFS    (-4800)
 
 // Section index of a code (0 = generic); index * PDI_ERR_BAND_SIZE is its base
 #define PDI_ERR_SECTION(code) ((int16_t)((-(int32_t)(code)) / PDI_ERR_BAND_SIZE))
@@ -75,6 +76,8 @@ namespace pdiutil {
 // framework error into a single generic code — encode it here instead.
 #define PDI_ERR_FROM_LWIP(e) ((int16_t)(PDI_ERRBASE_NET_LWIP + (int16_t)(e)))
 #define PDI_ERR_FROM_LFS(e)  ((int16_t)(PDI_ERRBASE_FS_LITTLEFS + (int16_t)(e)))
+/* FatFs results are positive, so they are subtracted: original = base - code */
+#define PDI_ERR_FROM_FAT(e)  ((int16_t)(PDI_ERRBASE_FS_FATFS - (int16_t)(e)))
 
 #ifdef __cplusplus
 enum pdi_err : int16_t {

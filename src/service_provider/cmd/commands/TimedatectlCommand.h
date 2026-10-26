@@ -39,7 +39,7 @@ struct TimedatectlCommand : public CommandBase {
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("tdctl  timedatectl: show clock status (local/UTC time, zone, NTP sync)");
+		return RODT_ATTR("timedatectl  show clock status (local/UTC time, zone, NTP sync)");
 	}
 
 	/* execute command with provided options */

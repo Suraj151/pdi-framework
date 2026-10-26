@@ -32,6 +32,8 @@ let msgelm=document.getElementsByClassName('msg');\
 if(msgelm[0])msgelm[0].style.display='none';\
 let nfl=document.querySelector('#nfl');\
 if(nfl)nfl.value=(location.pathname+location.search);\
+let nfd=document.querySelector('#nfd');\
+if(nfd)nfd.value=(new URLSearchParams(location.search).get('cp')||'/');\
 let ndl=document.querySelector('#ndl');\
 if(ndl)ndl.value=(location.pathname+location.search);\
 },3000);\

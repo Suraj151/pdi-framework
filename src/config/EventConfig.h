@@ -36,6 +36,9 @@ enum event_name : uint8_t {
   EVENT_TIME_SECOND,
   EVENT_TIME_MINUTE,
 
+  EVENT_DEVICE_ADDED,
+  EVENT_DEVICE_REMOVED,
+
   EVENT_NAME_MAX,
 };
 typedef enum event_name event_name_t;

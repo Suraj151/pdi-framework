@@ -128,21 +128,14 @@ struct PingCommand : public CommandBase {
 		m_terminal->write_ro(RODT_ATTR(") x"));
 		m_terminal->writeln((int32_t)count);
 
-		// print each reply/timeout live as the port reports it, so the shell
-		// doesn't look frozen during the run
-		iTerminalInterface *term = m_terminal;
-		CallBackVoidPointerArgFn on_packet = [term](void *arg){
+		static ping_pkt_t s_packet;
+		static volatile bool s_received = false;
+		s_received = false;
+		CallBackVoidPointerArgFn on_packet = [](void *arg){
 			ping_pkt_t *p = (ping_pkt_t *)arg;
 			if( nullptr == p ) return;
-			term->write_ro(RODT_ATTR("seq="));
-			term->write((int32_t)p->m_seqno);
-			if( p->m_replied ){
-				term->write_ro(RODT_ATTR(" time="));
-				term->write((int32_t)p->m_rtt_ms);
-				term->writeln_ro(RODT_ATTR(" ms"));
-			}else{
-				term->writeln_ro(RODT_ATTR(" timeout"));
-			}
+			s_packet = *p;
+			s_received = true;
 		};
 
 		if( !__i_ping.ping(ip, count, on_packet) ){
@@ -153,10 +146,12 @@ struct PingCommand : public CommandBase {
 		uint32_t start = __i_dvc_ctrl.millis_now();
 		uint32_t budget = (uint32_t)count * PING_CMD_PER_PACKET_MS + 1000;
 		while( !__i_ping.isPingComplete() && (__i_dvc_ctrl.millis_now() - start) < budget ){
+			writeReceived(s_packet, s_received);
 			__i_dvc_ctrl.wait(50);
 			__i_dvc_ctrl.yield();
 			m_terminal->commit();
 		}
+		writeReceived(s_packet, s_received);
 
 		const ping_stats_t &st = __i_ping.getPingStats();
 		uint16_t tx = st.m_transmitted;
@@ -182,6 +177,29 @@ struct PingCommand : public CommandBase {
 		}
 
 		return PDI_OK;
+	}
+
+private:
+
+	/**
+	 * Prints the reply or timeout the port reported, if one is waiting, in the
+	 * order it came, and marks it printed.
+	 */
+	void writeReceived(const ping_pkt_t &packet, volatile bool &received){
+		if( !received ){
+			return;
+		}
+		ping_pkt_t p = packet;
+		received = false;
+		m_terminal->write_ro(RODT_ATTR("seq="));
+		m_terminal->write((int32_t)p.m_seqno);
+		if( p.m_replied ){
+			m_terminal->write_ro(RODT_ATTR(" time="));
+			m_terminal->write((int32_t)p.m_rtt_ms);
+			m_terminal->writeln_ro(RODT_ATTR(" ms"));
+		}else{
+			m_terminal->writeln_ro(RODT_ATTR(" timeout"));
+		}
 	}
 };
 

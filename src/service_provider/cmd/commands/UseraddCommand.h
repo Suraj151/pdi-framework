@@ -51,10 +51,10 @@ struct UseraddCommand : public CommandBase {
 
 		const char *me = __auth_service.getUsername();
 		if( nullptr == me || 0 == me[0] ) return CMD_ERROR_PERM;
-		if( SessionManager::getCurrentUid() != USER_STORE_ROOT_UID ){
+		if( !SessionManager::isRoot() ){
 			if( nullptr != m_terminal ){
 				m_terminal->putln();
-				m_terminal->writeln_ro(RODT_ATTR("root required"));
+				m_terminal->writeln_ro(RODT_ATTR(CMD_MSG_ROOT_REQUIRED));
 			}
 			return CMD_ERROR_FAILED;
 		}
@@ -120,14 +120,29 @@ struct UseraddCommand : public CommandBase {
 		newRec.m_uid = nextUid;
 		newRec.m_gid = nextUid;
 		newRec.m_username = uname;
-		newRec.m_home = FILE_SEPARATOR;
+		UserStoreService::homePath(uname, newRec.m_home);
 		newRec.m_shell = CHARPTR_WRAP(USER_STORE_DEFAULT_SHELL);
 
 		if( __user_store_service.addUser(newRec, pw) ){
+			pdi_err_t homed = __user_store_service.makeHome(newRec);
+			if( homed < 0 && PDI_ERR_EXISTS != homed ){
+				__user_store_service.removeUser(uname);
+				if( nullptr != m_terminal ){
+					m_terminal->putln();
+					m_terminal->write_ro(RODT_ATTR("cannot create home "));
+					m_terminal->write(newRec.m_home.c_str());
+				}
+				return homed;
+			}
 			if( nullptr != m_terminal ){
 				m_terminal->putln();
 				m_terminal->write_ro(RODT_ATTR("added "));
 				m_terminal->write(uname);
+				if( PDI_ERR_EXISTS == homed ){
+					m_terminal->putln();
+					m_terminal->write_ro(RODT_ATTR("home exists, kept as it is: "));
+					m_terminal->write(newRec.m_home.c_str());
+				}
 			}
 			return PDI_OK;
 		}

@@ -10,6 +10,7 @@ created Date    : 22nd Aug 2026
 
 #include "DbLayout.h"
 #include <utility/Checksum.h>
+#include <utility/DataTypeConversions.h>
 #include <utility/SafeAlloc.h>
 
 #ifdef ENABLE_DB_SEALING
@@ -20,39 +21,15 @@ created Date    : 22nd Aug 2026
 
 static const uint8_t DB_MAGIC[3] = {'P', 'D', 'B'};
 
-static void db_put_u16(uint8_t *_buf, uint16_t _value)
-{
-    _buf[0] = (uint8_t)(_value & 0xFF);
-    _buf[1] = (uint8_t)((_value >> 8) & 0xFF);
-}
-
-static uint16_t db_get_u16(const uint8_t *_buf)
-{
-    return (uint16_t)_buf[0] | (uint16_t)((uint16_t)_buf[1] << 8);
-}
-
-static void db_put_u32(uint8_t *_buf, uint32_t _value)
-{
-    _buf[0] = (uint8_t)(_value & 0xFF);
-    _buf[1] = (uint8_t)((_value >> 8) & 0xFF);
-    _buf[2] = (uint8_t)((_value >> 16) & 0xFF);
-    _buf[3] = (uint8_t)((_value >> 24) & 0xFF);
-}
-
 static void db_put_entry(uint8_t *_buf, const db_dir_entry_t &_entry)
 {
-    db_put_u16(&_buf[0], _entry.m_id);
-    db_put_u16(&_buf[2], _entry.m_version);
-    db_put_u16(&_buf[4], _entry.m_offset);
-    db_put_u16(&_buf[6], _entry.m_cap);
-    db_put_u16(&_buf[8], _entry.m_len);
-    db_put_u16(&_buf[10], _entry.m_crc);
+    Uint16ToBytesLE(_entry.m_id, &_buf[0]);
+    Uint16ToBytesLE(_entry.m_version, &_buf[2]);
+    Uint16ToBytesLE(_entry.m_offset, &_buf[4]);
+    Uint16ToBytesLE(_entry.m_cap, &_buf[6]);
+    Uint16ToBytesLE(_entry.m_len, &_buf[8]);
+    Uint16ToBytesLE(_entry.m_crc, &_buf[10]);
     _buf[12] = _entry.m_flags;
-}
-
-static uint32_t db_get_u32(const uint8_t *_buf)
-{
-    return (uint32_t)_buf[0] | ((uint32_t)_buf[1] << 8) | ((uint32_t)_buf[2] << 16) | ((uint32_t)_buf[3] << 24);
 }
 
 /**
@@ -178,12 +155,12 @@ pdi_err_t DbLayout::read_superblock()
         return PDI_ERR_NOT_SUPPORTED;
     }
 
-    if (db_get_u16(&_buf[10]) != crc16Ccitt(_buf, DB_SUPERBLOCK_BYTES - 2))
+    if (BytesToUint16LE(&_buf[10]) != crc16Ccitt(_buf, DB_SUPERBLOCK_BYTES - 2))
     {
         return PDI_ERR_CRC;
     }
 
-    m_firmware = db_get_u32(&_buf[4]);
+    m_firmware = BytesToUint32LE(&_buf[4]);
     m_year = _buf[8];
     m_entries = _buf[9];
 
@@ -208,10 +185,10 @@ pdi_err_t DbLayout::write_superblock()
     _buf[1] = DB_MAGIC[1];
     _buf[2] = DB_MAGIC[2];
     _buf[3] = DB_FORMAT_VERSION;
-    db_put_u32(&_buf[4], m_firmware);
+    Uint32ToBytesLE(m_firmware, &_buf[4]);
     _buf[8] = m_year;
     _buf[9] = m_entries;
-    db_put_u16(&_buf[10], crc16Ccitt(_buf, DB_SUPERBLOCK_BYTES - 2));
+    Uint16ToBytesLE(crc16Ccitt(_buf, DB_SUPERBLOCK_BYTES - 2), &_buf[10]);
 
     if (!m_store->write(DB_REGION_START, _buf, DB_SUPERBLOCK_BYTES))
     {
@@ -237,12 +214,12 @@ pdi_err_t DbLayout::read_directory()
             return PDI_ERR_IO;
         }
 
-        m_directory[i].m_id = db_get_u16(&_buf[0]);
-        m_directory[i].m_version = db_get_u16(&_buf[2]);
-        m_directory[i].m_offset = db_get_u16(&_buf[4]);
-        m_directory[i].m_cap = db_get_u16(&_buf[6]);
-        m_directory[i].m_len = db_get_u16(&_buf[8]);
-        m_directory[i].m_crc = db_get_u16(&_buf[10]);
+        m_directory[i].m_id = BytesToUint16LE(&_buf[0]);
+        m_directory[i].m_version = BytesToUint16LE(&_buf[2]);
+        m_directory[i].m_offset = BytesToUint16LE(&_buf[4]);
+        m_directory[i].m_cap = BytesToUint16LE(&_buf[6]);
+        m_directory[i].m_len = BytesToUint16LE(&_buf[8]);
+        m_directory[i].m_crc = BytesToUint16LE(&_buf[10]);
         m_directory[i].m_flags = _buf[12];
 
         if ((uint32_t)m_directory[i].m_offset + m_directory[i].m_cap > m_store->capacity() ||

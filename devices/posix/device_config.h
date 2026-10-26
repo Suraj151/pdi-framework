@@ -39,6 +39,9 @@ created Date    : 16th Aug 2026
 #define strncmp_ro strncmp
 #define memcpy_ro memcpy
 
+#define CMD_SIZE_MAX                16  /* longest command name plus its terminator */
+#define CMD_OPTION_MAX              6   /* most options one command takes */
+
 /**
  * gpio pin counts
  */
@@ -58,6 +61,11 @@ created Date    : 16th Aug 2026
 #endif
 
 #define DEVICE_SUPPORTS_NTP
+
+#define DEVICE_SUPPORTS_DRIVER_CORE
+#define DEVICE_SUPPORTS_I2S
+#define DEVICE_SUPPORTS_I2C
+#define DEVICE_SUPPORTS_SPI
 
 /**
  * services this device offers. each one is turned on as its host backend lands.

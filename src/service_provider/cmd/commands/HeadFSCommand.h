@@ -98,11 +98,11 @@ struct HeadFSCommand : public CommandBase {
 							uint64_t offset = 0;
 							uint32_t printed = 0;
 							pdiutil::string linedata;
-							while(offset < (uint64_t)fs && printed < count){
+							while(offset < (uint64_t)fs && printed < count && !commandStopped(m_terminal)){
 								linedata.clear();
 								int bytes = __i_fs.readFile(filename, 200, [&](char *data, uint32_t size) -> bool {
 									linedata += pdiutil::string(data, size);
-									return true;
+									return !commandStopped(m_terminal);
 								}, offset, "\n");
 								if(bytes < 0) break;
 
@@ -125,7 +125,7 @@ struct HeadFSCommand : public CommandBase {
 			}
 		}
 
-		return result;
+		return stoppedResult(result);
 	}
 };
 

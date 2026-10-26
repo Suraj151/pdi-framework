@@ -386,3 +386,84 @@ TEST(servicetasks, a_renice_of_one_moves_the_cached_weight)
     ASSERT_TRUE(before > 0);
     ASSERT_TRUE(after > before);
 }
+
+/* -------------------------------------------- who a service's task runs as */
+
+namespace
+{
+
+void pumpFor(uint32_t ms)
+{
+    uint32_t began = __i_dvc_ctrl.millis_now();
+    while ((__i_dvc_ctrl.millis_now() - began) < ms)
+    {
+        __task_scheduler.handle_tasks();
+    }
+}
+
+} // namespace
+
+/**
+ * A service's own task runs between lines typed on terminals, so it must not
+ * pick up the identity of whoever typed last.
+ */
+TEST(servicetasks, a_service_task_runs_as_the_system_after_a_user_typed)
+{
+    BorrowedTaskSlot slot;
+    ProbeTaskService probe;
+    pditest::Shell user(1000, 1000);
+    user.run("pwd");
+    session_t *typed = SessionManager::current();
+    ASSERT_EQ(SessionManager::getCurrentUid(), 1000);
+
+    int seen = -1;
+    bool hadSession = true;
+    pdiutil::task_id_t id = probe.serviceSetTimeout([&]() {
+        seen = SessionManager::getCurrentUid();
+        hadSession = (nullptr != SessionManager::current());
+    }, 0, __i_dvc_ctrl.millis_now());
+    ASSERT_TRUE(id > 0);
+    pumpFor(50);
+
+    ASSERT_EQ(seen, 0);
+    ASSERT_FALSE(hadSession);
+    ASSERT_TRUE(SessionManager::current() == typed);
+}
+
+TEST(servicetasks, a_task_registered_straight_on_the_scheduler_keeps_the_session)
+{
+    BorrowedTaskSlot slot;
+    pditest::Shell user(1000, 1000);
+    user.run("pwd");
+
+    int seen = -1;
+    pdiutil::task_id_t id = __task_scheduler.setTimeout([&]() {
+        seen = SessionManager::getCurrentUid();
+    }, 0, __i_dvc_ctrl.millis_now());
+    ASSERT_TRUE(id > 0);
+    pumpFor(50);
+
+    ASSERT_EQ(seen, 1000);
+}
+
+TEST(servicetasks, a_session_let_go_during_a_service_task_is_not_put_back)
+{
+    BorrowedTaskSlot slot;
+    ProbeTaskService probe;
+    pditest::Shell *user = new pditest::Shell(1000, 1000);
+    user->run("pwd");
+    session_t *typed = SessionManager::current();
+    iTerminalInterface *terminal = typed->m_terminal;
+
+    bool ran = false;
+    pdiutil::task_id_t id = probe.serviceSetTimeout([&]() {
+        SessionManager::detach(terminal);
+        ran = true;
+    }, 0, __i_dvc_ctrl.millis_now());
+    ASSERT_TRUE(id > 0);
+    pumpFor(50);
+
+    ASSERT_TRUE(ran);
+    ASSERT_TRUE(nullptr == SessionManager::current());
+    delete user;
+}

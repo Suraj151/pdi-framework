@@ -49,6 +49,30 @@ public:
    */
   void resolveOwnerNames(uint16_t uid, uint16_t gid, pdiutil::string &owner, pdiutil::string &group);
 
+#ifdef ENABLE_STORAGE_SERVICE
+  /**
+   * @brief The home an added user is given: USER_STORE_HOME_BASE/<user>.
+   */
+  static void homePath(const char *username, pdiutil::string &out);
+
+  /**
+   * @brief Creates the record's own home owned by its user, and a missing base
+   * owned by root; PDI_ERR_EXISTS when there.
+   */
+  pdi_err_t makeHome(const user_record_t &record);
+
+  /**
+   * @brief Removes the record's home and everything in it, only when it is the
+   * record's own homePath.
+   */
+  pdi_err_t removeHome(const user_record_t &record);
+
+  /**
+   * @brief The user's home when the record names one that is a directory.
+   */
+  bool homeOf(const char *username, pdiutil::string &out);
+#endif
+
 private:
 
   void generateSalt(uint8_t *salt, uint8_t saltlen);
@@ -62,6 +86,12 @@ private:
   void resolveNameByUid(uint16_t uid, pdiutil::string &out);
 #ifdef ENABLE_STORAGE_SERVICE
   void bootstrapFromLoginTable();
+
+  /**
+   * @brief Whether the record's home is its own homePath, for a name that
+   *        cannot step out of USER_STORE_HOME_BASE.
+   */
+  bool isOwnHome(const user_record_t &record, pdiutil::string &home);
 #endif
 
   bool m_initStatus;

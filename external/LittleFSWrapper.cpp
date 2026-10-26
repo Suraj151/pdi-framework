@@ -12,6 +12,7 @@ created Date    : 6th Apr 2025
 ******************************************************************************/
 
 #include "LittleFSWrapper.h"
+#include "interface/pdi/impl/modules/storage/FileLines.h"
 
 // Map a LittleFS return (LFS_ERR_* negative, or a non-negative count/size) onto
 // the framework error space. Non-negative values (count/size) pass through
@@ -31,7 +32,7 @@ static int lfsToPdiErr(int rc) {
  * system, and formats it if mounting fails.
  */
 LittleFSWrapper::LittleFSWrapper(iStorageInterface& storage, bool defaultConfig)
-    : iFileSystemInterface(storage), m_mounted(false) {
+    : iFileSystemInterface(storage), m_mounted(false), m_busy_from(0), m_busy_last(0) {
     memset(&m_lfs, 0, sizeof(m_lfs));
     memset(&m_lfscfg, 0, sizeof(m_lfscfg));
     for (uint8_t i = 0; i < VFS_MAX_OPEN_FILES; i++) {
@@ -63,9 +64,42 @@ LittleFSWrapper::~LittleFSWrapper() {
 /**
  * @brief Initialize and mount the file system.
  * @param lfscnfg Pointer to the LittleFS configuration.
+ * @param formatOnFailure Formats the storage when it holds no filesystem to mount.
  * @return 0 on success, or a negative error code on failure.
  */
-int LittleFSWrapper::initLFSConfig(lfs_config *lfscnfg)
+int LittleFSWrapper::initLFSConfig(lfs_config *lfscnfg, bool formatOnFailure)
+{
+    fillLFSConfig(lfscnfg);
+
+    // Mount the file system
+    int ret = lfs_mount(&m_lfs, &m_lfscfg);
+    if (ret != LFS_ERR_OK && formatOnFailure) {
+        // Format and mount if mounting fails
+        lfs_format(&m_lfs, &m_lfscfg);
+        ret = lfs_mount(&m_lfs, &m_lfscfg);
+    }
+
+    m_mounted = (ret == LFS_ERR_OK);
+
+    return lfsToPdiErr(ret); // Success
+}
+
+/**
+ * @brief Makes a fresh, empty file system across the whole storage.
+ * @param lfscnfg Pointer to the LittleFS configuration.
+ * @return 0 on success, or a negative error code on failure.
+ */
+int LittleFSWrapper::formatLFS(lfs_config *lfscnfg)
+{
+    fillLFSConfig(lfscnfg);
+    return lfsToPdiErr(lfs_format(&m_lfs, &m_lfscfg));
+}
+
+/**
+ * Unmounts what is mounted and takes the configuration given, or the minimal
+ * default one, sized to the whole storage.
+ */
+void LittleFSWrapper::fillLFSConfig(lfs_config *lfscnfg)
 {
     if (m_mounted) {
         lfs_unmount(&m_lfs);
@@ -100,18 +134,6 @@ int LittleFSWrapper::initLFSConfig(lfs_config *lfscnfg)
     m_lfscfg.block_count = m_istorage.size() / m_lfscfg.block_size;
 
     m_lfscfg.context = this; // Context for lfs storage operations
-
-    // Mount the file system
-    int ret = lfs_mount(&m_lfs, &m_lfscfg);
-    if (ret != LFS_ERR_OK) {
-        // Format and mount if mounting fails
-        lfs_format(&m_lfs, &m_lfscfg);
-        ret = lfs_mount(&m_lfs, &m_lfscfg);
-    }
-
-    m_mounted = (ret == LFS_ERR_OK);
-
-    return lfsToPdiErr(ret); // Success
 }
 
 /**
@@ -555,6 +577,17 @@ pdi_err_t LittleFSWrapper::closeFile(pdi_fhandle_t handle) {
     return (pdi_err_t)lfsToPdiErr(okOrErr);
 }
 
+/**
+ * @brief How many files the filesystem holds open.
+ */
+uint16_t LittleFSWrapper::openCount() const {
+    uint16_t count = 0;
+    for (uint8_t i = 0; i < VFS_MAX_OPEN_FILES; i++) {
+        count += (nullptr != m_openfiles[i]) ? 1 : 0;
+    }
+    return count;
+}
+
 void LittleFSWrapper::stampCreate(const char *path, bool isDir){
     // Perms are independent of the clock, so always write them on fresh entries.
     uint16_t perms = isDir ? (uint16_t)FILE_PERM_DEFAULT_DIR : (uint16_t)FILE_PERM_DEFAULT_FILE;
@@ -595,77 +628,7 @@ void LittleFSWrapper::stampModify(const char *path){
  * @return The number of finding, or -1 on failure.
  */
 int LittleFSWrapper::findInFile(const char* path, const char* findStr, pdiutil::vector<uint32_t> *findindices, int maxindices, int everynthindice, int64_t offset, CallBackVoidArgFn yield){
-
-    int foundcount = 0;
-    if(findindices) findindices->clear();
-
-    if( nullptr != findStr ){
-
-        int filesize = getFileSize(path);
-        if(filesize < 0) return filesize;
-        
-        int bytesReadOrErr = 0;
-        int64_t endoffset = (offset < 0) ? -offset : -1;
-        uint64_t offsetindex = (offset < 0) ? 0 : offset;
-        int findstrlen = strlen(findStr);
-        bool didmatchfound = false;
-        uint64_t chunksizetoread = (endoffset < 0 || endoffset > 250) ? 250 : (uint64_t)endoffset;
-        if(maxindices > 0 && everynthindice > 1){
-            maxindices = maxindices / everynthindice;
-        }
-
-        int nextPushAt = everynthindice;
-        if(offset < 0 && everynthindice > 1){
-            int foundmatches = findInFile(path, findStr, nullptr, -1, 1, offset, yield);
-            nextPushAt = (foundmatches % everynthindice) + 1;
-        }
-
-        do{
-
-            bytesReadOrErr = readFile(path, chunksizetoread, [&](char *data, uint32_t size) -> bool {
-                // Continue reading
-                return true;
-            }, offsetindex, findStr, &didmatchfound);
-
-            if( bytesReadOrErr < 0 ){
-                return lfsToPdiErr(bytesReadOrErr); // error
-            }
-
-            offsetindex += bytesReadOrErr + 1; // move to next char to continue search
-            if( didmatchfound ){
-                didmatchfound = false; // reset for next read
-                foundcount++;
-                if(foundcount == nextPushAt){
-                    if(findindices){
-                        if(offset < 0 && maxindices > 0 && (int)findindices->size() >= maxindices){
-                            findindices->erase(findindices->begin());
-                        }
-                        findindices->push_back(offsetindex - findstrlen); // store the index where found
-                    }
-                    nextPushAt += everynthindice;
-                }
-            }
-
-            if( yield ){
-                yield();
-            }
-
-            if( endoffset > 0 ){
-                
-                if( offsetindex > endoffset ){
-                    break;
-                }
-
-                if( (offsetindex + chunksizetoread) > endoffset ){
-                    chunksizetoread = endoffset - offsetindex + 1;
-                }
-            }
-        }while( offsetindex < filesize && ( maxindices == -1 || offset < 0 || (findindices ? findindices->size() : foundcount) < maxindices  ) );
-    }else{
-        return PDI_ERR_NULL_PTR;
-    }
-
-    return foundcount;
+    return FileLines::findInFile(*this, path, findStr, findindices, maxindices, everynthindice, offset, yield);
 }
 
 /**
@@ -676,99 +639,7 @@ int LittleFSWrapper::findInFile(const char* path, const char* findStr, pdiutil::
  * @return The offset found, or -1 on failure.
  */
 int64_t LittleFSWrapper::getOffsetFromLineNumber(const char* path, int linenumber, CallBackVoidArgFn yield){
-
-    int64_t offset = 0;
-
-    if( linenumber < 0 ){
-
-        uint32_t totalnumberoflines = 0;
-        int iStatus = readFile(path, 250, [&](char *data, uint32_t size)->bool{
-            for(uint32_t i = 0; i < size; i++){
-                if(data[i] == '\n') totalnumberoflines++;
-            }
-            return true;
-        });
-        if( iStatus < 0 ) return iStatus; // error
-
-        int64_t fs = getFileSize(path);
-        if( fs > 0 ){
-            char lastChar = '\n';
-            readFile(path, 1, [&](char *data, uint32_t size) -> bool {
-                if(size > 0) lastChar = data[0];
-                return true;
-            }, (uint64_t)(fs - 1));
-            if( lastChar != '\n' ){
-                totalnumberoflines++;
-            }
-        }
-
-        linenumber = totalnumberoflines + linenumber;
-        if( linenumber < 0 ) return PDI_ERR_RANGE;
-    }
-
-    // Find the file content offset from line number offset
-    if( linenumber > 0 ){
-
-        int newlinesFound = 0;
-
-        int iStatus = readFile(path, 250, [&](char *data, uint32_t size)->bool{
-
-            for(uint32_t i = 0; i < size; i++){
-
-                if(data[i] == '\n') {
-
-                    newlinesFound++;
-
-                    if(newlinesFound >= linenumber){
-
-                        offset += i + 1;
-                        return false;
-                    }
-                }
-            }
-
-            offset += size;
-
-            if(yield){
-                yield();
-            }
-
-            return true;
-        });
-
-        if( iStatus < 0 ) return iStatus; // error
-
-        // int filesize = getFileSize(path);
-        // if(filesize < 0){
-        //     return filesize;
-        // }
-
-        // int newlinesFound = 0;
-        // bool didmatchfound = false;
-
-        // do
-        // {
-        //     int bytesReadOrErr = readFile(path, 250, [&](char *data, uint32_t size) -> bool {
-        //         return true;
-        //     }, offset, "\n", &didmatchfound);
-
-        //     if(bytesReadOrErr < 0){
-        //         return lfsToPdiErr(bytesReadOrErr);
-        //     }
-
-        //     offset += bytesReadOrErr + 1;
-        //     if(didmatchfound){
-        //         newlinesFound++;
-        //         didmatchfound = false;
-        //     }
-
-        //     if(yield){
-        //         yield();
-        //     }
-        // } while (offset < (uint64_t)filesize && newlinesFound < linenumber);
-    }
-
-    return offset;
+    return FileLines::getOffsetFromLineNumber(*this, path, linenumber, yield);
 }
 
 /**
@@ -779,74 +650,7 @@ int64_t LittleFSWrapper::getOffsetFromLineNumber(const char* path, int linenumbe
  * @return The line number found, or -1 on failure.
  */
 int64_t LittleFSWrapper::getLineNumberFromOffset(const char* path, int64_t offset, CallBackVoidArgFn yield){
-    
-    int64_t linenumber = 0;
-    int64_t filesize = getFileSize(path);
-    if( filesize < 0 ){
-        return filesize; // error
-    }
-
-    if( offset < 0 ){
-        offset = filesize + offset;
-    }
-
-    // Find the line number from offset
-    if( offset > 0 ){
-
-        int64_t offsetcount = 0;
-        int iStatus = readFile(path, 250, [&](char *data, uint32_t size)->bool{
-
-            for(uint32_t i = 0; i < size; i++){
-                
-                if(offset <= (offsetcount + i)){
-                    return false;
-                }
-
-                if(data[i] == '\n') {
-                    linenumber++;
-                }
-            }
-
-            offsetcount += size;
-            
-            if(yield){
-                yield();
-            }
-
-            return true;
-        });
-        if( iStatus < 0 ) return iStatus; // error
-
-        // int64_t offsetcount = 0;
-        // bool didmatchfound = false;
-
-        // do
-        // {
-        //     int bytesReadOrErr = readFile(path, 250, [&](char *data, uint32_t size) -> bool {
-        //         return true;
-        //     }, offsetcount, "\n", &didmatchfound);
-
-        //     if(bytesReadOrErr < 0){
-        //         return lfsToPdiErr(bytesReadOrErr);
-        //     }
-
-        //     offsetcount += bytesReadOrErr + 1;
-        //     if(didmatchfound){
-        //         if((offsetcount - 1) < (uint64_t)offset){
-        //             linenumber++;
-        //         }else{
-        //             break;
-        //         }
-        //         didmatchfound = false;
-        //     }
-
-        //     if(yield){
-        //         yield();
-        //     }
-        // } while (offsetcount < (uint64_t)offset && offsetcount < (uint64_t)filesize);
-    }
-
-    return linenumber;
+    return FileLines::getLineNumberFromOffset(*this, path, offset, yield);
 }
 
 /**
@@ -859,35 +663,7 @@ int64_t LittleFSWrapper::getLineNumberFromOffset(const char* path, int64_t offse
  * @return The number of line found, or -1 on failure.
  */
 int LittleFSWrapper::getLineNumbersInFile(const char* path, pdiutil::vector<uint32_t> &linenumberindices, int maxlinenumbers, int linenumberoffset, CallBackVoidArgFn yield){
-
-    // Find the file content offset from line number offset
-    int64_t offset = getOffsetFromLineNumber(path, linenumberoffset);
-
-    if( offset < 0 ){
-        offset = 0;
-    }
-
-    int status = findInFile(path, "\n", &linenumberindices, maxlinenumbers, 1, offset, yield);
-
-    if( status < 0 ){
-        return status; // error
-    }
-
-    if( linenumberindices.size() > 0 ){
-
-        int64_t filesize = getFileSize(path);
-        linenumberindices.insert(linenumberindices.begin(), (uint32_t)offset); // add start of first counted line as first index
-
-        for (size_t i = 1; i < linenumberindices.size(); i++){
-            linenumberindices[i] = linenumberindices[i] + 1; // move to next char after \n
-        }  
-
-        if( (linenumberindices.back() + 1) > (uint32_t)filesize ){
-            linenumberindices.pop_back(); // remove last index if it exceeds file size
-        }
-    }
-
-    return linenumberindices.size();
+    return FileLines::getLineNumbersInFile(*this, path, linenumberindices, maxlinenumbers, linenumberoffset, yield);
 }
 
 /**
@@ -900,80 +676,8 @@ int LittleFSWrapper::getLineNumbersInFile(const char* path, pdiutil::vector<uint
  * @return number of bytes read, or -1 on failure.
  */
 int LittleFSWrapper::readLineInFile(const char* path, int32_t linenumber, pdiutil::string &linedata, const char* pattern, CallBackVoidArgFn yield){
-
-    linedata.clear();
-
-    int64_t filesize = getFileSize(path);
-    if(filesize < 0) return (int)filesize;
-
-    int64_t lineoffset = -1;
-
-    if(pattern == nullptr){
-
-        lineoffset = getOffsetFromLineNumber(path, linenumber, yield);
-        if(lineoffset < 0) return (int)lineoffset;
-        if(lineoffset >= filesize) return PDI_ERR_NOT_FOUND;
-
-    }else{
-
-        const int CAP = (linenumber > 0) ? linenumber : ((linenumber < 0) ? -linenumber : 1);
-
-        pdiutil::vector<uint32_t> patternindices;
-        int rc = findInFile(path, pattern, &patternindices, CAP, CAP,
-                            (linenumber < 0) ? -filesize : 0, yield);
-        if(rc < 0) return lfsToPdiErr(rc);
-        if(patternindices.size() == 0) return PDI_ERR_NOT_FOUND;
-
-        int64_t anchorLine = getLineNumberFromOffset(path, patternindices[0], yield);
-        if(anchorLine < 0) return (int)anchorLine;
-
-        const int WINDOW = 50;
-        int windowStartLine = (int)anchorLine - WINDOW;
-        if(windowStartLine < 0) windowStartLine = 0;
-
-        pdiutil::vector<uint32_t> linenumbersvec;
-        rc = getLineNumbersInFile(path, linenumbersvec, 2 * WINDOW + 1, windowStartLine, yield);
-        if(rc < 0) return lfsToPdiErr(rc);
-        if(linenumbersvec.size() == 0) return PDI_ERR_NOT_FOUND;
-
-        pdiutil::vector<uint32_t> winpatternindices;
-        rc = findInFile(path, pattern, &winpatternindices, -1, 1, (int64_t)linenumbersvec[0], yield);
-        if(rc < 0) return lfsToPdiErr(rc);
-
-        pdiutil::vector<uint32_t> filtered;
-        for(size_t i = 0; i < linenumbersvec.size(); i++){
-            uint32_t lineStart = linenumbersvec[i];
-            uint32_t lineEnd = (i+1 < linenumbersvec.size()) ? linenumbersvec[i+1] : (uint32_t)filesize;
-            for(size_t j = 0; j < winpatternindices.size(); j++){
-                if(winpatternindices[j] >= lineStart && winpatternindices[j] < lineEnd){
-                    filtered.push_back(lineStart);
-                    break;
-                }
-            }
-        }
-
-        if(filtered.size() == 0) return PDI_ERR_NOT_FOUND;
-
-        int32_t idx = (linenumber < 0) ? ((int32_t)filtered.size() + linenumber) : linenumber;
-        if(idx < 0 || (size_t)idx >= filtered.size()) return PDI_ERR_NOT_FOUND;
-
-        lineoffset = (int64_t)filtered[idx];
-        if(lineoffset >= filesize) return PDI_ERR_NOT_FOUND;
-    }
-
-    int bytesReadedOrError = readFile(path, 250, [&](char *data, uint32_t size) -> bool {
-        linedata += pdiutil::string(data, size);
-        return true;
-    }, (uint64_t)lineoffset, "\n");
-
-    if( !linedata.empty() && linedata.back() == '\r' ){
-        linedata.pop_back();
-        bytesReadedOrError--;
-    }
-
-    return lfsToPdiErr(bytesReadedOrError);
+    return FileLines::readLineInFile(*this, path, linenumber, linedata, pattern, yield);
 }
-
 
 /**
  * @brief Creates a directory.
@@ -1070,9 +774,11 @@ pdi_err_t LittleFSWrapper::rename(const char* oldPath, const char* newPath) {
  * @brief Copies a file to a new path.
  * @param sourcePath The path of the source file.
  * @param destPath The path of the destination file.
+ * @param keepgoing Optional, asked between chunks; false stops the copy and
+ *        removes what it wrote, answered as PDI_ERR_ABORTED.
  * @return 0 on success, or a negative error code on failure.
  */
-pdi_err_t LittleFSWrapper::copyFile(const char* sourcePath, const char* destPath) {
+pdi_err_t LittleFSWrapper::copyFile(const char* sourcePath, const char* destPath, CallBackVoidArgBoolRetFn keepgoing) {
     // Buffer to store file content
     char buffer[m_lfscfg.read_size];
     memset(buffer, 0, sizeof(buffer));
@@ -1092,17 +798,25 @@ pdi_err_t LittleFSWrapper::copyFile(const char* sourcePath, const char* destPath
     // Copy the content from source file to destination file
     lfs_size_t filesize = lfs_file_size(&m_lfs, &sourceFile);
     int copyOrErr = 0;
+    bool stopped = false;
     for (lfs_size_t i = 0; i < filesize; i += m_lfscfg.read_size) {
         lfs_size_t chunk = lfs_min(m_lfscfg.read_size, filesize - i);
         copyOrErr = lfs_file_read(&m_lfs, &sourceFile, buffer, chunk);
         if (copyOrErr < 0) break;
         copyOrErr = lfs_file_write(&m_lfs, &destFile, buffer, chunk);
         if (copyOrErr < 0) break;
+        stopped = (nullptr != keepgoing) && !keepgoing();
+        if (stopped) break;
     }
 
     // Close the files
     lfs_file_close(&m_lfs, &sourceFile);
     lfs_file_close(&m_lfs, &destFile);
+
+    if (stopped) {
+        lfs_remove(&m_lfs, destPath);
+        return PDI_ERR_ABORTED;
+    }
 
     if (copyOrErr < 0) {
         lfs_remove(&m_lfs, destPath);
@@ -1321,7 +1035,8 @@ int LittleFSWrapper::readCallback(const struct lfs_config *c, lfs_block_t block,
                                   lfs_off_t offset, void *buffer, lfs_size_t size)
 {
     auto* wrapper = static_cast<LittleFSWrapper*>(c->context);
-    int64_t byteRead = wrapper->m_istorage.read(block * c->block_size + offset, buffer, size);
+    wrapper->keepAlive();
+    int64_t byteRead = wrapper->m_istorage.read((uint64_t)block * c->block_size + offset, buffer, size);
     // LogFmtI("\nlfsread callback: %d, %d, %d, %d", block, c->block_size, offset, byteRead);
     if( byteRead < 0 ){
         return LFS_ERR_IO;
@@ -1341,7 +1056,8 @@ int LittleFSWrapper::readCallback(const struct lfs_config *c, lfs_block_t block,
 int LittleFSWrapper::progCallback(const struct lfs_config* c, lfs_block_t block,
                                   lfs_off_t offset, const void* buffer, lfs_size_t size) {
     auto* wrapper = static_cast<LittleFSWrapper*>(c->context);
-    int64_t byteWritten = wrapper->m_istorage.write(block * c->block_size + offset, buffer, size);
+    wrapper->keepAlive();
+    int64_t byteWritten = wrapper->m_istorage.write((uint64_t)block * c->block_size + offset, buffer, size);
     // LogFmtI("\nlfsprog callback: %d, %d, %d, %d", block, c->block_size, offset, byteWritten);
     if( byteWritten < 0 ){
         return LFS_ERR_IO;
@@ -1357,12 +1073,29 @@ int LittleFSWrapper::progCallback(const struct lfs_config* c, lfs_block_t block,
  */
 int LittleFSWrapper::eraseCallback(const struct lfs_config* c, lfs_block_t block) {
     auto* wrapper = static_cast<LittleFSWrapper*>(c->context);
-    bool bytesErased = wrapper->m_istorage.erase(block * c->block_size, c->block_size);
+    wrapper->keepAlive();
+    bool bytesErased = wrapper->m_istorage.erase((uint64_t)block * c->block_size, c->block_size);
     // LogFmtI("\nlfserase callback: %d, %d", block, c->block_size);
     if( bytesErased ){
         return LFS_ERR_OK;
     }
     return LFS_ERR_IO;
+}
+
+/**
+ * @brief Called from every flash access: after LFS_BUSY_YIELD_MS of back to back
+ * accesses, gives the system its turn.
+ */
+void LittleFSWrapper::keepAlive() {
+    uint32_t now = busyMillis();
+    if ((uint32_t)(now - m_busy_last) > LFS_BUSY_YIELD_MS) {
+        m_busy_from = now;
+    } else if ((uint32_t)(now - m_busy_from) >= LFS_BUSY_YIELD_MS) {
+        busyYield();
+        now = busyMillis();
+        m_busy_from = now;
+    }
+    m_busy_last = now;
 }
 
 /**

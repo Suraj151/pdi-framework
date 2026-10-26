@@ -99,7 +99,7 @@ struct KillCommand : public CommandBase {
 		uint8_t task_owner = t->m_owner;
 
 #if defined(ENABLE_AUTH_SERVICE) && defined(ENABLE_STORAGE_SERVICE)
-		bool isRoot = ( SessionManager::getCurrentUid() == USER_STORE_ROOT_UID );
+		bool isRoot = SessionManager::isRoot();
 		if( !isRoot ){
 			session_t *cur = SessionManager::current();
 			uint8_t cur_sid = (nullptr != cur) ? cur->m_sid : 0;

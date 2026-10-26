@@ -175,6 +175,18 @@ protected:
     uint32_t nowEpoch() override;
 
     /**
+     * @brief The device's millisecond clock, for timing a long run of flash
+     *        work.
+     */
+    uint32_t busyMillis() override;
+
+    /**
+     * @brief Gives the device's system its turn part way through a long run of
+     *        flash work, so its watchdog is fed and its network served.
+     */
+    void busyYield() override;
+
+    /**
      * @brief Returns the current session's cached uid/gid so stampCreate can
      *        record who owns a freshly created entry. Defaults to root (0/0)
      *        when there is no active session (e.g. during boot).

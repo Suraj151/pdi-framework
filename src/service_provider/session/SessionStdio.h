@@ -113,6 +113,17 @@ public:
   bool availableforwrite(uint32_t size) override;
 
   /**
+   * Whether the output descriptor takes no further write.
+   */
+  bool writeRefused() const override;
+
+  /**
+   * Writes bytes exactly as given to the output descriptor, with no line end
+   * tidied, as a copy of a file must arrive.
+   */
+  int32_t writeData(const uint8_t *c_str, uint32_t size) override;
+
+  /**
    * Sends each half of the flush to the descriptor that owns it, and passes
    * the type straight through when both resolve to the same stream.
    */

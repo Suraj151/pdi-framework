@@ -85,6 +85,7 @@ bool HttpServer::initService(void *arg)
   const char *headerkeys[] = {"Cookie", "Host"};
   size_t headerkeyssize = sizeof(headerkeys) / sizeof(char *);
   this->m_server->collectHeaders(headerkeys, headerkeyssize);
+  this->m_server->setUploadGate([](){ return __web_route_handler.request_has_session(); });
 
   // Start the server
   #if defined(ENABLE_HTTPS_SERVER) && defined(ENABLE_TLS_SERVICE)

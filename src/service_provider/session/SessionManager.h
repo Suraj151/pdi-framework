@@ -30,6 +30,25 @@ public:
   static uint8_t maxSessions() { return PDI_MAX_SESSIONS; }
   static uint8_t activeCount();
 
+  /**
+   * The scheduler's hooks around a service task: no session is current while it
+   * runs, and the previous one is restored after.
+   */
+  static void *enterSystem();
+  static void leaveSystem(void *previous);
+
+  /**
+   * Makes the given session current for the scope's lifetime, or none when it
+   * is null, and puts back the one that was current.
+   */
+  class Scope {
+  public:
+    explicit Scope(session_t *s);
+    ~Scope();
+  private:
+    session_t *m_previous;
+  };
+
 #ifdef ENABLE_STORAGE_SERVICE
   static pdiutil::string getPWD();
   static pdiutil::string getLastPWD();
@@ -43,6 +62,12 @@ public:
   static uint16_t getCurrentUid();
   static uint16_t getCurrentGid();
 #endif
+
+  /**
+   * Whether the current session is root, as every session is in a build
+   * without accounts.
+   */
+  static bool isRoot();
 
 #ifdef ENABLE_CMD_SERVICE
   /**
@@ -77,6 +102,22 @@ public:
    * Null when nothing is claimed, meaning the session terminal serves directly.
    */
   static SessionStdio *stdioFor(session_t *s);
+
+  /**
+   * Whether ctrl+c reached the current session's terminal since its line began,
+   * polled at most every CMD_INTERRUPT_POLL_MS.
+   */
+  static bool interruptRequested();
+
+  /**
+   * Whether the current session was interrupted, without looking again.
+   */
+  static bool interrupted();
+
+  /**
+   * Lets the current session's next line run with no interrupt pending.
+   */
+  static void clearInterrupt();
 #endif
 
 private:

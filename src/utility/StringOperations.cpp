@@ -171,6 +171,88 @@ void __append_padded_num(pdiutil::string &_out, int64_t _value, uint32_t _width,
 }
 
 /**
+ * The nth whitespace separated field of a line, empty where the line is short.
+ */
+bool __line_field(const pdiutil::string &line, uint8_t index, pdiutil::string &out)
+{
+  out.clear();
+
+  pdiutil::string::size_type cursor = 0;
+  uint8_t seen = 0;
+
+  while (cursor < line.length())
+  {
+    while (cursor < line.length() &&
+           (line[cursor] == ' ' || line[cursor] == '\t'))
+    {
+      cursor++;
+    }
+    if (cursor >= line.length()) break;
+
+    pdiutil::string::size_type stop = cursor;
+    while (stop < line.length() && line[stop] != ' ' && line[stop] != '\t')
+    {
+      stop++;
+    }
+
+    if (seen == index)
+    {
+      out = line.substr(cursor, stop - cursor);
+      return true;
+    }
+
+    cursor = stop;
+    seen++;
+  }
+
+  return false;
+}
+
+/**
+ * Splits text at each separator, keeping an empty piece between two separators but
+ * not an empty last piece.
+ */
+void __split(const pdiutil::string &_str, char _sep, pdiutil::vector<pdiutil::string> &_out)
+{
+    pdiutil::string::size_type start = 0, end;
+    while ((end = _str.find(_sep, start)) != pdiutil::string::npos) {
+        _out.push_back(_str.substr(start, end - start));
+        start = end + 1;
+    }
+    if (start < _str.size()) {
+        _out.push_back(_str.substr(start));
+    }
+}
+
+/**
+ * Whether a separated list holds the item as one of its pieces, whole.
+ */
+bool __list_contains(const pdiutil::string &_list, char _sep, const pdiutil::string &_item)
+{
+    pdiutil::string::size_type at = 0;
+    while (at <= _list.size()) {
+        pdiutil::string::size_type stop = _list.find(_sep, at);
+        stop = (pdiutil::string::npos == stop) ? _list.size() : stop;
+        if (stop - at == _item.size() && 0 == strncmp(_list.c_str() + at, _item.c_str(), _item.size())) {
+            return true;
+        }
+        at = stop + 1;
+    }
+    return false;
+}
+
+/**
+ * Takes every trailing copy of the character off the text, keeping a text that is
+ * only that character.
+ */
+void __strip_trailing(pdiutil::string &_str, char _ch)
+{
+    while (_str.size() > 1 && _ch == _str[_str.size() - 1]) {
+        _str.erase(_str.size() - 1);
+    }
+}
+
+/**
  * Appends text as the body of a json string, escaping quotes, backslashes and
  * control characters.
  */

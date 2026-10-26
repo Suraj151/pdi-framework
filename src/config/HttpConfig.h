@@ -120,6 +120,10 @@ typedef enum http_method http_method_t;
 #define HTTP_UPLOAD_LOG_EVERY_N_BLOCKS 64
 #endif
 
+#define HTTP_UPLOAD_DIR_ARG "dir"           /* form field naming the directory an upload is bound for */
+
+#define HTTP_UPLOAD_UNNAMED_FILE "upload"   /* name an upload is staged under when it came with none */
+
 #ifndef HTTP_UPLOAD_READ_BLOCK_SIZE
 #define HTTP_UPLOAD_READ_BLOCK_SIZE 2048
 #endif

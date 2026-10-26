@@ -37,12 +37,15 @@ created Date    : 1st Jan 2026
 #define memcpy_ro memcpy_P
 
 #define TCP_WRITE_DRAIN_TIMEOUT_MS    (MILLISECOND_DURATION_1000/2)
+#define TCP_WRITE_CHUNK_MAX           536
+#define TCP_UNACKED_MAX               TCP_SND_BUF
 
 #define SERIAL_BOOT_RX_QUIET_MS       (MILLISECOND_DURATION_1000/20)
 
 #define PDI_NET_STACK_LWIP
 
-#define CMD_OPTION_MAX                5   ///< Maximum number of options for a command.
+#define CMD_SIZE_MAX                  16  /* longest command name plus its terminator */
+#define CMD_OPTION_MAX                6   ///< Maximum number of options for a command.
 
 /**
  * session table and the transport pools that draw from it
@@ -112,5 +115,9 @@ created Date    : 1st Jan 2026
 #define DEVICE_SUPPORTS_OFFLOOP_NETWORK_TASK
 
 #define DEVICE_SUPPORTS_NTP
+
+#define DEVICE_SUPPORTS_DRIVER_CORE
+#define DEVICE_SUPPORTS_I2C
+#define DEVICE_SUPPORTS_SPI
 
 #endif // _ESP8266_DEVICE_CONFIG_H_

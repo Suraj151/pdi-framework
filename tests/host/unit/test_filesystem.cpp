@@ -618,3 +618,112 @@ TEST(filesystem, mime_type_of_a_file_without_an_extension_is_unknown)
     fs->createFile("/noext", "x");
     ASSERT_EQ(fs->getFileMimeType(pdiutil::string("/noext")), MIME_TYPE_MAX);
 }
+
+/* ------------------------------------------- long flash work and the system */
+
+namespace
+{
+
+/**
+ * A flash that costs a set number of milliseconds on the virtual clock for
+ * every access, so littlefs work on it runs as long as on a slow chip.
+ */
+struct SlowFlash : public iStorageInterface
+{
+    explicit SlowFlash(uint32_t ms) : m_ms(ms), m_data(64 * 4096, (char)0xFF) {}
+
+    int64_t read(uint64_t address, void *buffer, uint64_t size) override
+    {
+        __i_dvc_ctrl.advanceVirtualClock((uint64_t)m_ms * 1000);
+        memcpy(buffer, &m_data[(size_t)address], (size_t)size);
+        return (int64_t)size;
+    }
+
+    int64_t write(uint64_t address, const void *buffer, uint64_t size) override
+    {
+        __i_dvc_ctrl.advanceVirtualClock((uint64_t)m_ms * 1000);
+        const char *in = (const char *)buffer;
+        for (uint64_t i = 0; i < size; i++)
+        {
+            m_data[(size_t)(address + i)] &= in[i];
+        }
+        return (int64_t)size;
+    }
+
+    bool erase(uint64_t address, uint64_t size) override
+    {
+        __i_dvc_ctrl.advanceVirtualClock((uint64_t)m_ms * 1000);
+        memset(&m_data[(size_t)address], 0xFF, (size_t)size);
+        return true;
+    }
+
+    uint64_t size() const override { return m_data.size(); }
+
+    uint32_t m_ms;
+    std::string m_data;
+};
+
+/**
+ * The root filesystem over a flash of the test's choosing, counting each time
+ * it gives the system its turn.
+ */
+struct CountingFs : public FileSystemInterfaceImpl
+{
+    explicit CountingFs(iStorageInterface &flash) : FileSystemInterfaceImpl(flash, false), m_yields(0) {}
+
+    void busyYield() override
+    {
+        m_yields++;
+        FileSystemInterfaceImpl::busyYield();
+    }
+
+    uint32_t m_yields;
+};
+
+} // namespace
+
+/**
+ * Moving a block for wear levelling can run the flash for seconds inside one
+ * call, and a board whose system gets no turn for that long is reset by its
+ * watchdog.
+ */
+TEST(storage, long_flash_work_gives_the_system_its_turn)
+{
+    __i_dvc_ctrl.useVirtualClock(true);
+    SlowFlash flash(5);
+    CountingFs fs(flash);
+
+    int initialised = (int)fs.init();
+    uint32_t mounting = fs.m_yields;
+    std::string body(20000, 'x');
+    fs.m_yields = 0;
+    int written = fs.writeFile("/slow.bin", body.data(), (uint32_t)body.size(), false);
+    uint32_t writing = fs.m_yields;
+    __i_dvc_ctrl.useVirtualClock(false);
+
+    ASSERT_EQ(initialised, 0);
+    ASSERT_EQ(written, (int)body.size());
+    ASSERT_TRUE(mounting > 0);
+    ASSERT_TRUE(writing > 0);
+}
+
+TEST(storage, quick_flash_work_is_never_paused)
+{
+    __i_dvc_ctrl.useVirtualClock(true);
+    SlowFlash flash(0);
+    CountingFs fs(flash);
+
+    int initialised = (int)fs.init();
+    std::string body(20000, 'x');
+    int written = fs.writeFile("/quick.bin", body.data(), (uint32_t)body.size(), false);
+    for (int i = 0; i < 20; i++)
+    {
+        fs.writeFile("/quick.bin", "y", 1, true);
+        __i_dvc_ctrl.advanceVirtualClock((uint64_t)(LFS_BUSY_YIELD_MS + 10) * 1000);
+    }
+    __i_dvc_ctrl.useVirtualClock(false);
+
+    ASSERT_EQ(initialised, 0);
+    ASSERT_EQ(written, (int)body.size());
+    ASSERT_EQ(fs.m_yields, 0u);
+}

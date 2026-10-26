@@ -521,6 +521,196 @@ def delete_honours_permissions(t):
         t.run("userdel u=%s" % account)
 
 
+def scratch_account(t, account):
+    """A fresh account with its own home, or a skip when the target cannot make one."""
+    t.run("userdel u=%s" % account)
+    out = t.run("useradd u=%s p=%s" % (account, "portalpw1"))
+    if "root required" in out:
+        raise Skip("not root on this target")
+    if "added" not in out:
+        raise Skip("this target would not make a scratch account: %s" % out)
+
+
+@test("a user uploads into their own home from the portal",
+      needs=("useradd", "userdel", "cat", "ls"))
+def upload_into_users_home(t):
+    """
+    The server stages an upload before it knows the session, then hands it to
+    the signed in user. Taking it out of the staging directory is the server's
+    step; the user only has to be allowed to write where it lands.
+    """
+    account = "portalup"
+    name = "portal_home.txt"
+    scratch_account(t, account)
+    try:
+        portal = t.portal(username=account, password="portalpw1")
+        answer = upload(t, portal, name, b"a user's own upload\n",
+                        location="/storage?cp=/home/%s" % account)
+        if answer.status not in (200, 301, 302, 303):
+            raise AssertionError("the upload answered %d" % answer.status)
+
+        expect_in("a user's own upload", t.run("cat /home/%s/%s" % (account, name)),
+                  "what the user's home holds after the upload")
+        expect_in(account, t.run("ls /home/%s" % account),
+                  "the owner of the uploaded file")
+    finally:
+        t.run("userdel u=%s" % account)
+
+
+@test("an upload into a directory the user may not write is refused",
+      needs=("useradd", "userdel", "cat", "rm"))
+def upload_honours_permissions(t):
+    account = "portalro"
+    name = "portal_denied.txt"
+    scratch_account(t, account)
+    t.run("rm /%s" % name)
+    try:
+        portal = t.portal(username=account, password="portalpw1")
+        upload(t, portal, name, b"should not land\n", location="/storage")
+
+        expect_not_in("should not land", t.run("cat /%s" % name),
+                      "the root directory after a user's upload into it")
+    finally:
+        t.run("rm /%s" % name)
+        t.run("userdel u=%s" % account)
+
+
+@test("an uploaded file's own name cannot place it outside the staging directory",
+      needs=("cat", "rm"))
+def upload_name_cannot_climb_out(t):
+    portal = t.portal()
+    name = "portal_escape.txt"
+    t.run("rm /etc/%s" % name)
+    t.run("rm /%s" % name)
+    try:
+        upload(t, portal, "../etc/" + name, b"escaped staging\n")
+
+        expect_not_in("escaped staging", t.run("cat /etc/%s" % name),
+                      "/etc after an upload whose file name climbs out of staging")
+        expect_in("escaped staging", t.run("cat /%s" % name),
+                  "the target after an upload whose name carried a directory")
+    finally:
+        t.run("rm /etc/%s" % name)
+        t.run("rm /%s" % name)
+
+
+@test("a refused upload leaves nothing staged", needs=("useradd", "userdel", "ls", "rm"))
+def refused_upload_leaves_nothing_staged(t):
+    account = "portalst"
+    name = "portal_staged_left.txt"
+    scratch_account(t, account)
+    try:
+        portal = t.portal(username=account, password="portalpw1")
+        upload(t, portal, name, b"refused\n", location="/storage")
+
+        expect_not_in(name, t.run("ls /temp"), "the staging directory after a refused upload")
+    finally:
+        t.run("rm /%s" % name)
+        t.run("rm /temp/%s" % name)
+        t.run("userdel u=%s" % account)
+
+
+@test("an upload refused for its csrf token leaves nothing staged", needs=("ls", "rm"))
+def csrf_refused_upload_leaves_nothing_staged(t):
+    name = "portal_nocsrf.txt"
+    t.run("rm /temp/%s" % name)
+    try:
+        portal = t.portal()
+        portal.post_multipart("/storage-fileupload", {"loc": "/storage"},
+                              [("nf", name, b"no csrf\n")])
+        expect_not_in(name, t.run("ls /temp"), "the staging directory after an upload with no csrf")
+        expect_not_in(name, t.run("ls /"), "the root after an upload with no csrf")
+    finally:
+        t.run("rm /temp/%s" % name)
+        t.run("rm /%s" % name)
+
+
+@test("an upload under a field the page does not take leaves nothing staged", needs=("ls", "rm"))
+def unknown_field_upload_leaves_nothing_staged(t):
+    name = "portal_field.txt"
+    t.run("rm /temp/%s" % name)
+    try:
+        portal = t.portal()
+        portal.post_multipart("/storage-fileupload", {"csrf": portal.csrf(), "loc": "/storage"},
+                              [("notthefield", name, b"wrong field\n")])
+        expect_not_in(name, t.run("ls /temp"), "the staging directory after an upload under another field")
+    finally:
+        t.run("rm /temp/%s" % name)
+        t.run("rm /%s" % name)
+
+
+@test("an upload cannot climb out of the user's home with a dot dot",
+      needs=("useradd", "userdel", "cat", "rm"))
+def upload_cannot_climb_out(t):
+    account = "portaldd"
+    name = "portal_climb.txt"
+    scratch_account(t, account)
+    t.run("rm /etc/%s" % name)
+    try:
+        portal = t.portal(username=account, password="portalpw1")
+        upload(t, portal, name, b"climbed out\n",
+               location="/storage?cp=/home/%s/../../etc" % account)
+
+        expect_not_in("climbed out", t.run("cat /etc/%s" % name),
+                      "/etc after an upload aimed at it through a dot dot")
+    finally:
+        t.run("rm /etc/%s" % name)
+        t.run("userdel u=%s" % account)
+
+
+@test("a user makes a folder in their home from the portal but not in the root",
+      needs=("useradd", "userdel", "ls", "rm"))
+def folder_honours_permissions(t):
+    account = "portalmk"
+    scratch_account(t, account)
+    t.run("rm /portal_rootdir")
+    try:
+        portal = t.portal(username=account, password="portalpw1")
+        portal.post("/storage-fileupload", {
+            "csrf": portal.csrf(),
+            "loc": "/storage?cp=/home/%s" % account,
+            "nd": "portal_mine",
+        })
+        portal.post("/storage-fileupload", {
+            "csrf": portal.csrf(),
+            "loc": "/storage",
+            "nd": "portal_rootdir",
+        })
+
+        expect_in("portal_mine", t.run("ls /home/%s" % account),
+                  "the user's home after making a folder there")
+        expect_not_in("portal_rootdir", t.run("ls /"),
+                      "the root directory after a user tried to make a folder there")
+    finally:
+        t.run("rm /portal_rootdir")
+        t.run("userdel u=%s" % account)
+
+
+@test("the portal moves only a staged upload, never a file named by the user",
+      needs=("useradd", "userdel", "cat", "ls"))
+def upload_moves_only_staged_files(t):
+    """
+    The name of the staged file comes back in the form, so a user could name
+    any file on the target instead. Whatever is named that the server did not
+    stage stays where it is.
+    """
+    account = "portalnf"
+    scratch_account(t, account)
+    try:
+        portal = t.portal(username=account, password="portalpw1")
+        portal.post("/storage-fileupload", {
+            "csrf": portal.csrf(),
+            "loc": "/storage?cp=/home/%s" % account,
+            "nf": "/etc/passwd",
+        })
+
+        expect_in(":0:0:", t.run("cat /etc/passwd"), "/etc/passwd after the forged move")
+        expect_not_in("passwd", t.run("ls /home/%s" % account),
+                      "the user's home after the forged move")
+    finally:
+        t.run("userdel u=%s" % account)
+
+
 def drain(sock, quiet=1.0):
     """Read until the peer has said nothing for a while, and return what came."""
     got = b""

@@ -14,6 +14,7 @@ import argparse
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -24,7 +25,7 @@ BUILD_DIR = os.path.join(TESTS_DIR, ".build")
 FUZZ_DIR = os.path.join(TESTS_DIR, "fuzz")
 FUZZ_BUILD_DIR = os.path.join(TESTS_DIR, ".build-fuzz")
 
-TIERS = ("unit", "system", "device", "fuzz")
+TIERS = ("unit", "system", "device", "fuzz", "perf")
 
 # one per parser that a peer reaches before any credential is checked
 FUZZ_TARGETS = (
@@ -39,6 +40,7 @@ FUZZ_TARGETS = (
     "fuzz_mdns",
     "fuzz_json",
     "fuzz_mqtt",
+    "fuzz_devices",
 )
 
 GREEN = "\033[32m"
@@ -587,6 +589,126 @@ def run_device_interleaved(specs, feature, verbose, timeout, username, password,
                 pass
 
 
+def board_name(shell, timeout):
+    """The target's own name for itself, which keys its perf baselines."""
+    try:
+        out = shell.run("cat /etc/hostname", timeout).strip()
+    except Exception:
+        return None
+    lines = [line.strip() for line in out.splitlines() if line.strip()]
+    return lines[0] if lines and " " not in lines[0] else None
+
+
+def run_perf_lanes(lanes, feature, verbose, timeout, record, board):
+    """
+    The perf tier over lanes already opened (label -> Target). A run the target
+    restarted during is void: nothing is judged as final and nothing is stored.
+    """
+    from suite.perf import registry as perf_registry
+
+    first = next(iter(lanes.values()))
+    board = board or board_name(first.shell, timeout)
+    if not board:
+        fail("the target names no board in /etc/hostname; pass --perf-board")
+        return 1
+
+    say("%sperf on %s over %s%s" % (DIM, board, ", ".join(lanes), RESET))
+    began = read_uptime(first.shell, timeout)
+    ok, failed, skipped, commit = perf_registry.run(lanes, board, only=feature,
+                                                    record=record, verbose=verbose)
+    ended = read_uptime(first.shell, timeout)
+
+    if began is not None and ended is not None and ended < began:
+        fail("the target restarted during the perf run: %ds -> %ds; nothing was stored"
+             % (began, ended))
+        return 1
+
+    commit()
+    say("")
+    say("%d measured, %d failed, %d skipped" % (ok + len(failed), len(failed), len(skipped)))
+    if failed:
+        fail("slower than baseline or failed to measure: %s" % ", ".join(failed))
+        return 1
+    return 0
+
+
+def run_perf_device(specs, feature, verbose, timeout, username, password, key_filename,
+                    record, board):
+    sys.path.insert(0, TESTS_DIR)
+    from suite.driver.connect import connect, parse
+    from suite.driver.caps import Capabilities
+    from suite.features import registry
+    from suite.driver.shell import ShellError
+
+    lanes = {}
+    shells = []
+    try:
+        for spec in specs:
+            scheme, _ = parse(spec)
+            try:
+                shell, description = connect(spec, username=username, password=password,
+                                             key_filename=key_filename, reset=False)
+                shells.append(shell)
+                shell.attach(username, password, timeout=max(timeout, 30))
+            except ShellError as err:
+                fail("%s: %s" % (spec, err))
+                continue
+            caps = Capabilities.probe(shell)
+            lanes[scheme] = registry.Target(shell, caps, username, password, timeout)
+
+        if not lanes:
+            fail("no transport could be opened")
+            return 1
+        return run_perf_lanes(lanes, feature, verbose, timeout, record, board)
+    finally:
+        for shell in shells:
+            try:
+                shell.close()
+            except Exception:
+                pass
+
+
+def run_perf_host(feature, verbose, timeout, username, password, record, board):
+    binary = os.path.join(BUILD_DIR, "pdid")
+    if not os.path.exists(binary):
+        fail("pdid missing at %s" % binary)
+        return 1
+
+    sys.path.insert(0, TESTS_DIR)
+    from suite.driver.host_shell import HostShell
+    from suite.driver.connect import connect
+    from suite.driver.caps import Capabilities
+    from suite.features import registry
+
+    shell = HostShell(binary)
+    others = []
+    try:
+        shell.attach(username, password, timeout=max(timeout, 30))
+        caps = Capabilities.probe(shell)
+        lanes = {"host": registry.Target(shell, caps, username, password, timeout)}
+
+        telnet_port = shell.is_listening(23)
+        ssh_port = shell.is_listening(22)
+        for label, spec in (("telnet", "telnet:127.0.0.1:%d" % telnet_port if telnet_port else None),
+                            ("ssh", "ssh:%s@127.0.0.1:%d" % (username, ssh_port) if ssh_port else None)):
+            if spec is None:
+                continue
+            peer, _ = connect(spec, username=username, password=password, reset=False)
+            others.append(peer)
+            peer.attach(username, password, timeout=max(timeout, 30))
+            lanes[label] = registry.Target(peer, Capabilities.probe(peer), username, password,
+                                           timeout)
+
+        return run_perf_lanes(lanes, feature, verbose, timeout, record, board or "host")
+    finally:
+        for peer in others:
+            try:
+                peer.close()
+            except Exception:
+                pass
+        shell.close()
+
+
 def run_system_features(feature, verbose, timeout, username, password):
     binary = os.path.join(BUILD_DIR, "pdid")
     if not os.path.exists(binary):
@@ -795,6 +917,11 @@ def main():
     parser.add_argument("--jobs", type=int, default=os.cpu_count() or 1,
                         help="host processes run at once for the unit suites, the feature suites "
                              "and the fuzz harnesses (default: every cpu; 1 runs them in turn)")
+    parser.add_argument("--perf-record", action="store_true",
+                        help="perf tier: take this run's numbers as the baselines")
+    parser.add_argument("--perf-board",
+                        help="perf tier: the name baselines are kept under, when the "
+                             "target's /etc/hostname cannot be read")
     parser.add_argument("--features-only", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
 
@@ -802,7 +929,7 @@ def main():
         return run_system_features(args.feature, args.verbose, args.timeout, args.user, args.password)
 
     tiers = args.tier if args.tier else ["unit", "system"]
-    if args.device and "device" not in tiers:
+    if args.device and "device" not in tiers and "perf" not in tiers:
         tiers.append("device")
     if args.fuzz_target and "fuzz" not in tiers:
         tiers.append("fuzz")
@@ -885,6 +1012,31 @@ def main():
                 if not args.keep_going:
                     return code
 
+    if "perf" in tiers:
+        if args.list:
+            sys.path.insert(0, TESTS_DIR)
+            from suite.perf import registry as perf_registry
+            for item in perf_registry.discover():
+                say("perf.%s" % item.full_name)
+        else:
+            say("")
+            say("%sperf%s" % (DIM, RESET))
+            if args.device:
+                code = run_perf_device(args.device, args.feature, args.verbose, args.timeout,
+                                       args.user, args.password, args.key, args.perf_record,
+                                       args.perf_board)
+            else:
+                if not built:
+                    if not configure(not args.no_sanitize) or not build():
+                        return 1
+                    built = True
+                code = run_perf_host(args.feature, args.verbose, args.timeout, args.user,
+                                     args.password, args.perf_record, args.perf_board)
+            if code != 0:
+                failures.append("perf")
+                if not args.keep_going:
+                    return code
+
     if "fuzz" in tiers:
         if not args.list:
             say("")
@@ -903,7 +1055,13 @@ def main():
     return 0
 
 
+def _stop_on_term(signum, frame):
+    """A kill stops the run the way Ctrl+C does, so suites still put a board back."""
+    raise KeyboardInterrupt()
+
+
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, _stop_on_term)
     try:
         sys.exit(main())
     except KeyboardInterrupt:

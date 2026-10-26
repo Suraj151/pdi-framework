@@ -70,6 +70,28 @@ void __append_padded_num(pdiutil::string &_out, int64_t _value, uint32_t _width,
 void __append_json_escaped(pdiutil::string &_out, const char *_str);
 
 /**
+ * The nth whitespace separated field of a line, empty where the line is short.
+ */
+bool __line_field(const pdiutil::string &line, uint8_t index, pdiutil::string &out);
+
+/**
+ * Splits text at each separator, keeping an empty piece between two separators but
+ * not an empty last piece.
+ */
+void __split(const pdiutil::string &_str, char _sep, pdiutil::vector<pdiutil::string> &_out);
+
+/**
+ * Whether a separated list holds the item as one of its pieces, whole.
+ */
+bool __list_contains(const pdiutil::string &_list, char _sep, const pdiutil::string &_item);
+
+/**
+ * Takes every trailing copy of the character off the text, keeping a text that is
+ * only that character.
+ */
+void __strip_trailing(pdiutil::string &_str, char _ch);
+
+/**
  * @brief Whether the character is a letter.
  * @param c The character to test.
  * @return True when the character is a to z in either case.

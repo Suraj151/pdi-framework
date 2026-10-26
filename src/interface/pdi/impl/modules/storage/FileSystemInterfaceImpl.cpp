@@ -311,6 +311,22 @@ void FileSystemInterfaceImpl::applyFileSizeLimit(pdiutil::string &name, uint32_t
     }
 }
 
+/**
+ * @brief The device's millisecond clock, for timing a long run of flash
+ *        work.
+ */
+uint32_t FileSystemInterfaceImpl::busyMillis(){
+    return (uint32_t)__i_dvc_ctrl.millis_now();
+}
+
+/**
+ * @brief Gives the device's system its turn part way through a long run of
+ *        flash work, so its watchdog is fed and its network served.
+ */
+void FileSystemInterfaceImpl::busyYield(){
+    __i_dvc_ctrl.yield();
+}
+
 uint32_t FileSystemInterfaceImpl::nowEpoch(){
     if( !__i_ntp.is_valid_ntptime() ){
         return 0;

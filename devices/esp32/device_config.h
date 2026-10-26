@@ -42,7 +42,7 @@ extern portMUX_TYPE __pdi_critical_mux;
 #define NESTED_CRITICAL_SECTION_EXIT  interrupts();
 #endif
 
-#define CMD_SIZE_MAX                8   ///< Maximum size of a command.
+#define CMD_SIZE_MAX                16  ///< Maximum size of a command.
 #define CMD_OPTION_MAX              6   ///< Maximum number of options for a command.
 #define CMD_OPTION_SIZE_MAX         3   ///< Maximum size of an option.
 
@@ -52,6 +52,9 @@ extern portMUX_TYPE __pdi_critical_mux;
 #define MAX_SERVICE_TASKS           12
 #define SCRIPT_MAX_DEPTH            4
 #define TCP_WRITE_DRAIN_TIMEOUT_MS  (MILLISECOND_DURATION_1000/2)
+#define SSH_SFTP_READ_MAX           16384
+#define TCP_WRITE_CHUNK_MAX         1436
+#define TCP_UNACKED_MAX             TCP_SND_BUF
 
 #define PDI_NET_STACK_LWIP
 
@@ -78,6 +81,8 @@ extern portMUX_TYPE __pdi_critical_mux;
  * Bytes a pipe carries between two stages.
  */
 #define PDI_PIPE_CAPACITY 6*1024
+
+#define SD_CLOCK_HZ 4000000 /* sd card transfer clock in Hz */
 
 /**
  * device can spare the ram the record ciphers need
@@ -113,6 +118,12 @@ extern portMUX_TYPE __pdi_critical_mux;
 
 #define DEVICE_SUPPORTS_NTP
 #define DEVICE_SUPPORTS_PROGRAM_EXEC
+#define DEVICE_SUPPORTS_DRIVER_CORE
+#define DEVICE_SUPPORTS_I2S
+#define DEVICE_SUPPORTS_I2C
+#define DEVICE_SUPPORTS_SPI
+/* the core already links FatFs, so the vendored copy stays out of the build */
+#define DEVICE_PROVIDES_FATFS
 // device yield is valid from any task, so blocking network calls may run off the main loop
 #define DEVICE_SUPPORTS_OFFLOOP_NETWORK_TASK
 

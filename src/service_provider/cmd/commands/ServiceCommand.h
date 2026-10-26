@@ -427,11 +427,11 @@ private:
 
 	bool requireRoot(){
 #if defined(ENABLE_AUTH_SERVICE) && defined(ENABLE_STORAGE_SERVICE)
-		if( SessionManager::getCurrentUid() == USER_STORE_ROOT_UID ){
+		if( SessionManager::isRoot() ){
 			return true;
 		}
 		m_terminal->putln();
-		m_terminal->writeln_ro(RODT_ATTR("root required"));
+		m_terminal->writeln_ro(RODT_ATTR(CMD_MSG_ROOT_REQUIRED));
 		return false;
 #else
 		return true;

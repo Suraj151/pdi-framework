@@ -140,6 +140,19 @@ public:
     bool setTaskOwner(pdiutil::task_id_t _id, uint8_t _owner);
 
     /**
+     * @brief Mark an already-registered task as a service's own work, so the
+     *        system hooks run around it.
+     * @return true if the task was found and updated.
+     */
+    bool setTaskSystem(pdiutil::task_id_t _id);
+
+    /**
+     * @brief Hooks run before and after every task marked as a service's own work;
+     * either missing runs neither.
+     */
+    void setSystemHooks(system_enter_fn_t _enter, system_leave_fn_t _leave);
+
+    /**
      * @brief Update the nice value of a task (POSIX-style, -20..19).
      *        Does not immediately re-sort; caller may follow with rebaseAndRestartPrioTasks().
      * @return true if the task was found and updated.
@@ -397,6 +410,18 @@ private:
      * @brief Id to hand to the next task registered, advancing rather than refilling gaps.
      */
     pdiutil::task_id_t m_next_task_id;
+
+    /**
+     * @var system_enter_fn_t m_system_enter
+     * @brief Run before a task marked as a service's own work.
+     */
+    system_enter_fn_t m_system_enter;
+
+    /**
+     * @var system_leave_fn_t m_system_leave
+     * @brief Run after it, with what m_system_enter answered.
+     */
+    system_leave_fn_t m_system_leave;
 };
 
 /**

@@ -196,6 +196,252 @@ TEST(cmdusers, userdel_is_refused_to_a_user_that_is_not_root)
     __user_store_service.removeUser("meddler");
 }
 
+/* ------------------------------------------------------------ home dirs */
+
+static bool inDir(const char *want)
+{
+    pdiutil::string pwd = SessionManager::getPWD();
+    while (pwd.size() > 1 && '/' == pwd[pwd.size() - 1]) pwd.pop_back();
+    return pwd == want;
+}
+
+static void dropHome(const char *name)
+{
+    pdiutil::string home = "/home/";
+    home += name;
+    __i_fs.beginPrivileged();
+    __user_store_service.removeUser(name);
+    if (__i_fs.isDirExist(home.c_str())) __i_fs.deleteDirectory(home.c_str());
+    __i_fs.endPrivileged();
+}
+
+TEST(cmdusers, useradd_makes_a_home_owned_by_the_new_user)
+{
+    pditest::Shell shell;
+    readyStore();
+    dropHome("homer");
+
+    shell.run("useradd u=homer p=homerpass");
+
+    user_record_t found;
+    ASSERT_TRUE(__user_store_service.findUserByName("homer", found));
+    ASSERT_TRUE(found.m_home == "/home/homer");
+    ASSERT_TRUE(__i_fs.isDirectory("/home/homer"));
+
+    file_info_t meta;
+    ASSERT_EQ(__i_fs.getFileMeta("/home/homer", meta), 0);
+    ASSERT_EQ(meta.m_uid, found.m_uid);
+    ASSERT_EQ(meta.m_gid, found.m_gid);
+    ASSERT_EQ(meta.m_perms, 0755);
+
+    ASSERT_EQ(__i_fs.getFileMeta("/home", meta), 0);
+    ASSERT_EQ(meta.m_uid, USER_STORE_ROOT_UID);
+    ASSERT_EQ(meta.m_perms, 0755);
+
+    dropHome("homer");
+}
+
+TEST(cmdusers, userdel_removes_the_home_and_what_is_in_it)
+{
+    pditest::Shell shell;
+    readyStore();
+    dropHome("leaver");
+
+    shell.run("useradd u=leaver p=leaverpass");
+    ASSERT_TRUE(__i_fs.isDirectory("/home/leaver"));
+    __i_fs.createFile("/home/leaver/notes", "n\n");
+    __i_fs.createDirectory("/home/leaver/sub");
+
+    shell.run("userdel u=leaver");
+
+    user_record_t found;
+    ASSERT_FALSE(__user_store_service.findUserByName("leaver", found));
+    ASSERT_FALSE(__i_fs.isDirExist("/home/leaver"));
+    ASSERT_TRUE(__i_fs.isDirectory("/home"));
+
+    dropHome("leaver");
+}
+
+TEST(cmdusers, userdel_leaves_a_home_outside_home_alone)
+{
+    pditest::Shell shell;
+    makeUser("rooted", 1512, "rootedpass");
+
+    shell.run("userdel u=rooted");
+
+    user_record_t found;
+    ASSERT_FALSE(__user_store_service.findUserByName("rooted", found));
+    ASSERT_TRUE(__i_fs.isDirectory(USER_STORE_ETC_DIR));
+    ASSERT_TRUE(__i_fs.isFileExist(USER_STORE_PASSWD_PATH));
+}
+
+TEST(cmdusers, useradd_keeps_a_home_that_is_already_there)
+{
+    pditest::Shell shell;
+    readyStore();
+    dropHome("keeper2");
+    __i_fs.createDirectory("/home/keeper2");
+    __i_fs.createFile("/home/keeper2/old", "old\n");
+
+    std::string out = shell.run("useradd u=keeper2 p=keeperpass");
+
+    user_record_t found;
+    ASSERT_TRUE(__user_store_service.findUserByName("keeper2", found));
+    ASSERT_TRUE(saw(out, "home exists"));
+    ASSERT_TRUE(__i_fs.isFileExist("/home/keeper2/old"));
+    file_info_t meta;
+    ASSERT_EQ(__i_fs.getFileMeta("/home/keeper2", meta), 0);
+    ASSERT_EQ(meta.m_uid, USER_STORE_ROOT_UID);
+
+    dropHome("keeper2");
+}
+
+TEST(cmdusers, useradd_takes_the_account_back_when_a_file_holds_the_home)
+{
+    pditest::Shell shell;
+    readyStore();
+    dropHome("blocked");
+    __i_fs.createDirectory("/home");
+    __i_fs.createFile("/home/blocked", "in the way\n");
+
+    std::string out = shell.run("useradd u=blocked p=blockedpass");
+
+    user_record_t found;
+    ASSERT_FALSE(__user_store_service.findUserByName("blocked", found));
+    ASSERT_TRUE(saw(out, "cannot create home"));
+    ASSERT_TRUE(__i_fs.isFileExist("/home/blocked"));
+    ASSERT_FALSE(__i_fs.isDirectory("/home/blocked"));
+
+    __i_fs.deleteFile("/home/blocked");
+}
+
+TEST(cmdusers, useradd_gives_no_home_to_a_name_of_only_dots)
+{
+    pditest::Shell shell;
+    readyStore();
+    __i_fs.createDirectory("/home");
+    __i_fs.createFile("/home/dots_marker", "m\n");
+
+    std::string out = shell.run("useradd u=.. p=dotspass");
+    shell.run("useradd u=. p=dotspass");
+
+    user_record_t found;
+    ASSERT_FALSE(__user_store_service.findUserByName("..", found));
+    ASSERT_FALSE(__user_store_service.findUserByName(".", found));
+    ASSERT_TRUE(saw(out, "cannot create home"));
+    ASSERT_TRUE(__i_fs.isFileExist("/home/dots_marker"));
+    ASSERT_TRUE(__i_fs.isFileExist(USER_STORE_PASSWD_PATH));
+
+    __i_fs.deleteFile("/home/dots_marker");
+}
+
+TEST(cmdusers, userdel_leaves_a_home_that_belongs_to_another_name_alone)
+{
+    pditest::Shell shell;
+    readyStore();
+    __user_store_service.removeUser("thief");
+    __i_fs.createDirectory("/home/victim");
+    __i_fs.createFile("/home/victim/data", "victim's\n");
+
+    user_record_t record;
+    record.m_username = "thief";
+    record.m_uid = 1513;
+    record.m_gid = 1513;
+    record.m_home = "/home/victim";
+    record.m_shell = "/bin/sh";
+    __user_store_service.addUser(record, "thiefpass");
+
+    shell.run("userdel u=thief");
+
+    user_record_t found;
+    ASSERT_FALSE(__user_store_service.findUserByName("thief", found));
+    ASSERT_TRUE(__i_fs.isFileExist("/home/victim/data"));
+
+    __i_fs.deleteDirectory("/home/victim");
+}
+
+TEST(cmdusers, login_with_a_home_that_is_gone_stays_where_logout_left_it)
+{
+    pditest::Shell shell;
+    readyStore();
+    dropHome("homeless");
+    shell.run("useradd u=homeless p=homelesspass");
+    __i_fs.deleteDirectory("/home/homeless");
+
+    shell.run("logout");
+    shell.type("homeless\n");
+    shell.type("homelesspass\n");
+
+    user_record_t found;
+    ASSERT_TRUE(__user_store_service.findUserByName("homeless", found));
+    ASSERT_EQ(SessionManager::getCurrentUid(), found.m_uid);
+    ASSERT_TRUE(inDir("/"));
+
+    dropHome("homeless");
+}
+
+TEST(cmdusers, login_lands_in_the_users_home)
+{
+    pditest::Shell shell;
+    readyStore();
+    dropHome("lander");
+    shell.run("useradd u=lander p=landerpass");
+
+    shell.run("logout");
+    shell.type("lander\n");
+    shell.type("landerpass\n");
+
+    user_record_t found;
+    ASSERT_TRUE(__user_store_service.findUserByName("lander", found));
+    ASSERT_EQ(SessionManager::getCurrentUid(), found.m_uid);
+    ASSERT_TRUE(inDir("/home/lander"));
+
+    ASSERT_TRUE(__i_fs.createFile("/home/lander/mine", "m\n") >= 0);
+
+    dropHome("lander");
+}
+
+TEST(cmdusers, a_bare_cd_and_cd_tilde_go_to_the_users_home)
+{
+    pditest::Shell shell;
+    readyStore();
+    dropHome("walker");
+    shell.run("useradd u=walker p=walkerpass");
+    shell.run("su walker walkerpass");
+
+    shell.run("cd /tmp");
+    shell.run("cd");
+    ASSERT_TRUE(inDir("/home/walker"));
+
+    shell.run("cd /etc");
+    shell.run("cd ~");
+    ASSERT_TRUE(inDir("/home/walker"));
+
+    dropHome("walker");
+}
+
+TEST(cmdusers, su_lands_in_the_new_users_home)
+{
+    pditest::Shell shell;
+    readyStore();
+    dropHome("stayer");
+    shell.run("useradd u=stayer p=stayerpass");
+
+    shell.run("cd /etc");
+    shell.run("su stayer stayerpass");
+    ASSERT_TRUE(inDir("/home/stayer"));
+
+    dropHome("stayer");
+}
+
+TEST(cmdusers, root_still_lands_in_slash)
+{
+    pditest::Shell shell;
+    shell.run("cd /etc");
+    shell.run("cd");
+    ASSERT_TRUE(inDir("/"));
+}
+
 /* ------------------------------------------------------------------- su */
 
 TEST(cmdusers, su_switches_the_session_to_another_user)

@@ -39,4 +39,14 @@ uint16_t crc16Ccitt(const uint8_t *_buf, uint32_t _len);
  */
 uint16_t crc16CcittUpdate(uint16_t _crc, const uint8_t *_buf, uint32_t _len);
 
+/**
+ * @brief The 7 bit crc an SD card command or register carries, polynomial
+ * x^7 + x^3 + 1 seeded with zero.
+ *
+ * @param _buf Bytes to run over.
+ * @param _len Number of bytes.
+ * @return The checksum in the low 7 bits.
+ */
+uint8_t crc7(const uint8_t *_buf, uint32_t _len);
+
 #endif

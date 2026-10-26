@@ -18,15 +18,10 @@ created Date    : 27th Aug 2026
 /* generated filesystem reading support functions */
 
 /**
- * Hands every line of a generated node to the callback in turn, stopping where
- * it answers false. False when the path holds nothing to read.
+ * Hands every line of a file to the callback in turn, stopping where it answers
+ * false; false when nothing is readable.
  */
 bool readProcLines(const char *path, pdiutil::function<bool(pdiutil::string &)> online);
-
-/**
- * The nth whitespace separated field of a line, empty where the line is short.
- */
-bool procLineField(const pdiutil::string &line, uint8_t index, pdiutil::string &out);
 
 #ifdef ENABLE_CMD_SERVICE
 

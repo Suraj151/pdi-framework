@@ -88,6 +88,10 @@ created Date    : 3rd June 2026
 #define TLS_DEFAULT_SERVER_KEY_PATH       TLS_DEFAULT_HTTP_DIR "/server.key"
 #endif
 
+#ifndef TLS_PRIVATE_KEY_PERMS
+#define TLS_PRIVATE_KEY_PERMS             0600  /* mode a tls private key file is kept at */
+#endif
+
 #ifndef TLS_DEFAULT_CLIENT_CA_PATH
 #define TLS_DEFAULT_CLIENT_CA_PATH        TLS_DEFAULT_HTTP_DIR "/client-ca.crt"
 #endif

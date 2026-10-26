@@ -234,6 +234,34 @@ TEST(dataconv, epoch_zero_is_the_start_of_1970)
     ASSERT_EQ((int)dt.m_weekday, 4);
 }
 
+TEST(dataconv, calendar_fields_give_back_the_epoch_they_came_from)
+{
+    const uint32_t samples[6] = {0u, 59u, 951782400u, 1709214307u, 1735689599u, 2147483647u};
+
+    for (int i = 0; i < 6; i++)
+    {
+        datetime_t dt;
+        EpochToDateTime(samples[i], dt);
+        ASSERT_EQ(DateTimeToEpoch(dt), samples[i]);
+    }
+}
+
+TEST(dataconv, calendar_fields_before_1970_or_with_no_month_give_no_epoch)
+{
+    datetime_t dt;
+    dt.m_year = 1969;
+    dt.m_month = 12;
+    dt.m_day = 31;
+    ASSERT_EQ(DateTimeToEpoch(dt), 0u);
+
+    dt.m_year = 2024;
+    dt.m_month = 0;
+    ASSERT_EQ(DateTimeToEpoch(dt), 0u);
+
+    dt.m_month = 13;
+    ASSERT_EQ(DateTimeToEpoch(dt), 0u);
+}
+
 TEST(dataconv, weekday_is_sunday_zero_across_a_whole_week)
 {
     // 2024-03-03 was a Sunday; walk the seven days after it
@@ -284,3 +312,82 @@ TEST(dataconv, a_space_padded_day_pads_a_single_digit_with_a_space)
     ASSERT_STREQ(twodigit, "Oct 14 00:00:00");
     ASSERT_EQ(strlen(unknown), (size_t)15);
 }
+
+TEST(dataconv, big_endian_values_read_and_write_in_network_order)
+{
+    const uint8_t net[8] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x88};
+    ASSERT_EQ((int)BytesToUint16BE(net), 0x0102);
+    ASSERT_EQ(BytesToUint32BE(net + 4), 0x05060788u);
+    ASSERT_EQ(BytesToUint64BE(net), 0x0102030405060788ull);
+
+    uint8_t out[8] = {0};
+    Uint16ToBytesBE(0xA1B2, out);
+    ASSERT_EQ((int)out[0], 0xA1);
+    ASSERT_EQ((int)out[1], 0xB2);
+    Uint32ToBytesBE(0xDEADBEEF, out);
+    ASSERT_EQ(BytesToUint32BE(out), 0xDEADBEEFu);
+    ASSERT_EQ((int)out[0], 0xDE);
+    Uint64ToBytesBE(0x8877665544332211ull, out);
+    ASSERT_EQ(BytesToUint64BE(out), 0x8877665544332211ull);
+    ASSERT_EQ((int)out[7], 0x11);
+
+    pdiutil::vector<uint8_t> grown;
+    grown.push_back(0x5A);
+    AppendUint32BE(grown, 0x01020304);
+    AppendUint64BE(grown, 0x1112131415161718ull);
+    ASSERT_EQ((int)grown.size(), 13);
+    ASSERT_EQ((int)grown[0], 0x5A);
+    ASSERT_EQ(BytesToUint32BE(&grown[1]), 0x01020304u);
+    ASSERT_EQ(BytesToUint64BE(&grown[5]), 0x1112131415161718ull);
+}
+
+TEST(dataconv, little_endian_values_read_and_write_lowest_byte_first)
+{
+    const uint8_t disk[4] = {0x78, 0x56, 0x34, 0x92};
+    ASSERT_EQ((int)BytesToUint16LE(disk), 0x5678);
+    ASSERT_EQ(BytesToUint32LE(disk), 0x92345678u);
+
+    uint8_t out[4] = {0};
+    Uint16ToBytesLE(0xBEEF, out);
+    ASSERT_EQ((int)out[0], 0xEF);
+    ASSERT_EQ((int)out[1], 0xBE);
+    Uint32ToBytesLE(0xCAFEF00D, out);
+    ASSERT_EQ((int)out[0], 0x0D);
+    ASSERT_EQ((int)out[3], 0xCA);
+    ASSERT_EQ(BytesToUint32LE(out), 0xCAFEF00Du);
+}
+
+TEST(dataconv, hex_is_zero_padded_to_the_digits_asked_for)
+{
+    char hex[9];
+    Uint32ToHexString(0x1fe, hex, sizeof(hex), false, 8);
+    ASSERT_STREQ(hex, "000001fe");
+    Uint32ToHexString(0xc, hex, sizeof(hex), false, 2);
+    ASSERT_STREQ(hex, "0c");
+    Uint32ToHexString(0xABCDE, hex, sizeof(hex), true, 4);
+    ASSERT_STREQ(hex, "ABCDE");
+    Uint32ToHexString(0, hex, sizeof(hex), false, 4);
+    ASSERT_STREQ(hex, "0000");
+    Uint32ToHexString(0x7f, hex, sizeof(hex));
+    ASSERT_STREQ(hex, "7f");
+}
+
+TEST(dataconv, parse_uint32_takes_only_digits_that_fit)
+{
+    uint32_t out = 7;
+    ASSERT_TRUE(ParseUint32("4294967295", 10, out));
+    ASSERT_EQ(out, 4294967295u);
+    ASSERT_TRUE(ParseUint32("0", 1, out));
+    ASSERT_EQ(out, 0u);
+    ASSERT_TRUE(ParseUint32("123abc", 3, out));
+    ASSERT_EQ(out, 123u);
+
+    out = 7;
+    ASSERT_FALSE(ParseUint32("4294967296", 10, out));
+    ASSERT_FALSE(ParseUint32("12a", 3, out));
+    ASSERT_FALSE(ParseUint32("-1", 2, out));
+    ASSERT_FALSE(ParseUint32("", 0, out));
+    ASSERT_FALSE(ParseUint32(nullptr, 3, out));
+    ASSERT_EQ(out, 7u);
+}
+

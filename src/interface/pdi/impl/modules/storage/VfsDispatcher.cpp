@@ -14,9 +14,7 @@ Created Date    : 20th July 2026
 
 #include "VfsDispatcher.h"
 
-#ifdef ENABLE_AUTH_SERVICE
 #include <service_provider/session/SessionManager.h>
-#endif
 
 namespace {
 
@@ -41,24 +39,29 @@ VfsDispatcher::VfsDispatcher() : iFileSystemInterface(s_null_storage), m_mount_c
 #endif
 {}
 
-int8_t VfsDispatcher::mount(const char* prefix, iFileSystemInterface* backend, const char* name, vfs_type_t type) {
+int8_t VfsDispatcher::mount(const char* prefix, iFileSystemInterface* backend, const char* name, vfs_type_t type, bool removable) {
     if (!prefix || !backend) {
         return PDI_ERR_INVALID_ARG;
-    }
-    if (m_mount_count >= VFS_MAX_MOUNTS) {
-        return PDI_ERR_NO_SPACE;
     }
     uint32_t plen = strlen(prefix);
     if (plen == 0 || plen > VFS_MOUNT_PREFIX_MAX) {
         return PDI_ERR_INVALID_ARG;
     }
+    uint8_t slot = m_mount_count;
     for (uint8_t i = 0; i < m_mount_count; ++i) {
+        if (nullptr == m_mounts[i].m_backend) {
+            slot = (slot == m_mount_count) ? i : slot;
+            continue;
+        }
         if (strcmp(m_mounts[i].m_prefix, prefix) == 0) {
             return PDI_ERR_EXISTS;
         }
     }
+    if (slot >= VFS_MAX_MOUNTS) {
+        return PDI_ERR_NO_SPACE;
+    }
 
-    vfs_mount_t& m = m_mounts[m_mount_count];
+    vfs_mount_t& m = m_mounts[slot];
     memset(m.m_prefix, 0, sizeof(m.m_prefix));
     memcpy(m.m_prefix, prefix, plen);
     m.m_prefix_len = (uint8_t)plen;
@@ -72,7 +75,10 @@ int8_t VfsDispatcher::mount(const char* prefix, iFileSystemInterface* backend, c
 
     m.m_backend = backend;
     m.m_type = type;
-    ++m_mount_count;
+    m.m_removable = removable;
+    if (slot == m_mount_count) {
+        ++m_mount_count;
+    }
     return 0;
 }
 
@@ -194,6 +200,52 @@ bool VfsDispatcher::checkAccess(const char* path, uint8_t need_mask) {
 #endif
 }
 
+/**
+ * Whether the current session may write the directory holding path, or the nearest
+ * one of its parents that exists.
+ */
+bool VfsDispatcher::checkParentAccess(const char* path) {
+    if (isPrivileged()) return true;
+#ifdef ENABLE_AUTH_SERVICE
+    if (SessionManager::getCurrentUid() == 0) return true;
+    if (nullptr == path) return true;
+
+    size_t cut = strlen(path);
+    while (cut > 1 && PATH_SEPARATOR_CHAR == path[cut - 1]) cut--;
+    while (cut > 0 && PATH_SEPARATOR_CHAR != path[cut - 1]) cut--;
+
+    if (0 == cut) {
+        return checkAccess(s_root_path, VFS_ACCESS_W);
+    }
+
+    file_info_t meta;
+    pdiutil::string parent(path, (1 == cut) ? 1 : cut - 1);
+    while (parent.size() > 1 && 0 != getFileMeta(parent.c_str(), meta)) {
+        size_t up = parent.size();
+        while (up > 0 && PATH_SEPARATOR_CHAR != parent[up - 1]) up--;
+        parent.resize((up > 1) ? up - 1 : 1);
+    }
+    return checkAccess(parent.c_str(), VFS_ACCESS_W);
+#else
+    (void)path;
+    return true;
+#endif
+}
+
+/**
+ * Whether the current session may bring path into being: always when it exists,
+ * else when it may write its directory.
+ */
+bool VfsDispatcher::checkCreateAccess(const char* path) {
+    if (isPrivileged()) return true;
+#ifdef ENABLE_AUTH_SERVICE
+    if (SessionManager::getCurrentUid() == 0) return true;
+#endif
+    file_info_t meta;
+    if (0 == getFileMeta(path, meta)) return true;
+    return checkParentAccess(path);
+}
+
 bool VfsDispatcher::checkOwnerOrRoot(const char* path) {
     if (isPrivileged()) return true;
 #ifdef ENABLE_AUTH_SERVICE
@@ -225,6 +277,7 @@ bool VfsDispatcher::checkOwnerOrRoot(const char* path) {
 
 int VfsDispatcher::createFile(const char* path, const char* content, int64_t size) {
     VFS_GUARD();
+    if (!checkCreateAccess(path)) return PDI_ERR_PERM;
     VFS_ROUTE_PATH(createFile, path, STORAGE_ERROR_NOT_MOUNTED, content, size);
 }
 int VfsDispatcher::editFile(const char* path, uint64_t offset, const char* content, uint32_t size) {
@@ -235,6 +288,7 @@ int VfsDispatcher::editFile(const char* path, uint64_t offset, const char* conte
 int VfsDispatcher::writeFile(const char* path, const char* content, uint32_t size, bool append) {
     VFS_GUARD();
     if (!checkAccess(path, VFS_ACCESS_W)) return PDI_ERR_PERM;
+    if (!checkCreateAccess(path)) return PDI_ERR_PERM;
     VFS_ROUTE_PATH(writeFile, path, STORAGE_ERROR_NOT_MOUNTED, content, size, append);
 }
 int VfsDispatcher::readFile(const char* path, uint64_t size, pdiutil::function<bool(char*, uint32_t)> readbackfn, uint64_t offset, const char* readUntilMatchStr, bool* didmatchfound) {
@@ -269,16 +323,62 @@ int VfsDispatcher::readLineInFile(const char* path, int32_t linenumber, pdiutil:
 }
 pdi_err_t VfsDispatcher::createDirectory(const char* path) {
     VFS_GUARD();
+    if (!checkCreateAccess(path)) return PDI_ERR_PERM;
     VFS_ROUTE_PATH(createDirectory, path, STORAGE_ERROR_NOT_MOUNTED);
+}
+
+/**
+ * Detaches a runtime mount; refused for a boot mount, or while it holds open files
+ * or a session's working directory.
+ */
+pdi_err_t VfsDispatcher::umount(const char* prefix) {
+    if (!prefix) {
+        return PDI_ERR_INVALID_ARG;
+    }
+
+    VFS_GUARD();
+
+    vfs_mount_t* found = nullptr;
+    for (uint8_t i = 0; i < m_mount_count && nullptr == found; ++i) {
+        if (nullptr != m_mounts[i].m_backend && strcmp(m_mounts[i].m_prefix, prefix) == 0) {
+            found = &m_mounts[i];
+        }
+    }
+    if (nullptr == found) {
+        return PDI_ERR_NOT_FOUND;
+    }
+    if (!found->m_removable) {
+        return PDI_ERR_PERM;
+    }
+    if (found->m_backend->openCount() > 0) {
+        return PDI_ERR_BUSY;
+    }
+
+    for (uint8_t i = 0; i < SessionManager::maxSessions(); ++i) {
+        session_t* s = SessionManager::getByIndex(i);
+        if (nullptr == s || SESSION_STATE_FREE == s->m_state) continue;
+        const char* cwd = s->m_cwd.c_str();
+        if (0 == strncmp(cwd, found->m_prefix, found->m_prefix_len) &&
+            ('\0' == cwd[found->m_prefix_len] || PATH_SEPARATOR_CHAR == cwd[found->m_prefix_len])) {
+            return PDI_ERR_BUSY;
+        }
+    }
+
+    iFileSystemInterface* backend = found->m_backend;
+    *found = vfs_mount_t();
+    backend->unmounted();
+    return PDI_OK;
 }
 pdi_err_t VfsDispatcher::deleteDirectory(const char* path) {
     VFS_GUARD();
     if (!checkAccess(path, VFS_ACCESS_W)) return PDI_ERR_PERM;
+    if (!checkParentAccess(path)) return PDI_ERR_PERM;
     VFS_ROUTE_PATH(deleteDirectory, path, STORAGE_ERROR_NOT_MOUNTED);
 }
 pdi_err_t VfsDispatcher::deleteFile(const char* path) {
     VFS_GUARD();
     if (!checkAccess(path, VFS_ACCESS_W)) return PDI_ERR_PERM;
+    if (!checkParentAccess(path)) return PDI_ERR_PERM;
     VFS_ROUTE_PATH(deleteFile, path, STORAGE_ERROR_NOT_MOUNTED);
 }
 int64_t VfsDispatcher::getFileSize(const char* path) {
@@ -339,6 +439,7 @@ int VfsDispatcher::setFileOwner(const char* path, uint16_t uid, uint16_t gid) {
 pdi_err_t VfsDispatcher::touch(const char* path) {
     VFS_GUARD();
     if (!checkAccess(path, VFS_ACCESS_W)) return PDI_ERR_PERM;
+    if (!checkCreateAccess(path)) return PDI_ERR_PERM;
     VFS_ROUTE_PATH(touch, path, STORAGE_ERROR_NOT_MOUNTED);
 }
 
@@ -381,6 +482,9 @@ pdi_fhandle_t VfsDispatcher::openFile(const char* path, uint8_t flags) {
     if (flags & FILE_OPEN_READ) need |= VFS_ACCESS_R;
     if (flags & (FILE_OPEN_WRITE | FILE_OPEN_CREATE | FILE_OPEN_TRUNCATE | FILE_OPEN_APPEND)) need |= VFS_ACCESS_W;
     if (need && !checkAccess(path, need)) {
+        return (pdi_fhandle_t)PDI_ERR_PERM;
+    }
+    if ((flags & FILE_OPEN_CREATE) && !checkCreateAccess(path)) {
         return (pdi_fhandle_t)PDI_ERR_PERM;
     }
 
@@ -507,21 +611,32 @@ pdi_err_t VfsDispatcher::closeFile(pdi_fhandle_t handle) {
     return backend->closeFile(bh);
 }
 
-int VfsDispatcher::crossCopy(iFileSystemInterface* sb, const char* srel, iFileSystemInterface* db, const char* drel) {
+int VfsDispatcher::crossCopy(iFileSystemInterface* sb, const char* srel, iFileSystemInterface* db, const char* drel,
+                             CallBackVoidArgBoolRetFn keepgoing) {
     // Only regular files stream across a mount boundary.
     if (!sb->isFileExist(srel) || sb->isDirectory(srel)) return STORAGE_ERROR_NOT_A_FILE;
     if (db->isFileExist(drel) || db->isDirExist(drel)) return PDI_ERR_EXISTS;
 
     // Deliver source content in chunks; the first chunk creates/truncates the
     // destination, the rest append. `size` here is the per-callback chunk cap.
+    pdi_fhandle_t out = db->openFile(drel, FILE_OPEN_WRITE | FILE_OPEN_CREATE | FILE_OPEN_TRUNCATE);
     bool first = true;
     bool ok = true;
+    bool stopped = false;
     int rc = sb->readFile(srel, 128, [&](char* data, uint32_t n)->bool {
-        int w = db->writeFile(drel, data, n, !first);
+        int w = (out >= 0) ? db->writeFileHandle(out, data, n) : db->writeFile(drel, data, n, !first);
         first = false;
-        if (w < 0) { ok = false; return false; }
-        return true;
+        if (w < 0 || (out >= 0 && (uint32_t)w != n)) { ok = false; return false; }
+        stopped = (nullptr != keepgoing) && !keepgoing();
+        return !stopped;
     });
+    if (out >= 0 && PDI_OK != db->closeFile(out)) {
+        ok = false;
+    }
+    if (stopped) {
+        db->deleteFile(drel);
+        return PDI_ERR_ABORTED;
+    }
     if (rc < 0 || !ok) {
         db->deleteFile(drel);
         return STORAGE_ERROR_BACKEND;
@@ -529,13 +644,14 @@ int VfsDispatcher::crossCopy(iFileSystemInterface* sb, const char* srel, iFileSy
     // Empty source: no chunk was delivered. A zero-byte writeFile does not
     // create the file on every backend (LittleFS opens without O_CREAT for an
     // empty write), so materialise the empty destination with createFile.
-    if (first && db->createFile(drel, "", 0) < 0) return STORAGE_ERROR_BACKEND;
+    if (first && out < 0 && db->createFile(drel, "", 0) < 0) return STORAGE_ERROR_BACKEND;
     return 0;
 }
 
 pdi_err_t VfsDispatcher::rename(const char* oldPath, const char* newPath) {
     VFS_GUARD();
     if (!checkAccess(newPath, VFS_ACCESS_W)) return PDI_ERR_PERM;
+    if (!checkParentAccess(oldPath) || !checkParentAccess(newPath)) return PDI_ERR_PERM;
     const char *orel = nullptr, *nrel = nullptr;
     iFileSystemInterface* ob = resolve(oldPath, &orel);
     iFileSystemInterface* nb = resolve(newPath, &nrel);
@@ -546,20 +662,22 @@ pdi_err_t VfsDispatcher::rename(const char* oldPath, const char* newPath) {
     if (rc < 0) return rc;
     return ob->deleteFile(orel);
 }
-pdi_err_t VfsDispatcher::copyFile(const char* sourcePath, const char* destPath) {
+pdi_err_t VfsDispatcher::copyFile(const char* sourcePath, const char* destPath, CallBackVoidArgBoolRetFn keepgoing) {
     VFS_GUARD();
     if (!checkAccess(sourcePath, VFS_ACCESS_R)) return PDI_ERR_PERM;
     if (!checkAccess(destPath, VFS_ACCESS_W)) return PDI_ERR_PERM;
+    if (!checkCreateAccess(destPath)) return PDI_ERR_PERM;
     const char *srel = nullptr, *drel = nullptr;
     iFileSystemInterface* sb = resolve(sourcePath, &srel);
     iFileSystemInterface* db = resolve(destPath, &drel);
     if (!sb || !db) return STORAGE_ERROR_NOT_MOUNTED;
-    if (sb == db) return sb->copyFile(srel, drel);
-    return crossCopy(sb, srel, db, drel);
+    if (sb == db) return sb->copyFile(srel, drel, keepgoing);
+    return crossCopy(sb, srel, db, drel, keepgoing);
 }
 pdi_err_t VfsDispatcher::moveFile(const char* oldPath, const char* newPath) {
     VFS_GUARD();
     if (!checkAccess(newPath, VFS_ACCESS_W)) return PDI_ERR_PERM;
+    if (!checkParentAccess(oldPath) || !checkParentAccess(newPath)) return PDI_ERR_PERM;
     const char *orel = nullptr, *nrel = nullptr;
     iFileSystemInterface* ob = resolve(oldPath, &orel);
     iFileSystemInterface* nb = resolve(newPath, &nrel);
@@ -584,6 +702,16 @@ uint64_t VfsDispatcher::getFreeSize() {
     VFS_GUARD();
     iFileSystemInterface* r = rootBackend();
     return r ? r->getFreeSize() : 0;
+}
+
+/**
+ * The free bytes of the filesystem the path is on, the way statvfs answers
+ * for a path; the root's for a path no mount covers.
+ */
+uint64_t VfsDispatcher::getFreeSize(const char* path) {
+    VFS_GUARD();
+    iFileSystemInterface* b = resolve(path, nullptr);
+    return b ? b->getFreeSize() : 0;
 }
 
 pdiutil::string VfsDispatcher::getPWD() const {
@@ -623,6 +751,23 @@ const char* VfsDispatcher::getHomeDirectory() const {
     iFileSystemInterface* r = rootBackend();
     return r ? r->getHomeDirectory() : s_root_path;
 }
+/**
+ * Where a file bound for path is written first: the staging directory of the disk
+ * mounted there, else the root's temp.
+ */
+pdiutil::string VfsDispatcher::getStagingDirectory(const char* path) {
+    VFS_GUARD();
+    const vfs_mount_t* m = (nullptr == path) ? nullptr : findMountForPath(path);
+    if (nullptr == m || !m->m_removable) {
+        return pdiutil::string(getTempDirectory());
+    }
+    pdiutil::string dir = m->m_prefix;
+    dir += PATH_SEPARATOR_CHAR;
+    dir += CHARPTR_WRAP(VFS_STAGING_DIR_NAME);
+    dir += PATH_SEPARATOR_CHAR;
+    return dir;
+}
+
 const char* VfsDispatcher::getTempDirectory() const {
     iFileSystemInterface* r = rootBackend();
     return r ? r->getTempDirectory() : s_root_path;

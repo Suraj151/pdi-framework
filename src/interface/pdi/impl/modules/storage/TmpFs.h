@@ -23,6 +23,7 @@ Created Date    : 23rd July 2026
 #include <config/TmpFsConfig.h>
 #include <interface/pdi/modules/storage/iFileSystemInterface.h>
 #include <interface/pdi/modules/storage/iStorageInterface.h>
+#include <interface/pdi/impl/modules/storage/FileLines.h>
 
 struct tmpfs_node_t {
   pdiutil::string m_path; ///< normalized, no leading '/', e.g. "x/a.txt"
@@ -51,25 +52,25 @@ public:
                bool *didmatchfound = nullptr) override;
 
   int64_t getOffsetFromLineNumber(const char *path, int linenumber,
-                                  CallBackVoidArgFn yield = nullptr) override { return PDI_ERR_NOT_SUPPORTED; }
+                                  CallBackVoidArgFn yield = nullptr) override { return FileLines::getOffsetFromLineNumber(*this, path, linenumber, yield); }
   int64_t getLineNumberFromOffset(const char *path, int64_t offset,
-                                  CallBackVoidArgFn yield = nullptr) override { return PDI_ERR_NOT_SUPPORTED; }
+                                  CallBackVoidArgFn yield = nullptr) override { return FileLines::getLineNumberFromOffset(*this, path, offset, yield); }
   int findInFile(const char *path, const char *findStr,
                  pdiutil::vector<uint32_t> *findindices, int maxindices = -1,
                  int everynthindice = 1, int64_t offset = 0,
-                 CallBackVoidArgFn yield = nullptr) override { return PDI_ERR_NOT_SUPPORTED; }
+                 CallBackVoidArgFn yield = nullptr) override { return FileLines::findInFile(*this, path, findStr, findindices, maxindices, everynthindice, offset, yield); }
   int getLineNumbersInFile(const char *path,
                            pdiutil::vector<uint32_t> &linenumberindices,
                            int maxlinenumbers = -1, int linenumberoffset = 0,
-                           CallBackVoidArgFn yield = nullptr) override { return PDI_ERR_NOT_SUPPORTED; }
+                           CallBackVoidArgFn yield = nullptr) override { return FileLines::getLineNumbersInFile(*this, path, linenumberindices, maxlinenumbers, linenumberoffset, yield); }
   int readLineInFile(const char *path, int32_t linenumber,
                      pdiutil::string &linedata, const char *pattern = nullptr,
-                     CallBackVoidArgFn yield = nullptr) override { return PDI_ERR_NOT_SUPPORTED; }
+                     CallBackVoidArgFn yield = nullptr) override { return FileLines::readLineInFile(*this, path, linenumber, linedata, pattern, yield); }
 
   pdi_err_t createDirectory(const char *path) override;
   pdi_err_t deleteDirectory(const char *path) override;
   pdi_err_t rename(const char *oldPath, const char *newPath) override;
-  pdi_err_t copyFile(const char *sourcePath, const char *destPath) override;
+  pdi_err_t copyFile(const char *sourcePath, const char *destPath, CallBackVoidArgBoolRetFn keepgoing = nullptr) override;
   pdi_err_t moveFile(const char *oldPath, const char *newPath) override;
   pdi_err_t deleteFile(const char *path) override;
 

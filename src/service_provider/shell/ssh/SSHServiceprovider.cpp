@@ -298,7 +298,12 @@ void SSHServer::handle() {
     for (uint8_t i = 0; i < SSH_MAX_SESSIONS; i++) {
         if (m_sessions[i] == nullptr) continue;
         m_session = m_sessions[i];
-        serviceSession();
+        {
+            session_t *own = (nullptr != m_session->m_sshclient) ?
+                SessionManager::findByTerminal(m_session->m_sshclient) : nullptr;
+            SessionManager::Scope scope(own);
+            serviceSession();
+        }
         m_sessions[i] = m_session;
     }
     m_session = nullptr;
@@ -780,10 +785,7 @@ void LWSSH::SSHServer::handleAuthentication(){
                         pdiutil::string nofree = CHARPTR_WRAP("no session available");
                         pdiutil::vector<uint8_t> bye;
                         bye.push_back(SSH2_MSG_DISCONNECT);
-                        bye.push_back((SSH2_DISCONNECT_TOO_MANY_CONNECTIONS >> 24) & 0xFF);
-                        bye.push_back((SSH2_DISCONNECT_TOO_MANY_CONNECTIONS >> 16) & 0xFF);
-                        bye.push_back((SSH2_DISCONNECT_TOO_MANY_CONNECTIONS >> 8) & 0xFF);
-                        bye.push_back(SSH2_DISCONNECT_TOO_MANY_CONNECTIONS & 0xFF);
+                        AppendUint32BE(bye, SSH2_DISCONNECT_TOO_MANY_CONNECTIONS);
                         append_ssh_string(bye, nofree.c_str(), nofree.length());
                         append_ssh_string(bye, "", 0);
                         send_server_ssh_packet(m_session, bye, true);
@@ -794,6 +796,7 @@ void LWSSH::SSHServer::handleAuthentication(){
                         reply.push_back(SSH2_MSG_USERAUTH_SUCCESS); // 52
                         if( send_server_ssh_packet(m_session, reply, true) ){
                             __auth_service.setAuthorized(true);
+                            __auth_service.enterHome();
                             m_session->m_state = LWSSHSession::SESSION_STATE_CHANNEL_REQUEST;
                         }else{
                             SessionManager::detach(m_session->m_sshclient);
@@ -854,8 +857,8 @@ void LWSSH::SSHServer::handleChannelRequest(){
 
                 if(bstatus){
 
-                    // Currently setting same received client window size & packet size 
-                    bstatus = send_channel_open_confirmation(m_session, m_session->current_channel.window_size, m_session->current_channel.max_packet_size);
+                    m_session->current_channel.window_used = 0;
+                    bstatus = send_channel_open_confirmation(m_session, SSH_CHANNEL_WINDOW, m_session->current_channel.max_packet_size);
 
                     if(!bstatus){
 
@@ -890,8 +893,8 @@ void LWSSH::SSHServer::handleChannelRequest(){
                     }else if( recvreqst.request_type == rt_window_change ){
 
                         if( recvreqst.request_specific_data.size() >= 8 && m_session->m_sshclient ){
-                            uint32_t w = (recvreqst.request_specific_data[0] << 24) | (recvreqst.request_specific_data[1] << 16) | (recvreqst.request_specific_data[2] << 8) | recvreqst.request_specific_data[3];
-                            uint32_t h = (recvreqst.request_specific_data[4] << 24) | (recvreqst.request_specific_data[5] << 16) | (recvreqst.request_specific_data[6] << 8) | recvreqst.request_specific_data[7];
+                            uint32_t w = BytesToUint32BE(&recvreqst.request_specific_data[0]);
+                            uint32_t h = BytesToUint32BE(&recvreqst.request_specific_data[4]);
                             m_session->current_channel.pty_req.width_chars = w;
                             m_session->current_channel.pty_req.height_rows = h;
                             m_session->m_sshclient->set_column_width((uint16_t)w);
@@ -910,7 +913,7 @@ void LWSSH::SSHServer::handleChannelRequest(){
                             m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
                         }else{
 
-                            int32_t vallen = (recvreqst.request_specific_data[offset] << 24) | (recvreqst.request_specific_data[offset+1] << 16) | (recvreqst.request_specific_data[offset+2] << 8) | recvreqst.request_specific_data[offset+3];
+                            int32_t vallen = BytesToUint32BE(&recvreqst.request_specific_data[offset]);
                             offset += 4;
 
                             if ((offset + vallen) > recvreqst.request_specific_data.size()){
@@ -932,10 +935,7 @@ void LWSSH::SSHServer::handleChannelRequest(){
                         pdiutil::vector<uint8_t> reply;
                         reply.push_back(SSH2_MSG_CHANNEL_SUCCESS); // 99
                         // recipient channel (client's channel id)
-                        reply.push_back((m_session->current_channel.client_channel_id >> 24) & 0xFF);
-                        reply.push_back((m_session->current_channel.client_channel_id >> 16) & 0xFF);
-                        reply.push_back((m_session->current_channel.client_channel_id >> 8) & 0xFF);
-                        reply.push_back(m_session->current_channel.client_channel_id & 0xFF);
+                        AppendUint32BE(reply, m_session->current_channel.client_channel_id);
 
                         if(send_server_ssh_packet(m_session, reply, true)){
                             if(m_session->current_channel.ischannelreqsuccess < 0){
@@ -955,10 +955,7 @@ void LWSSH::SSHServer::handleChannelRequest(){
 
                         pdiutil::vector<uint8_t> reply;
                         reply.push_back(isscp ? SSH2_MSG_CHANNEL_SUCCESS : SSH2_MSG_CHANNEL_FAILURE);
-                        reply.push_back((m_session->current_channel.client_channel_id >> 24) & 0xFF);
-                        reply.push_back((m_session->current_channel.client_channel_id >> 16) & 0xFF);
-                        reply.push_back((m_session->current_channel.client_channel_id >> 8) & 0xFF);
-                        reply.push_back(m_session->current_channel.client_channel_id & 0xFF);
+                        AppendUint32BE(reply, m_session->current_channel.client_channel_id);
 
                         if(send_server_ssh_packet(m_session, reply, true)){
 
@@ -980,6 +977,8 @@ void LWSSH::SSHServer::handleChannelRequest(){
                 bool bstatus = parse_channel_data_request(m_session->m_sshpacket.payload, chdata);
 
                 if( bstatus ){
+
+                    consume_channel_window(m_session, (uint32_t)chdata.data.size());
 
                     pdiutil::string rt_shell = CHARPTR_WRAP("shell");
                     pdiutil::string rt_pty = CHARPTR_WRAP("pty-req");
@@ -1017,10 +1016,7 @@ void LWSSH::SSHServer::handleChannelRequest(){
                 pdiutil::vector<uint8_t> reply;
                 reply.push_back(SSH2_MSG_CHANNEL_EOF); // 96
                 // recipient channel (client's channel id)
-                reply.push_back((m_session->current_channel.client_channel_id >> 24) & 0xFF);
-                reply.push_back((m_session->current_channel.client_channel_id >> 16) & 0xFF);
-                reply.push_back((m_session->current_channel.client_channel_id >> 8) & 0xFF);
-                reply.push_back(m_session->current_channel.client_channel_id & 0xFF);
+                AppendUint32BE(reply, m_session->current_channel.client_channel_id);
 
                 if(send_server_ssh_packet(m_session, reply, true)){
 
@@ -1030,10 +1026,7 @@ void LWSSH::SSHServer::handleChannelRequest(){
                     reply.clear();
                     reply.push_back(SSH2_MSG_CHANNEL_REQUEST); // 98
                     // recipient channel (client's channel id)
-                    reply.push_back((m_session->current_channel.client_channel_id >> 24) & 0xFF);
-                    reply.push_back((m_session->current_channel.client_channel_id >> 16) & 0xFF);
-                    reply.push_back((m_session->current_channel.client_channel_id >> 8) & 0xFF);
-                    reply.push_back(m_session->current_channel.client_channel_id & 0xFF);
+                    AppendUint32BE(reply, m_session->current_channel.client_channel_id);
                     // append equest type "exit-status"
                     pdiutil::string reqtype = CHARPTR_WRAP("exit-status");
                     append_ssh_string(reply, reqtype.c_str(), reqtype.length());
@@ -1041,19 +1034,13 @@ void LWSSH::SSHServer::handleChannelRequest(){
                     reply.push_back(0); // false, we don't want reply for exit-status
                     // append exit status
                     uint32_t exit_status = 0; // Set exit status as needed
-                    reply.push_back((exit_status >> 24) & 0xFF);
-                    reply.push_back((exit_status >> 16) & 0xFF);
-                    reply.push_back((exit_status >> 8) & 0xFF);
-                    reply.push_back(exit_status & 0xFF);
+                    AppendUint32BE(reply, exit_status);
                     send_server_ssh_packet(m_session, reply, true);
 
                     __i_dvc_ctrl.wait(10);
                     reply.clear();
                     reply.push_back(SSH2_MSG_CHANNEL_CLOSE); // 97
-                    reply.push_back((m_session->current_channel.client_channel_id >> 24) & 0xFF);
-                    reply.push_back((m_session->current_channel.client_channel_id >> 16) & 0xFF);
-                    reply.push_back((m_session->current_channel.client_channel_id >> 8) & 0xFF);
-                    reply.push_back(m_session->current_channel.client_channel_id & 0xFF);
+                    AppendUint32BE(reply, m_session->current_channel.client_channel_id);
                     send_server_ssh_packet(m_session, reply, true);
                     m_session->current_channel.ischannelreqsuccess = -1;
 
@@ -1072,10 +1059,7 @@ void LWSSH::SSHServer::handleChannelRequest(){
                     pdiutil::vector<uint8_t> reply;
                     reply.push_back(SSH2_MSG_CHANNEL_CLOSE); // 97
                     // recipient channel (client's channel id)
-                    reply.push_back((m_session->current_channel.client_channel_id >> 24) & 0xFF);
-                    reply.push_back((m_session->current_channel.client_channel_id >> 16) & 0xFF);
-                    reply.push_back((m_session->current_channel.client_channel_id >> 8) & 0xFF);
-                    reply.push_back(m_session->current_channel.client_channel_id & 0xFF);
+                    AppendUint32BE(reply, m_session->current_channel.client_channel_id);
 
                     send_server_ssh_packet(m_session, reply, true);
                     m_session->current_channel.ischannelreqsuccess = -1;
@@ -1120,7 +1104,7 @@ void LWSSH::SSHServer::handleChannelRequest(){
             m_session->current_channel.ischannelreqsuccess > 1 &&
             ( m_session->current_channel.req_type == rt_shell_pending ||
               m_session->current_channel.req_type == rt_pty_pending ) &&
-            m_session->m_sshclient->available() > 0
+            __cmd_service.hasPendingInput(m_session->m_sshclient)
         ){
             pdi_err_t res = __cmd_service.processTerminalInput(m_session->m_sshclient);
 
@@ -1149,7 +1133,7 @@ void LWSSH::SSHServer::handleChannelSubsystemRequest(pdiutil::vector<uint8_t>& d
 
         while (accum.size() >= 4) {
 
-            uint32_t packetlen = (accum[0] << 24) | (accum[1] << 16) | (accum[2] << 8) | accum[3];
+            uint32_t packetlen = BytesToUint32BE(&accum[0]);
 
             if (packetlen > SSH_SFTP_MAX_RX_PACKET) {
                 accum.clear();
@@ -1193,7 +1177,7 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
             m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
         }else{
 
-            int32_t packetlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+            int32_t packetlen = BytesToUint32BE(&data[payloadoffset]);
             payloadoffset += 4;
 
             // a packet shorter than it declares leaves the stream unframed, so
@@ -1213,7 +1197,7 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                 int32_t errcode = -1;
 
                 // Parse request-id
-                uint32_t request_id = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                uint32_t request_id = BytesToUint32BE(&data[payloadoffset]);
                 payloadoffset += 4;
 
                 if (packettype == SSH_FXP_INIT) {
@@ -1236,7 +1220,7 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                     if (payloadoffset + 4 > data.size()) {
                         errcode = SSH_FX_BAD_MESSAGE;
                     } else {
-                        uint32_t pathlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                        uint32_t pathlen = BytesToUint32BE(&data[payloadoffset]);
                         payloadoffset += 4;
 
                         if (pathlen > (data.size() - payloadoffset)) {
@@ -1287,33 +1271,21 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                             // Build SSH_FXP_NAME reply with 1 entry and zero attrs
                             uint32_t namelen = canonical.length();
                             uint32_t reply_len = 1 + 4 + 4 + (4 + namelen) + (4 + namelen) + 4; // type + reqid + count + filename(string) + longname(string) + attrs(flags=0)
-                            sftp_reply.push_back((reply_len >> 24) & 0xFF);
-                            sftp_reply.push_back((reply_len >> 16) & 0xFF);
-                            sftp_reply.push_back((reply_len >> 8) & 0xFF);
-                            sftp_reply.push_back(reply_len & 0xFF);
+                            AppendUint32BE(sftp_reply, reply_len);
 
                             sftp_reply.push_back(SSH_FXP_NAME); // 104
 
-                            sftp_reply.push_back((request_id >> 24) & 0xFF);
-                            sftp_reply.push_back((request_id >> 16) & 0xFF);
-                            sftp_reply.push_back((request_id >> 8) & 0xFF);
-                            sftp_reply.push_back(request_id & 0xFF);
+                            AppendUint32BE(sftp_reply, request_id);
 
                             // count = 1
                             sftp_reply.push_back(0); sftp_reply.push_back(0); sftp_reply.push_back(0); sftp_reply.push_back(1);
 
                             // filename string
-                            sftp_reply.push_back((namelen >> 24) & 0xFF);
-                            sftp_reply.push_back((namelen >> 16) & 0xFF);
-                            sftp_reply.push_back((namelen >> 8) & 0xFF);
-                            sftp_reply.push_back(namelen & 0xFF);
+                            AppendUint32BE(sftp_reply, namelen);
                             sftp_reply.insert(sftp_reply.end(), canonical.begin(), canonical.end());
 
                             // longname string (same as filename; ls-style listing not required for REALPATH)
-                            sftp_reply.push_back((namelen >> 24) & 0xFF);
-                            sftp_reply.push_back((namelen >> 16) & 0xFF);
-                            sftp_reply.push_back((namelen >> 8) & 0xFF);
-                            sftp_reply.push_back(namelen & 0xFF);
+                            AppendUint32BE(sftp_reply, namelen);
                             sftp_reply.insert(sftp_reply.end(), canonical.begin(), canonical.end());
 
                             // attrs: flags = 0 (no following fields)
@@ -1337,71 +1309,46 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
 
                         // type + reqid + flags + size + uid + gid + perms + atime + mtime
                         uint32_t reply_len = 1 + 4 + 4 + 8 + 4 + 4 + 4 + 4 + 4;
-                        sftp_reply.push_back((reply_len >> 24) & 0xFF);
-                        sftp_reply.push_back((reply_len >> 16) & 0xFF);
-                        sftp_reply.push_back((reply_len >> 8) & 0xFF);
-                        sftp_reply.push_back(reply_len & 0xFF);
+                        AppendUint32BE(sftp_reply, reply_len);
 
                         // SSH_FXP_ATTRS reply
                         sftp_reply.push_back(SSH_FXP_ATTRS); // type 105
 
                         // Request ID
-                        sftp_reply.push_back((request_id >> 24) & 0xFF);
-                        sftp_reply.push_back((request_id >> 16) & 0xFF);
-                        sftp_reply.push_back((request_id >> 8) & 0xFF);
-                        sftp_reply.push_back(request_id & 0xFF);
+                        AppendUint32BE(sftp_reply, request_id);
 
                         // attrs (SFTP v3 order): flags, size, uid, gid, permissions, atime, mtime
                         uint32_t flags = SSH_FILEXFER_ATTR_SIZE | SSH_FILEXFER_ATTR_UIDGID | SSH_FILEXFER_ATTR_PERMISSIONS | SSH_FILEXFER_ATTR_ACMODTIME;
-                        sftp_reply.push_back((flags >> 24) & 0xFF);
-                        sftp_reply.push_back((flags >> 16) & 0xFF);
-                        sftp_reply.push_back((flags >> 8) & 0xFF);
-                        sftp_reply.push_back(flags & 0xFF);
+                        AppendUint32BE(sftp_reply, flags);
 
                         uint64_t filesize = isDir ? 0 : meta.m_size;
                         sftp_reply.push_back((filesize >> 56) & 0xFF);
                         sftp_reply.push_back((filesize >> 48) & 0xFF);
                         sftp_reply.push_back((filesize >> 40) & 0xFF);
                         sftp_reply.push_back((filesize >> 32) & 0xFF);
-                        sftp_reply.push_back((filesize >> 24) & 0xFF);
-                        sftp_reply.push_back((filesize >> 16) & 0xFF);
-                        sftp_reply.push_back((filesize >> 8) & 0xFF);
-                        sftp_reply.push_back(filesize & 0xFF);
+                        AppendUint32BE(sftp_reply, filesize);
 
                         uint32_t uid = meta.m_uid;
-                        sftp_reply.push_back((uid >> 24) & 0xFF);
-                        sftp_reply.push_back((uid >> 16) & 0xFF);
-                        sftp_reply.push_back((uid >> 8) & 0xFF);
-                        sftp_reply.push_back(uid & 0xFF);
+                        AppendUint32BE(sftp_reply, uid);
 
                         uint32_t gid = meta.m_gid;
-                        sftp_reply.push_back((gid >> 24) & 0xFF);
-                        sftp_reply.push_back((gid >> 16) & 0xFF);
-                        sftp_reply.push_back((gid >> 8) & 0xFF);
-                        sftp_reply.push_back(gid & 0xFF);
+                        AppendUint32BE(sftp_reply, gid);
 
                         uint32_t perms = (isDir ? 0040000u : 0100000u) | (meta.m_perms & 07777);
-                        sftp_reply.push_back((perms >> 24) & 0xFF);
-                        sftp_reply.push_back((perms >> 16) & 0xFF);
-                        sftp_reply.push_back((perms >> 8) & 0xFF);
-                        sftp_reply.push_back(perms & 0xFF);
+                        AppendUint32BE(sftp_reply, perms);
 
                         uint32_t atime = meta.m_ctime;
-                        sftp_reply.push_back((atime >> 24) & 0xFF);
-                        sftp_reply.push_back((atime >> 16) & 0xFF);
-                        sftp_reply.push_back((atime >> 8) & 0xFF);
-                        sftp_reply.push_back(atime & 0xFF);
+                        AppendUint32BE(sftp_reply, atime);
 
                         uint32_t mtime = meta.m_mtime;
-                        sftp_reply.push_back((mtime >> 24) & 0xFF);
-                        sftp_reply.push_back((mtime >> 16) & 0xFF);
-                        sftp_reply.push_back((mtime >> 8) & 0xFF);
-                        sftp_reply.push_back(mtime & 0xFF);
+                        AppendUint32BE(sftp_reply, mtime);
                     } else {
                         // Status code: SSH_FX_NO_SUCH_FILE (2)
                         errcode = SSH_FX_NO_SUCH_FILE;
                     }
                 }else if (packettype == SSH_FXP_OPEN){
+
+                    m_session->closeSftpFile();
 
                     // Parse filename
                     pdiutil::string filename;
@@ -1412,7 +1359,7 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                     // Parse flags if present
                     uint32_t flags = 0;
                     if (payloadoffset + 4 <= data.size()) {
-                        flags = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                        flags = BytesToUint32BE(&data[payloadoffset]);
                         payloadoffset += 4;
                     }
 
@@ -1488,19 +1435,18 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                         m_session->current_channel.subsystem_req.sftp.filepath = filename;
                         m_session->current_channel.subsystem_req.sftp.handle = handle;
                         m_session->current_channel.subsystem_req.sftp.is_dir = false;
+                        if( !__i_fs.isDirExist(filename.c_str()) ){
+                            uint8_t mode = ((flags & SSH_FXF_READ) ? FILE_OPEN_READ : 0) | ((flags & SSH_FXF_WRITE) ? FILE_OPEN_WRITE : 0);
+                            pdi_fhandle_t opened = (0 == mode) ? -1 : __i_fs.openFile(filename.c_str(), mode);
+                            m_session->current_channel.subsystem_req.sftp.file = (opened >= 0) ? opened : -1;
+                        }
 
                         uint32_t reply_len = 1 + 4 + 4 + handlesize; // type + reqid + handle size + handle bytes
-                        sftp_reply.push_back((reply_len >> 24) & 0xFF);
-                        sftp_reply.push_back((reply_len >> 16) & 0xFF);
-                        sftp_reply.push_back((reply_len >> 8) & 0xFF);
-                        sftp_reply.push_back(reply_len & 0xFF);
+                        AppendUint32BE(sftp_reply, reply_len);
 
                         sftp_reply.push_back(SSH_FXP_HANDLE);
 
-                        sftp_reply.push_back((request_id >> 24) & 0xFF);
-                        sftp_reply.push_back((request_id >> 16) & 0xFF);
-                        sftp_reply.push_back((request_id >> 8) & 0xFF);
-                        sftp_reply.push_back(request_id & 0xFF);
+                        AppendUint32BE(sftp_reply, request_id);
 
                         sftp_reply.push_back(0x00); sftp_reply.push_back(0x00); sftp_reply.push_back(0x00); sftp_reply.push_back(handlesize); // handle length
                         sftp_reply.insert(sftp_reply.end(), handle, handle+handlesize);
@@ -1532,6 +1478,7 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                                 auto &sftp = m_session->current_channel.subsystem_req.sftp;
                                 sftp.dir_entries.clear();
                                 sftp.readdir_offset = 0;
+                                m_session->closeSftpFile();
                                 sftp.is_dir = true;
                                 sftp.filepath = dirpath;
 
@@ -1556,17 +1503,11 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                                 sftp.handle = handle;
 
                                 uint32_t reply_len = 1 + 4 + 4 + handlesize;
-                                sftp_reply.push_back((reply_len >> 24) & 0xFF);
-                                sftp_reply.push_back((reply_len >> 16) & 0xFF);
-                                sftp_reply.push_back((reply_len >> 8) & 0xFF);
-                                sftp_reply.push_back(reply_len & 0xFF);
+                                AppendUint32BE(sftp_reply, reply_len);
 
                                 sftp_reply.push_back(SSH_FXP_HANDLE);
 
-                                sftp_reply.push_back((request_id >> 24) & 0xFF);
-                                sftp_reply.push_back((request_id >> 16) & 0xFF);
-                                sftp_reply.push_back((request_id >> 8) & 0xFF);
-                                sftp_reply.push_back(request_id & 0xFF);
+                                AppendUint32BE(sftp_reply, request_id);
 
                                 sftp_reply.push_back(0x00); sftp_reply.push_back(0x00); sftp_reply.push_back(0x00); sftp_reply.push_back(handlesize);
                                 sftp_reply.insert(sftp_reply.end(), handle, handle+handlesize);
@@ -1636,88 +1577,52 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                                 reply_len += 4 + 8 + 8 + 4 + 8;
                             }
 
-                            sftp_reply.push_back((reply_len >> 24) & 0xFF);
-                            sftp_reply.push_back((reply_len >> 16) & 0xFF);
-                            sftp_reply.push_back((reply_len >> 8) & 0xFF);
-                            sftp_reply.push_back(reply_len & 0xFF);
+                            AppendUint32BE(sftp_reply, reply_len);
 
                             sftp_reply.push_back(SSH_FXP_NAME); // 104
 
-                            sftp_reply.push_back((request_id >> 24) & 0xFF);
-                            sftp_reply.push_back((request_id >> 16) & 0xFF);
-                            sftp_reply.push_back((request_id >> 8) & 0xFF);
-                            sftp_reply.push_back(request_id & 0xFF);
+                            AppendUint32BE(sftp_reply, request_id);
 
                             // count
-                            sftp_reply.push_back((batch >> 24) & 0xFF);
-                            sftp_reply.push_back((batch >> 16) & 0xFF);
-                            sftp_reply.push_back((batch >> 8) & 0xFF);
-                            sftp_reply.push_back(batch & 0xFF);
+                            AppendUint32BE(sftp_reply, batch);
 
                             for (uint32_t i = 0; i < batch; i++) {
                                 const auto &e = sftp.dir_entries[sftp.readdir_offset + i];
                                 const auto &ln = longnames[i];
 
                                 uint32_t nl = e.name.length();
-                                sftp_reply.push_back((nl >> 24) & 0xFF);
-                                sftp_reply.push_back((nl >> 16) & 0xFF);
-                                sftp_reply.push_back((nl >> 8) & 0xFF);
-                                sftp_reply.push_back(nl & 0xFF);
+                                AppendUint32BE(sftp_reply, nl);
                                 sftp_reply.insert(sftp_reply.end(), e.name.begin(), e.name.end());
 
                                 uint32_t ll = ln.length();
-                                sftp_reply.push_back((ll >> 24) & 0xFF);
-                                sftp_reply.push_back((ll >> 16) & 0xFF);
-                                sftp_reply.push_back((ll >> 8) & 0xFF);
-                                sftp_reply.push_back(ll & 0xFF);
+                                AppendUint32BE(sftp_reply, ll);
                                 sftp_reply.insert(sftp_reply.end(), ln.begin(), ln.end());
 
                                 // attrs (SFTP v3 order): flags, size, uid, gid, permissions, atime, mtime
                                 uint32_t flags = SSH_FILEXFER_ATTR_SIZE | SSH_FILEXFER_ATTR_UIDGID | SSH_FILEXFER_ATTR_PERMISSIONS | SSH_FILEXFER_ATTR_ACMODTIME;
-                                sftp_reply.push_back((flags >> 24) & 0xFF);
-                                sftp_reply.push_back((flags >> 16) & 0xFF);
-                                sftp_reply.push_back((flags >> 8) & 0xFF);
-                                sftp_reply.push_back(flags & 0xFF);
+                                AppendUint32BE(sftp_reply, flags);
 
                                 uint64_t sz = e.size;
                                 sftp_reply.push_back((sz >> 56) & 0xFF);
                                 sftp_reply.push_back((sz >> 48) & 0xFF);
                                 sftp_reply.push_back((sz >> 40) & 0xFF);
                                 sftp_reply.push_back((sz >> 32) & 0xFF);
-                                sftp_reply.push_back((sz >> 24) & 0xFF);
-                                sftp_reply.push_back((sz >> 16) & 0xFF);
-                                sftp_reply.push_back((sz >> 8) & 0xFF);
-                                sftp_reply.push_back(sz & 0xFF);
+                                AppendUint32BE(sftp_reply, sz);
 
                                 uint32_t uid = e.uid;
-                                sftp_reply.push_back((uid >> 24) & 0xFF);
-                                sftp_reply.push_back((uid >> 16) & 0xFF);
-                                sftp_reply.push_back((uid >> 8) & 0xFF);
-                                sftp_reply.push_back(uid & 0xFF);
+                                AppendUint32BE(sftp_reply, uid);
 
                                 uint32_t gid = e.gid;
-                                sftp_reply.push_back((gid >> 24) & 0xFF);
-                                sftp_reply.push_back((gid >> 16) & 0xFF);
-                                sftp_reply.push_back((gid >> 8) & 0xFF);
-                                sftp_reply.push_back(gid & 0xFF);
+                                AppendUint32BE(sftp_reply, gid);
 
                                 uint32_t perms = (e.is_dir ? 0040000u : 0100000u) | (e.perms & 07777);
-                                sftp_reply.push_back((perms >> 24) & 0xFF);
-                                sftp_reply.push_back((perms >> 16) & 0xFF);
-                                sftp_reply.push_back((perms >> 8) & 0xFF);
-                                sftp_reply.push_back(perms & 0xFF);
+                                AppendUint32BE(sftp_reply, perms);
 
                                 uint32_t atime = e.ctime;
-                                sftp_reply.push_back((atime >> 24) & 0xFF);
-                                sftp_reply.push_back((atime >> 16) & 0xFF);
-                                sftp_reply.push_back((atime >> 8) & 0xFF);
-                                sftp_reply.push_back(atime & 0xFF);
+                                AppendUint32BE(sftp_reply, atime);
 
                                 uint32_t mtime = e.mtime;
-                                sftp_reply.push_back((mtime >> 24) & 0xFF);
-                                sftp_reply.push_back((mtime >> 16) & 0xFF);
-                                sftp_reply.push_back((mtime >> 8) & 0xFF);
-                                sftp_reply.push_back(mtime & 0xFF);
+                                AppendUint32BE(sftp_reply, mtime);
                             }
 
                             sftp.readdir_offset += batch;
@@ -1729,7 +1634,7 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                     if (payloadoffset + 4 > data.size()) {
                         errcode = SSH_FX_BAD_MESSAGE;
                     } else {
-                        uint32_t pathlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                        uint32_t pathlen = BytesToUint32BE(&data[payloadoffset]);
                         payloadoffset += 4;
 
                         if (pathlen > (data.size() - payloadoffset)) {
@@ -1755,7 +1660,7 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                     if (payloadoffset + 4 > data.size()) {
                         errcode = SSH_FX_BAD_MESSAGE;
                     } else {
-                        uint32_t handlelen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                        uint32_t handlelen = BytesToUint32BE(&data[payloadoffset]);
                         payloadoffset += 4;
 
                         if (handlelen == 0 || handlelen > (data.size() - payloadoffset)) {
@@ -1782,58 +1687,31 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
 
                                 // type + reqid + flags + size + uid + gid + perms + atime + mtime
                                 uint32_t reply_len = 1 + 4 + 4 + 8 + 4 + 4 + 4 + 4 + 4;
-                                sftp_reply.push_back((reply_len >> 24) & 0xFF);
-                                sftp_reply.push_back((reply_len >> 16) & 0xFF);
-                                sftp_reply.push_back((reply_len >> 8) & 0xFF);
-                                sftp_reply.push_back(reply_len & 0xFF);
+                                AppendUint32BE(sftp_reply, reply_len);
 
                                 sftp_reply.push_back(SSH_FXP_ATTRS); // 105
 
-                                sftp_reply.push_back((request_id >> 24) & 0xFF);
-                                sftp_reply.push_back((request_id >> 16) & 0xFF);
-                                sftp_reply.push_back((request_id >> 8) & 0xFF);
-                                sftp_reply.push_back(request_id & 0xFF);
+                                AppendUint32BE(sftp_reply, request_id);
 
                                 // attrs (SFTP v3 order): flags, size, uid, gid, permissions, atime, mtime
                                 uint32_t flags = SSH_FILEXFER_ATTR_SIZE | SSH_FILEXFER_ATTR_UIDGID | SSH_FILEXFER_ATTR_PERMISSIONS | SSH_FILEXFER_ATTR_ACMODTIME;
-                                sftp_reply.push_back((flags >> 24) & 0xFF);
-                                sftp_reply.push_back((flags >> 16) & 0xFF);
-                                sftp_reply.push_back((flags >> 8) & 0xFF);
-                                sftp_reply.push_back(flags & 0xFF);
+                                AppendUint32BE(sftp_reply, flags);
 
                                 sftp_reply.push_back((filesize >> 56) & 0xFF);
                                 sftp_reply.push_back((filesize >> 48) & 0xFF);
                                 sftp_reply.push_back((filesize >> 40) & 0xFF);
                                 sftp_reply.push_back((filesize >> 32) & 0xFF);
-                                sftp_reply.push_back((filesize >> 24) & 0xFF);
-                                sftp_reply.push_back((filesize >> 16) & 0xFF);
-                                sftp_reply.push_back((filesize >> 8) & 0xFF);
-                                sftp_reply.push_back(filesize & 0xFF);
+                                AppendUint32BE(sftp_reply, filesize);
 
-                                sftp_reply.push_back((uid >> 24) & 0xFF);
-                                sftp_reply.push_back((uid >> 16) & 0xFF);
-                                sftp_reply.push_back((uid >> 8) & 0xFF);
-                                sftp_reply.push_back(uid & 0xFF);
+                                AppendUint32BE(sftp_reply, uid);
 
-                                sftp_reply.push_back((gid >> 24) & 0xFF);
-                                sftp_reply.push_back((gid >> 16) & 0xFF);
-                                sftp_reply.push_back((gid >> 8) & 0xFF);
-                                sftp_reply.push_back(gid & 0xFF);
+                                AppendUint32BE(sftp_reply, gid);
 
-                                sftp_reply.push_back((perms >> 24) & 0xFF);
-                                sftp_reply.push_back((perms >> 16) & 0xFF);
-                                sftp_reply.push_back((perms >> 8) & 0xFF);
-                                sftp_reply.push_back(perms & 0xFF);
+                                AppendUint32BE(sftp_reply, perms);
 
-                                sftp_reply.push_back((atime >> 24) & 0xFF);
-                                sftp_reply.push_back((atime >> 16) & 0xFF);
-                                sftp_reply.push_back((atime >> 8) & 0xFF);
-                                sftp_reply.push_back(atime & 0xFF);
+                                AppendUint32BE(sftp_reply, atime);
 
-                                sftp_reply.push_back((mtime >> 24) & 0xFF);
-                                sftp_reply.push_back((mtime >> 16) & 0xFF);
-                                sftp_reply.push_back((mtime >> 8) & 0xFF);
-                                sftp_reply.push_back(mtime & 0xFF);
+                                AppendUint32BE(sftp_reply, mtime);
                             }
                         }
                     }
@@ -1846,7 +1724,7 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                     if (payloadoffset + 4 > data.size()) {
                         errcode = SSH_FX_BAD_MESSAGE;
                     } else {
-                        uint32_t pathlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                        uint32_t pathlen = BytesToUint32BE(&data[payloadoffset]);
                         payloadoffset += 4;
 
                         if (pathlen > (data.size() - payloadoffset)) {
@@ -1905,7 +1783,7 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                     if (payloadoffset + 4 > data.size()) {
                         errcode = SSH_FX_BAD_MESSAGE;
                     } else {
-                        uint32_t pathlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                        uint32_t pathlen = BytesToUint32BE(&data[payloadoffset]);
                         payloadoffset += 4;
 
                         if (pathlen > (data.size() - payloadoffset)) {
@@ -1930,7 +1808,7 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                     if (payloadoffset + 4 > data.size()) {
                         errcode = SSH_FX_BAD_MESSAGE;
                     } else {
-                        uint32_t pathlen = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                        uint32_t pathlen = BytesToUint32BE(&data[payloadoffset]);
                         payloadoffset += 4;
 
                         if (pathlen > (data.size() - payloadoffset)) {
@@ -1958,94 +1836,65 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
 
                         if( m_session->current_channel.subsystem_req.sftp.handle == handle ){
                             // Parse offset
-                            uint64_t fileoffset = ((uint64_t)data[payloadoffset] << 56) | ((uint64_t)data[payloadoffset+1] << 48) |
-                                            ((uint64_t)data[payloadoffset+2] << 40) | ((uint64_t)data[payloadoffset+3] << 32) |
-                                            ((uint64_t)data[payloadoffset+4] << 24) | ((uint64_t)data[payloadoffset+5] << 16) |
-                                            ((uint64_t)data[payloadoffset+6] << 8) | (uint64_t)data[payloadoffset+7];
+                            uint64_t fileoffset = BytesToUint64BE(&data[payloadoffset]);
                             payloadoffset += 8;
 
                             // Parse length
-                            uint32_t length = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                            uint32_t length = BytesToUint32BE(&data[payloadoffset]);
                             payloadoffset += 4;
 
-                            // Check if the file exists and read data
-                            if (__i_fs.isFileExist(m_session->current_channel.subsystem_req.sftp.filepath.c_str())) {
+                            auto &sftp = m_session->current_channel.subsystem_req.sftp;
+                            uint32_t headroom = SSH_SFTP_READ_REPLY_HEADER + SSH_SFTP_READ_PACKET_OVERHEAD;
+                            uint32_t room = (m_session->current_channel.max_packet_size > headroom) ?
+                                            m_session->current_channel.max_packet_size - headroom : 0;
+                            uint32_t want = pdistd::min(length, (uint32_t)SSH_SFTP_READ_MAX);
+                            want = pdistd::min(want, room);
 
-                                uint64_t file_size = __i_fs.getFileSize(m_session->current_channel.subsystem_req.sftp.filepath.c_str());
-                                
-                                if (fileoffset >= file_size && length > 0) {
+                            sftp_reply.resize(SSH_SFTP_READ_REPLY_HEADER + want);
+                            uint8_t *into = sftp_reply.data() + SSH_SFTP_READ_REPLY_HEADER;
+                            int32_t got = 0;
 
-                                    errcode = SSH_FX_EOF; // EOF if offset is beyond file size and length is greater than zero
-                                }else if(file_size > 0 && length == 0){
-
-                                    errcode = SSH_FX_EOF; // end of file if accepted length is zero
-                                }else{
-                                    
-                                    bool startsending = false;
-                                    uint64_t totalskip = 0;
-
-                                    int iStatus = __i_fs.readFile(m_session->current_channel.subsystem_req.sftp.filepath.c_str(), 1024, [&](char* data, uint32_t size)->bool{
-                                        
-                                        if( !startsending ){
-
-                                            if( fileoffset == 0 ){
-
-                                                startsending = true; // Start sending data from the beginning
-                                            }else{
-
-                                                if( totalskip < fileoffset ){
-
-                                                    uint32_t skip = fileoffset - totalskip;
-                                                    
-                                                    if( skip >= size ){
-                                                        totalskip += size;
-                                                        return true; // Skip this chunk, continue reading
-                                                    }else{
-                                                        data += skip; // Skip the initial bytes
-                                                        size -= skip; // Reduce the size to send
-                                                        totalskip += skip; // Update total skip
-                                                        startsending = true;
-                                                    }
-                                                }else{
-                                                    startsending = true;
-                                                }
-                                            }
-                                        }
-
-                                        if( startsending ){
-                                            // Prepare SSH_FXP_DATA reply (type 103)
-                                            uint32_t reply_len = 1 + 4 + 4 + size; // type + reqid + data length + data
-                                            sftp_reply.push_back((reply_len >> 24) & 0xFF);
-                                            sftp_reply.push_back((reply_len >> 16) & 0xFF);
-                                            sftp_reply.push_back((reply_len >> 8) & 0xFF);
-                                            sftp_reply.push_back(reply_len & 0xFF);
-
-                                            sftp_reply.push_back(SSH_FXP_DATA); // type 103
-
-                                            sftp_reply.push_back((request_id >> 24) & 0xFF);
-                                            sftp_reply.push_back((request_id >> 16) & 0xFF);
-                                            sftp_reply.push_back((request_id >> 8) & 0xFF);
-                                            sftp_reply.push_back(request_id & 0xFF);
-
-                                            sftp_reply.push_back((size >> 24) & 0xFF);
-                                            sftp_reply.push_back((size >> 16) & 0xFF);
-                                            sftp_reply.push_back((size >> 8) & 0xFF);
-                                            sftp_reply.push_back(size & 0xFF);
-
-                                            sftp_reply.insert(sftp_reply.end(), data, data + size);
-                                        }
-
-                                        // return false to stop continue reading as we collected the chunk we need to send
-                                        return false;
-                                    });
-
-                                    if( iStatus < 0 ){
-                                        
-                                        errcode = SSH_FX_FAILURE; // Failure if read operation failed
+                            if( sftp_reply.size() < SSH_SFTP_READ_REPLY_HEADER + want ){
+                                got = PDI_ERR_NO_MEM;
+                            }else if( 0 == want ){
+                                got = 0;
+                            }else if( sftp.file >= 0 ){
+                                int64_t at = __i_fs.seekFile(sftp.file, (int64_t)fileoffset, FILE_SEEK_SET);
+                                got = (at < 0) ? (int32_t)at : 0;
+                                while( at >= 0 && got < (int32_t)want ){
+                                    int part = __i_fs.readFileHandle(sftp.file, (char *)into + got, want - got);
+                                    if( part < 0 ){
+                                        got = part;
+                                        break;
                                     }
+                                    if( 0 == part ){
+                                        break;
+                                    }
+                                    got += part;
                                 }
                             }else{
-                                errcode = SSH_FX_NO_SUCH_PATH;
+                                int status = __i_fs.readFile(sftp.filepath.c_str(), want, [&](char* data, uint32_t size)->bool{
+                                    uint32_t take = pdistd::min(size, want - (uint32_t)got);
+                                    memcpy(into + got, data, take);
+                                    got += (int32_t)take;
+                                    return (uint32_t)got < want;
+                                }, fileoffset);
+                                got = (status < 0) ? status : got;
+                            }
+
+                            if( got < 0 ){
+                                sftp_reply.clear();
+                                errcode = __i_fs.isFileExist(sftp.filepath.c_str()) ? SSH_FX_FAILURE : SSH_FX_NO_SUCH_PATH;
+                            }else if( 0 == got ){
+                                sftp_reply.clear();
+                                errcode = SSH_FX_EOF;
+                            }else{
+                                sftp_reply.resize(SSH_SFTP_READ_REPLY_HEADER + got);
+                                uint32_t reply_len = 1 + 4 + 4 + (uint32_t)got; // type + reqid + data length + data
+                                Uint32ToBytesBE(reply_len, &sftp_reply[0]);
+                                sftp_reply[4] = SSH_FXP_DATA; // type 103
+                                Uint32ToBytesBE(request_id, &sftp_reply[5]);
+                                Uint32ToBytesBE((uint32_t)got, &sftp_reply[9]);
                             }
                         }else{
                             errcode = SSH_FX_INVALID_HANDLE;
@@ -2061,20 +1910,21 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
 
                         if( m_session->current_channel.subsystem_req.sftp.handle == handle ){
                             // Parse offset
-                            uint64_t fileoffset = ((uint64_t)data[payloadoffset] << 56) | ((uint64_t)data[payloadoffset+1] << 48) |
-                                            ((uint64_t)data[payloadoffset+2] << 40) | ((uint64_t)data[payloadoffset+3] << 32) |
-                                            ((uint64_t)data[payloadoffset+4] << 24) | ((uint64_t)data[payloadoffset+5] << 16) |
-                                            ((uint64_t)data[payloadoffset+6] << 8) | (uint64_t)data[payloadoffset+7];
+                            uint64_t fileoffset = BytesToUint64BE(&data[payloadoffset]);
                             payloadoffset += 8;
 
                             // Parse length
-                            uint32_t length = (data[payloadoffset] << 24) | (data[payloadoffset+1] << 16) | (data[payloadoffset+2] << 8) | data[payloadoffset+3];
+                            uint32_t length = BytesToUint32BE(&data[payloadoffset]);
                             payloadoffset += 4;
 
-                            int iStatus = __i_fs.editFile(  m_session->current_channel.subsystem_req.sftp.filepath.c_str(), 
-                                                            fileoffset,
-                                                            (const char*)&data[payloadoffset], 
-                                                            length);
+                            auto &sftp = m_session->current_channel.subsystem_req.sftp;
+                            int iStatus = 0;
+                            if( sftp.file >= 0 ){
+                                int64_t at = __i_fs.seekFile(sftp.file, (int64_t)fileoffset, FILE_SEEK_SET);
+                                iStatus = (at < 0) ? (int)at : __i_fs.writeFileHandle(sftp.file, (const char*)&data[payloadoffset], length);
+                            }else{
+                                iStatus = __i_fs.editFile(sftp.filepath.c_str(), fileoffset, (const char*)&data[payloadoffset], length);
+                            }
                             if( iStatus < 0 ){
                                 errcode = SSH_FX_FAILURE; // Failure if write operation failed
                             }else{
@@ -2117,6 +1967,8 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
 
                             m_session->current_channel.doHandleBolusChannelDataChunksCb = nullptr; // reset the bolus chunk handler if any
 
+                            m_session->closeSftpFile();
+
                             // Release dir-handle state if this was an OPENDIR handle
                             auto &sftp = m_session->current_channel.subsystem_req.sftp;
                             sftp.is_dir = false;
@@ -2131,38 +1983,37 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                     }
                 }
 
-                if(errcode != -1){
+                auto status_reply = [&](uint32_t code){
                     // Prepare SSH_FXP_STATUS reply (type 101)
                     uint32_t reply_len = 1 + 4 + 4 + 4 + 4; // type + reqid + code + msglen + lang-tag len
                     sftp_reply.clear();
-                    sftp_reply.push_back((reply_len >> 24) & 0xFF);
-                    sftp_reply.push_back((reply_len >> 16) & 0xFF);
-                    sftp_reply.push_back((reply_len >> 8) & 0xFF);
-                    sftp_reply.push_back(reply_len & 0xFF);
+                    AppendUint32BE(sftp_reply, reply_len);
 
                     sftp_reply.push_back(SSH_FXP_STATUS); // type 101
                     
-                    sftp_reply.push_back((request_id >> 24) & 0xFF);
-                    sftp_reply.push_back((request_id >> 16) & 0xFF);
-                    sftp_reply.push_back((request_id >> 8) & 0xFF);
-                    sftp_reply.push_back(request_id & 0xFF);
+                    AppendUint32BE(sftp_reply, request_id);
 
-                    uint32_t code = errcode;
-                    sftp_reply.push_back((code >> 24) & 0xFF);
-                    sftp_reply.push_back((code >> 16) & 0xFF);
-                    sftp_reply.push_back((code >> 8) & 0xFF);
-                    sftp_reply.push_back(code & 0xFF);
+                    AppendUint32BE(sftp_reply, code);
 
                     // Empty error message (length 0)
                     sftp_reply.push_back(0x00); sftp_reply.push_back(0x00); sftp_reply.push_back(0x00); sftp_reply.push_back(0x00);
 
                     // Empty language tag (length 0)
                     sftp_reply.push_back(0x00); sftp_reply.push_back(0x00); sftp_reply.push_back(0x00); sftp_reply.push_back(0x00);
+                };
+
+                if(errcode != -1){
+                    status_reply(errcode);
                 }
 
                 // Send the SFTP reply back to the client
                 if( sftp_reply.size() > 0 && expectReply ){
-                    if (send_channel_data(m_session, (const char*)sftp_reply.data(), sftp_reply.size())) {
+                    bool sent = send_channel_data(m_session, (const char*)sftp_reply.data(), sftp_reply.size());
+                    if( !sent && SSH_FXP_STATUS != sftp_reply[4] && m_session->m_client && m_session->m_client->connected() ){
+                        status_reply(SSH_FX_FAILURE);
+                        sent = send_channel_data(m_session, (const char*)sftp_reply.data(), sftp_reply.size());
+                    }
+                    if (sent) {
                         // __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write_ro(RODT_ATTR("SSH SFTP subsystem rply sent : "));
                         // for (size_t i = 0; i < sftp_reply.size(); i++)
                         // {
@@ -2217,16 +2068,10 @@ bool LWSSH::SSHServer::handleChannelSftpBolusChunks(pdiutil::vector<uint8_t> &bo
 
         boluschunk.erase(boluschunk.begin(), boluschunk.begin() + 28);
 
-        sftpheaderoffset = ((uint64_t)sftpheader[16] << 56) | ((uint64_t)sftpheader[17] << 48) |
-                        ((uint64_t)sftpheader[18] << 40) | ((uint64_t)sftpheader[19] << 32) |
-                        ((uint64_t)sftpheader[20] << 24) | ((uint64_t)sftpheader[21] << 16) |
-                        ((uint64_t)sftpheader[22] << 8) | (uint64_t)sftpheader[23];
+        sftpheaderoffset = BytesToUint64BE(&sftpheader[16]);
 
         // note the initial total packet length to be received in contineous chunks
-        expectedDataLen  =  (sftpheader[24] << 24) | 
-                            (sftpheader[25] << 16) | 
-                            (sftpheader[26] << 8) | 
-                            sftpheader[27];
+        expectedDataLen  =  BytesToUint32BE(&sftpheader[24]);
 
         totalreceived = 0;                                    
     }
@@ -2234,27 +2079,14 @@ bool LWSSH::SSHServer::handleChannelSftpBolusChunks(pdiutil::vector<uint8_t> &bo
     // modify the length field in header as we get the data in chunks
     uint32_t chunksize = pdistd::min( (uint32_t)(expectedDataLen - totalreceived), (uint32_t)boluschunk.size());
     uint32_t newlen = 1 + 4 + 4 + 3 + 8 + 4 + chunksize; // type + reqid + handle length + we know handle + offset + data length + data bytes size
-    sftpheader[0] = (newlen >> 24) & 0xFF;
-    sftpheader[1] = (newlen >> 16) & 0xFF;
-    sftpheader[2] = (newlen >> 8) & 0xFF;
-    sftpheader[3] = newlen & 0xFF;
+    Uint32ToBytesBE(newlen, &sftpheader[0]);
 
     // Modify file offset in header as we get the data in chunks
     uint64_t sftpfileoffset = sftpheaderoffset + totalreceived;
-    sftpheader[16] = ((sftpfileoffset) >> 56) & 0xFF;
-    sftpheader[17] = ((sftpfileoffset) >> 48) & 0xFF;
-    sftpheader[18] = ((sftpfileoffset) >> 40) & 0xFF;
-    sftpheader[19] = ((sftpfileoffset) >> 32) & 0xFF;
-    sftpheader[20] = ((sftpfileoffset) >> 24) & 0xFF;
-    sftpheader[21] = ((sftpfileoffset) >> 16) & 0xFF;
-    sftpheader[22] = ((sftpfileoffset) >> 8) & 0xFF;
-    sftpheader[23] = (sftpfileoffset) & 0xFF;
+    Uint64ToBytesBE(sftpfileoffset, &sftpheader[16]);
 
     // modify the data len bytes in header as we get the data in chunks
-    sftpheader[24] = (chunksize >> 24) & 0xFF;
-    sftpheader[25] = (chunksize >> 16) & 0xFF;
-    sftpheader[26] = (chunksize >> 8) & 0xFF;
-    sftpheader[27] = chunksize & 0xFF;
+    Uint32ToBytesBE(chunksize, &sftpheader[24]);
 
     // Insert the modified header and chunk data to file
     boluschunk.insert(boluschunk.begin(), sftpheader, sftpheader + 28);

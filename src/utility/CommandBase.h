@@ -36,7 +36,7 @@ typedef enum cmd_status cmd_status_t;
 
 /* Command constants */
 #ifndef CMD_SIZE_MAX
-#define CMD_SIZE_MAX                8   ///< Maximum size of a command.
+#define CMD_SIZE_MAX                16  ///< Maximum size of a command.
 #endif
 
 #ifndef CMD_OPTION_MAX
@@ -687,6 +687,23 @@ typedef struct CommandBase {
         m_argsoverflow = false;
         if(deep)
             m_waitingoptionindx = -1;
+    }
+
+    /**
+     * @brief Writes "<prefix><what> : <code>", the way a command names what it
+     *        failed on and the code it failed with; the caller places the line.
+     * @param prefix The read only text before what failed, e.g. "dd: ".
+     * @param what What failed, usually a path.
+     * @param code The code it failed with.
+     */
+    void writeFailure(const char *prefix, const char *what, int32_t code){
+        if( nullptr == m_terminal ){
+            return;
+        }
+        m_terminal->write_ro(prefix);
+        m_terminal->write(what);
+        m_terminal->write_ro(RODT_ATTR(" : "));
+        m_terminal->write(code);
     }
 
     /**

@@ -94,7 +94,7 @@ TlsClientInterface::TlsClientInterface() :
     m_pcb(nullptr),
     m_isConnected(false),
     m_timeout(3000),
-    m_isLastWriteAcked(true),
+    m_unacked(0),
     m_tls(nullptr),
     m_rxBuf(nullptr),
     m_rxBufOffset(0),
@@ -109,7 +109,7 @@ TlsClientInterface::TlsClientInterface(struct tcp_pcb* pcb) :
     m_pcb(pcb),
     m_isConnected(true),
     m_timeout(3000),
-    m_isLastWriteAcked(true),
+    m_unacked(0),
     m_tls(nullptr),
     m_rxBuf(nullptr),
     m_rxBufOffset(0),
@@ -561,15 +561,11 @@ int TlsClientInterface::bioSend(void* ctx, const unsigned char* buf, size_t len)
     }
 
     uint16_t toSend = (len < sndbuf) ? (uint16_t)len : sndbuf;
-    uint8_t flags = TCP_WRITE_FLAG_COPY;
-    if (!self->m_isLastWriteAcked) flags |= TCP_WRITE_FLAG_MORE;
-
-    err_t err = tcp_write(self->m_pcb, buf, toSend, flags);
+    bool push = (0 == self->m_unacked) || (toSend >= TCP_MSS);
+    err_t err = tcp_write(self->m_pcb, buf, toSend, TCP_WRITE_FLAG_COPY | (push ? 0 : TCP_WRITE_FLAG_MORE));
     if (err == ERR_OK) {
-        if (self->m_isLastWriteAcked) {
-            self->m_isLastWriteAcked = false;
-            tcp_output(self->m_pcb);
-        }
+        self->m_unacked += toSend;
+        if (push) tcp_output(self->m_pcb);
         TCP_GUARD_END
         return (int)toSend;
     }
@@ -772,6 +768,7 @@ bool TlsClientInterface::availableforwrite(uint32_t size) {
 
     uint32_t availablebuff = tcp_sndbuf(m_pcb);
     uint32_t queuelen = tcp_sndqueuelen(m_pcb);
+    bool fits = (0 == m_unacked) || ((m_unacked + size) <= (uint32_t)TCP_UNACKED_MAX);
     TCP_GUARD_END
 
     if ((availablebuff < size) ||
@@ -781,14 +778,14 @@ bool TlsClientInterface::availableforwrite(uint32_t size) {
         return false;
     }
     __i_dvc_ctrl.yield();
-    return m_isLastWriteAcked;
+    return fits;
 }
 
 void TlsClientInterface::flush(int16_t flushtype) {
     TCP_GUARD_BEGIN
     if (IsFlushTx(flushtype) && m_pcb) tcp_output(m_pcb);
+    m_unacked = 0;
     TCP_GUARD_END
-    m_isLastWriteAcked = true;
 }
 
 
@@ -840,10 +837,10 @@ void TlsClientInterface::onError(void* arg, err_t /*err*/) {
     if (self->m_tls) self->m_tls->engineFatal = true;
 }
 
-err_t TlsClientInterface::onSent(void* arg, struct tcp_pcb*, u16_t) {
+err_t TlsClientInterface::onSent(void* arg, struct tcp_pcb*, u16_t len) {
     TlsClientInterface* self = static_cast<TlsClientInterface*>(arg);
     if (!self) return ERR_VAL;
-    self->m_isLastWriteAcked = true;
+    self->m_unacked = (len >= self->m_unacked) ? 0 : self->m_unacked - len;
     return ERR_OK;
 }
 

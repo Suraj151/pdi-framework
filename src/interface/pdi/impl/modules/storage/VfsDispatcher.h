@@ -34,11 +34,17 @@ public:
 #endif
     }
 
-    int8_t mount(const char* prefix, iFileSystemInterface* backend, const char* name, vfs_type_t type);
+    int8_t mount(const char* prefix, iFileSystemInterface* backend, const char* name, vfs_type_t type, bool removable = false);
+
+    /**
+     * Detaches a runtime mount; refused for a boot mount, or while it holds open
+     * files or a session's working directory.
+     */
+    pdi_err_t umount(const char* prefix);
 
     uint8_t getMountCount() const { return m_mount_count; }
     const vfs_mount_t* getMount(uint8_t idx) const {
-        return (idx < m_mount_count) ? &m_mounts[idx] : nullptr;
+        return (idx < m_mount_count && nullptr != m_mounts[idx].m_backend) ? &m_mounts[idx] : nullptr;
     }
     const vfs_mount_t* findMountForPath(const char* path) const;
 
@@ -58,7 +64,7 @@ public:
     pdi_err_t createDirectory(const char* path) override;
     pdi_err_t deleteDirectory(const char* path) override;
     pdi_err_t rename(const char* oldPath, const char* newPath) override;
-    pdi_err_t copyFile(const char* sourcePath, const char* destPath) override;
+    pdi_err_t copyFile(const char* sourcePath, const char* destPath, CallBackVoidArgBoolRetFn keepgoing = nullptr) override;
     pdi_err_t moveFile(const char* oldPath, const char* newPath) override;
     pdi_err_t deleteFile(const char* path) override;
 
@@ -72,6 +78,12 @@ public:
     uint64_t getUsedSize() override;
     uint64_t getFreeSize() override;
 
+    /**
+     * The free bytes of the filesystem the path is on, the way statvfs answers
+     * for a path; the root's for a path no mount covers.
+     */
+    uint64_t getFreeSize(const char* path);
+
     pdiutil::string getPWD() const override;
     bool setPWD(const char* path) override;
     pdiutil::string getLastPWD() const override;
@@ -83,6 +95,12 @@ public:
     const char* getRootDirectory() const override;
     const char* getHomeDirectory() const override;
     const char* getTempDirectory() const override;
+
+    /**
+     * Where a file bound for path is written first: the staging directory of the
+     * disk mounted there, else the root's temp.
+     */
+    pdiutil::string getStagingDirectory(const char* path) override;
     bool setHomeDirectory(pdiutil::string& homedir) override;
 
     mimetype_t getFileMimeType(const pdiutil::string& path) override;
@@ -134,10 +152,25 @@ protected:
     iFileSystemInterface* resolve(const char* path, const char** relpath_out) const;
     iFileSystemInterface* rootBackend() const;
 
-    // Stream a regular file from one backend to another (used when copy/move
-    // cross a mount boundary). Returns 0 on success, -1 otherwise.
+    /**
+     * Whether the current session may write the directory holding path, or the
+     * nearest one of its parents that exists.
+     */
+    bool checkParentAccess(const char* path);
+
+    /**
+     * Whether the current session may bring path into being: always when it exists,
+     * else when it may write its directory.
+     */
+    bool checkCreateAccess(const char* path);
+
+    /**
+     * Streams a regular file across mounts; keepgoing can stop it between chunks,
+     * removing the copy with PDI_ERR_ABORTED.
+     */
     int crossCopy(iFileSystemInterface* sb, const char* srel,
-                  iFileSystemInterface* db, const char* drel);
+                  iFileSystemInterface* db, const char* drel,
+                  CallBackVoidArgBoolRetFn keepgoing = nullptr);
 
     // The backend owns every open file; the dispatcher only carries which mount
     // a handle came from, packed into the handle itself. Returns nullptr when

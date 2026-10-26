@@ -42,6 +42,7 @@ set(PDI_FUZZ_TARGETS
   fuzz_mdns
   fuzz_json
   fuzz_mqtt
+  fuzz_devices
 )
 
 foreach(target ${PDI_FUZZ_TARGETS})

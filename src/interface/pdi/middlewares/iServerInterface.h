@@ -168,6 +168,12 @@ public:
 
   virtual void setStoragePath(const pdiutil::string &storagepath) {}
   virtual bool handleStaticFileRequest() { return false; }
+
+  /**
+   * @brief Set the check an uploaded file must pass before any of it is stored.
+   * @param gate Answers whether the request may store files; unset stores every upload.
+   */
+  virtual void setUploadGate(CallBackVoidArgBoolRetFn gate) {}
   
   virtual void send(int code, mimetype_t content_type = MIME_TYPE_MAX, const char *content = nullptr, bool send_in_chunks = false) = 0;
   virtual void sendChunk(const char *chunk = nullptr) {}

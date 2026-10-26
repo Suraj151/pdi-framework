@@ -49,6 +49,25 @@ uint64_t StringToUint64(const char *pString, uint8_t _len = 32);
 uint32_t StringToUint32(const char *pString, uint8_t _len = 32);
 
 /**
+ * @brief Writes a size in bytes as fdisk, lsblk and df -h do: "3.7G" short, "3.75
+ * GiB" long.
+ * @param bytes The size.
+ * @param shortform One letter unit and one decimal for small values.
+ * @param out Where the text goes.
+ * @param outsize Bytes out holds.
+ */
+void BytesToSizeString(uint64_t bytes, bool shortform, char *out, uint8_t outsize);
+
+/**
+ * @brief Reads a whole number written as nothing but digits that fits 32 bits.
+ * @param pString The digits.
+ * @param _len How many characters to read.
+ * @param out The number, set only when the digits are one.
+ * @return Whether every character was a digit and the number fit.
+ */
+bool ParseUint32(const char *pString, uint16_t _len, uint32_t &out);
+
+/**
  * @brief Converts a string to a signed 32-bit integer.
  * @param pString The string to convert.
  * @param _len The maximum length of the string (default is 32).
@@ -140,8 +159,9 @@ void MicrosToTimeString(uint64_t val, char *pString, uint8_t _maxlen, uint8_t _f
  * @param pString The buffer to store the resulting string.
  * @param _maxlen The maximum length of the string buffer.
  * @param cap If true, uses uppercase A-F (default is false).
+ * @param _padmin Fewest digits, zero padded on the left, up to 8 (default is 0).
  */
-void Uint32ToHexString(uint32_t val, char *pString, uint8_t _maxlen, bool cap = false);
+void Uint32ToHexString(uint32_t val, char *pString, uint8_t _maxlen, bool cap = false, uint8_t _padmin = 0);
 
 /**
  * @brief Converts a byte array to a lowercase hex string.
@@ -236,6 +256,12 @@ void EpochToDateTimeString(uint32_t epoch, char *pString, uint8_t _maxlen,
 void EpochToDateTime(uint32_t epoch, datetime_t &out);
 
 /**
+ * The epoch the calendar fields name, the reverse of EpochToDateTime; 0 for a
+ * date before 1970 or a month outside 1-12.
+ */
+uint32_t DateTimeToEpoch(const datetime_t &in);
+
+/**
  * @brief Counts the number of digits in a signed 32-bit integer.
  * @param x The signed 32-bit integer.
  * @return The number of digits in the integer.
@@ -260,5 +286,89 @@ uint8_t Int64DigitCount(int64_t x);
  * @return The re-scaled value, or tolow when the source range is empty.
  */
 int32_t MapRange(int32_t value, int32_t fromlow, int32_t fromhigh, int32_t tolow, int32_t tohigh);
+
+/**
+ * @brief Reads a big-endian (network order) 16-bit value.
+ * @param at The first of the two bytes.
+ * @return The value.
+ */
+uint16_t BytesToUint16BE(const uint8_t *at);
+
+/**
+ * @brief Reads a big-endian (network order) 32-bit value.
+ * @param at The first of the four bytes.
+ * @return The value.
+ */
+uint32_t BytesToUint32BE(const uint8_t *at);
+
+/**
+ * @brief Reads a big-endian (network order) 64-bit value.
+ * @param at The first of the eight bytes.
+ * @return The value.
+ */
+uint64_t BytesToUint64BE(const uint8_t *at);
+
+/**
+ * @brief Reads a little-endian 16-bit value.
+ * @param at The first of the two bytes.
+ * @return The value.
+ */
+uint16_t BytesToUint16LE(const uint8_t *at);
+
+/**
+ * @brief Reads a little-endian 32-bit value.
+ * @param at The first of the four bytes.
+ * @return The value.
+ */
+uint32_t BytesToUint32LE(const uint8_t *at);
+
+/**
+ * @brief Writes a 16-bit value in big-endian (network) order.
+ * @param val The value.
+ * @param at Where the two bytes go.
+ */
+void Uint16ToBytesBE(uint16_t val, uint8_t *at);
+
+/**
+ * @brief Writes a 32-bit value in big-endian (network) order.
+ * @param val The value.
+ * @param at Where the four bytes go.
+ */
+void Uint32ToBytesBE(uint32_t val, uint8_t *at);
+
+/**
+ * @brief Writes a 64-bit value in big-endian (network) order.
+ * @param val The value.
+ * @param at Where the eight bytes go.
+ */
+void Uint64ToBytesBE(uint64_t val, uint8_t *at);
+
+/**
+ * @brief Writes a 16-bit value in little-endian order.
+ * @param val The value.
+ * @param at Where the two bytes go.
+ */
+void Uint16ToBytesLE(uint16_t val, uint8_t *at);
+
+/**
+ * @brief Writes a 32-bit value in little-endian order.
+ * @param val The value.
+ * @param at Where the four bytes go.
+ */
+void Uint32ToBytesLE(uint32_t val, uint8_t *at);
+
+/**
+ * @brief Appends a 32-bit value in big-endian (network) order.
+ * @param out The bytes to append to.
+ * @param val The value.
+ */
+void AppendUint32BE(pdiutil::vector<uint8_t> &out, uint32_t val);
+
+/**
+ * @brief Appends a 64-bit value in big-endian (network) order.
+ * @param out The bytes to append to.
+ * @param val The value.
+ */
+void AppendUint64BE(pdiutil::vector<uint8_t> &out, uint64_t val);
 
 #endif

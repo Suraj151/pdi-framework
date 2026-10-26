@@ -97,9 +97,11 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   FileEditCommand::RegisterCommand();
 
   HexdumpCommand::RegisterCommand();
+  DdCommand::RegisterCommand();
   DfFSCommand::RegisterCommand();
   DatabaseCommand::RegisterCommand();
   MountCommand::RegisterCommand();
+  UmountCommand::RegisterCommand();
   WcFSCommand::RegisterCommand();
   HeadFSCommand::RegisterCommand();
   TailFSCommand::RegisterCommand();
@@ -155,6 +157,8 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
 
   HelpCommand::RegisterCommand();
   UptimeCommand::RegisterCommand();
+  UnameCommand::RegisterCommand();
+  HostnameCommand::RegisterCommand();
   EchoCommand::RegisterCommand();
   EnvCommand::RegisterCommand();
   ExportCommand::RegisterCommand();
@@ -170,6 +174,23 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   #endif
   DateCommand::RegisterCommand();
   TimedatectlCommand::RegisterCommand();
+#ifdef ENABLE_DRIVER_CORE
+  UdevadmCommand::RegisterCommand();
+  LsblkCommand::RegisterCommand();
+#endif
+#if defined(ENABLE_DRIVER_CORE) && defined(ENABLE_STORAGE_SERVICE)
+  BlkidCommand::RegisterCommand();
+#endif
+#if defined(ENABLE_DRIVER_CORE) && defined(ENABLE_STORAGE_SERVICE) && defined(ENABLE_DEVFS)
+  WipefsCommand::RegisterCommand();
+  SfdiskCommand::RegisterCommand();
+#endif
+#if defined(ENABLE_DRIVER_CORE) && defined(ENABLE_STORAGE_SERVICE) && defined(ENABLE_DEVFS) && defined(ENABLE_DISK_FS)
+  MkfsCommand::RegisterCommand();
+#endif
+#if defined(ENABLE_I2S_BUS) && defined(ENABLE_STORAGE_SERVICE)
+  ArecordCommand::RegisterCommand();
+#endif
 
   #ifdef ENABLE_PROGRAM_EXEC
   ExecCommand::RegisterCommand();
@@ -270,6 +291,40 @@ bool CommandLineServiceProvider::consumeTelnetByte(session_t *session, iTerminal
 #endif
 
 /**
+ * Whether the shell has input to take: bytes on the terminal, or keys its session
+ * kept while looking for ctrl+c.
+ */
+bool CommandLineServiceProvider::hasPendingInput(iTerminalInterface *terminal)
+{
+  if( nullptr == terminal ){
+    return false;
+  }
+  session_t *session = SessionManager::findByTerminal(terminal);
+  return keyWaiting(session, terminal);
+}
+
+/**
+ * Whether a key waits for the shell, the session's typed ahead keys first.
+ */
+bool CommandLineServiceProvider::keyWaiting(session_t *session, iTerminalInterface *terminal)
+{
+  return (nullptr != session && !session->m_typeahead.empty()) || terminal->available() > 0;
+}
+
+/**
+ * The next key for the shell, the session's typed ahead keys first.
+ */
+char CommandLineServiceProvider::nextKey(session_t *session, iTerminalInterface *terminal)
+{
+  if( nullptr != session && !session->m_typeahead.empty() ){
+    char c = session->m_typeahead[0];
+    session->m_typeahead.erase(0, 1);
+    return c;
+  }
+  return terminal->read();
+}
+
+/**
  * execute command provided or in list available
  *
  * @param iTerminalInterface* terminal
@@ -303,9 +358,9 @@ pdi_err_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface *t
       }
     }
     
-    while (terminal->available())
+    while (keyWaiting(session, terminal))
     {
-      char c = terminal->read();
+      char c = nextKey(session, terminal);
 
 #ifdef ENABLE_TELNET_SERVICE
       if (TERMINAL_TYPE_TELNET == terminal->get_terminal_type() && consumeTelnetByte(session, terminal, (uint8_t)c)) {
@@ -371,13 +426,13 @@ pdi_err_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface *t
         __i_dvc_ctrl.wait(2);
 
         // check for ANSI escape sequence
-        if(terminal->available()){
+        if(keyWaiting(session, terminal)){
 
           char escseq[5];
           uint8_t seqlen = 0;
           memset(escseq, 0, 5);
           escseq[seqlen++] = c;
-          escseq[seqlen++] = terminal->read();
+          escseq[seqlen++] = nextKey(session, terminal);
 
           // there might be more escape sequences out there
           // but we will process only few of them as of now
@@ -390,9 +445,9 @@ pdi_err_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface *t
           __i_dvc_ctrl.wait(2);
           
           // Check for ANSI escape sequence
-          if (escseq[1] == '[' && terminal->available()) {
+          if (escseq[1] == '[' && keyWaiting(session, terminal)) {
 
-            escseq[seqlen++] = terminal->read();
+            escseq[seqlen++] = nextKey(session, terminal);
 
             // wait a 2ms to get the next char
             __i_dvc_ctrl.wait(2);
@@ -430,9 +485,9 @@ pdi_err_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface *t
               // end
               inseq = CMD_TERM_INSEQ_END;
               session->m_cursor = session->m_linebuf.size();
-            }else if (terminal->available()){
+            }else if (keyWaiting(session, terminal)){
 
-              escseq[seqlen++] = terminal->read();
+              escseq[seqlen++] = nextKey(session, terminal);
 
               // check for vt sequence
               if( escseq[3] == '~' ){
@@ -566,6 +621,7 @@ pdi_err_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface *t
       session->m_cursor = 0;
     }
 
+    SessionManager::clearInterrupt();
     pdi_err_t result = executeCommand(&session->m_linebuf, inseq);
 
     // A waiting command (e.g. the fedit line editor) can manage the line
@@ -1243,6 +1299,7 @@ pdi_err_t CommandLineServiceProvider::runPipeline(const char *line, const ShellP
 
   pdi_err_t res = CMD_ERROR_UNSET;
   PipeStream *carry = nullptr;
+  uint16_t cutat = 0;
   pdiutil::string outpath;
   int16_t first = pipeline.m_command_start;
   int16_t last = (int16_t)(first + pipeline.m_command_count - 1);
@@ -1358,6 +1415,10 @@ pdi_err_t CommandLineServiceProvider::runPipeline(const char *line, const ShellP
       }
     }
 
+    if( nullptr != carry && carry->overflowed() && 0 == carry->available() ){
+      cutat = carry->capacity();
+    }
+
     pdiutil::safe_delete(carry);
     carry = outpipe;
 
@@ -1369,6 +1430,13 @@ pdi_err_t CommandLineServiceProvider::runPipeline(const char *line, const ShellP
   }
 
   pdiutil::safe_delete(carry);
+
+  if( 0 != cutat ){
+    m_terminal->writeln();
+    m_terminal->write_ro(RODT_ATTR("pipe full, output cut at "));
+    m_terminal->write((int32_t)cutat);
+    m_terminal->writeln_ro(RODT_ATTR(" bytes"));
+  }
 
   SessionManager::resetStdio();
   return res;

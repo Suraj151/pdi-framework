@@ -9,6 +9,7 @@ created Date    : 1st Jan 2024
 ******************************************************************************/
 
 #include "DeviceControlInterface.h"
+#include <coredecls.h>
 #include "ExceptionsNotifier.h"
 #include "core/Espnow.h"
 #include "PingInterface.h"
@@ -24,6 +25,10 @@ created Date    : 1st Jan 2024
 
 #ifdef ENABLE_HTTP_CLIENT
 #include <transports/http/HTTPClient.h>
+#endif
+
+#ifdef ENABLE_DRIVER_CORE
+#include <interface/pdi/impl/drivers/BuiltInDrivers.h>
 #endif
 
 /**
@@ -193,6 +198,9 @@ bool DeviceControlInterface::isExceptionalGpio(gpio_id_t pin)
 
     if( EXCEPTIONAL_GPIO_PINS[j] == hw )return true;
   }
+#ifdef ENABLE_DRIVER_CORE
+  if( isDriverGpio(hw) )return true;
+#endif
   return false;
 }
 
@@ -245,6 +253,10 @@ void DeviceControlInterface::initDeviceSpecificFeatures()
 
     #if defined(ENABLE_NETWORK_SERVICE) && defined(PDI_NET_STACK_LWIP)
     __netif_registry.registerStack( &__lwip_net_stack );
+    #endif
+
+    #ifdef ENABLE_DRIVER_CORE
+    registerBuiltInDrivers();
     #endif
 
     #ifdef ENABLE_EXCEPTION_NOTIFIER
@@ -473,6 +485,20 @@ void DeviceControlInterface::handleEvents()
         serial_event_t e(SERIAL_IFACE_UART, SERIAL_IFACE_CMD, &__serial_uart);
         __utl_event.execute_event(EVENT_SERIAL_AVAILABLE, &e);
     }
+}
+
+/**
+ * Whether the caller may wait: true on the loop and in a preemptive task,
+ * false in the system context callbacks run in.
+ */
+bool DeviceControlInterface::canWait() const
+{
+    #ifdef ENABLE_CONTEXTUAL_EXECUTION
+    if (__i_preemptive_scheduler.is_task_context()) {
+        return true;
+    }
+    #endif
+    return can_yield();
 }
 
 /**

@@ -21,6 +21,8 @@ Created Date    : 23rd July 2026
 
 #include "SynthFs.h"
 
+class iNvmemDriverInterface;
+
 class SysFs : public SynthFs {
 public:
   SysFs();
@@ -29,12 +31,24 @@ public:
   int writeFile(const char *path, const char *content, uint32_t size,
                 bool append = false) override;
 
+#ifdef ENABLE_DRIVER_CORE
+  int readFile(const char *path, uint64_t size,
+               pdiutil::function<bool(char *, uint32_t)> readbackfn,
+               uint64_t offset = 0, const char *readUntilMatchStr = nullptr,
+               bool *didmatchfound = nullptr) override;
+  int editFile(const char *path, uint64_t offset, const char *content,
+               uint32_t size) override;
+#endif
+
 protected:
   synth_node_t resolve(const char *path) override;
   pdiutil::string render(const char *path) override;
   int listChildren(const char *path,
                    pdiutil::vector<file_info_t> &items) override;
   uint16_t permsFor(const char *path, synth_node_t kind) override;
+#ifdef ENABLE_DRIVER_CORE
+  int64_t sizeOf(const char *path) override;
+#endif
 
 private:
   enum NodeKind : uint8_t {
@@ -47,7 +61,21 @@ private:
     SYS_MODE,
     SYS_NETDIR,
     SYS_NETIF,
-    SYS_NETATTR
+    SYS_NETATTR,
+    SYS_BUS,
+    SYS_BUSDIR,
+    SYS_BUSDEVS,
+    SYS_BUSDEV,
+    SYS_BUSDEVATTR,
+    SYS_BUSDRVS,
+    SYS_BUSDRV,
+    SYS_BUSRESCAN,
+    SYS_BUSDEVNVMEM,
+    SYS_BLOCK,
+    SYS_BLOCKDEV,
+    SYS_BLOCKSIZE,
+    SYS_BLOCKPART,
+    SYS_BLOCKPARTATTR
   };
 
   /**
@@ -66,6 +94,42 @@ private:
    * What one leaf of a registered network interface currently reads.
    */
   pdiutil::string renderNetAttr(uint8_t index, uint8_t leaf);
+
+#ifdef ENABLE_DRIVER_CORE
+  /**
+   * Which node under /sys/bus the rest of the path names: a bus, its devices and
+   * drivers, a device leaf, or rescan.
+   */
+  NodeKind classifyBus(const char *p, int16_t &index_out, uint8_t &leaf_out) const;
+
+  /**
+   * Which node under /sys/block the rest of the path names.
+   */
+  NodeKind classifyBlock(const char *p, int16_t &index_out, uint8_t &leaf_out) const;
+
+  /**
+   * What a disk or partition leaf under /sys/block currently reads.
+   */
+  pdiutil::string renderBlockAttr(uint16_t device, uint8_t leaf);
+
+  /**
+   * What one leaf of a known device currently reads.
+   */
+  pdiutil::string renderBusAttr(uint16_t device, uint8_t leaf);
+
+  /**
+   * The memory behind a device's eeprom file, nullptr when the path names none.
+   */
+  iNvmemDriverInterface *nvmemAt(const char *path) const;
+
+  /**
+   * Delivers device memory from the offset a transfer at a time, yielding between
+   * and finding the device again each time.
+   */
+  int readNvmem(const char *path, uint64_t size,
+                pdiutil::function<bool(char *, uint32_t)> readbackfn,
+                uint64_t offset, const char *readUntilMatchStr, bool *didmatchfound);
+#endif
 };
 
 extern SysFs __i_sysfs;

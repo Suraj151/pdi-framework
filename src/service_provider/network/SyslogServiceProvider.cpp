@@ -107,7 +107,9 @@ void SyslogServiceProvider::handleLine(logger_type_t log_type, const char *line,
   if (s_syslog_busy || nullptr == line || 0 == len) return;
   s_syslog_busy = true;
 
+  __i_fs.beginPrivileged();
   writeToFile(log_type, line, len);
+  __i_fs.endPrivileged();
 #ifdef ENABLE_SYSLOG_FORWARD
   forward(log_type, line, len);
 #endif

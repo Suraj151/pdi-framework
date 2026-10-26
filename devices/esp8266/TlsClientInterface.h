@@ -184,7 +184,7 @@ private:
     struct tcp_pcb* m_pcb;
     bool     m_isConnected;
     uint32_t m_timeout;
-    bool     m_isLastWriteAcked;
+    uint32_t m_unacked;
 
     BearSSLState* m_bear;
 

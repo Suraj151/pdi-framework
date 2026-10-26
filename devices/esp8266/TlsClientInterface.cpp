@@ -213,7 +213,7 @@ TlsClientInterface::TlsClientInterface() :
     m_pcb(nullptr),
     m_isConnected(false),
     m_timeout(3000),
-    m_isLastWriteAcked(true),
+    m_unacked(0),
     m_bear(nullptr),
     m_rxBuf(nullptr),
     m_rxBufOffset(0),
@@ -233,7 +233,7 @@ TlsClientInterface::TlsClientInterface(struct tcp_pcb* pcb) :
     m_pcb(pcb),
     m_isConnected(true),
     m_timeout(3000),
-    m_isLastWriteAcked(true),
+    m_unacked(0),
     m_bear(nullptr),
     m_rxBuf(nullptr),
     m_rxBufOffset(0),
@@ -785,7 +785,7 @@ int32_t TlsClientInterface::write(const uint8_t* data, uint32_t size) {
         unsigned char* appBuf = (state & BR_SSL_SENDAPP) ? br_ssl_engine_sendapp_buf(eng, &bufLen) : nullptr;
 
         if (!appBuf || bufLen == 0) {
-            if (!m_pcb || !m_isConnected || waited >= TCP_WRITE_DRAIN_TIMEOUT_MS) break;
+            if (!m_pcb || !m_isConnected || waited >= TCP_WRITE_DRAIN_TIMEOUT_MS || !__i_dvc_ctrl.canWait()) break;
             br_ssl_engine_flush(eng, 0);
             pumpEngine();
             __i_dvc_ctrl.wait(1);
@@ -914,6 +914,8 @@ bool TlsClientInterface::availableforwrite(uint32_t size) {
         queuelen = tcp_sndqueuelen(m_pcb);
     }
 
+    bool fits = (0 == m_unacked) || ((m_unacked + size) <= (uint32_t)TCP_UNACKED_MAX);
+
     #ifdef ENABLE_CONTEXTUAL_EXECUTION
     __lwip_mutex.critical_unlock();
     #endif
@@ -938,7 +940,7 @@ bool TlsClientInterface::availableforwrite(uint32_t size) {
         return false;
     }
 
-    return m_isLastWriteAcked;
+    return fits;
 }
 
 void TlsClientInterface::flush(int16_t flushtype) {
@@ -954,7 +956,7 @@ void TlsClientInterface::flush(int16_t flushtype) {
     // consumed yet
     if (IsFlushTx(flushtype) && m_pcb) tcp_output(m_pcb);
 
-    m_isLastWriteAcked = true;
+    m_unacked = 0;
 }
 
 
@@ -1016,11 +1018,11 @@ void TlsClientInterface::onError(void* arg, err_t err) {
     NESTED_CRITICAL_SECTION_EXIT
 }
 
-err_t TlsClientInterface::onSent(void* arg, struct tcp_pcb* /*tpcb*/, u16_t /*len*/) {
+err_t TlsClientInterface::onSent(void* arg, struct tcp_pcb* /*tpcb*/, u16_t len) {
     TlsClientInterface* self = static_cast<TlsClientInterface*>(arg);
     if (!self) return ERR_VAL;
     NESTED_CRITICAL_SECTION_ENTER
-    self->m_isLastWriteAcked = true;
+    self->m_unacked = (len >= self->m_unacked) ? 0 : self->m_unacked - len;
     self->m_pumpPending = true;
     NESTED_CRITICAL_SECTION_EXIT
     return ERR_OK;
@@ -1164,33 +1166,26 @@ void TlsClientInterface::pumpEngine() {
 
         uint16_t toSend = (len < sndbuf) ? static_cast<uint16_t>(len) : sndbuf;
 
-        uint8_t flags = TCP_WRITE_FLAG_COPY;
-
-        if (!m_isLastWriteAcked){
-            flags |= TCP_WRITE_FLAG_MORE; // do not tcp-PuSH (yet)
-        }
-
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
         __lwip_mutex.critical_lock();
         #endif
-        err_t err = tcp_write(m_pcb, buf, toSend, flags);
+        bool push = (0 == m_unacked) || (toSend >= TCP_MSS);
+        err_t wrote = tcp_write(m_pcb, buf, toSend, TCP_WRITE_FLAG_COPY | (push ? 0 : TCP_WRITE_FLAG_MORE));
+        err_t pushed = ERR_OK;
+        if (ERR_OK == wrote) {
+            m_unacked += toSend;
+            pushed = push ? tcp_output(m_pcb) : ERR_OK;
+        }
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
         __lwip_mutex.critical_unlock();
         #endif
 
-        if (m_isLastWriteAcked) {
-            #ifdef ENABLE_CONTEXTUAL_EXECUTION
-            __lwip_mutex.critical_lock();
-            #endif
-            m_isLastWriteAcked = false;
-            err = tcp_output(m_pcb);
-            #ifdef ENABLE_CONTEXTUAL_EXECUTION
-            __lwip_mutex.critical_unlock();
-            #endif
+        if (ERR_OK == wrote) {
+            br_ssl_engine_sendrec_ack(eng, toSend);
         }
-
-        br_ssl_engine_sendrec_ack(eng, toSend);
         __i_dvc_ctrl.yield();
+
+        err_t err = (ERR_OK != wrote) ? wrote : pushed;
 
         if (err != ERR_OK) {
             SysLogE("TLS pumpEngine: tcp_write err=%d\n", (int)err);

@@ -59,6 +59,7 @@ struct SSHSubsystemRequest {
     struct Sftp{
         pdiutil::string filepath;
         pdiutil::string handle; // Handle for the sftp, if needed. currently supporting 1 only at a time
+        pdi_fhandle_t file = -1;
         uint32_t fxp_write_totalrecvd = 0; // Total bytes received for current write operation
         uint32_t fxp_write_expectedrecvlen = 0; // Expected total length for current
         uint8_t fxp_write_header[28] = {0}; // per-session reassembled SSH_FXP_WRITE header
@@ -92,6 +93,7 @@ struct SSHChannel {
     uint32_t server_channel_id = 0;   // The ID assigned by your server
     uint32_t window_size = 0;
     uint32_t max_packet_size = 0;
+    uint32_t window_used = 0;
     // Add more fields as needed (state, pty info, etc.)
     // e.g., bool shell_started, std::string pty_type, etc.
     pdiutil::string req_type;
@@ -182,8 +184,14 @@ struct LWSSHSession {
             m_sshclient->setSSHSession(this);
         }
     }
+    /**
+     * Closes the file the sftp handle holds open, if any.
+     */
+    void closeSftpFile();
+
     // Destructor
     ~LWSSHSession() {
+        closeSftpFile();
         if (m_sshclient) {
             m_sshclient->close();
         }
@@ -285,6 +293,12 @@ bool send_server_ssh_packet(LWSSHSession* session, pdiutil::vector<uint8_t> &pay
 bool read_ssh_string(const pdiutil::vector<uint8_t>& payload, pdiutil::string& str, int32_t &offset);
 bool read_ssh_string(const pdiutil::vector<uint8_t>& payload, pdiutil::vector<uint8_t>& str, int32_t &offset);
 bool send_channel_open_confirmation(LWSSHSession* session, uint32_t window_size, uint32_t max_packet);
+
+/**
+ * Counts the client's channel data against its window and tops the window up once
+ * half of it is used.
+ */
+bool consume_channel_window(LWSSHSession* session, uint32_t bytes);
 bool send_channel_data(LWSSHSession* session, const char* data, uint32_t length);
 
 void build_exchange_hash(

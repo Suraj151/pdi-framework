@@ -1,0 +1,108 @@
+{
+ "host": {
+  "terminal.ssh command round trip": {
+   "better": "lower",
+   "runs": [
+    20.131945610046387
+   ],
+   "unit": "ms"
+  },
+  "terminal.ssh output": {
+   "better": "higher",
+   "runs": [
+    5518.523342819663
+   ],
+   "unit": "lines/s"
+  },
+  "terminal.telnet command round trip": {
+   "better": "lower",
+   "runs": [
+    40.99843502044678
+   ],
+   "unit": "ms"
+  },
+  "terminal.telnet output": {
+   "better": "higher",
+   "runs": [
+    6620.759327427593
+   ],
+   "unit": "lines/s"
+  },
+  "transfer.sftp download": {
+   "better": "higher",
+   "runs": [
+    47.547147379699375
+   ],
+   "unit": "KB/s"
+  },
+  "transfer.sftp upload": {
+   "better": "higher",
+   "runs": [
+    3552.8483356495267
+   ],
+   "unit": "KB/s"
+  }
+ },
+ "pdi-15d3ec": {
+  "terminal.ssh command round trip": {
+   "better": "lower",
+   "runs": [
+    244.58110332489014
+   ],
+   "unit": "ms"
+  },
+  "terminal.ssh output": {
+   "better": "higher",
+   "runs": [
+    95.84911983109839
+   ],
+   "unit": "lines/s"
+  },
+  "terminal.telnet command round trip": {
+   "better": "lower",
+   "runs": [
+    184.4045639038086
+   ],
+   "unit": "ms"
+  },
+  "terminal.telnet output": {
+   "better": "higher",
+   "runs": [
+    70.7590792215149
+   ],
+   "unit": "lines/s"
+  },
+  "transfer.sftp download": {
+   "better": "higher",
+   "runs": [
+    23.04204979172189
+   ],
+   "unit": "KB/s"
+  },
+  "transfer.sftp upload": {
+   "better": "higher",
+   "runs": [
+    12.463036285488034
+   ],
+   "unit": "KB/s"
+  }
+ },
+ "pdi-bff549": {
+  "transfer.sftp download": {
+   "better": "higher",
+   "runs": [
+    5.76528967537996,
+    5.402285839130229
+   ],
+   "unit": "KB/s"
+  },
+  "transfer.sftp upload": {
+   "better": "higher",
+   "runs": [
+    15.758271398024313,
+    18.705503193103795
+   ],
+   "unit": "KB/s"
+  }
+ }
+}

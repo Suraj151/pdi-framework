@@ -161,6 +161,31 @@ public:
   }
 
   /**
+   * @brief Whether the request's cookie names a live session, without making it current.
+   *
+   * @return `true` when the cookie carries a valid session token.
+   */
+  bool request_has_session(void)
+  {
+    if (nullptr != m_active_session)
+    {
+      return true;
+    }
+
+    if (nullptr == __web_resource.m_server ||
+        !__web_resource.m_server->hasHeader(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_COOKIE)))
+    {
+      return false;
+    }
+
+    pdiutil::string cookie = __web_resource.m_server->header(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_COOKIE));
+    pdiutil::string token;
+
+    return extract_cookie_value(cookie, session_cookie_name(), token) &&
+           nullptr != __web_session_manager.validate(token.c_str());
+  }
+
+  /**
    * @brief Reissues the session cookie once it is halfway through its life.
    *
    * The server side window slides with every request, but the cookie handed to

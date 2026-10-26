@@ -89,6 +89,8 @@ created Date    : 1st June 2019
 #define CMD_NAME_IOT  			    "iot"
 #define CMD_NAME_HELP  			    "help"
 #define CMD_NAME_UPTIME  		    "uptime"
+#define CMD_NAME_UNAME  		    "uname"
+#define CMD_NAME_HOSTNAME  		    "hostname"
 #define CMD_NAME_HEXDUMP  		    "hexdump"
 #define CMD_NAME_DF  			    "df"
 #define CMD_NAME_MOUNT  		    "mount"
@@ -98,7 +100,7 @@ created Date    : 1st June 2019
 #define CMD_NAME_GREP  			    "grep"
 #define CMD_NAME_ECHO  			    "echo"
 #define CMD_NAME_DATE  			    "date"
-#define CMD_NAME_TIMEDATECTL	    "tdctl"
+#define CMD_NAME_TIMEDATECTL	    "timedatectl"
 #define CMD_NAME_HOST			    "host"
 #define CMD_NAME_PING			    "ping"
 #define CMD_NAME_DB				    "db"
@@ -112,7 +114,34 @@ created Date    : 1st June 2019
 #define CMD_NAME_TRUE			    "true"
 #define CMD_NAME_FALSE			    "false"
 #define CMD_NAME_CRONTAB		    "crontab"
+#define CMD_NAME_UDEVADM		    "udevadm"
+#define CMD_NAME_ARECORD		    "arecord"
+#define CMD_NAME_LSBLK			    "lsblk"
+#define CMD_NAME_DD			    "dd"
+#define CMD_NAME_UMOUNT			    "umount"
+#define CMD_NAME_BLKID			    "blkid"
+#define CMD_NAME_WIPEFS			    "wipefs"
+#define CMD_NAME_SFDISK			    "sfdisk"
+#define CMD_NAME_MKFS			    "mkfs"
 #define CMD_NAME_WGET			    "wget"
+
+/**
+ * Runs a background command's work as the session that started it, on its own
+ * terminal, then restores what was current.
+ */
+static inline void runAsOwner(CommandBase *cmd, pdiutil::function<void()> work){
+	session_t *previous = SessionManager::current();
+	iTerminalInterface *shell = ServiceProvider::getTerminal();
+	if( nullptr != cmd && nullptr != cmd->m_owner ){
+		SessionManager::setCurrent(cmd->m_owner);
+	}
+	if( nullptr != cmd && nullptr != cmd->m_terminal ){
+		ServiceProvider::setTerminal(cmd->m_terminal);
+	}
+	work();
+	SessionManager::setCurrent(previous);
+	ServiceProvider::setTerminal(shell);
+}
 
 #ifdef ENABLE_STORAGE_SERVICE
 /**
@@ -126,15 +155,33 @@ static inline bool isInputRedirected(){
 }
 
 /**
- * Feeds a command its input in blocks, from the named file when one was given
- * and from the input descriptor otherwise.
+ * Whether a command in a long read should stop: ctrl+c reached its terminal,
+ * or what it writes to takes no more.
+ */
+static inline bool commandStopped(iTerminalInterface *out){
+	return SessionManager::interruptRequested() || (nullptr != out && out->writeRefused());
+}
+
+/**
+ * The result a stopped command ends with: canceled for ctrl+c, its own result when
+ * only its output stopped.
+ */
+static inline pdi_err_t stoppedResult(pdi_err_t result){
+	return SessionManager::interrupted() ? (pdi_err_t)CMD_ERROR_CANCELED : result;
+}
+
+/**
+ * Feeds a command its input in blocks from the named file or the input descriptor,
+ * until commandStopped says so.
  */
 static inline int readCommandInput(const pdiutil::string &path, iTerminalInterface *term,
 								   pdiutil::function<bool(char*, uint32_t)> sink,
 								   uint16_t blocksize = 250){
 
 	if( !path.empty() ){
-		return __i_fs.readFile(path.c_str(), blocksize, sink);
+		return __i_fs.readFile(path.c_str(), blocksize, [&](char *data, uint32_t size)->bool{
+			return sink(data, size) && !commandStopped(term);
+		});
 	}
 
 	if( nullptr == term ){
@@ -152,7 +199,7 @@ static inline int readCommandInput(const pdiutil::string &path, iTerminalInterfa
 		}
 
 		total += (int)got;
-		if( !sink(block, (uint32_t)got) ){
+		if( !sink(block, (uint32_t)got) || commandStopped(term) ){
 			break;
 		}
 	}

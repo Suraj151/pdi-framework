@@ -44,3 +44,32 @@ uint16_t crc16Ccitt(const uint8_t *_buf, uint32_t _len)
 {
     return crc16CcittUpdate(0xFFFF, _buf, _len);
 }
+
+/**
+ * the 7 bit crc an sd card command or register carries.
+ *
+ * @param   const uint8_t*  _buf
+ * @param   uint32_t        _len
+ * @return  uint8_t
+ */
+uint8_t crc7(const uint8_t *_buf, uint32_t _len)
+{
+    uint8_t crc = 0;
+
+    for (uint32_t i = 0; i < _len; i++)
+    {
+        uint8_t byte = _buf[i];
+
+        for (uint8_t b = 0; b < 8; b++)
+        {
+            crc = (uint8_t)(crc << 1);
+            if ((byte ^ crc) & 0x80)
+            {
+                crc ^= 0x09;
+            }
+            byte = (uint8_t)(byte << 1);
+        }
+    }
+
+    return (uint8_t)(crc & 0x7F);
+}

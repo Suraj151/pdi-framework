@@ -591,3 +591,41 @@ TEST(stringops, json_escaped_of_nothing_appends_nothing)
     __append_json_escaped(out, "");
     ASSERT_STREQ(out.c_str(), "x");
 }
+
+TEST(stringops, split_keeps_inner_empty_pieces_and_drops_an_empty_last_one)
+{
+    pdiutil::vector<pdiutil::string> parts;
+    __split(pdiutil::string("aes128-ctr,,hmac-sha2-256,"), ',', parts);
+    ASSERT_EQ((int)parts.size(), 3);
+    ASSERT_STREQ(parts[0].c_str(), "aes128-ctr");
+    ASSERT_STREQ(parts[1].c_str(), "");
+    ASSERT_STREQ(parts[2].c_str(), "hmac-sha2-256");
+
+    pdiutil::vector<pdiutil::string> none;
+    __split(pdiutil::string(""), ',', none);
+    ASSERT_EQ((int)none.size(), 0);
+}
+
+TEST(stringops, a_list_contains_only_whole_pieces)
+{
+    pdiutil::string options = "defaults,nofail,rw";
+    ASSERT_TRUE(__list_contains(options, ',', pdiutil::string("nofail")));
+    ASSERT_TRUE(__list_contains(options, ',', pdiutil::string("rw")));
+    ASSERT_TRUE(__list_contains(options, ',', pdiutil::string("defaults")));
+    ASSERT_FALSE(__list_contains(options, ',', pdiutil::string("fail")));
+    ASSERT_FALSE(__list_contains(options, ',', pdiutil::string("noauto")));
+    ASSERT_FALSE(__list_contains(pdiutil::string(""), ',', pdiutil::string("rw")));
+}
+
+TEST(stringops, strip_trailing_keeps_a_lone_root)
+{
+    pdiutil::string dir = "/mnt///";
+    __strip_trailing(dir, '/');
+    ASSERT_STREQ(dir.c_str(), "/mnt");
+    pdiutil::string root = "/";
+    __strip_trailing(root, '/');
+    ASSERT_STREQ(root.c_str(), "/");
+    pdiutil::string plain = "/etc";
+    __strip_trailing(plain, '/');
+    ASSERT_STREQ(plain.c_str(), "/etc");
+}

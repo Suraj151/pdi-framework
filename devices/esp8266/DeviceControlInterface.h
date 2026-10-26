@@ -24,6 +24,29 @@ created Date    : 1st Jan 2024
 const uint8_t EXCEPTIONAL_GPIO_PINS[] = {1, 3, 6, 7, 8, 9, 10, 11};
 
 /**
+ * Gpio's the I2S bus runs on, in the order SCK, WS, SD; held only while a line uses
+ * the bus.
+ */
+#if defined(ENABLE_DRIVER_CORE) && defined(ENABLE_I2S_BUS)
+const uint8_t I2S_GPIO_PINS[] = {13, 14, 12};
+#endif
+
+/**
+ * Gpio's the I2C bus runs on when no bus line names its own, in the order SDA, SCL; held only while a line uses the bus
+ */
+#if defined(ENABLE_DRIVER_CORE) && defined(ENABLE_I2C_BUS)
+const uint8_t I2C_GPIO_PINS[] = {4, 5};
+#endif
+
+/**
+ * Gpio's the SPI bus runs on, in the order SCK, MISO, MOSI; held only while a line
+ * uses the bus.
+ */
+#if defined(ENABLE_DRIVER_CORE) && defined(ENABLE_SPI_BUS)
+const uint8_t SPI_GPIO_PINS[] = {14, 12, 13};
+#endif
+
+/**
  * DeviceControlInterface class
  */
 class DeviceControlInterface: public iDeviceControlInterface
@@ -85,6 +108,12 @@ public:
   void log(logger_type_t log_type, const char *content) override;
   void yield() override;
   void handleEvents() override;
+
+  /**
+   * Whether the caller may wait: true on the loop and in a preemptive task,
+   * false in the system context callbacks run in.
+   */
+  bool canWait() const;
 
   // upgrade api
 #ifdef ENABLE_OTA_SERVICE

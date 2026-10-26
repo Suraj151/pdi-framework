@@ -274,7 +274,7 @@ protected:
 
 			if( !hinted ){
 				hinted = true;
-				available = __i_fs.getFreeSize();
+				available = __i_fs.getFreeSize(path.c_str());
 				contentlen = sz;
 				if( 0 < sz && (uint64_t)sz > available ){
 					wanted = sz;
@@ -328,10 +328,7 @@ protected:
 
 			__i_fs.deleteFile(destpath.c_str());
 			m_terminal->putln();
-			m_terminal->write_ro(RODT_ATTR("Failed to write: "));
-			m_terminal->write(destpath.c_str());
-			m_terminal->write_ro(RODT_ATTR(" : "));
-			m_terminal->write((int32_t)writeerr);
+			writeFailure(RODT_ATTR("Failed to write: "), destpath.c_str(), (int32_t)writeerr);
 			return CMD_ERROR_FAILED;
 		}
 
@@ -339,10 +336,7 @@ protected:
 
 			__i_fs.deleteFile(destpath.c_str());
 			m_terminal->putln();
-			m_terminal->write_ro(RODT_ATTR("Failed to download: "));
-			m_terminal->write(url.c_str());
-			m_terminal->write_ro(RODT_ATTR(" : "));
-			m_terminal->write((int32_t)got);
+			writeFailure(RODT_ATTR("Failed to download: "), url.c_str(), (int32_t)got);
 			return CMD_ERROR_FAILED;
 		}
 

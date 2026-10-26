@@ -180,6 +180,22 @@ def crontab_seeds():
     }
 
 
+def devices_seeds():
+    """One /etc/devices.conf line."""
+
+    return {
+        "i2c_hex": b"i2c0 0x76 bme280",
+        "i2c_decimal": b"i2c1 96 bme280",
+        "spi_cs": b"spi0 cs=5 spiflash",
+        "i2s_rx": b"i2s0 rx mic",
+        "usb": b"usb0 3 keyboard",
+        "tabs": b"\tuart1\t0\tgps\t",
+        "comment": b"# bus target driver",
+        "extra_field": b"i2c0 0x76 bme280 extra",
+        "wide_target": b"i2c0 0x1ffffffff bme280",
+    }
+
+
 def mdns_seeds():
     """One query packet: a header asking one or more questions, then each question."""
 
@@ -279,6 +295,7 @@ TARGETS = {
     "fuzz_mdns": mdns_seeds,
     "fuzz_json": json_seeds,
     "fuzz_mqtt": mqtt_seeds,
+    "fuzz_devices": devices_seeds,
 }
 
 

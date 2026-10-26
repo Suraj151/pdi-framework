@@ -14,6 +14,7 @@ created Date    : 16th Aug 2026
 #include <PdiStack.h>
 #include <devices/posix/TcpServerInterface.h>
 #include <devices/posix/DeviceControlInterface.h>
+#include <devices/posix/SerialInterface.h>
 #include <csignal>
 #include <cstdio>
 #include <cstring>
@@ -37,6 +38,8 @@ static void usage()
     printf("  --headless          do not read the terminal from stdin\n");
     printf("  --port-base <n>     move refused well known ports to n plus the port\n");
     printf("  --gpio-input <file> read input pin levels from lines like 'D4 1' or 'A0 512'\n");
+    printf("  --heap-input <file> cap the free heap and largest block from lines like 'free 20000' or 'block 1500'\n");
+    printf("  --bus-input <file>  read plugged devices from lines like 'i2c0 0x50 42' or 'usb0 2 046d c31c 03'\n");
     printf("  --help              this text\n");
 }
 
@@ -78,6 +81,14 @@ int main(int argc, char **argv)
         else if (0 == strcmp(argv[i], "--gpio-input") && (i + 1) < argc)
         {
             DeviceControlInterface::setGpioInputFile(argv[++i]);
+        }
+        else if (0 == strcmp(argv[i], "--heap-input") && (i + 1) < argc)
+        {
+            DeviceControlInterface::setHeapInputFile(argv[++i]);
+        }
+        else if (0 == strcmp(argv[i], "--bus-input") && (i + 1) < argc)
+        {
+            SimulatedBus::setInputFile(argv[++i]);
         }
         else if (0 == strcmp(argv[i], "--headless"))
         {

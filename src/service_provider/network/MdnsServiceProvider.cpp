@@ -410,7 +410,7 @@ void MdnsServiceProvider::onUdpPacket(void *arg) {
   // ignore responses (QR bit set)
   if (b[2] & 0x80) return;
 
-  uint16_t qdcount = ((uint16_t)b[4] << 8) | b[5];
+  uint16_t qdcount = BytesToUint16BE(b + 4);
   uint16_t off = 12;
 
   pdiutil::string _services_label_ro = CHARPTR_WRAP("_services"), _dnssd_label_ro = CHARPTR_WRAP("_dns-sd");
@@ -431,7 +431,7 @@ void MdnsServiceProvider::onUdpPacket(void *arg) {
       off += l;
     }
     if (off + 4 > len) return;
-    uint16_t qtype = ((uint16_t)b[off] << 8) | b[off + 1];
+    uint16_t qtype = BytesToUint16BE(b + off);
     off += 4; // qtype(2) + qclass(2)
 
     if (bad || n < 2) continue;

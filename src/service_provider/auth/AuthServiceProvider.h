@@ -47,6 +47,13 @@ uint8_t getServiceDependencies(service_t *_out, uint8_t _max) const override {
 	bool isAuthorized(const char *username, const char *password);
 
 	void setAuthorized(bool auth);
+
+	/**
+	 * Moves the current session to its user's home, as a login does, leaving it in
+	 * place when the account names none.
+	 */
+	void enterHome();
+
 	bool getAuthorized();
 	const char* getUsername();
 	void setVerifiedUsername(const char *username);

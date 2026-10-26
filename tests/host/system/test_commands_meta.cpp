@@ -202,17 +202,21 @@ TEST(cmdmeta, chown_takes_a_separate_group)
 TEST(cmdmeta, chown_is_refused_to_a_user_that_is_not_root)
 {
     pditest::Shell shell(7, 7);
+    __i_fs.beginPrivileged();
     tidy("/w_chownno.txt");
     __i_fs.createFile("/w_chownno.txt", "owned");
     __i_fs.setFileOwner("/w_chownno.txt", 7, 7);
+    __i_fs.endPrivileged();
 
     shell.run("chown 8 /w_chownno.txt");
 
     file_info_t meta;
-    __i_fs.getFileMeta("/w_chownno.txt", meta);
+    ASSERT_EQ(__i_fs.getFileMeta("/w_chownno.txt", meta), (pdi_err_t)0);
     ASSERT_EQ(meta.m_uid, 7);
 
+    __i_fs.beginPrivileged();
     tidy("/w_chownno.txt");
+    __i_fs.endPrivileged();
 }
 
 TEST(cmdmeta, umask_prints_the_current_value)

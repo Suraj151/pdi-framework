@@ -34,6 +34,9 @@ class UpdateServer(object):
         if 404 == self.portal.get(PAGE).status:
             raise Skip("this build serves no ota page")
         self.saved = read_form(self.portal, PAGE)
+        # img names a firmware image on the board's own filesystem: posting it
+        # back flashes that image and restarts the board, so it is never resent
+        self.saved.pop("img", None)
         self.sink = HttpSink().start()
         self.sink.reply = b'{"latest":"0"}'
         address = local_address_towards(t.address())

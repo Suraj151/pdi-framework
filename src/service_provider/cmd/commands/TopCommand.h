@@ -101,10 +101,12 @@ struct TopCommand : public CommandBase {
 				stopRunningInBackground();
 				return;
 			}
-			m_terminal->csi_erase_display();
-			m_terminal->csi_cursor_home();
-			printProcessTable(m_terminal, m_filter_owner);
-			m_terminal->commit();
+			runAsOwner(this, [&](){
+				m_terminal->csi_erase_display();
+				m_terminal->csi_cursor_home();
+				printProcessTable(m_terminal, m_filter_owner);
+				m_terminal->commit();
+			});
 		}, interval, DEFAULT_TASK_PRIORITY, __i_dvc_ctrl.millis_now(), iterations, CMD_NAME_TOP );
 
 		if( m_toptaskid < 0 ){

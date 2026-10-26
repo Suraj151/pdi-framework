@@ -246,6 +246,7 @@ bool generateCert(const char* certPath, const char* keyPath, const CertParams& p
         if (w1 < 0) { LogE("CertProvisioner: writeFile cert=%d\n", w1); goto done; }
         int w2 = fs.writeFile(keyPath, (const char*)keyPem, strlen((const char*)keyPem), false);
         if (w2 < 0) { LogE("CertProvisioner: writeFile key=%d\n", w2); goto done; }
+        fs.setFilePermissions(keyPath, TLS_PRIVATE_KEY_PERMS);
     }
 
     ok = true;
@@ -278,6 +279,7 @@ bool ensureServerCert(const char* certPath, const char* keyPath,
         bool matched = loaded && sanMatches(&crt, ip_v4, dns_name);
         mbedtls_x509_crt_free(&crt);
         if (matched) {
+            fs.setFilePermissions(keyPath, TLS_PRIVATE_KEY_PERMS);
             LogI("CertProvisioner: existing server cert is current\n");
             return true;
         }

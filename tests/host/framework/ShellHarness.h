@@ -89,6 +89,7 @@ namespace pditest
 
         __task_scheduler.setUtilityInterface(&__i_dvc_ctrl);
         __task_scheduler.setMaxTasksLimit(MAX_SCHEDULABLE_TASKS);
+        __task_scheduler.setSystemHooks(SessionManager::enterSystem, SessionManager::leaveSystem);
     }
 
     /**
@@ -197,7 +198,7 @@ namespace pditest
             m_terminal.forget();
             m_terminal.feed(keys);
 
-            while (m_terminal.available() > 0)
+            while (__cmd_service.hasPendingInput(&m_terminal))
             {
                 m_result = __cmd_service.processTerminalInput(&m_terminal);
             }
@@ -215,7 +216,7 @@ namespace pditest
             m_terminal.forget();
             m_terminal.feed(bytes, len);
 
-            while (m_terminal.available() > 0)
+            while (__cmd_service.hasPendingInput(&m_terminal))
             {
                 m_result = __cmd_service.processTerminalInput(&m_terminal);
             }

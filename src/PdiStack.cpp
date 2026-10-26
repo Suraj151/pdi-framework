@@ -9,6 +9,7 @@ created Date    : 1st June 2019
 ******************************************************************************/
 #include "PdiStack.h"
 #include <utility/EventUtil.h>
+#include <service_provider/session/SessionManager.h>
 #ifdef ENABLE_SCRIPT_RUNNER
 #include <service_provider/cmd/ScriptRunner.h>
 #endif
@@ -73,6 +74,7 @@ void PDIStack::initialize(){
   __utl_event.begin(&__i_dvc_ctrl);
   __task_scheduler.setUtilityInterface(&__i_dvc_ctrl);
   __task_scheduler.setMaxTasksLimit(MAX_SCHEDULABLE_TASKS);
+  __task_scheduler.setSystemHooks(SessionManager::enterSystem, SessionManager::leaveSystem);
 
   __log_manager.init(__i_dvc_ctrl.getTerminal());
   // LogI("\n________________________\n\nInitializing PDI Stack\nRelease : %s\nConfig  : %s\n________________________\n", RELEASE, CONFIG_VERSION);

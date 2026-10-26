@@ -76,6 +76,14 @@ public:
    */
   virtual void getDeviceInfo(device_info_t &_out) { }
 
+#ifdef ENABLE_DRIVER_CORE
+  /**
+   * Whether a line in /etc/devices.conf holds the pin for a driver's bus, so gpio
+   * operations leave it alone.
+   */
+  bool isDriverGpio(gpio_id_t hwpin);
+#endif
+
   // below are the utility interface dependencies which needs to be satisfy
   // virtual void wait(uint64_t timeoutms) = 0;
   // virtual uint32_t millis_now() = 0;

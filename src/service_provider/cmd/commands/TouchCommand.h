@@ -58,10 +58,7 @@ struct TouchCommand : public CommandBase {
 				if (bStatus < 0) {
 					result = CMD_ERROR_FAILED;
 					m_terminal->putln();
-					m_terminal->write_ro(RODT_ATTR("Failed to touch: "));
-					m_terminal->write(filename.c_str());
-					m_terminal->write_ro(RODT_ATTR(" : "));
-					m_terminal->write((int32_t)bStatus);
+					writeFailure(RODT_ATTR("Failed to touch: "), filename.c_str(), (int32_t)bStatus);
 				}
 			}else{
 				result = CMD_ERROR_INVAL;

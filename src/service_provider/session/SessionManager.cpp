@@ -127,6 +127,32 @@ uint8_t SessionManager::activeCount() {
   return n;
 }
 
+/**
+ * The scheduler's hooks around a service task: no session is current while it runs,
+ * and the previous one is restored after.
+ */
+void *SessionManager::enterSystem() {
+  session_t *previous = m_current;
+  m_current = nullptr;
+  return previous;
+}
+
+void SessionManager::leaveSystem(void *previous) {
+  m_current = static_cast<session_t *>(previous);
+}
+
+/**
+ * Makes the given session current for the scope's lifetime, or none when it
+ * is null, and puts back the one that was current.
+ */
+SessionManager::Scope::Scope(session_t *s) : m_previous(m_current) {
+  m_current = s;
+}
+
+SessionManager::Scope::~Scope() {
+  leaveSystem(m_previous);
+}
+
 #ifdef ENABLE_STORAGE_SERVICE
 
 pdiutil::string SessionManager::getPWD() {
@@ -202,6 +228,18 @@ uint16_t SessionManager::getCurrentGid() {
 }
 
 #endif
+
+/**
+ * Whether the current session is root, as every session is in a build
+ * without accounts.
+ */
+bool SessionManager::isRoot() {
+#ifdef ENABLE_AUTH_SERVICE
+  return USER_STORE_ROOT_UID == getCurrentUid();
+#else
+  return true;
+#endif
+}
 
 #ifdef ENABLE_CMD_SERVICE
 
@@ -393,6 +431,60 @@ void SessionManager::releaseFds(session_t *s) {
   if (nullptr != s->m_fdtable) {
     pdiutil::safe_delete(s->m_fdtable->m_stdio);
     pdiutil::safe_delete(s->m_fdtable);
+  }
+}
+
+/**
+ * Whether ctrl+c reached the current session's terminal since its line began,
+ * polled at most every CMD_INTERRUPT_POLL_MS.
+ */
+bool SessionManager::interruptRequested() {
+
+  session_t *s = current();
+  if (nullptr == s || s->m_interrupted) {
+    return (nullptr != s);
+  }
+
+  uint32_t now = (uint32_t)__i_dvc_ctrl.millis_now();
+  if (0 != s->m_inputPolledAt && (now - s->m_inputPolledAt) < CMD_INTERRUPT_POLL_MS) {
+    return false;
+  }
+  s->m_inputPolledAt = (0 == now) ? 1 : now;
+
+  iTerminalInterface *t = s->m_terminal;
+  while (nullptr != t && t->available() > 0) {
+    uint8_t c = t->read();
+    if (CMD_INTERRUPT_CHAR == c) {
+      s->m_interrupted = true;
+      s->m_typeahead.clear();
+      if (__cmd_service.isSessionBusy(s)) {
+        s->m_typeahead += (char)c;
+      }
+      break;
+    }
+    if (s->m_typeahead.size() < CMD_TYPEAHEAD_MAX) {
+      s->m_typeahead += (char)c;
+    }
+  }
+  return s->m_interrupted;
+}
+
+/**
+ * Whether the current session was interrupted, without looking again.
+ */
+bool SessionManager::interrupted() {
+  session_t *s = current();
+  return (nullptr != s) && s->m_interrupted;
+}
+
+/**
+ * Lets the current session's next line run with no interrupt pending.
+ */
+void SessionManager::clearInterrupt() {
+  session_t *s = current();
+  if (nullptr != s) {
+    s->m_interrupted = false;
+    s->m_inputPolledAt = 0;
   }
 }
 

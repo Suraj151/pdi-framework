@@ -27,7 +27,7 @@ TcpClientInterface::TcpClientInterface() :
     m_rxBuf(nullptr),
     m_rxBufOffset(0),
     m_timeout(3000),
-    m_isLastWriteAcked(true) {}
+    m_unacked(0) {}
 
 /**
  * @brief Parameterized Constructor for TcpClientInterface.
@@ -41,7 +41,7 @@ TcpClientInterface::TcpClientInterface(struct tcp_pcb* pcb):
     m_rxBuf(nullptr),
     m_rxBufOffset(0),
     m_timeout(3000),
-    m_isLastWriteAcked(true) {
+    m_unacked(0) {
 
     if (m_pcb) {
         TCP_GUARD_BEGIN
@@ -175,15 +175,10 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
         return PDI_ERR_STATE;
     }
 
-    uint8_t flags = TCP_WRITE_FLAG_COPY;
-
-    if (!m_isLastWriteAcked){
-        flags |= TCP_WRITE_FLAG_MORE;
-    }
-
     err_t err = ERR_OK;
     int32_t total_sent = 0;
     uint32_t waited = 0;
+    bool push = (0 == m_unacked) || (size >= TCP_MSS);
 
     while (total_sent < size) {
 
@@ -217,13 +212,14 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
         }
 
         int32_t chunk = std::min(remaining, (int32_t)avail);
-
-        if (chunk < remaining)
-            flags |= TCP_WRITE_FLAG_MORE;
+        uint8_t flags = TCP_WRITE_FLAG_COPY | ((chunk < remaining || !push) ? TCP_WRITE_FLAG_MORE : 0);
 
         {
             TCP_GUARD_BEGIN
             err = m_pcb ? tcp_write(m_pcb, c_str + total_sent, chunk, flags) : ERR_CLSD;
+            if (ERR_OK == err) {
+                m_unacked += (uint32_t)chunk;
+            }
             TCP_GUARD_END
         }
 
@@ -239,10 +235,8 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
         waited = 0;
     }
 
-    if (m_isLastWriteAcked){
-
+    if (push) {
         TCP_GUARD_BEGIN
-        m_isLastWriteAcked = false;
         err = m_pcb ? tcp_output(m_pcb) : ERR_CLSD;
         TCP_GUARD_END
 
@@ -483,7 +477,7 @@ void TcpClientInterface::onError(void* arg, err_t err) {
 err_t TcpClientInterface::onSent(void* arg, struct tcp_pcb* tpcb, u16_t len) {
     TcpClientInterface* client = static_cast<TcpClientInterface*>(arg);
     if (client) {
-        client->m_isLastWriteAcked = true;
+        client->m_unacked = (len >= client->m_unacked) ? 0 : client->m_unacked - len;
     }
     return ERR_OK;
 }
@@ -578,12 +572,13 @@ void TcpClientInterface::setTimeout(uint32_t timeout) {
 }
 
 /**
- * @brief Check whether available for write
+ * @brief Whether the connection takes size more bytes now, within lwIP's room and
+ * TCP_UNACKED_MAX unacknowledged bytes.
  */
 bool TcpClientInterface::availableforwrite(uint32_t size) {
 
     err_t err = ERR_OK;
-    bool isConn, isAcked;
+    bool isConn, fits;
 
     TCP_GUARD_BEGIN
     if ( m_pcb &&
@@ -609,12 +604,12 @@ bool TcpClientInterface::availableforwrite(uint32_t size) {
         }
     }
     isConn = m_isConnected;
-    isAcked = m_isLastWriteAcked;
+    fits = (0 == m_unacked) || ((m_unacked + size) <= (uint32_t)TCP_UNACKED_MAX);
     TCP_GUARD_END
 
     __i_dvc_ctrl.yield();
 
-    return isConn && isAcked && err == ERR_OK;
+    return isConn && fits && err == ERR_OK;
 }
 
 /**
@@ -638,6 +633,6 @@ void TcpClientInterface::flush(int16_t flushtype) {
         tcp_output(m_pcb);
     }
 
-    m_isLastWriteAcked = true;
+    m_unacked = 0;
     TCP_GUARD_END
 }

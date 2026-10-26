@@ -18,6 +18,7 @@ Created Date    : 1st Jan 2024
 
 #include "DataTypeDef.h"
 #include "StringOperations.h"
+#include "DataTypeConversions.h"
 
 /**
  * @class iIOInterface
@@ -205,7 +206,7 @@ public:
   virtual int32_t write(int64_t val) {
     char tembuff[25];
     memset(tembuff, 0, 25);
-    __sprintf(tembuff, "%ld", val);
+    Int64ToString(val, tembuff, sizeof(tembuff), 0);
     return write(tembuff);
   }
 
@@ -326,6 +327,18 @@ public:
    */
   virtual int32_t available() = 0;
   virtual bool availableforwrite(uint32_t size) { return true; }
+
+  /**
+   * @brief Whether every further write is refused for good, as by a pipe that
+   *        filled with no reader to drain it, so a writer can stop.
+   */
+  virtual bool writeRefused() const { return false; }
+
+  /**
+   * @brief Writes bytes exactly as given, where write may tidy a command's line
+   * ends for a non terminal.
+   */
+  virtual int32_t writeData(const uint8_t *c_str, uint32_t size) { return write(c_str, size); }
 
   /**
    * @brief Reads until provided char not get.

@@ -74,10 +74,7 @@ struct RemoveFSCommand : public CommandBase {
 				if(iStatus < 0){
 					result = CMD_ERROR_FAILED;
 					m_terminal->putln();
-					m_terminal->write_ro(RODT_ATTR("Failed to delete : "));
-					m_terminal->write(fileOrDir.c_str());
-					m_terminal->write_ro(RODT_ATTR(" : "));
-					m_terminal->write((int32_t)iStatus);
+					writeFailure(RODT_ATTR("Failed to delete : "), fileOrDir.c_str(), (int32_t)iStatus);
 				}
 			}else{
 				result = CMD_ERROR_INVAL;

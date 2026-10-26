@@ -230,7 +230,8 @@ class ServiceProvider{
     /**
      * Thin wrappers around __task_scheduler.setInterval / setTimeout /
      * updateInterval that auto-supply the task name (m_service_name), auto-tag
-     * owner=0 (kernel), and add the returned id to this service's tracked list.
+     * owner=0 (kernel), mark the task as the service's own work so it runs with
+     * no session current, and add the returned id to this service's tracked list.
      *
      * Signatures mirror TaskScheduler 1:1 with the trailing `name`/`owner` args
      * dropped — every other argument (including now_millis, priority,
@@ -239,18 +240,19 @@ class ServiceProvider{
      */
     pdiutil::task_id_t serviceSetInterval(CallBackVoidArgFn _fn, pdiutil::millis_t _duration, pdiutil::millis_t _now_millis, pdiutil::task_priority_t _priority = DEFAULT_TASK_PRIORITY){
       pdiutil::task_id_t id = __task_scheduler.setInterval(_fn, _duration, _now_millis, _priority, m_service_name, 0);
-      if (id > 0) trackServiceTask(id);
+      if (id > 0) { __task_scheduler.setTaskSystem(id); trackServiceTask(id); }
       return id;
     }
 
     pdiutil::task_id_t serviceSetTimeout(CallBackVoidArgFn _fn, pdiutil::millis_t _duration, pdiutil::millis_t _now_millis, pdiutil::task_priority_t _priority = DEFAULT_TASK_PRIORITY){
       pdiutil::task_id_t id = __task_scheduler.setTimeout(_fn, _duration, _now_millis, _priority, m_service_name, 0);
-      if (id > 0) trackServiceTask(id);
+      if (id > 0) { __task_scheduler.setTaskSystem(id); trackServiceTask(id); }
       return id;
     }
 
     pdiutil::task_id_t serviceUpdateInterval(pdiutil::task_id_t _existing_id, CallBackVoidArgFn _fn, pdiutil::millis_t _duration, pdiutil::task_priority_t _priority = DEFAULT_TASK_PRIORITY, pdiutil::millis_t _last_millis = 0, pdiutil::attempts_t _max_attempts = -1){
       pdiutil::task_id_t id = __task_scheduler.updateInterval(_existing_id, _fn, _duration, _priority, _last_millis, _max_attempts, m_service_name, 0);
+      if (id > 0) __task_scheduler.setTaskSystem(id);
       if (id > 0 && !isServiceTaskTracked(id)) trackServiceTask(id);
       return id;
     }

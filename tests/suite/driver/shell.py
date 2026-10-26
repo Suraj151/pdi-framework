@@ -321,6 +321,16 @@ class Shell(object):
         self.send_raw("\n")
         seen = self.drain(0.5, 6.0)
 
+        # a login part way through: an earlier key was taken as a user name and
+        # the target waits for its password, ignoring an empty line. A throwaway
+        # password fails it and brings the login prompt back, then log in properly
+        if PASSWORD_PROMPT.search(seen) and not LOGIN_PROMPT.search(seen):
+            self.send_raw("-\n")
+            seen = self.expect(ANY_PROMPT, timeout, consume=False)
+            if LOGIN_PROMPT.search(seen):
+                return self.login(username, password, timeout)
+            return seen
+
         if PROMPT.search(seen) and not LOGIN_PROMPT.search(seen):
             return seen
 

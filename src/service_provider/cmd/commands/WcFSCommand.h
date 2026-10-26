@@ -79,10 +79,9 @@ struct WcFSCommand : public CommandBase {
 
 					if(iStatus < 0){
 						result = CMD_ERROR_FAILED;
-						m_terminal->write_ro(RODT_ATTR("Failed : "));
-						m_terminal->write(filename.c_str());
-						m_terminal->write_ro(RODT_ATTR(" : "));
-						m_terminal->write((int32_t)iStatus);
+						writeFailure(RODT_ATTR("Failed : "), filename.c_str(), (int32_t)iStatus);
+					}else if( SessionManager::interrupted() ){
+						result = CMD_ERROR_CANCELED;
 					}else{
 						m_terminal->write((int32_t)lines);
 						m_terminal->write(' ');

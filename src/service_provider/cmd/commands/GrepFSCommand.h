@@ -47,11 +47,11 @@ struct GrepFSCommand : public CommandBase {
 		uint64_t offset = 0;
 		int32_t lineNo = 0;
 		pdiutil::string linedata;
-		while(offset < (uint64_t)fs){
+		while(offset < (uint64_t)fs && !commandStopped(m_terminal)){
 			linedata.clear();
 			int bytes = __i_fs.readFile(filepath, 200, [&](char *data, uint32_t size) -> bool {
 				linedata += pdiutil::string(data, size);
-				return true;
+				return !commandStopped(m_terminal);
 			}, offset, "\n");
 			if(bytes < 0) break;
 
@@ -84,7 +84,7 @@ struct GrepFSCommand : public CommandBase {
 
 		if(rc >= 0){
 			for(file_info_t &item : items){
-				if(nullptr == item.m_name) continue;
+				if(nullptr == item.m_name || commandStopped(m_terminal)) continue;
 
 				int namelen = (int)strlen(item.m_name);
 				char *childpath = pdiutil::safe_new_array<char>(dirpath_len + namelen + 2);
@@ -122,7 +122,7 @@ struct GrepFSCommand : public CommandBase {
 		int32_t lineNo = 0;
 		char block[64];
 
-		while(m_terminal->available() > 0){
+		while(m_terminal->available() > 0 && !commandStopped(m_terminal)){
 
 			int32_t got = m_terminal->read((uint8_t*)block, sizeof(block));
 			if(got <= 0) break;
@@ -216,7 +216,7 @@ struct GrepFSCommand : public CommandBase {
 			}
 		}
 
-		return result;
+		return stoppedResult(result);
 	}
 };
 

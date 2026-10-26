@@ -12,9 +12,23 @@ created Date    : 20th July 2026
 
 #include "Common.h"
 
+#ifdef ENABLE_FAT_FS
+#include "FatFsConfig.h"
+#endif
+
 #ifndef VFS_MAX_MOUNTS
+#if defined(ENABLE_FAT_FS) && defined(ENABLE_LFS_DISK)
+#define VFS_MAX_MOUNTS (5 + FAT_VOLUMES_MAX + LFS_DISK_VOLUMES_MAX)
+#elif defined(ENABLE_FAT_FS)
+#define VFS_MAX_MOUNTS (5 + FAT_VOLUMES_MAX)
+#elif defined(ENABLE_LFS_DISK)
+#define VFS_MAX_MOUNTS (5 + LFS_DISK_VOLUMES_MAX)
+#else
 #define VFS_MAX_MOUNTS 5
 #endif
+#endif
+
+#define VFS_STAGING_DIR_NAME ".upload"      /* staging directory at the top of a disk mounted at runtime */
 
 #ifndef VFS_MOUNT_PREFIX_MAX
 #define VFS_MOUNT_PREFIX_MAX 15
@@ -42,6 +56,23 @@ created Date    : 20th July 2026
 #ifndef SYS_MOUNT_PREFIX
 #define SYS_MOUNT_PREFIX "/sys"
 #endif
+
+#define SYSFS_BUS_DIR         "bus"
+#define SYSFS_CLASS_DIR       "class"
+#define SYSFS_BLOCK_DIR       "block"
+#define SYSFS_BLOCK_SIZE      "size"
+#define SYSFS_BLOCK_START     "start"
+#define SYSFS_GPIO_VALUE      "value"
+#define SYSFS_GPIO_MODE       "mode"
+#define SYSFS_NET_ADDRESS     "address"
+#define SYSFS_NET_OPERSTATE   "operstate"
+#define SYSFS_NET_IP          "ip"
+#define SYSFS_NET_NETMASK     "netmask"
+#define SYSFS_NET_GATEWAY     "gateway"
+#define SYSFS_NET_SSID        "ssid"
+#define SYSFS_NET_RSSI        "rssi"
+#define SYSFS_NET_STATE_UP    "up"
+#define SYSFS_NET_STATE_DOWN  "down"
 
 #ifndef ENABLE_DEVFS
 #define ENABLE_DEVFS

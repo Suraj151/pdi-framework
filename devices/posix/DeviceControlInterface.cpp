@@ -47,9 +47,13 @@ char **pdi_posix_saved_argv()
 #include "SerialInterface.h"
 #include <utility/EventUtil.h>
 #endif
+#ifdef ENABLE_DRIVER_CORE
+#include <interface/pdi/impl/drivers/BuiltInDrivers.h>
+#endif
 #include <malloc.h>
 #include <stdio.h>
 #include <time.h>
+#include <string.h>
 
 /**
  * a mac that stays the same across runs so expectations can hardcode it
@@ -65,7 +69,8 @@ DeviceControlInterface::DeviceControlInterface() : m_boot_micros(0),
                                                    m_virtual_micros(0),
                                                    m_virtual_clock(false),
                                                    m_random_state(0x1F2E3D4Cu),
-                                                   m_free_heap_cap(0)
+                                                   m_free_heap_cap(0),
+                                                   m_max_block_cap(0)
 #ifdef MOCK_DEVICE_TEST
                                                    , m_reset_count(0)
                                                    , m_restart_count(0)
@@ -149,6 +154,63 @@ void DeviceControlInterface::setGpioInputFile(const char *path)
     s_gpio_input_file = path;
 }
 
+const char *DeviceControlInterface::s_heap_input_file = nullptr;
+uint32_t DeviceControlInterface::s_heap_file_free = 0;
+uint32_t DeviceControlInterface::s_heap_file_block = 0;
+uint64_t DeviceControlInterface::s_heap_file_read_at = 0;
+
+/**
+ * @brief Takes heap limits from a file of `free N` / `block N` lines, re-read at most every 50 ms.
+ */
+void DeviceControlInterface::setHeapInputFile(const char *path)
+{
+    s_heap_input_file = path;
+    s_heap_file_read_at = 0;
+}
+
+/**
+ * @brief Takes the heap limits the input file holds, once its re-read interval has passed.
+ */
+void DeviceControlInterface::readHeapInputFile()
+{
+    if (nullptr == s_heap_input_file)
+    {
+        return;
+    }
+
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    uint64_t millis = (uint64_t)now.tv_sec * 1000u + (uint64_t)(now.tv_nsec / 1000000);
+    if (0 != s_heap_file_read_at && (millis - s_heap_file_read_at) < 50u)
+    {
+        return;
+    }
+    s_heap_file_read_at = millis;
+
+    uint32_t free_limit = 0;
+    uint32_t block_limit = 0;
+    FILE *file = fopen(s_heap_input_file, "r");
+    if (nullptr != file)
+    {
+        char key[8] = {0};
+        unsigned long value = 0;
+        while (2 == fscanf(file, " %7s %lu", key, &value))
+        {
+            if (0 == strcmp(key, "free"))
+            {
+                free_limit = (uint32_t)value;
+            }
+            else if (0 == strcmp(key, "block"))
+            {
+                block_limit = (uint32_t)value;
+            }
+        }
+        fclose(file);
+    }
+    s_heap_file_free = free_limit;
+    s_heap_file_block = block_limit;
+}
+
 /**
  * @brief The level the input file gives a pin, or false when it names none.
  */
@@ -196,6 +258,12 @@ bool DeviceControlInterface::isExceptionalGpio(gpio_id_t pin)
             return true;
         }
     }
+#ifdef ENABLE_DRIVER_CORE
+    if (isDriverGpio(gpioFromPinMap(pin)))
+    {
+        return true;
+    }
+#endif
     return false;
 }
 
@@ -218,6 +286,10 @@ void DeviceControlInterface::initDeviceSpecificFeatures()
 
 #ifdef ENABLE_NETWORK_SERVICE
     __netif_registry.registerStack(&__i_net_stack);
+#endif
+
+#ifdef ENABLE_DRIVER_CORE
+    registerBuiltInDrivers();
 #endif
 }
 
@@ -391,12 +463,22 @@ uint32_t DeviceControlInterface::get_free_heap()
     struct mallinfo2 info = mallinfo2();
     uint32_t used = (uint32_t)info.uordblks;
     uint32_t free_heap = used < PDI_POSIX_HEAP_SIZE ? (PDI_POSIX_HEAP_SIZE - used) : 0;
+    readHeapInputFile();
+    if (0 != s_heap_file_free && free_heap > s_heap_file_free)
+    {
+        free_heap = s_heap_file_free;
+    }
     return (0 != m_free_heap_cap && free_heap > m_free_heap_cap) ? m_free_heap_cap : free_heap;
 }
 
 uint32_t DeviceControlInterface::get_max_free_block()
 {
-    return get_free_heap();
+    uint32_t block = get_free_heap();
+    if (0 != s_heap_file_block && block > s_heap_file_block)
+    {
+        block = s_heap_file_block;
+    }
+    return (0 != m_max_block_cap && block > m_max_block_cap) ? m_max_block_cap : block;
 }
 
 /**
@@ -458,6 +540,14 @@ void DeviceControlInterface::seedRandom(uint32_t seed)
 void DeviceControlInterface::capFreeHeap(uint32_t bytes)
 {
     m_free_heap_cap = bytes;
+}
+
+/**
+ * @brief Report at most bytes as the largest free block, as a fragmented heap does; 0 reports the free heap.
+ */
+void DeviceControlInterface::capMaxFreeBlock(uint32_t bytes)
+{
+    m_max_block_cap = bytes;
 }
 
 #ifdef MOCK_DEVICE_TEST

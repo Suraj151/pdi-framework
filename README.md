@@ -53,6 +53,21 @@ Manual clone paths, the autogen script, board-package versions and git-ignored f
 
 Not every board exposes every capability. An Arduino UNO has no WiFi, so the web server, MQTT and OTA services are compiled out on that port.
 
+**Default bus pins.** The GPIO numbers each board runs a driver's bus on when `/etc/devices.conf` names no pins for it ([§6.2.4](#624-serialserviceprovider--__serial_service)). They stay ordinary GPIOs until a line in that file uses the bus.
+
+| Board | I2S — SCK, WS, SD | I2C — SDA, SCL | SPI — SCK, MISO, MOSI |
+|---|---|---|---|
+| esp32 (esp32dev and other classic boards) | 26, 27, 39 | 21, 22 | 18, 19, 23 |
+| esp32-c3 | 3, 4, 5 | 8, 9 | 6, 1, 7 |
+| esp32-s2 | 5, 6, 7 | 8, 9 | 36, 37, 35 |
+| esp32-s3 | 17, 18, 21 | 8, 9 | 12, 13, 11 |
+| esp32-c6 | 22, 23, 14 | 6, 7 | 21, 20, 19 |
+| esp32-h2 | 5, 6, 7 | 12, 13 | 10, 11, 4 |
+| esp8266 | — | 4, 5 | 14, 12, 13 (fixed) |
+| arduinouno | — | — | — |
+
+They are `I2S_GPIO_PINS`, `I2C_GPIO_PINS` and `SPI_GPIO_PINS` in `devices/<port>/DeviceControlInterface.h`, beside the pins the board keeps for its flash and console. An SPI device's chip select is not among them: every SPI line names its own with `cs=`.
+
 ## What You Can Do With It
 
 **Log in to your board like a computer.** Open a serial monitor, or `ssh` in, or `telnet` in — you get the same login prompt and the same 55+ commands either way. `ls`, `cat`, `grep`, `ps`, `top`, `kill`, `df`, `chmod`, `ping`, `wget` and the rest all behave the way you expect, with tab completion, command history, an in-place file editor and Ctrl+C. Commands pipe into each other and redirect to files, so `ps | grep ssh` and `cat /proc/meminfo > /tmp/mem.txt` do exactly what they look like.
@@ -88,7 +103,7 @@ Per-service reference in [§6 Service Providers](#6-service-providers).
 
 **55+ shell commands** — the full list is in [§7.8 Built-in command inventory](#78-built-in-command-inventory).
 
-**Storage** — one filesystem tree covering flash, `/proc`, `/sys`, `/dev` and `/tmp`, with Unix-style permissions and multi-user access control.
+**Storage** — one filesystem tree covering flash, `/proc`, `/sys`, `/dev` and `/tmp`, with Unix-style permissions and multi-user access control. An SD card is partitioned, formatted FAT or littlefs, and mounted with the linux commands for it — `sfdisk`, `mkfs`, `wipefs`, `mount` — and `/etc/fstab` mounts it whenever it is put in.
 Details in [§6.2.12](#6212-storage-interface-init-no-provider).
 
 **Building blocks** — task scheduler, event bus, queues, string and conversion helpers, crypto, and a compact C++ standard library for boards that ship without one.
@@ -437,6 +452,8 @@ Generated headers are passed through `clang-format --style=Microsoft` when the f
 
 [external/littlefs/](external/littlefs/) is the filesystem used by the storage interface on devices that have storage, and by everything downstream of it — SFTP, shell history, the file commands. Builds for a device without storage never reach it.
 
+[external/fatfs/](external/fatfs/) is ChaN's FatFs, used to mount the FAT volume on an SD card or one of its partitions. It is built only with `ENABLE_FAT_FS`, and only where the board's core does not already link FatFs; where it does (`DEVICE_PROVIDES_FATFS`), the core's copy is used through the same wrapper. Its code page 437 name tables — upper casing and the 437 to Unicode mapping, about 940 bytes — come from [external/FatFsUnicode.c](external/FatFsUnicode.c), the same tables and lookups kept in flash rather than RAM.
+
 #### 2.4.1 NAT and mesh
 
 Both are radio-level capabilities layered onto WiFi rather than regular services.
@@ -499,6 +516,11 @@ Board-specific answers live in each port's `device_config.h`, not in the central
 | `DEVICE_SUPPORTS_CONTEXTUAL_EXECUTION` | a port with the threading interfaces | same shape, for the cooperative and preemptive lanes |
 | `DEVICE_SUPPORTS_TLS_CERT_GENERATION` | a port with the RAM and the RNG for it | gates on-device certificate generation |
 | `DEVICE_SUPPORTS_NTP` | a port that can reach the network | the port can reach a time server, so the clock can call itself valid; a port without it still keeps time, counted from boot |
+| `DEVICE_SUPPORTS_DRIVER_CORE` | a port with the flash and RAM for it | lets `ENABLE_DRIVER_CORE` take effect — devices found on the serial interfaces, their drivers, `/sys/bus` and `udevadm`; ports without it build none of it |
+| `DEVICE_SUPPORTS_I2S` | a port with an I2S peripheral it can drive | lets `ENABLE_I2S_BUS` take effect |
+| `DEVICE_SUPPORTS_I2C` | a port with an I2C bus it can drive | lets `ENABLE_I2C_BUS` take effect |
+| `DEVICE_SUPPORTS_SPI` | a port with an SPI peripheral it can drive | lets `ENABLE_SPI_BUS` take effect |
+| `DEVICE_PROVIDES_FATFS` | a port whose core already links FatFs | `ENABLE_FAT_FS` uses the core's FatFs instead of building the copy in `external/fatfs` |
 | `MAX_DIGITAL_GPIO_PINS`, `MAX_ANALOG_GPIO_PINS`, `MAX_DB_TABLES` | every port | per-board limits |
 | `ENABLE_NETWORK_SERVICE`, `ENABLE_AUTH_SERVICE`, `ENABLE_STORAGE_SERVICE`, `ENABLE_GPIO_BASIC_ONLY` | every port | per-board defaults — a port with no radio and no filesystem omits network, auth and storage; one with both enables them |
 
@@ -551,6 +573,12 @@ Every flag acts as a triple gate: which interface the device exposes, which serv
 | Flag | On by default | Brings in | Needs | Cost |
 |---|---|---|---|---|
 | `ENABLE_SERIAL_SERVICE` | all boards | serial service + `SerialConfig.h` | `iSerialInterface` | low |
+| `ENABLE_DRIVER_CORE` | boards declaring `DEVICE_SUPPORTS_DRIVER_CORE` | devices found on the serial interfaces, their drivers, `/etc/devices.conf`, `/sys/bus`, `udevadm` | the serial service | low |
+| `ENABLE_I2S_BUS` | boards declaring `DEVICE_SUPPORTS_I2S` | the I2S bus, the `inmp441` microphone driver, `/dev/snd`, and `arecord` with storage | the driver core | low |
+| `ENABLE_I2C_BUS` | boards declaring `DEVICE_SUPPORTS_I2C` | the I2C bus and the `at24` eeprom driver with its `eeprom` file under `/sys/bus/i2c` | the driver core | low |
+| `ENABLE_SPI_BUS` | boards declaring `DEVICE_SUPPORTS_SPI` | the SPI bus and the `mmc_spi` SD card driver with its `/dev/mmcblk0` disk | the driver core | low |
+| `ENABLE_FAT_FS` | with the driver core and storage | mounting the FAT volume a disk or partition carries, `mount <device> <dir>`, `mkfs -t vfat`, and `FAT_VOLUMES_MAX` (2) more mount slots | the driver core, storage | medium; a mounted volume holds one sector of cache, an open file on it a little more |
+| `ENABLE_LFS_DISK` | with the driver core and storage | mounting and making a littlefs volume on a disk or partition, `mkfs -t littlefs`, and `LFS_DISK_VOLUMES_MAX` (1) more mount slot | the driver core, storage | low until mounted; a mounted volume takes about 1.5 KB of heap, an open file on it 512 bytes more |
 | `ENABLE_STORAGE_SERVICE` | where the port has storage | filesystem + `StorageConfig.h` | `iStorageInterface`, `iFileSystemInterface` | medium |
 | `ENABLE_GPIO_SERVICE` | yes | GPIO service + `GpioConfig.h` | `iGpioInterface` | low; `ENABLE_GPIO_BASIC_ONLY` trims it further |
 | `ENABLE_CMD_SERVICE` | yes | the CLI | a terminal source | low |
@@ -599,6 +627,9 @@ Every flag acts as a triple gate: which interface the device exposes, which serv
 | `WIFI_STATION_CONNECT_ATTEMPT_TIMEOUT` | station connect budget, seconds | 1 |
 | `WIFI_CONNECTIVITY_CHECK_DURATION` | link recheck interval, ms | 5000 |
 | `INTERNET_CONNECTIVITY_CHECK_DURATION` | internet recheck cadence | same |
+| `TCP_UNACKED_MAX` | bytes a TCP or TLS connection may have sent and not yet had acknowledged before a write waits | the network stack's send buffer, `TCP_SND_BUF`; lower to spare RAM |
+| `TCP_WRITE_CHUNK_MAX` | most bytes one write hands a connection | one TCP segment: 1436 where the network stack's MSS is 1436, 536 where it may be 536 |
+| `SSH_SFTP_READ_MAX` | most file bytes one SFTP read reply carries | 2 KB, 16 KB where RAM allows |
 
 ### 3.4 The shape of a service config
 
@@ -1179,7 +1210,7 @@ Two switches shape the behaviour. `AUTO_FACTORY_RESET_ON_INVALID_CONFIGS` runs a
   db list       one line per record, sealed ones marked
   db verify     read every record past its checksum or tag
   db save       take what is running now as the defaults
-  db restore    put those defaults back in use
+  db restore    put those defaults back in use (root only)
 ```
 
 `db` never prints a record's contents, so a sealed credential stays sealed. `db restore` also rewrites each feature's `/etc` config file ([§3.10](#310-the-etc-config-surface)) from its restored record, so the file cannot put the old values straight back.
@@ -1249,6 +1280,8 @@ Background work goes through the base's scheduling wrappers rather than the sche
                       `pkill <Service>` work, and `service stop` reap the right tasks
 ```
 
+A task registered through these runs as the system: no session is current while it runs, so it reads and writes as root rather than as whoever typed last on a terminal, and the session that was current is put back afterwards. A task registered straight on the scheduler, as a command does for work it runs in the background, keeps whatever session is current — a command that must act as its user sets that itself.
+
 The tracked list is fixed-size — six slots by default. `stopService` in the base reaps every one of them, so an override is only needed when you also have sockets or buffers to release; call the base at the end when you do write one. If you ever register a task straight on the scheduler, hand its id to `trackServiceTask(id)` so it is not orphaned on stop.
 
 Persisted configuration always goes through the database service accessors, never `__i_db`. Cross-service reactions go through `__utl_event`, never direct calls — that is what keeps the dependency graph one-directional.
@@ -1294,6 +1327,152 @@ Always present. Polls the flash button for a six-to-seven second hold and fires 
 #### 6.2.4 `SerialServiceProvider` — `__serial_service`
 
 Opens the serial port at the configured baud and hooks its input handler into the device event pump. It supplies the default terminal for the CLI, and exposes the JSON apply/append hooks that Device-IoT uses to move sensor payloads across the serial link.
+
+**It also finds the devices on its interfaces and binds drivers to them.** Every serial interface a port makes — UART, I2C, SPI, I2S, a USB host port — is an `iSerialInterface`, so a bus is a stream the shell can use like any other as well as something devices sit on. Every `DEVICE_SCAN_INTERVAL_MS` (2 s) the service looks on each interface the port made:
+
+| Interface | How a device is found |
+|---|---|
+| I2C | only the addresses a compiled-in driver answers to are probed, never the whole bus, and only while a line in `/etc/devices.conf` uses the bus |
+| USB host | the port reports what is attached, with its vendor, product and class |
+| SPI, I2S, UART | nothing to detect: a device there is declared in `/etc/devices.conf` |
+
+A device that turns up is offered to each driver that could drive it, and the driver **confirms the chip** — an id register, a JEDEC id — before it takes it, since two different chips can answer at one I2C address. A device no driver takes is still listed, without a driver. A device that goes away is let go of the same way. Each one raises `EVENT_DEVICE_ADDED` or `EVENT_DEVICE_REMOVED` on the event bus and writes one line to the system log.
+
+A scan never holds the board up for long. A declared device whose probe takes longer than `DEVICE_SCAN_PROBE_MAX_MS` (100 ms) is left out of every later scan, bound or not, and keeps the state it has; the system log says so once, `DEV: i2c0 0-0050 probe took 1080 ms, left to udevadm trigger`, and `udevadm info` shows `manual` after its state. `udevadm trigger` probes it again and puts it back in the scan when the probe is quick. A device left out that is unplugged is noticed on its next read or write. Where the port drives I2C in software, a bus whose lines do not both rest high, with nothing pulling them up, is not clocked by a probe at all, so an unplugged chip costs nothing; where the bus is a hardware peripheral, a probe is bounded by `I2C_BUS_TIMEOUT_MS` (50 ms).
+
+`/etc/devices.conf` declares what cannot be detected, one device per line, `#` for comments:
+
+```
+# interface  target   driver    settings
+i2c0         bus      i2c       sda=25 scl=15 clock=400000
+i2c0         0x76     bme280
+i2c0         0x50     at24      chip=24c128 size=16384 page=64
+spi0         bus      spi       sck=6 miso=1 mosi=7 clock=8000000
+spi0         cs=10    mmc_spi
+i2s0         rx       inmp441   sck=26 ws=27 sd=39 rate=16000
+```
+
+The target is a number (`0x` for hex) on I2C, USB and UART, `cs=<pin>` on SPI, `rx` or `tx` on I2S, and `bus` on a line that sets up the bus itself rather than declaring a device — its driver is the bus's own name. After the driver come up to `DRIVER_PARAMS_MAX` (8) `key=value` settings, which the driver reads for what it cannot find out for itself — the pins a bus is wired to, a sample rate, the size of a memory. The settings a driver reads are whole numbers in decimal or `0x` hex; one it does not read, such as `chip=`, stays in the file as a label. A line that does not read is logged and skipped, and the rest still load. The file is taken in at boot and again whenever its size or modification time changes, judged without reading it; `udevadm trigger` reads it whatever it looks like, for an edit of the same length on a board whose clock is not set. A declared device that is not there is listed as `absent`, and one whose named driver will not take it as `failed`.
+
+**Pins.** A bus whose pins the framework hands out — I2C, I2S and SPI — runs on the pins its line names, or on the board's default pins ([Supported Boards](#supported-boards)) when it names none. Those pins are **held** for as long as a line in `/etc/devices.conf` uses the bus, whether or not the device is there or bound: the GPIO service, `/sys/class/gpio` and the portal's GPIO pages leave a held pin alone and drive it again once the line is gone, so the driver always wins over a GPIO setting. Without a line, a default pin is an ordinary GPIO and the bus is never started. Each kind of bus takes its pins in its own way:
+
+| Bus | Line | Pins it holds |
+|---|---|---|
+| I2S | `i2s0 rx inmp441 sck=26 ws=27 sd=39` | the three it names |
+| I2S | `i2s0 rx inmp441` | the board's default SCK, WS, SD |
+| I2C | `i2c0 bus i2c sda=25 scl=15 [clock=<hz>]` | the two it names, for every device on `i2c0` |
+| I2C | `i2c0 0x50 at24 …` with no bus line | the board's default SDA, SCL |
+| SPI | `spi0 bus spi sck=6 miso=1 mosi=7 [clock=<hz>]` | the three it names, for every device on `spi0` |
+| SPI | `spi0 cs=10 mmc_spi` | the bus's pins and its own chip select |
+
+A bus line names all of its pins or none, and `clock` is optional: `I2C_BUS_CLOCK_HZ` (100 kHz) for I2C, and for SPI the top clock `SPI_BUS_CLOCK_HZ` (20 MHz), below which each device picks its own. A bus line alone is enough to have an I2C bus looked on for chips that can be detected. A line whose own pins repeat — an SPI chip select on one of the bus's pins — is refused with `PDI_ERR_BUSY`. A board whose gpio matrix reaches any pin takes any pin that can drive a line; a board that drives the bus in software takes any GPIO but the ones kept for flash and console. Bus lines are taken first, then device lines in file order, and a line whose pins a line on another bus already holds is refused. A device line refused that way is listed `failed` with `PDI_ERR_BUSY` and gets its turn again once the pins are free; a bus line that is refused leaves its bus on the default pins, logged as `DEV: <bus> bus refused: <code>`:
+
+| Error | Why a bus line was refused |
+|---|---|
+| `PDI_ERR_INVALID_ARG` | it names some of its pins without the rest, the same pin twice, or a pin that cannot carry its line |
+| `PDI_ERR_NOT_FOUND` | the board has no such interface |
+| `PDI_ERR_NOT_SUPPORTED` | the bus takes no bus line, or the board's pins for it are fixed in hardware |
+| `PDI_ERR_BUSY` | a line on another bus already holds one of its pins |
+| `PDI_ERR_EXISTS` | an earlier bus line already set up the same bus |
+
+**Sound.** An I2S microphone is declared with its three pins, or none for the board's defaults: `sck` to the mic's SCK, `ws` to WS, `sd` to SD, with L/R tied to ground so it sends on the left channel. `rate` is optional, `SOUND_DEFAULT_RATE` (16000) without it. The `inmp441` driver starts the bus and listens for up to `SOUND_PROBE_WAIT_MS` (300 ms), long enough for the mic to wake, and takes the device only when the samples change — a data pin with nothing on it reads flat, and is listed `failed` with the bus handed back. A bound mic appears as `/dev/snd/pcmC0D0c`, 16 bit mono samples, and `arecord -d <seconds> <file>` records it into a WAV file ([§7.8](#78-built-in-command-inventory)). The I2S bus is behind `ENABLE_I2S_BUS`, on where the port declares `DEVICE_SUPPORTS_I2S`.
+
+A declared device its driver refuses is listed `failed`, and the system log names the driver's reason as a `DEV: ... refused by <driver>: <code>` line. The same codes come back from `arecord` as `capture device failed : <code>`:
+
+| Error | What failed |
+|---|---|
+| `PDI_ERR_INVALID_ARG` | the declaration names some of the three pins but not all, or the port cannot use one |
+| `PDI_ERR_NO_MEM` | no memory left to start the bus |
+| `PDI_ERR_NOT_FOUND` | the bus runs but the data pin reads flat — nothing is sending on it |
+| `PDI_ERR_NOT_SUPPORTED` | the bus cannot run in the direction asked for |
+| `PDI_ERR_NOT_INITIALIZED` | the bus was read before it was started |
+| `PDI_ERR_BUSY` | a pin is held by a line on another bus or taken by another peripheral, or no I2S controller is free |
+| `PDI_ERR_IO`, `PDI_ERR_STATE` | the port's I2S driver failed, or was in the wrong state for the call |
+
+**Memory.** An I2C eeprom of the 24c family is declared with the `at24` driver and two settings, both required:
+
+| Setting | Meaning |
+|---|---|
+| `size` | bytes the chip holds, a power of two up to 512 KB |
+| `page` | bytes the chip stores in one write, at most `I2C_TRANSFER_MAX` (64) and no more than `size` |
+| `chip` | optional, the chip's name as a label — `24c02`, `24c128`, … |
+
+An eeprom carries no id to read back, so it is bound by declaration only: the driver takes it when it answers at its address and gives back its first byte. A chip of up to 2 KB takes a one byte word address and the bits above it in its bus address, so a 512 byte chip at `0x50` also answers at `0x51`; a larger chip takes a two byte word address. A bound eeprom has an `eeprom` file in its device directory under `/sys/bus/i2c`, `0600`, the size of the chip. Reading it gives the memory from the offset asked for; writing it stores from the start, and an edit at an offset stores from there. Writes go a page at a time, never across a page edge, and each waits up to `AT24_WRITE_TIMEOUT_MS` (25 ms) for the chip to finish storing before the next. The file is read and written `I2C_TRANSFER_MAX` (64) bytes at a time with the system given its turn between each, so reading or writing the whole chip never holds the processor long enough to trip a watchdog. While a read or write is under way the driver counts as busy: a scan does not take the chip's silence for it going away, a change to `/etc/devices.conf` is taken in once it ends, and a stop of the serial service waits up to `DEVICE_BUSY_WAIT_MS` (1 s) for it. A chip taken away part way ends the read or write with its code. The I2C bus is behind `ENABLE_I2C_BUS`, on where the port declares `DEVICE_SUPPORTS_I2C`, and runs at `I2C_BUS_CLOCK_HZ` (100 kHz).
+
+Wire the chip's SDA and SCL to the bus's pins — the bus line's, or the board's defaults. The bus needs pull-ups on both lines, which most eeprom modules carry.
+
+A declared eeprom its driver refuses is listed `failed` with the same `DEV: ... refused by at24: <code>` line, and a read or write of its `eeprom` file fails with one of the same codes:
+
+| Error | What failed |
+|---|---|
+| `PDI_ERR_INVALID_ARG` | `size` or `page` is missing from the declaration |
+| `PDI_ERR_NULL_PTR` | a read or write was given no buffer |
+| `PDI_ERR_TIMEOUT` | the chip did not answer again after storing a page — it took too long, or was taken away while storing — or the bus timed out |
+| `PDI_ERR_NOT_FOUND` | nothing answers at the address — the chip is not wired, not powered or was taken away |
+| `PDI_ERR_NOT_SUPPORTED` | the bus is not I2C, or a write tried to append to the `eeprom` file |
+| `PDI_ERR_BUSY` | a bus line is held low, or a line on another bus holds the bus's pins |
+| `PDI_ERR_NO_SPACE` | a write starts at or past the end of the chip |
+| `PDI_ERR_IO` | the chip answered its address but refused the data |
+| `PDI_ERR_RANGE` | `size` or `page` is one no eeprom has |
+
+**Disks.** An SD card on the SPI bus is declared by the chip select it is wired to, `spi0 cs=10 mmc_spi`, with the card's CS on that pin and its CK, DI and DO on the bus's SCK, MOSI and MISO. A card carries no id the bus could find on its own, so it is bound by declaration only. The `mmc_spi` driver speaks the card's SPI mode itself: it wakes the card with its select high at `SD_INIT_CLOCK_HZ` (400 kHz), resets it, tells an older card from a newer one, turns the card's CRC checking on the way linux does so every command and block carries a checked CRC, tells a standard capacity card from a high capacity one, reads its size, and from then on runs it at `SD_CLOCK_HZ`, held to the bus's top clock: 20 MHz by default, lowered by a port whose hardware bus does not read a card reader on jumper wires cleanly that fast — down to 4 MHz on one that gave corrupt blocks at 8 MHz. A card wired for a faster or slower clock sets it with the bus line's `clock=`. A bound card is a disk:
+
+| Where | What |
+|---|---|
+| `/dev/mmcblk0` | the whole card, `0600`, the size of the card; read from any offset, written at any offset, a block it changes in part read first so the rest is kept |
+| `/dev/mmcblk0p1` … | each partition of a card that carries a dos partition table, numbered by its slot in the table as linux numbers them, so deleting one leaves the others their numbers; `0600`, read and written the same way and never past the partition's end |
+| `/sys/block/mmcblk0/size` | the card's size in 512 byte sectors |
+| `/sys/block/mmcblk0/mmcblk0p1/{start,size}` | where each partition starts and how long it is, in 512 byte sectors |
+| `lsblk` | one row for the card and one per partition, with the name, the size in bytes, `disk` or `part`, and the filesystem |
+| `blkid` | one line per node that carries something: `/dev/mmcblk0: PTTYPE="dos"` for a partition table, `/dev/mmcblk0p1: TYPE="vfat"` for a filesystem; `blkid <node>` names only that one |
+
+What a card carries is read from its first blocks, the way linux blkid reads it: a partition table, or a filesystem across the whole card, and the filesystem in each partition. A filesystem is named by its signature — `vfat`, `exfat`, `ntfs`, `ext2`, `ext3`, `ext4`, `littlefs` — whether or not the framework can mount it, so a card in a format it cannot read is still named for what it is. A gpt table is named `gpt`, with no partitions listed. A first block that ends in the boot signature is a dos table, even with no partitions in it, the way linux reads an empty label; a FAT filesystem needs that signature as well as its own name. What was read is kept until a write reaches the card, then read again; a first block that reads as all zeros is read again on every look. A card that is bound logs what it carries, `DEV: mmcblk0: dos p1 p2`, or `DEV: mmcblk0: no partition table`.
+
+**Mounting a card.** Root mounts the filesystem a card or one of its partitions carries on a directory that already exists, the way linux does: `mkdir /mnt` then `mount /dev/mmcblk0p1 /mnt`. Which filesystem it is comes from the card, as `blkid` names it: a littlefs volume with `ENABLE_LFS_DISK`, and a FAT volume with `ENABLE_FAT_FS`. Files under `/mnt` are then the card's files, read and written by every file command; `mount` lists it as `vfat` or `littlefs`, and `umount /mnt` detaches it once no file on it is open.
+
+FAT keeps no owner or mode, so every entry on a FAT volume shows root's `0755`, less the write bits when the entry is read-only; `chmod` sets or clears read-only and `chown` is refused. Each file keeps the time it was last written, to two seconds, as the local wall time the way FAT has always kept it, so a computer the card is moved to shows the same time the board does. A littlefs volume keeps the owner, mode and times of every entry the way the root filesystem does, so `chmod`, `chown` and `ls` work on it as they do on `/`. It is read and written a sector at a time in 4 KB blocks and leaves wear levelling to the card, and it takes its caches, about 1.5 KB, from the heap only while it is mounted. Up to `FAT_VOLUMES_MAX` (2) FAT volumes and `LFS_DISK_VOLUMES_MAX` (1) littlefs volume are mounted at once, each in a mount slot of its own. A mount that fails prints `mount: <device> : <code>`:
+
+| Error | Meaning |
+|---|---|
+| `PDI_ERR_INVALID_ARG` | the directory's path is longer than `VFS_MOUNT_PREFIX_MAX` (15) |
+| `PDI_ERR_NOT_FOUND` | the device is not a disk or partition node |
+| `PDI_ERR_NOT_SUPPORTED` | the device is a whole disk that carries a partition table (mount the partition, e.g. `/dev/mmcblk0p1`), or carries a filesystem `blkid` names that is neither FAT nor littlefs |
+| `PDI_ERR_BUSY` | the device is mounted already |
+| `PDI_ERR_PERM` | not root |
+| `PDI_ERR_EXISTS` | something is mounted on the directory already |
+| `PDI_ERR_FULL` | `FAT_VOLUMES_MAX` FAT volumes, or `LFS_DISK_VOLUMES_MAX` littlefs volumes, are mounted already |
+| `PDI_ERR_NO_MEM` | the heap could not hold a littlefs volume |
+| `STORAGE_ERROR_NOT_A_DIRECTORY` | the directory does not exist |
+| `PDI_ERR_FROM_FAT(<result>)` | FatFs refused it, its own `FRESULT` kept in the `PDI_ERRBASE_FS_FATFS` band; `PDI_ERR_FROM_FAT(FR_NO_FILESYSTEM)` is a device with no FAT filesystem on it |
+| `PDI_ERR_FROM_LFS(<code>)` | littlefs refused it, its own error kept in the `PDI_ERRBASE_FS_LITTLEFS` band; `PDI_ERR_FROM_LFS(LFS_ERR_CORRUPT)` is a littlefs volume that cannot be read |
+
+A read or write on a mounted card that the card itself fails gives the card's code, `PDI_ERR_NOT_FOUND` for a card that was taken out. A card bound again while it is mounted, by a changed `/etc/devices.conf` or a card swapped in, may not be the card the mount read its tables from, so every read and write of that mount answers `PDI_ERR_NOT_FOUND` without touching the card until it is unmounted and mounted again.
+
+**Preparing a card.** Three commands clear a card, partition it and make a filesystem on it, the way their linux namesakes do. Each is for root only, anyone else being refused with `PDI_ERR_PERM`, and each refuses a card a volume is mounted from with `PDI_ERR_BUSY`. A failure prints `<command>: <device> : <code>`.
+
+- `wipefs /dev/mmcblk0` lists the signatures a disk or partition carries, one `DEVICE OFFSET TYPE` row each, and changes nothing. `wipefs -a /dev/mmcblk0` erases them, saying what each held: `/dev/mmcblk0: 8 bytes were erased at offset 0x00000052 (vfat): 46 41 54 33 32 20 20 20`. A signature is the name a filesystem keeps in its first blocks — `vfat`, `exfat`, `ntfs`, `ext2` to `ext4`, and both copies of a littlefs superblock — and the boot signature a `dos` or `gpt` table ends with. Only those bytes go, as on linux, so the card then reads as blank, with no table and no filesystem, and nothing else on it is touched.
+- `sfdisk /dev/mmcblk0` writes a dos partition table from a script on its input: `echo ",,c" | sfdisk /dev/mmcblk0` makes one FAT32 partition across the card, and `sfdisk /dev/mmcblk0 < /layout.txt` takes one from a file. Each line is `start, size, type, bootable`, separated by commas or by spaces, and any field left empty takes its default: `start` the first 1 MiB boundary after the partition before; `size` the rest of the card, as does `+`, in sectors or with `K`, `M`, `G` or `T` (`KiB` and so on too); `type` a hex id such as `c` or `83`, or `L`, `S`, `E` or `U`, `83` when empty; `bootable` is `*`. Blank lines and lines starting with `#` are skipped. Nothing is written until every line has been taken, so a wrong line leaves the card as it was and prints `sfdisk: line <n> : <code>`: `PDI_ERR_RANGE` for a partition outside the card or over the one before, `PDI_ERR_INVALID_ARG` for a field it cannot read, `PDI_ERR_FULL` for a fifth partition. A card that has a dos table already keeps its disk identifier and boot code; one that has none gets a new random identifier. A partition node is refused with `PDI_ERR_INVALID_ARG`, and a script with no partitions in it with `sfdisk: no partitions given`.
+- `sfdisk -l` lists every disk, or `sfdisk -l /dev/mmcblk0` one, the way `fdisk -l` does: the size, the label type and identifier, and one row per partition with its start, end, sectors, size, id and type name. `sfdisk --delete /dev/mmcblk0 2` empties slot 2, leaving the other partitions their numbers, and `sfdisk --delete /dev/mmcblk0` empties every slot, leaving an empty dos label; a slot that is not in use is `PDI_ERR_NOT_FOUND`.
+- `mkfs -t vfat /dev/mmcblk0p1` makes a FAT filesystem with two FATs the way `mkfs.vfat` does: `FAT32` from 512 MiB up, and below that `FAT12` or `FAT16` as the size calls for; `mkfs -t littlefs /dev/mmcblk0p1` makes an empty littlefs volume. It says `this may take some time` before it starts. A whole card that carries a partition table is refused with `PDI_ERR_EXISTS`, as `mkfs.vfat` refuses one without `-I`, so `wipefs -a` clears it first. Neither changes the partition's type id, as on linux. Another type is `PDI_ERR_NOT_SUPPORTED`, and what the filesystem library refuses comes back in its own band.
+
+sfdisk writes dos tables only, with up to four primary partitions; gpt tables, extended and logical partitions, and sfdisk's own `-d` dump format are not supported.
+
+**Mounting at boot.** `/etc/fstab` lists what to mount, one line per filesystem in the linux layout, `<device> <dir> <type> <options> <dump> <pass>`: `/dev/mmcblk0p1 /mnt vfat defaults,nofail 0 0`. The device is a node under `/dev`; `UUID=` and `LABEL=` are not supported and give `PDI_ERR_NOT_FOUND`. The type is `vfat`, `littlefs` or `auto`; a type that is not the one `blkid` names on the card gives `PDI_ERR_NOT_SUPPORTED`. Of the options, `noauto` leaves the line out and `nofail` keeps its failure quiet; any other option, and the dump and pass fields, are taken and ignored. Each time a disk is bound — at boot, and when a card is put in — every line whose device is not mounted on its directory yet is mounted, and a line that fails is logged as `DEV: <device> not mounted from fstab: <code>`. Root runs the same pass with `mount -a`, which prints `mount: <device> : <code>` for each line that fails.
+
+The card is read and written a 512 byte block at a time with the system given its turn between blocks, so a long read or write never trips a watchdog. Writing the disk node replaces what is on the card, filesystem and all. One card is handled at a time, at `/dev/mmcblk0`. SPI has no line that says a card is in the slot, so each scan asks a bound card for its status, the way linux polls a card with no detect pin: a card that does not answer three times running is let go, with an `EVENT_DEVICE_REMOVED` and its `/dev` and `/sys/block` entries gone, and a read or write meanwhile fails with `PDI_ERR_NOT_FOUND`. While the slot is empty the card is listed `absent` and offered to `mmc_spi` again on each scan, its refusal logged once rather than every scan, so a card put back is bound on the next scan with no `udevadm trigger`. A slot that never answers the reset as an idle card holds no card, whatever its floating data line happens to read, and is listed `absent` too. A card that answers but is refused for another reason — a card half way in — is listed `failed` and offered again on each scan the same way, so it is bound once it answers properly. A driver that takes longer than `DEVICE_SCAN_PROBE_MAX_MS` to answer leaves the card out of the scan until `udevadm trigger`; writing the refusal to the log is not counted. A declared card its driver refuses, and a read or write of `/dev/mmcblk0` that fails, give one of these:
+
+| Error | What failed |
+|---|---|
+| `PDI_ERR_INVALID_ARG` | the chip select is a pin that cannot drive a line |
+| `PDI_ERR_TIMEOUT` | the card never left its idle state within `SD_READY_TIMEOUT_MS` (1 s), sent no data within `SD_READ_TIMEOUT_MS` (100 ms), or was still storing a block after `SD_WRITE_TIMEOUT_MS` (500 ms) |
+| `PDI_ERR_NOT_FOUND` | no card answers behind the chip select — not wired, no card in the slot, or taken out |
+| `PDI_ERR_NOT_SUPPORTED` | the bus is not SPI, the card is an MMC, does not take the board's voltage or is over 2 TB, or a write tried to append to the disk |
+| `PDI_ERR_BUSY` | the bus could not be started, or the chip select is one of the bus's pins or held by another line |
+| `PDI_ERR_NO_SPACE` | a read or write past the end of the card |
+| `PDI_ERR_IO` | the card refused a command, or answered a read or write with an error, which the system log gives as `SD: ...` |
+| `PDI_ERR_CRC` | a block's CRC did not match, read from the card — the log gives both, `SD: block CRC from card …, computed …` — or as the card checked a write. A card that does not know how to turn CRC on is driven without checking its data CRC, and the log says so |
+
+Devices show up under `/sys/bus` ([§6.2.12](#6212-storage-interface-init-no-provider)) and through `udevadm` ([§7.8](#78-built-in-command-inventory)). The whole of this is behind `ENABLE_DRIVER_CORE`, on by default on a board whose port declares `DEVICE_SUPPORTS_DRIVER_CORE`, and switched off automatically on any other board or without the serial service; with it off nothing here is built.
 
 #### 6.2.5 `WiFiServiceProvider` — `__wifi_service`
 
@@ -1395,6 +1574,8 @@ Storage has no service class. The filesystem is used directly by SSH and SFTP, t
                          └─ /tmp    tmpfs    RAM-backed, lost on reboot
 ```
 
+The flash filesystem moves busy blocks to fresh ones as they wear, and one write can set off a move that reads and rewrites the flash for seconds. While littlefs works the flash back to back for more than `LFS_BUSY_YIELD_MS` (50 ms), it gives the system its turn, so the watchdog is fed and the network served through the longest move; work shorter than that is never paused.
+
 Mounting happens during `initialize()`, and the table is five slots by default — exactly what those five backends need. `mount` shows the table at runtime and `df` reports usage per mount. On a RAM-tight port, `/tmp` is the first thing to drop, since it holds file content in the heap.
 
 Each prefix is named once, in [src/config/VfsConfig.h](src/config/VfsConfig.h): `PROC_MOUNT_PREFIX`, `SYS_MOUNT_PREFIX`, `DEV_MOUNT_PREFIX` and `TMP_MOUNT_PREFIX` beside the `ENABLE_` flag for the backend that answers there, with the root at `FILE_SEPARATOR`. Code that reaches a synthetic node writes `PROC_MOUNT_PREFIX "/mounts"` rather than the path in full, so moving a mount is one edit.
@@ -1409,7 +1590,7 @@ Columns are fixed width rather than tab separated, here and in every command tha
 
 `ps`, `top`, `mount` and `df` read through these nodes rather than reaching into the scheduler or the mount table, so what a command shows and what a file says cannot disagree. `df` takes its list of mounts from `/proc/mounts` and asks the backend behind each prefix for its sizes.
 
-**sysfs** carries GPIO and the network interfaces:
+**sysfs** carries GPIO, the network interfaces, and the devices the serial service found:
 
 | Node | Mode | Content |
 |---|---|---|
@@ -1419,6 +1600,15 @@ Columns are fixed width rather than tab separated, here and in every command tha
 | `/sys/class/net/<iface>/operstate` | `0444` | `up` or `down` |
 | `/sys/class/net/<iface>/{ip,netmask,gateway}` | `0444` | its current addressing |
 | `/sys/class/net/<iface>/{ssid,rssi}` | `0444` | the association, on a station only |
+| `/sys/bus/<bus>/devices/<id>/{driver,state,target}` | `0444` | the driver bound, `absent` · `present` · `bound` · `failed`, and where the device sits |
+| `/sys/bus/usb/devices/<id>/{idVendor,idProduct,bDeviceClass}` | `0444` | what a usb device's descriptors say it is |
+| `/sys/bus/i2c/devices/<id>/eeprom` | `0600` | the memory of a bound eeprom, read from any offset and written from the start |
+| `/sys/block/<disk>/size` | `0444` | a bound disk's size in 512 byte sectors |
+| `/sys/block/<disk>/<disk>p<n>/{start,size}` | `0444` | where a partition starts and its length, in 512 byte sectors |
+| `/sys/bus/<bus>/drivers/<name>` | `0555` | one directory per compiled-in driver for that bus |
+| `/sys/bus/<bus>/rescan` | `0200` | write anything to look for devices at once |
+
+A bus appears under `/sys/bus` only when the port made an interface of that kind — `uart`, `i2c`, `spi`, `can`, `i2s`, `usb`. Devices are named the way linux names them: `0-0076` for address `0x76` on the first I2C bus, `1-2` for usb device 2, `spi0.5` for chip select 5.
 
 The radio presents itself as `wlan0` and `ap0`. A link type registers into a table the same way a filesystem registers into the mount table, so Ethernet or PPP appears here by registering rather than by anything under `/sys` changing.
 
@@ -1431,6 +1621,9 @@ Reads return what the GPIO service last sampled; writes update its config copy, 
 | `/dev/null` | nothing, immediate EOF | discarded |
 | `/dev/zero` | zero bytes | discarded |
 | `/dev/random`, `/dev/urandom` | random bytes from the device RNG | discarded |
+| `/dev/snd/pcmC0D0c` | 16 bit mono samples from a bound microphone, `0444`, present only while one is bound ([§6.2.4](#624-serialserviceprovider--__serial_service)) | refused |
+| `/dev/mmcblk0` | the whole of a bound SD card, `0600`, the size of the card, read from any offset, present only while one is bound | stored at the offset, from the start for `>`; `>>` refused |
+| `/dev/mmcblk0p<n>` | one partition of a bound card, `0600`, the size of the partition | stored at the offset within the partition, never past its end |
 
 The endless ones are capped per read call — 64 bytes by default — so `cat /dev/zero` finishes instead of pinning the CPU until the watchdog fires. The RNG behind them is hardware on the ESP ports and a micros-seeded xorshift elsewhere, which is fine for filling buffers and not for keys.
 
@@ -1441,16 +1634,22 @@ The endless ones are capped per read call — 64 bytes by default — so `cat /d
 ```
   write family    (write, edit, delete, touch)        ─▶ W bits on the path
   read family     (read, list, search)                ─▶ R bits on the path
+  create          (a path that does not exist yet)    ─▶ W bits on the directory holding it
+  delete / rename / move                              ─▶ W bits on every directory losing or gaining the name
   attribute + permission changes                      ─▶ owner or root
   ownership changes                                   ─▶ root only
-  create / rename / metadata queries                  ─▶ ungated
+  metadata queries                                    ─▶ ungated
         │
         └─ root bypasses all of it; entries with no recorded owner read as root-owned
 ```
 
-There is a narrow setuid analogue: a privileged scope that suspends those checks between a begin and an end call. The user store brackets exactly one thing in it — reading and writing `/etc/shadow` on behalf of a `su`, `login` or `passwd` running as a non-root session.
+Adding, removing or renaming an entry changes the directory that holds it, so those need write permission on that directory whatever the entry's own mode is. A file anyone may read in a root-owned directory such as `/etc` can still be copied, but not moved or removed. Creating a path that already exists is answered by the filesystem, the same for every user. Search permission on the directories along a path is not checked; a file is protected by its own mode.
 
-Copying, renaming or moving across mounts streams the file chunk by chunk into the destination backend, creating on the first chunk and appending after that; a failure part-way removes the partial destination, and a `mv` is that copy followed by deleting the source. Same-backend operations go straight to the backend's own call. Directories don't cross mounts, and an existing destination is refused.
+There is a narrow setuid analogue: a privileged scope that suspends those checks between a begin and an end call. The user store brackets exactly one thing in it — reading and writing `/etc/shadow` on behalf of a `su`, `login` or `passwd` running as a non-root session. The system log writes its files in the same scope, so a line raised inside a user's command still reaches `/var/log`.
+
+Each session acts as its own user. A shell line runs as the session that typed it; an SSH connection, shell, scp and SFTP alike, runs as the account that logged in over it, whichever terminal was used last.
+
+Copying, renaming or moving across mounts streams the file chunk by chunk into the destination backend, through one open file where the destination keeps open files, else creating on the first chunk and appending after that; a failure part-way removes the partial destination, and a `mv` is that copy followed by deleting the source. Same-backend operations go straight to the backend's own call. Directories don't cross mounts, and an existing destination is refused.
 
 #### 6.2.13 `WebServer` — `__web_server`
 
@@ -1824,7 +2023,9 @@ Each session carries a small descriptor table — `stdin`, `stdout`, `stderr` �
 
 `cat`, `head`, `tail`, `wc`, `grep` and `read` read the input descriptor when no filename is given, which is what makes them useful on the right of a pipe. Everything else keeps writing to `stdout` without a line of its own changing.
 
-Two limits are worth knowing. A pipe is a fixed buffer of `PDI_PIPE_CAPACITY` bytes (1024 by default), the way a real one is; a stage that outruns it marks the pipe overflowed instead of growing until the heap is gone. And a write the filesystem refuses — a redirect into read-only `/proc`, or a full disk — is reported as `cannot write <path>` rather than passing silently, because the answer only arrives when the last block is committed.
+A command ends its lines with a carriage return and a newline for the terminal; when its output goes to a pipe or a file the carriage return is dropped, so what lands there ends lines the linux way. The bytes of a file are not a command's lines: `cat` hands them on exactly as stored, so `cat a.txt > b.txt` is a byte for byte copy whatever line ends `a.txt` uses.
+
+Two limits are worth knowing. A pipe is a fixed buffer of `PDI_PIPE_CAPACITY` bytes (1024 by default), the way a real one is; a stage that outruns it marks the pipe overflowed instead of growing until the heap is gone. The stages run one after another, so nothing drains a full pipe while its writer runs: a command reading a file or a device stops once its pipe is full, the way a linux one stops when the reader closes the pipe, so `hexdump /dev/mmcblk0 | head 2` reads a block or two rather than the whole card. A reader that goes on to the end of a pipe that was cut, as `wc` or `grep` do, answered on part of the output only, so the line ends with `pipe full, output cut at <bytes> bytes`; one that stops early, as `head` does, needed no more and nothing is said. And a write the filesystem refuses — a redirect into read-only `/proc`, or a full disk — is reported as `cannot write <path>` rather than passing silently, because the answer only arrives when the last block is committed.
 
 `;`, `&&` and `||` join whole pipelines rather than single commands, so `echo counted | wc && echo done` runs the pipeline first and the right-hand side on its result. `$?` carries that result, which is what a following `&&` reads and what `if` and `while` branch on ([§7.15](#715-shell-scripts-and-etcrclocal)). An operator with nothing after it is a syntax error, and one inside quotes is text.
 
@@ -1834,8 +2035,8 @@ Two limits are worth knowing. A pipe is a fixed buffer of `PDI_PIPE_CAPACITY` by
 
 | Command | Options | Brief |
 |---|---|---|
-| ls [\<dir>] | | List with mode, owner, group, mtime and size. No arg lists the current directory; relative paths join it. Owner and group show names, falling back to numbers. e.g. **ls**, **ls /proc** |
-| mkdir \<dir> | | Create a directory, `0755` masked by umask, owned by the session. e.g. **mkdir /scripts** |
+| ls [\<path>] | | List with mode, owner, group, mtime and size. No arg lists the current directory; relative paths join it. A directory lists `.` and `..` first on every filesystem; a file lists just itself, under the name given. Owner and group show names, falling back to numbers; a path that cannot be listed prints `Failed : <path> : <code>`. e.g. **ls**, **ls /proc**, **ls /etc/passwd** |
+| mkdir \<dir> | | Create a directory, `0755` masked by umask, owned by the session. A name already there, directory or file, is refused with `PDI_ERR_EXISTS`. e.g. **mkdir /scripts** |
 | touch \<file> | | Create empty at `0644` masked by umask, or bump mtime if it exists. e.g. **touch /notes.txt** |
 | mv \<src> \<dst> | | Move or rename, across mounts if needed. e.g. **mv /a.txt /b.txt** |
 | cp \<src> \<dst> | | Copy a file, across mounts if needed. e.g. **cp /a.txt /b.txt** |
@@ -1848,15 +2049,17 @@ Two limits are worth knowing. A pipe is a fixed buffer of `PDI_PIPE_CAPACITY` by
 | tail [\<file>] [N] | | Last N lines, default 10, in constant memory. Reads the piped input when no file is named. |
 | wc [\<file>] | | Lines, words, bytes, of a file or of the piped input. |
 | df | | One row per mount: total, used, free. The mount list comes from `/proc/mounts` and the sizes from the backend behind each prefix. |
-| mount | | The mount table: prefix, type, backend. |
+| mount [-a \| \<device> \<dir>] | positional | The mount table: prefix, type, backend. With a disk or partition node and an existing directory, root mounts the FAT or littlefs volume the node carries there, or prints `mount: <device> : <code>`; `-a` mounts what `/etc/fstab` lists that is not mounted yet. See [§6.2.4](#624-serialserviceprovider--__serial_service). e.g. **mount /dev/mmcblk0p1 /mnt** |
+| umount \<dir> | positional | Detach the filesystem mounted at runtime at `dir`, freeing its slot in the mount table; root only, like `mount`, so anyone else is refused with `PDI_ERR_PERM`. The mounts made at boot are refused with `PDI_ERR_PERM` too, a filesystem still holding open files or a session's working directory with `PDI_ERR_BUSY`, and a directory nothing is mounted at with `PDI_ERR_NOT_FOUND`, each as `umount: <dir> : <code>`. A filesystem mounted at runtime counts its open files, which is what keeps one from being detached under them. |
 | chmod \<octal> \<path> | | Set permission bits; owner or root. e.g. **chmod 0644 /etc/passwd** |
 | chown \<uid>[:\<gid>] \<path> | | Change owner, root only; gid defaults to uid. e.g. **chown 1001 /alice** |
 | umask [\<octal>] | | Show or set this session's umask, default `0022`. |
 | hexdump \<file> | | Offset, sixteen hex bytes, ASCII. |
+| dd if=\<file> of=\<file> [bs=512] [count=N] [skip=N] [seek=N] | key=value, as linux | Copy `count` blocks of `bs` bytes (1 to `DD_BLOCK_MAX`, 4 KB) from block `skip` of the input to block `seek` of the output, then print the whole and part records read and written and the bytes copied. Disks and other device nodes are written in place at the offset; a regular output file is replaced when no `seek` is given and written in place, not cut short, when one is. A stream node such as `/dev/zero` is read until `count` blocks are in, so it needs `count=`. A file that cannot be read or written ends the copy with `dd: <file> : <code>`. Ctrl+C stops it after the record under way and prints what it copied; `of=/dev/null` reads without keeping anything, to time a read. e.g. **dd if=/dev/mmcblk0 of=/boot.bin count=1** |
 | grep \<pattern> [\<path>] | | Search a file or directory tree, or the piped input, printing `path:line:col:content`. Regex subset: `.` `*` `+` `?` `^` `$` `[abc]` `[a-z]` `[^abc]` and escapes. e.g. **grep ^ERROR /log.txt**, **ps \| grep ssh** |
 | cls | | Clear the screen. |
-| cd \<dir> | | Change directory; `~` and `-` work. |
-| login | u=, p= | Interactive login, or inline with both options. |
+| cd \<dir> | | Change directory; `~` and `-` work. A bare `cd` or `~` goes to the logged in user's home. |
+| login | u=, p= | Interactive login, or inline with both options. The session starts in the user's home. |
 | logout | | End the session — serial returns to the prompt, telnet and SSH close. The working directory and the session's variables reset either way, so the next login starts clean on a terminal that outlives the login. |
 | whoami | | The session's username. |
 | id | | `uid=N(name) gid=N`. |
@@ -1864,8 +2067,8 @@ Two limits are worth knowing. A pipe is a fixed buffer of `PDI_PIPE_CAPACITY` by
 | groups | | The current user's primary group. |
 | su [\<user> [\<pass>]] | | Switch user in this session, prompting when arguments are omitted. On success the identity, uid, gid and home directory all follow, and the session's environment starts clean. |
 | passwd p=\<curr> n=\<new> c=\<confirm> | p, n, c | Change your own password; prompts in three echo-suppressed phases when arguments are omitted. |
-| useradd u=\<user> p=\<pass> | u, p | Root only. Next free uid, gid equal to uid, home `/`. Writes both user files. |
-| userdel u=\<user> | u | Root only. Removes from both files; refuses root and self. |
+| useradd u=\<user> p=\<pass> | u, p | Root only. Next free uid, gid equal to uid, home `/home/<user>`, created `0755` and owned by the new user (`/home` itself is made `0755 root` when missing). Writes both user files. A home already there is kept as it is; one that cannot be made takes the account back out and answers with the filesystem's error. |
+| userdel u=\<user> | u | Root only. Removes from both files and deletes `/home/<user>` with everything in it; a home anywhere else is left alone. Refuses root and self. |
 | service list \| status \| start \| stop \| restart \| enable \| disable | positional | Service control. `list` shows state, enabled and task count per service; `status <name>` adds tracked pids and that service's own detail, with any password shown as `********`; `start`/`stop`/`restart` bring a service up from cold and tear it down for real; `enable`/`disable` persist `enabled` for the next boot. Root for all but the first two. e.g. **service status MDNS** |
 | ps [\<sid>] | | Tasks with owner, state, %CPU, run count, interval and name, read from `/proc`; optional owner filter. |
 | top | i=, n=, u= | The `ps` view on a repeating tick — interval, iteration bound, owner filter. Ctrl+C stops it. |
@@ -1877,12 +2080,12 @@ Two limits are worth knowing. A pipe is a fixed buffer of `PDI_PIPE_CAPACITY` by
 | net \<option> | ip, scansta, connsta | Network state and control. e.g. **net connsta,\<ssid>,\<password>** |
 | host \<name> | | Resolve a name: IP literal, then `/etc/hosts`, then DNS. |
 | ping \<host> [count] | | ICMP echo, default four packets and at most ten, streaming each reply and finishing with a loss and rtt summary. |
-| wget [\<path>] \<url> | | Download an `http` or `https` url to a file, redrawing a transfer bar as it goes. The path may name a file or a directory; left out, the file lands in the working directory under the name the url ends with. An existing file is replaced. The transfer is refused before anything is fetched when the name is longer than the filesystem allows or the body will not fit in the free space, and a failed transfer leaves no partial file. `https` needs the TLS service ([§6.2.18](#6218-tls-no-provider-transport-hookup--cert-provisioning)). e.g. **wget https://host/app.bin**, **wget /app.bin https://host/app.bin** |
+| wget [\<path>] \<url> | | Download an `http` or `https` url to a file, redrawing a transfer bar as it goes. The path may name a file or a directory; left out, the file lands in the working directory under the name the url ends with. An existing file is replaced. The transfer is refused before anything is fetched when the name is longer than the filesystem allows or the body will not fit in the free space of the filesystem the file goes to, and a failed transfer leaves no partial file. `https` needs the TLS service ([§6.2.18](#6218-tls-no-provider-transport-hookup--cert-provisioning)). e.g. **wget https://host/app.bin**, **wget /app.bin https://host/app.bin** |
 | date [-u] [-n] [-s \<epoch>] [+\<fmt>] | | Show or set the clock. `-u` for UTC, `+fmt` for a custom format, `-s` to set, `-n` to force an NTP resync. |
-| tdctl | | Clock status: local and universal time, zone, sync state, server. |
+| timedatectl | | Clock status: local and universal time, zone, sync state, server. |
 | reboot | | Reboot. |
 | watch | c=, i=, n= | Run a command repeatedly. Options are comma separated, as every other command's are, so `;` stays the shell's own command separator. e.g. **watch c=net ip,i=3000,n=10**. Quote the inner command when it carries a comma of its own — **watch c="login u=a,p=b",i=3000** — and the quotes bound the value rather than ending it |
-| db status \| list \| verify \| save \| restore | positional | Inspect the config record store: which medium is live and how full it is, one line per record, a checksum pass over all of them, and saving or restoring the defaults tier. Never prints a record's contents. See [§5.10](#510-from-the-terminal). |
+| db status \| list \| verify \| save \| restore | positional | Inspect the config record store: which medium is live and how full it is, one line per record, a checksum pass over all of them, and saving or restoring the defaults tier. `restore` is root only. Never prints a record's contents. See [§5.10](#510-from-the-terminal). |
 | iot \<option> | setid, getid, sethost, gethost | Device unique id and IoT host. Changing either drops the device key; the next OTP request generates a new one. |
 | env | | Every variable this session can see, one `NAME=value` per line, each from the tier that wins. See [§7.14](#714-environment-variables). |
 | export \<name>=\<value> | | Set a variable for this session. Names the session answers for itself are refused. e.g. **export GREETING=hello** |
@@ -1893,8 +2096,17 @@ Two limits are worth knowing. A pipe is a fixed buffer of `PDI_PIPE_CAPACITY` by
 | true | | Answer yes and print nothing. e.g. **while true** |
 | false | | Answer no and print nothing. |
 | crontab | | List the scheduled jobs `/etc/crontab` holds, as the device parsed them, and what is due this minute. See [§7.16](#716-scheduled-jobs-and-etccrontab). |
+| udevadm info\|trigger\|monitor | | Devices on the serial interfaces. `info` lists each one with its interface, linux-style name, driver and state, with `manual` after the state of one left out of the scan; `trigger` reads `/etc/devices.conf` again, puts every device left out back in, and looks for devices at once; `monitor` prints `add` and `remove` lines as devices come and go, until Ctrl+C. See [§6.2.4](#624-serialserviceprovider--__serial_service). |
+| lsblk | | List the disks bound drivers present and their partitions, with the name of each one's node under `/dev`, its size in bytes, `disk` or `part`, and the filesystem it carries. See [§6.2.4](#624-serialserviceprovider--__serial_service). |
+| blkid [node] | positional | Name the filesystem (`TYPE`) and partition table (`PTTYPE`) each disk and partition carries, one line per node that carries either, or only the node given. See [§6.2.4](#624-serialserviceprovider--__serial_service). |
+| wipefs [-a] \<node> | positional | List the filesystem and partition table signatures a disk or partition carries; with `-a`, erase them, one line per signature with the bytes it held. Root only. See [§6.2.4](#624-serialserviceprovider--__serial_service). e.g. **wipefs -a /dev/mmcblk0** |
+| sfdisk \<disk> \| -l [disk] \| --delete \<disk> [n] | positional | Write a dos partition table from `start, size, type, bootable` lines on its input, list a disk's table the way `fdisk -l` does, or empty one slot or every slot. Root only to change a table. See [§6.2.4](#624-serialserviceprovider--__serial_service). e.g. **echo ",,c" \| sfdisk /dev/mmcblk0** |
+| mkfs -t vfat\|littlefs \<node> | positional | Make a FAT or littlefs filesystem on a disk or partition. Root only. See [§6.2.4](#624-serialserviceprovider--__serial_service). e.g. **mkfs -t vfat /dev/mmcblk0p1** |
+| arecord -d \<seconds> \<file> | positional | Record the first microphone bound into a 16 bit mono WAV file, in the background, and say how many bytes it kept. The file is replaced. A recording that will not fit on the filesystem the file goes to — the card for a file under a mounted card — is refused before it starts, `not enough space: needs N bytes, M free`, counting the header and `SOUND_CAPTURE_SPACE_RESERVE` (8 KB) the filesystem needs for itself. Samples are saved to storage every `SOUND_CAPTURE_SYNC_BYTES` (4 KB). Ctrl+C stops it early, and a recording cut short by Ctrl+C, a write that fails or the mic going away keeps what was saved, with the reason and its code ([§6.2.4](#624-serialserviceprovider--__serial_service)). Present where the I2S bus and storage are both built. e.g. **arecord -d 5 /voice.wav** |
 | help | | Every registered command with its usage line. Works before login. |
 | uptime | | `up Xd Yh Zm Ws`. |
+| hostname | | Print the host name, the one in `/etc/hostname`, which mDNS writes from the board's mac when it starts. |
+| uname [-a\|-s\|-n\|-r\|-v\|-m] | positional | Print the system name, or with options the system name, host name, release, version and machine, always in that order; `-a` prints all five. e.g. **uname -a** |
 | tls q=1,t=,l=,n=,i= | | On-device certificate generation. Present only where the port declares `DEVICE_SUPPORTS_TLS_CERT_GENERATION` and the flag is on; elsewhere certificates are generated off-device and uploaded ([§6.2.18](#6218-tls-no-provider-transport-hookup--cert-provisioning)). e.g. **tls q=1,t=0,l=256,n=device.local,i=192.168.1.50** |
 | exec \<path> | | Load a program image from the filesystem and run it as a background task, returning its pid. Present only where the port registers a loader; a board without one simply has no `exec`. See [§7.13](#713-dynamic-app-loading). |
 
@@ -1950,7 +2162,7 @@ sftp -P 22 pdiStack@<device-ip>                             # interactive
 | REMOVE | `rm` | delete |
 | RENAME | `rename` | rename without overwriting |
 
-Data records arrive small — the SSH crypto window caps them at 256 bytes — and stream straight to the filesystem, so a transfer never needs a whole-file buffer. Combined with flash write costs when overwriting, throughput lands between roughly 0.2 and 1 KB/s, which is why firmware goes over OTA rather than SFTP.
+A file stays open on its handle from OPEN to CLOSE, so each READ and WRITE seeks to its offset rather than opening the file again; a file a session leaves open when the client drops without closing it is closed when the session ends. A READ answers with as much of what it asked for as `SSH_SFTP_READ_MAX` allows (2 KB by default, 16 KB on boards with the RAM) and the client's largest packet holds. Uploads arrive in `SSH_RX_CHUNK` pieces (512 bytes), each taken from the socket in one go with the system given its turn between pieces, and stream straight to the filesystem, so a transfer never needs a whole-file buffer. The channel window a client may fill is `SSH_CHANNEL_WINDOW` (2 MB), topped up whenever half of it is used, so an upload of any size keeps going. All three are set in [src/config/SshConfig.h](src/config/SshConfig.h) and can be overridden per board in its device config. Over WiFi a file moves to or from an SD card at about 35 to 58 KB/s, and an upload at about 52 KB/s; firmware still goes over OTA, which writes the image straight into the update partition.
 
 Directory listings are read once when the directory opens and paginated across responses, released when it closes. One handle is tracked per session, which is what an interactive client uses. Idle SFTP sessions are reaped after a minute so a suspended client cannot hold a pool slot; interactive shell sessions are never idle-reaped, because a person may sit at a prompt for as long as they like.
 
@@ -1991,11 +2203,15 @@ The device's own host keys are separate, in `/etc/ssh`. Ed25519 lives in `/etc/s
 
 Ctrl+C handling is generic: the dispatcher walks its command list and calls `stopRunningInBackground()` on every backgrounded command owned by the current session. A new background command inherits that behaviour with no wiring in the shell. `ps` shows what is currently running, under the command's own name.
 
+A background command belongs to the session that started it, the way a linux job belongs to its login: each run of its task goes through `runAsOwner(this, …)`, which makes that session current and its terminal the one the shell prints on, then puts back what was there. So `watch` runs its command as the user who started it, with their access and working directory, and shows it only on their terminal, whoever typed last. When the session ends its background commands go with it.
+
+A command that works through a long file or device in one go — `cat`, `head`, `tail`, `grep`, `wc`, `hexdump`, `dd`, `cp` — never returns to the shell until it is done, so it asks `commandStopped()` between chunks instead. That looks at the session's own terminal at most every `CMD_INTERRUPT_POLL_MS` (50 ms): a Ctrl+C there ends the command with `CMD_ERROR_CANCELED` (`dd` still prints the records it copied, and `cp` removes its partial copy), and any other key typed meanwhile is kept, up to `CMD_TYPEAHEAD_MAX` (128), for the shell to read once the command is done. Ctrl+C drops the keys typed ahead of it, as linux does. A new long command gets the same by checking `commandStopped(m_terminal)` in its read loop and returning `stoppedResult(result)`.
+
 ### 7.12 Adding a command
 
 Say you want `temp`.
 
-1. Add the name — `#define CMD_NAME_TEMP "temp"` — keeping it within eight characters.
+1. Add the name — `#define CMD_NAME_TEMP "temp"` — keeping it shorter than `CMD_SIZE_MAX` (15 characters).
 2. Write the command:
    ```cpp
    struct TempCommand : public CommandBase {
@@ -2029,7 +2245,7 @@ That is the whole job. Tab completion, history, help, argument-error usage print
 
 **A command that answers a question** returns `CMD_RESULT_FALSE` for "no" rather than an error code. The dispatcher prints nothing for it, so a false result can sit inside a script or an `&&` chain without an error line, while `$?` still carries it — `test` is the one that does this today ([§7.15](#715-shell-scripts-and-etcrclocal)).
 
-A few limits shape command design. Names are capped at eight characters and options at three, each name up to three characters, so a verb that wants more either splits into sub-commands or takes positional arguments. Options are comma separated, and a value that needs to carry a comma, an `=` or a space is **quoted** — single or double, as a shell quotes — so `watch c="login u=a,p=b",i=3000` passes the whole inner command through as one value. The quotes bound the value and are removed before the command sees it. And `needauth()` is the only permission gate, so put it on anything that changes state.
+A few limits shape command design. Names are capped at `CMD_SIZE_MAX` less one (15 characters) and options at `CMD_OPTION_MAX`, each option name shorter than `CMD_OPTION_SIZE_MAX`, so a verb that wants more either splits into sub-commands or takes positional arguments. Options are comma separated, and a value that needs to carry a comma, an `=` or a space is **quoted** — single or double, as a shell quotes — so `watch c="login u=a,p=b",i=3000` passes the whole inner command through as one value. The quotes bound the value and are removed before the command sees it. And `needauth()` is the only permission gate, so put it on anything that changes state.
 
 Parsing stays index-based rather than building an argv: the parser hands each command the offsets and lengths of its options within the line it already holds, and quote removal compacts in place inside that span. On a device measured in kilobytes a second copy of every argument is a cost with nothing to show for it, so the index model is the standard here and argv is deliberately not built.
 
@@ -2559,7 +2775,7 @@ due this minute:
   none
 ```
 
-Editing is `fedit /etc/crontab`. The whole of this is behind `ENABLE_CRON_SERVICE`, on by default and switched off automatically without the cmd and storage services.
+Editing is `fedit /etc/crontab`. The whole of this is behind `ENABLE_CRON_SERVICE`, on by default and switched off automatically without the cmd and storage services or the script runner, which is what runs each job.
 
 ---
 ## 8. Web Server
@@ -2753,10 +2969,10 @@ The same server implementation runs in TLS mode, with responsibility split like 
 | Path | Default | Purpose |
 |---|---|---|
 | server certificate | `/etc/http/server.crt` | PEM, may be a chain |
-| server key | `/etc/http/server.key` | PEM, EC or RSA |
+| server key | `/etc/http/server.key` | PEM, EC or RSA, `0600` |
 | client CA | `/etc/http/client-ca.crt` | only under mTLS |
 
-Upload those over SFTP after first boot and reboot; the listener picks them up on the next start. The directory is created for you.
+Upload those over SFTP after first boot, `chmod 0600 /etc/http/server.key` so only root can read the key, and reboot; the listener picks them up on the next start. The directory is created for you.
 
 Where the port supports on-device generation, the certificates come from the `tls` command, or are minted automatically by the mDNS service once the station has an address, covering both the IP and `<hostname>.local`. Where it does not, they come from `scripts/GenTlsCerts.py` off-device and the upload above is the only way they arrive — there is no `tls` command to fall back on.
 
@@ -2793,7 +3009,7 @@ Routes answer `GET`, `POST` and `HEAD`. Any other method is refused with `405` a
 
 **`/listen-monitor`.** The browser polls; each request reads the analog pin and returns a small JSON object with the pin and its value. It carries the API gate, so an expired session gets a `401` and the page sends the browser back to the login form. That is the whole live-graph mechanism.
 
-**`/storage-fileupload`.** The body is streamed to a staging file under `/temp` as it arrives, so upload size is bounded by flash rather than by RAM; the directory is created on demand if it is missing. Parsing finishes before the handler runs, so the staged file is written before the session is known and lands owned by root. Once the CSRF check passes, the controller moves it to the requested directory — picking a free name rather than overwriting — and assigns it to the logged-in user, which is what lets that user manage the file afterwards. A move or delete that the user's permissions do not allow is reported back on the page rather than silently dropped.
+**`/storage-fileupload`.** The body is streamed to a staging file as it arrives, so upload size is bounded by storage rather than by RAM. The form's `dir` field names the directory the file is bound for, and the file is staged on that directory's filesystem: in `.upload` at the top of a disk mounted there, so an upload to a card is bounded by the card and moved into place without a copy, and under `/temp` for anything else. Only the last part of the name the file came with is kept, so a name carrying `../` cannot place it outside staging. The staging directory is created on demand if it is missing. The session cookie is checked before anything is staged, and a request that carries no live session stores nothing. Parsing finishes before the handler runs, so the staged file lands owned by root. Once the CSRF check passes, the controller moves it to the requested directory — picking a free name rather than overwriting — and assigns it to the logged-in user, which is what lets that user manage the file afterwards. The move is the server's own step, taken only for a file directly inside the staging directory and only when the user may write the directory it lands in; a name in the form that points anywhere else moves nothing. A move or delete that the user's permissions do not allow is reported back on the page rather than silently dropped. A staged file that is not moved is deleted, and a disk's `.upload` directory is removed once nothing else is staged in it.
 
 ### 8.10 Adding a page
 
@@ -3213,7 +3429,7 @@ It is the only example with a separate `.h` and `.cpp` rather than a single sket
 
 A command is a struct deriving from `CommandBase` with a name, a usage line and an `execute`. Registering it is one static call, and the sketch makes that call from `setup()` after `initialize()` — the shell resolves commands by name when they run, so nothing has to be compiled into the framework.
 
-What comes for free once it is registered: the command answers over serial, Telnet and SSH alike, tab completion offers it, `help` lists its usage line, and overriding `needauth()` puts it behind a login. Names are capped at seven characters.
+What comes for free once it is registered: the command answers over serial, Telnet and SSH alike, tab completion offers it, `help` lists its usage line, and overriding `needauth()` puts it behind a login. Names are capped at `CMD_SIZE_MAX` less one, 15 characters.
 
 ### 11.8 `Logging`
 
@@ -3347,7 +3563,7 @@ Use explicit-width integer types in config structs. `sizeof(int)` differs betwee
 
 Stay away from the `printf` family; the framework's own conversions save four to eight kilobytes by never linking libc's formatter.
 
-Move firmware over OTA rather than SFTP — file transfer runs at 0.2 to 1 KB/s by design ([§7.10](#710-sftp-and-scp-file-transfer)).
+Move firmware over OTA rather than SFTP: OTA writes the image straight into the update partition, while SFTP stores it as a file first ([§7.10](#710-sftp-and-scp-file-transfer)).
 
 ### 12.8 Looking at a running device
 
@@ -3424,6 +3640,10 @@ Composites are built by multiple inheritance rather than by aggregation, which i
 | `iGpioInterface` | GPIO service, `/sys/class/gpio` | mode, write, read, pin mapping, exceptional-pin check, blinker create and release |
 | `iGpioBlinkerInterface` | GPIO service in blink mode | configure, update, start, stop, running |
 | `iWdtInterface` | long-running services, the scheduler | enable, disable, feed |
+| `iSerialInterface` | the serial service, the shell, every driver | the stream calls, plus `type`, `select`, `probe` and `transfer` for a bus with peers on it |
+| `iI2cSerialInterface` | I2C drivers | `readRegister` and `writeRegister`; a port supplies only `probe`, `select` and `transfer` |
+| `iUsbHostSerialInterface` | usb drivers | `deviceCount` and `deviceAt` for what is attached; the endpoint is the selected target |
+| `iDriverInterface` | the serial service | `probe` to confirm and take a device, `remove` to let it go |
 
 #### 13.3.3 Middlewares
 
@@ -3843,7 +4063,7 @@ A sketch can add a controller the same way without touching the framework; [§11
 
 ### 16.8 A new command
 
-Add the name constant, write the command struct with its options and `execute`, then include and register it in the CLI service. Completion, history and Ctrl+C come for free. Keep the name within eight characters and the options within three ([§7.12](#712-adding-a-command)).
+Add the name constant, write the command struct with its options and `execute`, then include and register it in the CLI service. Completion, history and Ctrl+C come for free. Keep the name shorter than `CMD_SIZE_MAX` and the options within `CMD_OPTION_MAX` ([§7.12](#712-adding-a-command)).
 
 ### 16.9 Calling a service from a sketch
 
@@ -3894,6 +4114,47 @@ Keep vendor headers below the device layer. One `#include <esp_wifi.h>` in a ser
 Remember that a feature flag gates three things — the device aggregator include, the orchestrator include, and the orchestrator's init call. Miss one and you get either a link error or dead code in the binary.
 
 And keep one global per slot. A second service instance overwrites the first in the service table, and a second table at the same address is quietly skipped at registration.
+
+### 16.11 A new driver
+
+A driver is a class implementing `iDriverInterface` plus one registration that tells the serial service what it drives:
+
+```cpp
+class Bme280 : public iDriverInterface {
+public:
+    pdi_err_t probe(driver_device_t &dev, iSerialInterface *bus) override {
+        if (SERIAL_IFACE_I2C != serialFamily(bus->type())) return PDI_ERR_NOT_SUPPORTED;
+        iI2cSerialInterface *i2c = static_cast<iI2cSerialInterface *>(bus);
+        uint8_t id = 0;
+        i2c->select(dev.m_target);
+        if (1 != i2c->readRegister(0xD0, &id, 1) || 0x60 != id) return PDI_ERR_NOT_FOUND;
+        return PDI_OK;
+    }
+    void remove(driver_device_t &dev) override {}
+};
+
+static const uint8_t s_bme280_addresses[] = {0x76, 0x77};
+static iDriverInterface *createBme280() { return pdiutil::safe_new<Bme280>(); }
+
+void registerBme280() {
+    DeviceManager::registerDriver(driver_prop_t(RODT_ATTR(DRIVER_NAME_BME280), SERIAL_IFACE_I2C,
+        s_bme280_addresses, sizeof(s_bme280_addresses), nullptr, createBme280));
+}
+```
+
+The registry keeps the name pointer, so the name is a define in `DriverConfig.h` handed over with `RODT_ATTR` from inside a function and stays in flash. Call the registration from `registerBuiltInDrivers()`, which each port calls from its `initDeviceSpecificFeatures()` before the services start.
+
+The addresses are what a scan probes on I2C; a usb driver lists none and passes a match function that looks at `dev.m_class`, `m_vid` or `m_pid` instead. `probe` must confirm the chip and answer an error for anything else — the next driver then gets its turn. The driver object exists only while a device is bound to it, created by the factory when one turns up and deleted when it goes, so a driver with nothing bound costs its registry entry and nothing more. Check `bus->type()` before casting to a protocol's interface: some builds have no RTTI, so `dynamic_cast` is not available.
+
+A driver that gives the user something to read overrides `nodeName()` with a path under `/dev` and `readNode()` with what a read returns, and the node appears while the device is bound. A driver that is a kind of device commands look for answers its class from `driverClass()` — a microphone derives from `iSoundDriverInterface`, says `DRIVER_CLASS_SOUND_CAPTURE` and gives its `rate()`, and `arecord` finds it with `DeviceManager::bound()` without knowing which chip it is. A memory derives from `iNvmemDriverInterface`, says `DRIVER_CLASS_NVMEM` and gives its `size()`, `readAt()` and `writeAt()`, and its device directory gains an `eeprom` file that reads and writes through them. A disk derives from `iBlockDriverInterface`, says `DRIVER_CLASS_BLOCK` and gives its `blocks()`, `readBlocks()` and `writeBlocks()`; its `nodeName()` becomes a sized, `0600` disk under `/dev` and it appears in `/sys/block` and `lsblk`.
+
+An SPI driver talks to its device inside a transaction: `begin(cs, clock, mode)` takes the bus at the clock the device needs, held to the bus's top clock, and pulls the chip select low, `exchange()` clocks bytes out and in at once, and `end()` lets the chip select go. A port holds the bus from `begin()` to `end()` against other tasks, so a driver's commands and data are never split by another device's.
+
+A driver whose device stops answering on its bus while it works — an eeprom storing a page — overrides `busy()` to say so for that time, and a scan then takes the device as still there instead of letting it go.
+
+A driver for something that can be taken out on a bus no scan can see — a card on SPI — registers with its last `driver_prop_t` argument `true` and overrides `stillThere()` with a quick question to the device. Each scan then asks a bound one whether it is still there and lets it go when it is not, and offers a missing one to the driver again, so the device comes and goes the way a detected one does.
+
+A port's bus reports the pins it runs on by default from `defaultPins()`, and an I2C bus takes a bus line's pins and clock through `configure(sda, scl, clock)`, refusing a pin it cannot use. A port's `isExceptionalGpio()` asks `isDriverGpio()` on the device control interface, which answers from the pins the lines in `/etc/devices.conf` hold, so a new port gets the same pin handling by making that one call.
 
 ---
 ## 17. Test Suite
@@ -4103,7 +4364,7 @@ sshkgen t=1,f=b
 `t=1` is Ed25519 and is instant; `f=b` is the `/etc/ssh` host-key directory.
 
 **`scp -s` is slow.**
-Transfers stream in small chunks and pay flash-write cost on overwrite, which lands around 0.2 to 1 KB/s. Firmware belongs on OTA ([§7.10](#710-sftp-and-scp-file-transfer)).
+Transfers stream in pieces straight to the filesystem; over WiFi a file moves to or from an SD card at about 35 to 58 KB/s. Firmware belongs on OTA ([§7.10](#710-sftp-and-scp-file-transfer)).
 
 **`fedit` will not exit.**
 Press Esc for the menu, then `!w` to save and leave or `!c` to discard.

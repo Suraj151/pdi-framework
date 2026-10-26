@@ -106,6 +106,221 @@ TEST(vfs, a_mount_index_past_the_end_is_empty)
     ASSERT_NULL(fs->getMount(fs->getMountCount()));
 }
 
+namespace
+{
+
+/**
+ * A tmpfs that says it holds a file open, the way a disk filesystem in use does.
+ */
+class BusyTmpFs : public TmpFs
+{
+public:
+    uint16_t openCount() const override { return 1; }
+};
+
+/**
+ * A tmpfs that hands out a file handle and counts the reads through it.
+ */
+class HandleTmpFs : public TmpFs
+{
+public:
+    int m_reads = 0;
+    pdi_fhandle_t openFile(const char *path, uint8_t flags) override { return 7; }
+    int readFileHandle(pdi_fhandle_t handle, char *buffer, uint32_t size) override
+    {
+        m_reads++;
+        return 0;
+    }
+};
+
+/**
+ * A tmpfs that hands out a handle too big to carry its mount, and one that
+ * counts what the table tells it.
+ */
+class HugeHandleTmpFs : public TmpFs
+{
+public:
+    int m_closes = 0;
+    int m_unmounts = 0;
+    pdi_fhandle_t openFile(const char *path, uint8_t flags) override { return VFS_HANDLE_BACKEND_MASK + 1; }
+    pdi_err_t closeFile(pdi_fhandle_t handle) override
+    {
+        m_closes++;
+        return PDI_OK;
+    }
+    void unmounted() override { m_unmounts++; }
+};
+
+/**
+ * A table with a tmpfs at the root and another mounted at runtime at /mnt/x.
+ */
+struct RuntimeTable
+{
+    VfsDispatcher m_table;
+    TmpFs m_root;
+    TmpFs m_extra;
+
+    RuntimeTable()
+    {
+        m_table.mount("/", &m_root, "rootfs", VFS_TYPE_TMPFS);
+        m_table.mount("/mnt/x", &m_extra, "extra", VFS_TYPE_TMPFS, true);
+    }
+};
+
+} // namespace
+
+TEST(vfs, an_open_is_refused_a_missing_path_no_mount_a_handle_too_big_and_no_access)
+{
+    VfsDispatcher table;
+    HugeHandleTmpFs huge;
+    table.mount("/mnt/x", &huge, "huge", VFS_TYPE_TMPFS, true);
+
+    ASSERT_EQ((int)table.openFile(nullptr, FILE_OPEN_READ), (int)STORAGE_ERROR_BAD_PATH);
+    ASSERT_EQ((int)table.openFile("", FILE_OPEN_READ), (int)STORAGE_ERROR_BAD_PATH);
+    ASSERT_EQ((int)table.openFile("/elsewhere.txt", FILE_OPEN_READ), (int)STORAGE_ERROR_NOT_MOUNTED);
+    ASSERT_EQ((int)table.openFile("/mnt/x/a.txt", FILE_OPEN_READ), (int)PDI_ERR_RANGE);
+    ASSERT_EQ(huge.m_closes, 1);
+
+    TmpFs root;
+    table.mount("/", &root, "rootfs", VFS_TYPE_TMPFS);
+    table.beginPrivileged();
+    ASSERT_TRUE(table.createFile("/secret.txt", "s") >= 0);
+    ASSERT_EQ(table.setFilePermissions("/secret.txt", 0600), 0);
+    table.endPrivileged();
+    ScopedSession stranger(7, 7);
+    ASSERT_EQ((int)table.openFile("/secret.txt", FILE_OPEN_READ), (int)PDI_ERR_PERM);
+    ASSERT_EQ((int)table.openFile("/secret.txt", FILE_OPEN_WRITE), (int)PDI_ERR_PERM);
+}
+
+TEST(vfs, a_backend_is_told_once_when_its_mount_is_gone_and_not_when_umount_is_refused)
+{
+    VfsDispatcher table;
+    HugeHandleTmpFs backend;
+    TmpFs fixed;
+    table.mount("/", &fixed, "rootfs", VFS_TYPE_TMPFS);
+    table.mount("/mnt/x", &backend, "told", VFS_TYPE_TMPFS, true);
+
+    ASSERT_EQ((int)table.umount("/"), (int)PDI_ERR_PERM);
+    ASSERT_EQ((int)table.umount("/mnt/x"), (int)PDI_OK);
+    ASSERT_EQ(backend.m_unmounts, 1);
+    ASSERT_EQ((int)table.umount("/mnt/x"), (int)PDI_ERR_NOT_FOUND);
+    ASSERT_EQ(backend.m_unmounts, 1);
+}
+
+TEST(vfs, a_runtime_mount_is_reached_until_it_is_unmounted)
+{
+    RuntimeTable t;
+    t.m_table.beginPrivileged();
+    ASSERT_TRUE(t.m_table.createFile("/mnt/x/a.txt", "hi") >= 0);
+    t.m_table.endPrivileged();
+    ASSERT_TRUE(t.m_extra.isFileExist("/a.txt"));
+
+    ASSERT_EQ((int)t.m_table.umount("/mnt/x"), (int)PDI_OK);
+
+    ASSERT_NULL(t.m_table.getMount(1));
+    ASSERT_STREQ(t.m_table.findMountForPath("/mnt/x/a.txt")->m_prefix, "/");
+}
+
+TEST(vfs, the_slot_an_unmount_empties_is_taken_by_the_next_mount)
+{
+    RuntimeTable t;
+    TmpFs other;
+    ASSERT_EQ((int)t.m_table.umount("/mnt/x"), (int)PDI_OK);
+
+    ASSERT_EQ(t.m_table.mount("/mnt/y", &other, "other", VFS_TYPE_TMPFS, true), 0);
+
+    ASSERT_EQ(t.m_table.getMountCount(), 2);
+    ASSERT_STREQ(t.m_table.getMount(1)->m_prefix, "/mnt/y");
+}
+
+TEST(vfs, a_mount_made_at_boot_cannot_be_unmounted)
+{
+    RuntimeTable t;
+
+    ASSERT_EQ((int)t.m_table.umount("/"), (int)PDI_ERR_PERM);
+    ASSERT_NOT_NULL(t.m_table.getMount(0));
+}
+
+TEST(vfs, unmounting_a_prefix_nothing_is_mounted_at_is_not_found)
+{
+    RuntimeTable t;
+
+    ASSERT_EQ((int)t.m_table.umount("/mnt/z"), (int)PDI_ERR_NOT_FOUND);
+    ASSERT_EQ((int)t.m_table.umount("/mnt"), (int)PDI_ERR_NOT_FOUND);
+}
+
+TEST(vfs, a_filesystem_holding_open_files_is_busy)
+{
+    VfsDispatcher table;
+    TmpFs root;
+    BusyTmpFs busy;
+    table.mount("/", &root, "rootfs", VFS_TYPE_TMPFS);
+    table.mount("/mnt/x", &busy, "busy", VFS_TYPE_TMPFS, true);
+
+    ASSERT_EQ((int)table.umount("/mnt/x"), (int)PDI_ERR_BUSY);
+    ASSERT_NOT_NULL(table.getMount(1));
+}
+
+TEST(vfs, a_filesystem_a_session_is_working_inside_is_busy)
+{
+    RuntimeTable t;
+    pditest::Shell sh;
+    session_t *session = nullptr;
+    for (uint8_t i = 0; i < SessionManager::maxSessions() && nullptr == session; i++)
+    {
+        session_t *s = SessionManager::getByIndex(i);
+        if (nullptr != s && SESSION_STATE_FREE != s->m_state)
+        {
+            session = s;
+        }
+    }
+    ASSERT_NOT_NULL(session);
+    pdiutil::string saved = session->m_cwd;
+    session->m_cwd = "/mnt/x/sub";
+
+    pdi_err_t busy = t.m_table.umount("/mnt/x");
+    session->m_cwd = "/mnt/xy";
+    pdi_err_t freed = t.m_table.umount("/mnt/x");
+    session->m_cwd = saved;
+
+    ASSERT_EQ((int)busy, (int)PDI_ERR_BUSY);
+    ASSERT_EQ((int)freed, (int)PDI_OK);
+}
+
+TEST(vfs, a_handle_into_an_unmounted_filesystem_is_refused)
+{
+    VfsDispatcher table;
+    TmpFs root;
+    HandleTmpFs extra;
+    table.mount("/", &root, "rootfs", VFS_TYPE_TMPFS);
+    table.mount("/mnt/x", &extra, "extra", VFS_TYPE_TMPFS, true);
+    table.beginPrivileged();
+    pdi_fhandle_t handle = table.openFile("/mnt/x/a.txt", FILE_OPEN_READ);
+    table.endPrivileged();
+    ASSERT_TRUE(handle >= 0);
+    char buf[4];
+    table.readFileHandle(handle, buf, sizeof(buf));
+    ASSERT_EQ(extra.m_reads, 1);
+
+    ASSERT_EQ((int)table.umount("/mnt/x"), (int)PDI_OK);
+
+    ASSERT_EQ(table.readFileHandle(handle, buf, sizeof(buf)), (int)PDI_ERR_INVALID_ARG);
+    ASSERT_EQ(extra.m_reads, 1);
+}
+
+TEST(vfs, umount_says_why_it_would_not)
+{
+    pditest::Shell sh;
+
+    std::string boot = sh.run("umount /");
+    std::string none = sh.run("umount /nowhere");
+
+    ASSERT_TRUE(pditest::saw(boot, "umount: /"));
+    ASSERT_TRUE(pditest::saw(boot, "-12"));
+    ASSERT_TRUE(pditest::saw(none, "-6"));
+    ASSERT_NOT_NULL(__i_fs.getMount(0));
+}
+
 TEST(vfs, mounting_the_same_prefix_twice_is_refused)
 {
     VfsDispatcher table;
@@ -1485,17 +1700,28 @@ TEST(vfsperm, only_root_may_change_the_owner)
     fs->deleteFile("/chownme.txt");
 }
 
-TEST(vfsperm, a_missing_file_is_not_refused_so_it_can_be_created)
+TEST(vfsperm, a_missing_file_is_created_where_the_user_may_write_the_directory)
 {
     VfsDispatcher *fs = mountedVfs();
     removeIfPresent(fs, "/fresh.txt");
+    {
+        ScopedSession asroot(0, 0);
+        if (fs->isDirExist("/fresh_dir")) fs->deleteDirectory("/fresh_dir");
+        fs->createDirectory("/fresh_dir");
+        fs->setFileOwner("/fresh_dir", 7, 7);
+    }
 
     {
         ScopedSession anyone(7, 7);
-        ASSERT_GE(fs->createFile("/fresh.txt", "made by a user"), 0);
+        ASSERT_GE(fs->createFile("/fresh_dir/fresh.txt", "made by a user"), 0);
+        ASSERT_EQ(fs->createFile("/fresh.txt", "made by a user"), PDI_ERR_PERM);
     }
 
-    fs->deleteFile("/fresh.txt");
+    ASSERT_FALSE(fs->isFileExist("/fresh.txt"));
+    {
+        ScopedSession asroot(0, 0);
+        fs->deleteDirectory("/fresh_dir");
+    }
 }
 
 TEST(vfsperm, a_privileged_scope_reads_past_the_mode_bits)

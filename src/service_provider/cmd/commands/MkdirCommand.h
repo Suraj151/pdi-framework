@@ -54,14 +54,12 @@ struct MkdirCommand : public CommandBase {
 			CommandOption *cmdoptn = &m_options[0];
 			pdiutil::string dirname = resolveArgPath(cmdoptn);
 			if( !dirname.empty() ){
-				int bStatus = __i_fs.createDirectory(dirname.c_str());
+				int bStatus = ( __i_fs.isDirExist(dirname.c_str()) || __i_fs.isFileExist(dirname.c_str()) ) ?
+					PDI_ERR_EXISTS : __i_fs.createDirectory(dirname.c_str());
 				if (bStatus < 0) {
 					result = CMD_ERROR_FAILED;
 					m_terminal->putln();
-					m_terminal->write_ro(RODT_ATTR("Failed to create directory: "));
-					m_terminal->write(dirname.c_str());
-					m_terminal->write_ro(RODT_ATTR(" : "));
-					m_terminal->write((int32_t)bStatus);
+					writeFailure(RODT_ATTR("Failed to create directory: "), dirname.c_str(), (int32_t)bStatus);
 				}
 			}else{
 				result = CMD_ERROR_INVAL;
