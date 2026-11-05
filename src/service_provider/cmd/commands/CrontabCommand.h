@@ -22,6 +22,7 @@ struct CrontabCommand : public CommandBase {
 	CrontabCommand(){
 		Clear();
 		SetCommand(CMD_NAME_CRONTAB);
+		setArgs(RODT_ATTR(""), 0);
 	}
 
 	static void RegisterCommand(){

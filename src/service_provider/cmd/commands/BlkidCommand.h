@@ -27,6 +27,7 @@ struct BlkidCommand : public CommandBase {
 	BlkidCommand(){
 		Clear();
 		SetCommand(CMD_NAME_BLKID);
+		setArgs(RODT_ATTR(""), 1);
 		setAcceptArgsOptions(true);
 	}
 
@@ -62,8 +63,14 @@ struct BlkidCommand : public CommandBase {
 		}
 
 		m_terminal->putln();
+		if( optionGiven(&m_options[0]) && !__i_fs.isFileExist(only.c_str()) ){
+			writeFailure(RODT_ATTR("blkid: "), only.c_str(), PDI_ERR_NOT_FOUND);
+			return CMD_ERROR_FAILED;
+		}
+
 		DeviceManager *mgr = __serial_service.devices();
 		pdiutil::string node;
+		uint16_t shown = 0;
 
 		for( uint16_t i = 0; nullptr != mgr && i < mgr->count(); i++ ){
 			const driver_device_t *dev = mgr->at(i);
@@ -71,30 +78,30 @@ struct BlkidCommand : public CommandBase {
 			if( nullptr == disk || !disk->nodeName(node) ){
 				continue;
 			}
-			writeLine(node, only, disk->fsType(), disk->tableType());
+			shown += writeLine(node, only, disk->fsType(), disk->tableType()) ? 1 : 0;
 
 			for( uint8_t n = 1; n <= disk->partitionCount(); n++ ){
 				if( nullptr == disk->partition(n) ){
 					continue;
 				}
 				pdiutil::string name = blockPartitionName(node.c_str(), n);
-				writeLine(name, only, disk->partition(n)->m_fs, BLOCK_TABLE_NONE);
+				shown += writeLine(name, only, disk->partition(n)->m_fs, BLOCK_TABLE_NONE) ? 1 : 0;
 			}
 		}
 
-		return PDI_OK;
+		return ( optionGiven(&m_options[0]) && 0 == shown ) ? (pdi_err_t)CMD_RESULT_FALSE : (pdi_err_t)PDI_OK;
 	}
 
 private:
 
 	/**
 	 * One line for a node that carries a filesystem or a partition table, when
-	 * no node was asked for or this is the one asked for.
+	 * no node was asked for or this is the one asked for; true when written.
 	 */
-	void writeLine(const pdiutil::string &name, const pdiutil::string &only, uint8_t fs, uint8_t table){
+	bool writeLine(const pdiutil::string &name, const pdiutil::string &only, uint8_t fs, uint8_t table){
 		pdiutil::string path = DevFs::pathOf(name.c_str());
 		if( (!only.empty() && only != path) || (BLOCK_FS_NONE == fs && BLOCK_TABLE_NONE == table) ){
-			return;
+			return false;
 		}
 
 		pdiutil::string line = path;
@@ -114,6 +121,7 @@ private:
 			line += '"';
 		}
 		m_terminal->writeln(line.c_str());
+		return true;
 	}
 };
 

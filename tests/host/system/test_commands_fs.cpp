@@ -62,7 +62,7 @@ TEST(cmdfs, ls_lists_what_was_created)
     shell.run("touch one.txt");
     shell.run("touch two.txt");
 
-    std::string out = shell.run("ls");
+    std::string out = shell.run("ls -la");
     ASSERT_TRUE(saw(out, "one.txt"));
     ASSERT_TRUE(saw(out, "two.txt"));
 
@@ -76,7 +76,7 @@ TEST(cmdfs, ls_takes_a_directory_argument)
     shell.run("touch listed.txt");
     shell.run("cd /");
 
-    std::string out = shell.run("ls /w_lsarg");
+    std::string out = shell.run("ls -la /w_lsarg");
     ASSERT_TRUE(saw(out, "listed.txt"));
 
     scrub(shell, "/w_lsarg");
@@ -88,7 +88,7 @@ TEST(cmdfs, ls_shows_the_dot_entries_and_the_mode)
     workspace(shell, "/w_lsmode");
     shell.run("touch moded.txt");
 
-    std::string out = shell.run("ls");
+    std::string out = shell.run("ls -la");
     ASSERT_TRUE(saw(out, "."));
     ASSERT_TRUE(saw(out, ".."));
     ASSERT_TRUE(saw(out, "-rw-"));
@@ -143,7 +143,9 @@ TEST(cmdfs, a_command_with_no_argument_still_runs_when_it_needs_none)
     pditest::Shell shell;
 
     ASSERT_TRUE(saw(shell.run("pwd"), "/"));
-    ASSERT_TRUE(saw(shell.run("ls"), "."));
+    std::string names = shell.run("ls");
+    ASSERT_TRUE(saw(names, "etc"));
+    ASSERT_FALSE(saw(names, "rw-"));
 }
 
 /* -------------------------------------------------------------- echo, cat */
@@ -304,8 +306,8 @@ TEST(cmdfs, ls_of_a_file_prints_that_file)
     workspace(shell, "/w_lsfile");
     __i_fs.createFile("/w_lsfile/one.txt", "1234567");
 
-    std::string out = shell.run("ls /w_lsfile/one.txt");
-    std::string rel = shell.run("ls one.txt");
+    std::string out = shell.run("ls -la /w_lsfile/one.txt");
+    std::string rel = shell.run("ls -la one.txt");
 
     scrub(shell, "/w_lsfile");
     ASSERT_TRUE(saw(out, "/w_lsfile/one.txt"));
@@ -319,7 +321,7 @@ TEST(cmdfs, ls_of_a_file_prints_that_file)
 TEST(cmdfs, ls_of_a_missing_path_names_it)
 {
     pditest::Shell shell;
-    std::string out = shell.run("ls /w_no_such_thing");
+    std::string out = shell.run("ls -la /w_no_such_thing");
     ASSERT_TRUE(saw(out, "/w_no_such_thing"));
     ASSERT_TRUE(saw(out, "CmdErr"));
 }
@@ -329,7 +331,7 @@ TEST(cmdfs, ls_lists_the_dot_entries_in_tmp_as_on_the_flash)
     pditest::Shell shell;
     __i_fs.writeFile("/tmp/dotted.txt", "d", 1, false);
 
-    std::string out = shell.run("ls /tmp");
+    std::string out = shell.run("ls -la /tmp");
     shell.run("rm /tmp/dotted.txt");
 
     ASSERT_TRUE(saw(out, " ..\r") || saw(out, " ..\n"));

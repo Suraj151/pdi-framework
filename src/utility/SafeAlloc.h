@@ -13,6 +13,7 @@ Created Date    : 6th June 2026
 
 #include <stddef.h>
 #include <stdint.h>
+#include <new>
 
 /**
  * Headroom (in bytes) the rest of the system keeps on the total heap once the
@@ -35,6 +36,11 @@ namespace pdiutil {
 uint32_t safe_alloc_refusals();
 
 /**
+ * @brief Counts one refused allocation, for a caller that judged the heap itself.
+ */
+void note_refusal();
+
+/**
  * @brief Arms the heap check. Must be called once the device instances are
  *        constructed; PDIStack::initialize() does this.
  */
@@ -53,6 +59,36 @@ void enable_heap_check();
 bool has_heap_for(size_t bytes);
 
 /**
+ * @brief The most bytes one allocation could take right now under the same two
+ *        checks as has_heap_for(); the largest size_t when the check is not armed or the port reports neither figure.
+ */
+size_t heap_room();
+
+/**
+ * @brief Heap-checked `new T[n]` for the most elements up to `expected` the heap can hold now, never fewer
+ *        than `minimum`; `granted` carries the count taken, and nullptr with 0 when not even `minimum` fits.
+ */
+template <typename T>
+inline T* safe_new_array_upto(size_t expected, size_t minimum, size_t &granted) {
+    granted = 0;
+    if (expected == 0) return nullptr;
+    if (minimum == 0 || minimum > expected) minimum = expected;
+    size_t room = heap_room() / sizeof(T);
+    size_t count = (room < expected) ? room : expected;
+    if (count < minimum) {
+        note_refusal();
+        return nullptr;
+    }
+    T* block = new (std::nothrow) T[count]();
+    if (block == nullptr) {
+        note_refusal();
+        return nullptr;
+    }
+    granted = count;
+    return block;
+}
+
+/**
  * @brief Heap-checked `new T(args...)`. Returns nullptr if the heap
  *        cannot safely satisfy the allocation, otherwise behaves exactly
  *        like a regular `new T(args...)`.
@@ -64,7 +100,18 @@ bool has_heap_for(size_t bytes);
 template <typename T, typename... Args>
 inline T* safe_new(Args&&... args) {
     if (!has_heap_for(sizeof(T))) return nullptr;
-    return new T(static_cast<Args&&>(args)...);
+    T* made = new (std::nothrow) T(static_cast<Args&&>(args)...);
+    if (made == nullptr) note_refusal();
+    return made;
+}
+
+/**
+ * @brief Builds a T from args in storage already taken, from safe_alloc_bytes()
+ *        or a container's allocator, and returns it; nothing is allocated.
+ */
+template <typename T, typename... Args>
+inline T* safe_construct(void* where, Args&&... args) {
+    return new (where) T(static_cast<Args&&>(args)...);
 }
 
 /**
@@ -76,7 +123,9 @@ template <typename T>
 inline T* safe_new_array(size_t count) {
     if (count == 0) return nullptr;
     if (!has_heap_for(count * sizeof(T))) return nullptr;
-    return new T[count]();
+    T* block = new (std::nothrow) T[count]();
+    if (block == nullptr) note_refusal();
+    return block;
 }
 
 /**
@@ -85,7 +134,9 @@ inline T* safe_new_array(size_t count) {
 inline void* safe_alloc_bytes(size_t bytes) {
     if (bytes == 0) return nullptr;
     if (!has_heap_for(bytes)) return nullptr;
-    return ::operator new(bytes);
+    void* storage = ::operator new(bytes, std::nothrow);
+    if (storage == nullptr) note_refusal();
+    return storage;
 }
 
 /**

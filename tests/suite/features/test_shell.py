@@ -14,11 +14,10 @@ These mirror tests/host/system/test_shell_redirect.cpp.
 import re
 import time
 
-from .registry import test, expect_in, expect_not_in, Skip
+from .registry import test, expect_in, expect_not_in, Skip, meminfo
 
 W = "wt_"
 
-FREE_HEAP = re.compile(r"(\d+)\s+bytes free heap")
 
 
 def counts(text):
@@ -32,10 +31,10 @@ def counts(text):
 
 def free_heap(t):
     """What the target says it has left, or a skip when it does not say."""
-    found = FREE_HEAP.search(t.run("ps"))
+    found = meminfo(t)
     if found is None:
         raise Skip("this target does not report free heap")
-    return int(found.group(1))
+    return found["MemFree"]
 
 
 def heap_band(t, seconds=20.0, interval=2.0):

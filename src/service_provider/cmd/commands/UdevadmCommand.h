@@ -24,6 +24,7 @@ struct UdevadmCommand : public CommandBase {
 	UdevadmCommand() : m_added_listener(EVENT_LISTENER_ID_INVALID), m_removed_listener(EVENT_LISTENER_ID_INVALID) {
 		Clear();
 		SetCommand(CMD_NAME_UDEVADM);
+		setArgs(RODT_ATTR(""), 1);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
@@ -101,7 +102,7 @@ struct UdevadmCommand : public CommandBase {
 			return startWatching();
 		}
 
-		return CMD_ERROR_OPT;
+		return refuseArg(RODT_ATTR(CMD_MSG_UNKNOWN_SUBCOMMAND), verb->optionval, verb->optionvalsize, CMD_ERROR_OPT);
 	}
 
 private:

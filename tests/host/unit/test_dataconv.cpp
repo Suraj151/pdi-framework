@@ -73,6 +73,50 @@ TEST(dataconv, string_to_hex16_parses_both_cases)
     ASSERT_EQ(StringToHex16("00FF", 4), (uint16_t)0x00ff);
 }
 
+TEST(dataconv, string_to_hex32_reads_five_and_more_digits)
+{
+    ASSERT_EQ(StringToHex32("10000", 5), (uint32_t)0x10000);
+    ASSERT_EQ(StringToHex32("10BC8\r\n", 7), (uint32_t)0x10BC8);
+    ASSERT_EQ(StringToHex32("ffffffff", 8), (uint32_t)0xffffffff);
+}
+
+TEST(dataconv, string_to_hex32_stops_at_first_non_hex_and_counts_digits)
+{
+    uint8_t digits = 0xAA;
+    ASSERT_EQ(StringToHex32("1f40;name=v", 11, &digits), (uint32_t)0x1f40);
+    ASSERT_EQ(digits, (uint8_t)4);
+    ASSERT_EQ(StringToHex32(" \"7a", 4, &digits), (uint32_t)0x7a);
+    ASSERT_EQ(digits, (uint8_t)2);
+    ASSERT_EQ(StringToHex32("ffff", 2, &digits), (uint32_t)0xff);
+    ASSERT_EQ(digits, (uint8_t)2);
+}
+
+TEST(dataconv, string_to_hex32_tells_no_digits_from_zero)
+{
+    uint8_t digits = 0xAA;
+    ASSERT_EQ(StringToHex32("0\r\n", 3, &digits), (uint32_t)0);
+    ASSERT_EQ(digits, (uint8_t)1);
+    ASSERT_EQ(StringToHex32("\r\n", 2, &digits), (uint32_t)0);
+    ASSERT_EQ(digits, (uint8_t)0);
+    ASSERT_EQ(StringToHex32(nullptr, 4, &digits), (uint32_t)0);
+    ASSERT_EQ(digits, (uint8_t)0);
+}
+
+TEST(dataconv, string_to_hex32_counts_digits_past_its_width)
+{
+    uint8_t digits = 0;
+    StringToHex32("123456789", 9, &digits);
+    ASSERT_EQ(digits, (uint8_t)9);
+}
+
+TEST(dataconv, string_to_hex64_reads_beyond_32_bits)
+{
+    uint8_t digits = 0;
+    ASSERT_EQ(StringToHex64("123456789aBcDeF0", 16, &digits), (uint64_t)0x123456789abcdef0ULL);
+    ASSERT_EQ(digits, (uint8_t)16);
+    ASSERT_EQ(StringToHex64("100000000", 9), (uint64_t)0x100000000ULL);
+}
+
 TEST(dataconv, uint32_to_string_formats_value)
 {
     char buf[16];
@@ -166,22 +210,35 @@ TEST(dataconv, hex_string_to_bytes_rejects_non_hex)
 TEST(dataconv, file_perms_to_string_renders_regular_file)
 {
     char buf[12];
-    FilePermsToString(0644, false, buf);
+    FilePermsToString(0644, FILE_TYPE_REG, buf);
     ASSERT_STREQ(buf, "-rw-r--r--");
 }
 
 TEST(dataconv, file_perms_to_string_renders_directory)
 {
     char buf[12];
-    FilePermsToString(0755, true, buf);
+    FilePermsToString(0755, FILE_TYPE_DIR, buf);
     ASSERT_STREQ(buf, "drwxr-xr-x");
 }
 
 TEST(dataconv, file_perms_to_string_renders_no_permissions)
 {
     char buf[12];
-    FilePermsToString(0, false, buf);
+    FilePermsToString(0, FILE_TYPE_REG, buf);
     ASSERT_STREQ(buf, "----------");
+}
+
+TEST(dataconv, file_perms_to_string_marks_each_type)
+{
+    char buf[12];
+    FilePermsToString(0666, FILE_TYPE_CHR, buf);
+    ASSERT_STREQ(buf, "crw-rw-rw-");
+    FilePermsToString(0600, FILE_TYPE_BLK, buf);
+    ASSERT_STREQ(buf, "brw-------");
+    FilePermsToString(0777, FILE_TYPE_LINK, buf);
+    ASSERT_STREQ(buf, "lrwxrwxrwx");
+    FilePermsToString(07777, FILE_TYPE_MAX, buf);
+    ASSERT_STREQ(buf, "-rwxrwxrwx");
 }
 
 TEST(dataconv, float_to_string_formats_fraction)
@@ -190,6 +247,21 @@ TEST(dataconv, float_to_string_formats_fraction)
     FloatToString(3.25, buf, sizeof(buf));
     ASSERT_EQ(StringToUint32(buf), 3u);
     ASSERT_TRUE(strchr(buf, '.') != nullptr);
+}
+
+TEST(dataconv, string_to_double_reads_the_leading_number)
+{
+    ASSERT_NEAR(StringToDouble("42"), 42.0, 1e-9);
+    ASSERT_NEAR(StringToDouble("  -3.25 apples"), -3.25, 1e-9);
+    ASSERT_NEAR(StringToDouble("\t+0.5"), 0.5, 1e-9);
+    ASSERT_NEAR(StringToDouble("10x"), 10.0, 1e-9);
+}
+
+TEST(dataconv, string_to_double_reads_zero_from_a_string_with_no_number)
+{
+    ASSERT_NEAR(StringToDouble("apples"), 0.0, 1e-9);
+    ASSERT_NEAR(StringToDouble(""), 0.0, 1e-9);
+    ASSERT_NEAR(StringToDouble(nullptr), 0.0, 1e-9);
 }
 
 TEST(dataconv, int32_digit_count_counts_digits)
@@ -389,5 +461,117 @@ TEST(dataconv, parse_uint32_takes_only_digits_that_fit)
     ASSERT_FALSE(ParseUint32("", 0, out));
     ASSERT_FALSE(ParseUint32(nullptr, 3, out));
     ASSERT_EQ(out, 7u);
+}
+
+
+TEST(dataconv, a_size_reads_right_in_every_unit_up_to_the_largest_64_bit_value)
+{
+    char out[24];
+    BytesToSizeString(1099511627776ULL, true, out, sizeof(out));
+    ASSERT_STREQ(out, "1T");
+    BytesToSizeString(1000000000000ULL, true, out, sizeof(out));
+    ASSERT_STREQ(out, "931G");
+    BytesToSizeString(1125899906842624ULL, true, out, sizeof(out));
+    ASSERT_STREQ(out, "1P");
+    BytesToSizeString(1125899906842624ULL, false, out, sizeof(out));
+    ASSERT_STREQ(out, "1 PiB");
+    BytesToSizeString(1152921504606846976ULL, false, out, sizeof(out));
+    ASSERT_STREQ(out, "1 EiB");
+    BytesToSizeString(0xFFFFFFFFFFFFFFFFULL, true, out, sizeof(out));
+    ASSERT_STREQ(out, "16E");
+    BytesToSizeString(0xFFFFFFFFFFFFFFFFULL, false, out, sizeof(out));
+    ASSERT_STREQ(out, "16 EiB");
+}
+
+TEST(dataconv, a_size_that_rounds_to_1024_of_a_unit_is_shown_in_the_next_unit)
+{
+    char out[24];
+    BytesToSizeString(1048575ULL, true, out, sizeof(out));
+    ASSERT_STREQ(out, "1M");
+    BytesToSizeString(1073741823ULL, false, out, sizeof(out));
+    ASSERT_STREQ(out, "1 GiB");
+    BytesToSizeString(1023ULL, true, out, sizeof(out));
+    ASSERT_STREQ(out, "1023B");
+    BytesToSizeString(1024ULL, true, out, sizeof(out));
+    ASSERT_STREQ(out, "1K");
+    BytesToSizeString(0ULL, true, out, sizeof(out));
+    ASSERT_STREQ(out, "0B");
+}
+
+TEST(dataconv, a_size_never_writes_past_the_buffer_it_is_given)
+{
+    char out[6];
+    memset(out, 'Z', sizeof(out));
+    BytesToSizeString(0xFFFFFFFFFFFFFFFFULL, false, out, 4);
+    ASSERT_EQ(out[3], '\0');
+    ASSERT_EQ(out[4], 'Z');
+}
+
+TEST(dataconv, parse_octal_takes_every_digit_up_to_the_limit)
+{
+    uint32_t out = 9;
+    ASSERT_TRUE(ParseOctal("0", 1, 0777, out));
+    ASSERT_EQ(out, 0u);
+    ASSERT_TRUE(ParseOctal("644", 3, 0777, out));
+    ASSERT_EQ(out, 0644u);
+    ASSERT_TRUE(ParseOctal("0777", 4, 0777, out));
+    ASSERT_EQ(out, 0777u);
+    ASSERT_TRUE(ParseOctal("00000000000007", 14, 0777, out));
+    ASSERT_EQ(out, 7u);
+}
+
+TEST(dataconv, parse_octal_refuses_digits_past_seven_and_values_past_the_limit)
+{
+    uint32_t out = 9;
+    ASSERT_FALSE(ParseOctal("8", 1, 0777, out));
+    ASSERT_FALSE(ParseOctal("9", 1, 0777, out));
+    ASSERT_FALSE(ParseOctal("1000", 4, 0777, out));
+    ASSERT_FALSE(ParseOctal("99999", 5, 0777, out));
+    ASSERT_FALSE(ParseOctal("77777777777777777777", 20, 0777, out));
+    ASSERT_FALSE(ParseOctal("-1", 2, 0777, out));
+    ASSERT_FALSE(ParseOctal("0x1", 3, 0777, out));
+    ASSERT_FALSE(ParseOctal("", 0, 0777, out));
+    ASSERT_FALSE(ParseOctal(nullptr, 3, 0777, out));
+    ASSERT_EQ(out, 9u);
+}
+
+TEST(dataconv, parse_int64_reads_both_ends_of_the_range)
+{
+    int64_t out = 5;
+    ASSERT_TRUE(ParseInt64("9223372036854775807", 19, out));
+    ASSERT_EQ(out, INT64_MAX);
+    ASSERT_TRUE(ParseInt64("-9223372036854775808", 20, out));
+    ASSERT_EQ(out, INT64_MIN);
+    ASSERT_TRUE(ParseInt64("+12", 3, out));
+    ASSERT_EQ(out, 12);
+    ASSERT_TRUE(ParseInt64("-0", 2, out));
+    ASSERT_EQ(out, 0);
+}
+
+TEST(dataconv, parse_int64_refuses_what_is_not_one_number_that_fits)
+{
+    int64_t out = 5;
+    ASSERT_FALSE(ParseInt64("9223372036854775808", 19, out));
+    ASSERT_FALSE(ParseInt64("-9223372036854775809", 20, out));
+    ASSERT_FALSE(ParseInt64("99999999999999999999", 20, out));
+    ASSERT_FALSE(ParseInt64("-", 1, out));
+    ASSERT_FALSE(ParseInt64("+", 1, out));
+    ASSERT_FALSE(ParseInt64("1-", 2, out));
+    ASSERT_FALSE(ParseInt64("1 ", 2, out));
+    ASSERT_FALSE(ParseInt64("x", 1, out));
+    ASSERT_FALSE(ParseInt64("", 0, out));
+    ASSERT_FALSE(ParseInt64(nullptr, 1, out));
+    ASSERT_EQ(out, 5);
+}
+
+TEST(dataconv, string_to_int32_holds_at_its_limits_instead_of_wrapping)
+{
+    ASSERT_EQ(StringToInt32("2147483647", 10), INT32_MAX);
+    ASSERT_EQ(StringToInt32("-2147483648", 11), INT32_MIN);
+    ASSERT_EQ(StringToInt32("2147483648", 10), INT32_MAX);
+    ASSERT_EQ(StringToInt32("-2147483649", 11), INT32_MIN);
+    ASSERT_EQ(StringToInt32("99999999999999999999", 20), INT32_MAX);
+    ASSERT_EQ(StringToInt32("-99999999999999999999", 21), INT32_MIN);
+    ASSERT_EQ(StringToInt32("-42", 3), -42);
 }
 

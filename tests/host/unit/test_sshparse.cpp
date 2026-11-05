@@ -19,6 +19,8 @@ created Date    : 27th Aug 2026
 #ifdef ENABLE_SSH_SERVICE
 
 #include <service_provider/shell/ssh/SSHServiceUtil.h>
+#include <devices/posix/DeviceControlInterface.h>
+#include <utility/SafeAlloc.h>
 
 using namespace LWSSH;
 
@@ -373,7 +375,7 @@ TEST(sshparse, channel_data_carries_the_bytes_the_client_typed)
     appendString(payload, "ls -l\r\n");
 
     SSHChannelData data;
-    ASSERT_TRUE(parse_channel_data_request(payload, data));
+    ASSERT_EQ(parse_channel_data_request(payload, data), 0);
     ASSERT_EQ((int)data.data.size(), 7);
     ASSERT_EQ(data.data[0], (uint8_t)'l');
 }
@@ -388,8 +390,131 @@ TEST(sshparse, channel_data_filling_the_payload_exactly_is_accepted)
     appendString(payload, "x");
 
     SSHChannelData data;
-    ASSERT_TRUE(parse_channel_data_request(payload, data));
+    ASSERT_EQ(parse_channel_data_request(payload, data), 0);
     ASSERT_EQ((int)data.data.size(), 1);
+}
+
+TEST(sshparse, channel_data_is_moved_out_of_the_packet_so_a_squeezed_heap_still_reads_it_whole)
+{
+    pdiutil::vector<uint8_t> payload;
+    payload.push_back(SSH2_MSG_CHANNEL_DATA);
+    appendUint32(payload, 0);
+    appendBlob(payload, 1100);
+
+    SSHChannelData data;
+    pdiutil::enable_heap_check();
+    __i_dvc_ctrl.capMaxFreeBlock(100);
+    int parsed = parse_channel_data_request(payload, data);
+    __i_dvc_ctrl.capMaxFreeBlock(0);
+
+    ASSERT_EQ(parsed, 0);
+    ASSERT_EQ((int)data.data.size(), 1100);
+    ASSERT_EQ(data.data[0], (uint8_t)0);
+    ASSERT_EQ(data.data[1099], (uint8_t)(1099 & 0xFF));
+}
+
+TEST(sshparse, channel_data_the_squeezed_heap_still_holds_is_read_whole)
+{
+    pdiutil::vector<uint8_t> payload;
+    payload.push_back(SSH2_MSG_CHANNEL_DATA);
+    appendUint32(payload, 0);
+    appendBlob(payload, 900);
+
+    SSHChannelData data;
+    pdiutil::enable_heap_check();
+    __i_dvc_ctrl.capMaxFreeBlock(1000);
+    int parsed = parse_channel_data_request(payload, data);
+    __i_dvc_ctrl.capMaxFreeBlock(0);
+
+    ASSERT_EQ(parsed, 0);
+    ASSERT_EQ((int)data.data.size(), 900);
+    ASSERT_EQ(data.data[899], (uint8_t)(899 & 0xFF));
+}
+
+TEST(sshparse, a_malformed_channel_data_under_a_squeezed_heap_is_still_reported_malformed)
+{
+    pdiutil::vector<uint8_t> payload;
+    payload.push_back(SSH2_MSG_CHANNEL_DATA);
+    appendUint32(payload, 0);
+    appendUint32(payload, 2000);
+    payload.push_back('x');
+
+    SSHChannelData data;
+    pdiutil::enable_heap_check();
+    __i_dvc_ctrl.capMaxFreeBlock(1000);
+    int parsed = parse_channel_data_request(payload, data);
+    __i_dvc_ctrl.capMaxFreeBlock(0);
+
+    ASSERT_EQ(parsed, (int)PDI_ERR_CORRUPT);
+}
+
+TEST(sshparse, empty_channel_data_is_read_as_empty)
+{
+    pdiutil::vector<uint8_t> payload;
+    payload.push_back(SSH2_MSG_CHANNEL_DATA);
+    appendUint32(payload, 0);
+    appendUint32(payload, 0);
+
+    SSHChannelData data;
+    ASSERT_EQ(parse_channel_data_request(payload, data), 0);
+    ASSERT_EQ((int)data.data.size(), 0);
+}
+
+namespace
+{
+    bool exchangeHashOf(uint8_t secretbyte, uint8_t *out)
+    {
+        pdiutil::string cv("SSH-2.0-a"), sv("SSH-2.0-b");
+        pdiutil::vector<uint8_t> ckex, skex, hostkey, qc(32, 0x11), qs(32, 0x22);
+        ckex.push_back(1); ckex.push_back(2); ckex.push_back(3);
+        skex.push_back(4);
+        hostkey.push_back(5); hostkey.push_back(6);
+        uint8_t secret[32];
+        memset(secret, secretbyte, sizeof(secret));
+        return build_exchange_hash(cv, sv, ckex, skex, hostkey, qc, qs, secret, out);
+    }
+
+    void hexOf(const uint8_t *in, char *out)
+    {
+        const char *digits = "0123456789abcdef";
+        for (int i = 0; i < 32; i++)
+        {
+            out[2 * i] = digits[in[i] >> 4];
+            out[2 * i + 1] = digits[in[i] & 0x0F];
+        }
+        out[64] = 0;
+    }
+}
+
+TEST(sshparse, the_exchange_hash_is_the_sha256_of_every_field_in_order)
+{
+    uint8_t h[32];
+    char hex[65];
+    ASSERT_TRUE(exchangeHashOf(0x33, h));
+    hexOf(h, hex);
+    ASSERT_STREQ(hex, "c4f499722ffb6027834f3c4f7ef71daaa4d1f3e4c23d35810696527aad031f69");
+}
+
+TEST(sshparse, the_exchange_hash_carries_a_shared_secret_with_its_top_bit_set_as_a_positive_mpint)
+{
+    uint8_t h[32];
+    char hex[65];
+    ASSERT_TRUE(exchangeHashOf(0xAA, h));
+    hexOf(h, hex);
+    ASSERT_STREQ(hex, "453798e1c4bd6646fb599fe7e8f72b0386f78b624afac32a02f210017b02b9b4");
+}
+
+TEST(sshparse, an_exchange_hash_the_heap_cannot_build_is_refused_not_hashed_short)
+{
+    uint8_t h[32];
+    memset(h, 0x5A, sizeof(h));
+    pdiutil::enable_heap_check();
+    __i_dvc_ctrl.capMaxFreeBlock(100);
+    bool built = exchangeHashOf(0x33, h);
+    __i_dvc_ctrl.capMaxFreeBlock(0);
+
+    ASSERT_FALSE(built);
+    ASSERT_EQ(h[0], (uint8_t)0x5A);
 }
 
 TEST(sshparse, a_channel_data_length_past_the_payload_is_refused)
@@ -401,7 +526,7 @@ TEST(sshparse, a_channel_data_length_past_the_payload_is_refused)
     payload.push_back('x');
 
     SSHChannelData data;
-    ASSERT_FALSE(parse_channel_data_request(payload, data));
+    ASSERT_EQ(parse_channel_data_request(payload, data), (int)PDI_ERR_CORRUPT);
 }
 
 #endif

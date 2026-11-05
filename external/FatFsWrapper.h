@@ -96,6 +96,8 @@ public:
 
     uint64_t getFreeSize() override;
 
+    uint32_t getBlockSize() override;
+
     int setFileAttr(const char *path, uint8_t type, const void *buffer, uint32_t size) override;
 
     int getFileAttr(const char *path, uint8_t type, void *buffer, uint32_t size) override;

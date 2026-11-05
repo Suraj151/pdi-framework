@@ -265,8 +265,8 @@ pdiutil::string ProcFs::render(const char* path) {
         // RELEASE / CONFIG_VERSION land in IROM on esp8266; __vsnprintf's %s
         // reads char-by-char with plain *p and faults there. Marshal to RAM
         // first via CHARPTR_WRAP (same trick already used for format strings).
-        pdiutil::string fmt = CHARPTR_WRAP("PDI Stack version %s (%s)" TERMINAL_NEW_LINE);
-        pdiutil::string rel = CHARPTR_WRAP(RELEASE);
+        pdiutil::string fmt = CHARPTR_WRAP("PDI Stack version %s (config %s)" TERMINAL_NEW_LINE);
+        pdiutil::string rel = CHARPTR_WRAP(PDI_RELEASE);
         pdiutil::string cfg = CHARPTR_WRAP(CONFIG_VERSION);
         __snprintf(buf, sizeof(buf), fmt.c_str(), rel.c_str(), cfg.c_str());
         return pdiutil::string(buf);

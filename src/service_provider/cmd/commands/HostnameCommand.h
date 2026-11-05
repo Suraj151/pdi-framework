@@ -20,6 +20,7 @@ struct HostnameCommand : public CommandBase {
 	HostnameCommand(){
 		Clear();
 		SetCommand(CMD_NAME_HOSTNAME);
+		setArgs(RODT_ATTR(""), 0);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}

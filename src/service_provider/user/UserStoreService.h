@@ -82,6 +82,7 @@ private:
   void serializePasswdLine(const user_record_t &record, pdiutil::string &out);
   bool scanPasswdFile(bool matchByUid, uint16_t uid, const char *username, user_record_t &out);
   bool removeLineByUsername(const char *filepath, const char *username);
+  bool rewriteUserLine(const char *filepath, const char *username, const pdiutil::string *replacement, bool &found);
   bool readShadowRecord(const char *username, uint8_t hashOut[32], uint8_t *saltOut);
   void resolveNameByUid(uint16_t uid, pdiutil::string &out);
 #ifdef ENABLE_STORAGE_SERVICE

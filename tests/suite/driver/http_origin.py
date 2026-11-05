@@ -21,6 +21,26 @@ import threading
 import time
 
 
+CHUNKS_WIDE = [0x8000, 0x10000, 0x10BC8, 0x7438, 0xBD0]
+CHUNKS_SPLIT = [0x3000, 0x2400, 0x10, 0x5000]
+
+
+def patterned_body(size, seed=0):
+    """Bytes that differ along the whole body, so a lost or moved piece shows."""
+    return bytes(bytearray(((i * 7) + (i >> 8) + seed) & 0xFF for i in range(size)))
+
+
+def chunked_body(path):
+    """The bytes a chunked route carries, for a test to compare a download with."""
+    if path == "/chunked-wide.bin":
+        return patterned_body(sum(CHUNKS_WIDE), 1)
+    if path in ("/chunked-split.bin", "/chunked-ext.bin"):
+        return patterned_body(sum(CHUNKS_SPLIT), 2)
+    if path == "/chunked-cut.bin":
+        return patterned_body(sum(CHUNKS_SPLIT), 3)
+    return b""
+
+
 class Origin(object):
 
     def __init__(self, host="0.0.0.0", port=0):
@@ -134,6 +154,32 @@ class Origin(object):
             # declared far larger than any device filesystem, never sent
             self._head(conn, 200, 100 * 1024 * 1024)
 
+        elif path.startswith("/perf-") and path.endswith(".bin") and path[6:-4].isdigit():
+            size = min(int(path[6:-4]), 1024 * 1024)
+            body = bytes((i * 7 + 3) & 0xFF for i in range(size))
+            self._head(conn, 200, len(body))
+            conn.sendall(body)
+
+        elif path == "/chunked-wide.bin":
+            # chunk sizes of five hex digits, the shape a large page arrives in
+            self._chunked(conn, chunked_body(path), CHUNKS_WIDE, finish=True)
+
+        elif path == "/chunked-ext.bin":
+            self._chunked(conn, chunked_body(path), CHUNKS_SPLIT, finish=True, ext=b";name=v")
+
+        elif path == "/chunked-split.bin":
+            # every size line and every chunk end split across segments
+            self._chunked(conn, chunked_body(path), CHUNKS_SPLIT, finish=True, split=True)
+
+        elif path == "/chunked-cut.bin":
+            # the connection closes before the last, empty chunk
+            self._chunked(conn, chunked_body(path), CHUNKS_SPLIT, finish=False)
+
+        elif path == "/short.bin":
+            # declares more than it sends, then closes
+            self._head(conn, 200, 8000)
+            conn.sendall(patterned_body(3000, 4))
+
         elif path == "/small.txt":
             body = b"pdi"
             self._head(conn, 200, len(body))
@@ -143,6 +189,28 @@ class Origin(object):
             body = b"not found"
             self._head(conn, 404, len(body))
             conn.sendall(body)
+
+    def _chunked(self, conn, body, sizes, finish, ext=b"", split=False):
+        conn.sendall(b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n"
+                     b"Connection: close\r\n\r\n")
+        at = 0
+        for size in sizes:
+            line = b"%X" % size + ext + b"\r\n"
+            if split:
+                conn.sendall(line[:1]); time.sleep(0.05)
+                conn.sendall(line[1:-1]); time.sleep(0.05)
+                conn.sendall(line[-1:])
+            else:
+                conn.sendall(line)
+            conn.sendall(body[at:at + size])
+            at += size
+            if split:
+                conn.sendall(b"\r"); time.sleep(0.05)
+                conn.sendall(b"\n")
+            else:
+                conn.sendall(b"\r\n")
+        if finish:
+            conn.sendall(b"0\r\n\r\n")
 
     def _head(self, conn, status, length):
         # the Server value carries "HTTP/" on purpose: a reader that looks for

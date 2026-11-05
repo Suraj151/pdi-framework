@@ -26,9 +26,10 @@ bool readProcLines(const char *path, pdiutil::function<bool(pdiutil::string &)> 
 #ifdef ENABLE_CMD_SERVICE
 
 /**
- * Writes the process table a session may see, filtered to one owner or to all.
+ * Writes the process table a session may see, filtered to one owner or to all,
+ * under the top summary line when asked for.
  */
-void printProcessTable(iTerminalInterface *terminal, uint8_t filter_owner = 0xFF);
+void printProcessTable(iTerminalInterface *terminal, uint8_t filter_owner = 0xFF, bool summary = true);
 
 #endif
 

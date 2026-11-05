@@ -99,8 +99,13 @@ protected:
     void handleAuthentication();
     void handleChannelRequest();
     void handleChannelSubsystemRequest(pdiutil::vector<uint8_t>& data);
-    void handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t>& data, bool expectReply = true);
-    bool handleChannelSftpBolusChunks(pdiutil::vector<uint8_t>& boluschunk);
+    void handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t>& data);
+    static void appendSftpStatus(pdiutil::vector<uint8_t> &reply, uint32_t request_id, uint32_t code);
+    bool sendSftpReply(pdiutil::vector<uint8_t> &reply);
+    bool sendHeldSftpReply();
+    void writeSftpData(const uint8_t *bytes, uint32_t size);
+    size_t takeSftpStream(const uint8_t *bytes, size_t size);
+    void closeOnUnreadPacket(int status);
 };
 
 }

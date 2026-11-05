@@ -23,6 +23,7 @@ struct MkdirCommand : public CommandBase {
 	MkdirCommand(){
 		Clear();
 		SetCommand(CMD_NAME_MKDIR);
+		setArgs(RODT_ATTR(""), 1);
 		setAcceptArgsOptions(true);
 	}
 

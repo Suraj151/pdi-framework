@@ -20,6 +20,7 @@ struct UserdelCommand : public CommandBase {
 	UserdelCommand(){
 		Clear();
 		SetCommand(CMD_NAME_USERDEL);
+		setArgs(RODT_ATTR(""), 1, true);
 		AddOption(CMD_OPTION_NAME_U);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}

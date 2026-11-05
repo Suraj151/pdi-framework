@@ -160,7 +160,7 @@ TEST(cmdmeta, chmod_shows_the_new_mode_in_a_listing)
     shell.run("cd /w_chmodls");
 
     shell.run("chmod 400 f.txt");
-    ASSERT_TRUE(saw(shell.run("ls"), "-r--"));
+    ASSERT_TRUE(saw(shell.run("ls -la"), "-r--"));
 
     shell.run("cd /");
     tidy("/w_chmodls/f.txt");
@@ -263,4 +263,11 @@ TEST(cmdmeta, one_session_umask_does_not_leak_into_the_next)
 
     pditest::Shell second;
     ASSERT_NE(SessionManager::getCurrentUmask(), 0077);
+}
+
+TEST(cmdmeta, uname_r_prints_the_version_and_release_name)
+{
+    pditest::Shell shell;
+    ASSERT_TRUE(saw(shell.run("uname -r"), PDI_RELEASE));
+    ASSERT_TRUE(saw(shell.run("uname -r"), "-uEOS"));
 }

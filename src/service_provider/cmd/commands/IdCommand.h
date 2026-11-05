@@ -23,6 +23,7 @@ struct IdCommand : public CommandBase {
 	IdCommand(){
 		Clear();
 		SetCommand(CMD_NAME_ID);
+		setArgs(RODT_ATTR(""), 0);
 	}
 
 	static void RegisterCommand(){

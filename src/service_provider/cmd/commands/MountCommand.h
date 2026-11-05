@@ -35,6 +35,7 @@ struct MountCommand : public CommandBase {
 	MountCommand(){
 		Clear();
 		SetCommand(CMD_NAME_MOUNT);
+		setArgs(RODT_ATTR("a"), 2);
 #ifdef ENABLE_DISK_FS
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);

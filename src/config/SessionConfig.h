@@ -70,6 +70,9 @@ created Date    : 18th July 2026
 #define CMD_INTERRUPT_CHAR 0x03 /* the byte ctrl+c sends */
 
 #define CMD_MSG_ROOT_REQUIRED "root required" /* what a command prints when only root may run it */
+#define CMD_MSG_NOT_FOUND "Not found : " /* what a command prints before a path that is not there */
+#define CMD_MSG_FAILED "Failed : " /* what a command prints before a path an operation failed on */
+#define CMD_MSG_OUT_OF_MEMORY "out of memory" /* what a command prints when the heap refuses its working buffer */
 
 #define UNAME_SYSTEM_NAME "PDIStack" /* what uname prints as the system name */
 #define UNAME_UNKNOWN "unknown" /* what uname prints for a field the device cannot report */
@@ -80,8 +83,16 @@ created Date    : 18th July 2026
 #define UNAME_FIELD_MACHINE 0x10 /* uname -m */
 #define UNAME_FIELD_ALL 0x1F /* uname -a */
 
+#ifndef LS_LINE_WIDTH
+#define LS_LINE_WIDTH 80 /* columns a plain ls fills on a terminal before the next line */
+#endif
+
 #ifndef SHELL_CAPTURE_MAX
 #define SHELL_CAPTURE_MAX 256 /* bytes a $(...) may answer with; a longer answer fails the line rather than being cut */
+#endif
+
+#ifndef DIFF_LINES_MAX
+#define DIFF_LINES_MAX 65000 /* lines diff compares in one file */
 #endif
 
 #ifndef SHELL_CAPTURE_DEPTH

@@ -61,7 +61,7 @@ def present(t, path):
 def mode_of(t, path):
     """The permission column ls prints for path, or None when it is not listed."""
     parent, _, name = path.rstrip("/").rpartition("/")
-    for line in t.run("ls %s" % (parent or "/")).splitlines():
+    for line in t.run("ls -la %s" % (parent or "/")).splitlines():
         cols = line.split()
         if len(cols) >= 6 and cols[-1] == name:
             return cols[0]
@@ -70,7 +70,7 @@ def mode_of(t, path):
 
 def owner_of(t, path):
     parent, _, name = path.rstrip("/").rpartition("/")
-    for line in t.run("ls %s" % (parent or "/")).splitlines():
+    for line in t.run("ls -la %s" % (parent or "/")).splitlines():
         cols = line.split()
         if len(cols) >= 6 and cols[-1] == name:
             return cols[1]
@@ -465,13 +465,13 @@ def user_cannot_write_proc(t):
 def user_cannot_drive_gpio(t):
     setup(t)
     t.become_root()
-    pins = [l.split()[-1] for l in t.run("ls /sys/class/gpio").splitlines()
+    pins = [l.split()[-1] for l in t.run("ls -la /sys/class/gpio").splitlines()
             if l.split() and l.split()[-1].isdigit()]
     if not pins:
         raise Skip("the target lists no gpio in /sys/class/gpio")
     pin = pins[-1]
     node = "/sys/class/gpio/%s" % pin
-    names = [l.split()[-1] for l in t.run("ls %s" % node).splitlines() if l.split()]
+    names = [l.split()[-1] for l in t.run("ls -la %s" % node).splitlines() if l.split()]
     if "value" not in names:
         raise Skip("gpio %s has no value leaf" % pin)
     before = t.run("cat %s/value" % node).strip()

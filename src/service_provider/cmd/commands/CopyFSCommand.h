@@ -25,6 +25,7 @@ struct CopyFSCommand : public CommandBase {
 	CopyFSCommand(){
 		Clear();
 		SetCommand(CMD_NAME_COPY);
+		setArgs(RODT_ATTR(""), 2);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
@@ -39,7 +40,7 @@ struct CopyFSCommand : public CommandBase {
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("cp <src> <dst>  copy a file");
+		return RODT_ATTR("cp <src> <dst>  copy a file (into a directory keeps its name)");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -69,33 +70,44 @@ struct CopyFSCommand : public CommandBase {
 				pdiutil::string srcpath = resolveArgPath(cmdoptn1);
 				pdiutil::string dstpath = resolveArgPath(cmdoptn2);
 
-				if( !srcpath.empty() && !dstpath.empty() &&
-					!__are_str_equals(srcpath.c_str(), dstpath.c_str()) ){
+				if( __i_fs.isDirectory(dstpath.c_str()) ){
+					__i_fs.appendFileSeparator(dstpath);
+					dstpath += __i_fs.basename(srcpath.c_str());
+				}
 
-					int iStatus = 0;
+				if( __are_str_equals(srcpath.c_str(), dstpath.c_str()) ){
+					m_terminal->putln();
+					m_terminal->write_ro(RODT_ATTR("cp: "));
+					m_terminal->write(srcpath.c_str());
+					m_terminal->write_ro(RODT_ATTR(" and "));
+					m_terminal->write(dstpath.c_str());
+					m_terminal->write_ro(RODT_ATTR(" are the same file"));
+					return CMD_ERROR_FAILED;
+				}
 
-					if( !__i_fs.isFileExist(srcpath.c_str()) || __i_fs.isFileExist(dstpath.c_str()) ){
-						result = CMD_ERROR_FAILED;
-						m_terminal->putln();
-						m_terminal->writeln_ro(RODT_ATTR("src not exist OR dst exist"));
+				const char *failed = srcpath.c_str();
+				int iStatus = PDI_OK;
+				if( __i_fs.isDirectory(srcpath.c_str()) ){
+					iStatus = STORAGE_ERROR_NOT_A_FILE;
+				}else if( !__i_fs.isFileExist(srcpath.c_str()) ){
+					iStatus = PDI_ERR_NOT_FOUND;
+				}else{
+					failed = dstpath.c_str();
+					if( __i_fs.isFileExist(dstpath.c_str()) ){
+						iStatus = PDI_ERR_EXISTS;
 					}else{
 						iStatus = __i_fs.copyFile(srcpath.c_str(), dstpath.c_str(), [&]()->bool{
 							return !commandStopped(nullptr);
 						});
 					}
+				}
 
-					if (PDI_ERR_ABORTED == iStatus) {
-						result = CMD_ERROR_CANCELED;
-					}else if (iStatus < 0) {
-						result = CMD_ERROR_FAILED;
-						m_terminal->putln();
-						m_terminal->write_ro(RODT_ATTR("Failed to copy file: "));
-						m_terminal->write(srcpath.c_str());
-						m_terminal->write_ro(RODT_ATTR(" : "));
-						m_terminal->write(dstpath.c_str());
-						m_terminal->write_ro(RODT_ATTR(" : "));
-						m_terminal->write((int32_t)iStatus);
-					}
+				if (PDI_ERR_ABORTED == iStatus) {
+					result = CMD_ERROR_CANCELED;
+				}else if (iStatus < 0) {
+					result = CMD_ERROR_FAILED;
+					m_terminal->putln();
+					writeFailure(RODT_ATTR("cp: "), failed, (int32_t)iStatus);
 				}
 			}else{
 				result = CMD_ERROR_INVAL;

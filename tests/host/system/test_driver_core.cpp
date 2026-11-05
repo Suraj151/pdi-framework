@@ -245,6 +245,7 @@ public:
     bool m_open = false;
     int m_fail_begin = 0;
     pdi_err_t m_begin_result = PDI_ERR_BUSY;
+    uint32_t m_exchange_ms = 0;
 
     uint8_t defaultPins(uint8_t *out, uint8_t max) const override
     {
@@ -295,6 +296,10 @@ public:
 
     int32_t exchange(const uint8_t *tx, uint8_t *rx, uint32_t len) override
     {
+        if (m_exchange_ms > 0)
+        {
+            __i_dvc_ctrl.advanceVirtualClock((uint64_t)m_exchange_ms * 1000ULL);
+        }
         SdCardSim *card = cardAt(m_cs);
         for (uint32_t i = 0; i < len; i++)
         {
@@ -892,6 +897,25 @@ TEST(driver_core, a_bound_device_whose_probe_turns_slow_stays_bound_and_is_left_
     ASSERT_EQ((int)dev->m_state, (int)DEVICE_STATE_BOUND);
     ASSERT_EQ(g_removes, 0);
     ASSERT_EQ((int)bench.m_i2c.m_probed.count(0x60), 0);
+}
+
+TEST(driver_core, a_bound_chip_whose_slow_probe_finds_it_gone_is_let_go)
+{
+    SlowBusBench bench;
+    bench.plugChip(0x60, TESTCHIP_ID);
+    writeDevicesConf("i2c0 0x60 testchip\n");
+    DeviceManager mgr;
+    mgr.trigger();
+    ASSERT_EQ((int)mgr.find(SERIAL_IFACE_I2C, 0x60)->m_state, (int)DEVICE_STATE_BOUND);
+
+    bench.m_i2c.m_chips.clear();
+    bench.m_i2c.m_probe_ms = DEVICE_SCAN_PROBE_MAX_MS + 1;
+    mgr.scan();
+
+    const driver_device_t *dev = mgr.find(SERIAL_IFACE_I2C, 0x60);
+    ASSERT_EQ((int)dev->m_state, (int)DEVICE_STATE_ABSENT);
+    ASSERT_TRUE(dev->m_unscanned);
+    ASSERT_EQ(g_removes, 1);
 }
 
 TEST(driver_core, a_slow_probe_leaves_the_bus_working_for_the_bound_driver)
@@ -2008,7 +2032,7 @@ TEST(driver_core, a_bound_eeprom_has_an_eeprom_file_the_size_of_the_chip_only_ro
     EepromServiceBench bench;
     pditest::Shell sh;
 
-    std::string out = sh.run("ls /sys/bus/i2c/devices/0-0050");
+    std::string out = sh.run("ls -la /sys/bus/i2c/devices/0-0050");
     ASSERT_TRUE(pditest::saw(out, "eeprom"));
     ASSERT_TRUE(pditest::saw(out, "-rw-------"));
     ASSERT_TRUE(pditest::saw(out, "16384"));
@@ -2022,7 +2046,7 @@ TEST(driver_core, a_device_whose_driver_is_no_memory_has_no_eeprom_file)
     bench.scan();
     pditest::Shell sh;
 
-    ASSERT_FALSE(pditest::saw(sh.run("ls /sys/bus/i2c/devices/0-0050"), "eeprom"));
+    ASSERT_FALSE(pditest::saw(sh.run("ls -la /sys/bus/i2c/devices/0-0050"), "eeprom"));
     ASSERT_FALSE(__i_fs.isFileExist(EEPROM_FILE));
 }
 
@@ -2083,7 +2107,7 @@ TEST(driver_core, sys_bus_lists_the_drivers_of_a_bus_and_a_devices_target)
     EepromServiceBench bench;
     pditest::Shell sh;
 
-    std::string drivers = sh.run("ls /sys/bus/i2c/drivers");
+    std::string drivers = sh.run("ls -la /sys/bus/i2c/drivers");
     ASSERT_TRUE(pditest::saw(drivers, "at24"));
     ASSERT_TRUE(pditest::saw(drivers, "testchip"));
     ASSERT_FALSE(pditest::saw(drivers, "mmc_spi"));
@@ -2435,6 +2459,79 @@ TEST(driver_core, a_card_swapped_between_two_scans_is_let_go_and_bound_again_in_
     ASSERT_NE(card->serial(), before);
     ASSERT_EQ(g_removed_events, removed + 1);
     ASSERT_EQ(g_added_events, added + 1);
+}
+
+namespace
+{
+
+/**
+ * The card's service bench on a clock that moves only with the bus, so a slow
+ * check costs no real time.
+ */
+struct SlowSdServiceBench : SdServiceBench
+{
+    SlowSdServiceBench() { __i_dvc_ctrl.useVirtualClock(true); }
+    ~SlowSdServiceBench()
+    {
+        m_spi.m_exchange_ms = 0;
+        __i_dvc_ctrl.useVirtualClock(false);
+    }
+};
+
+} // namespace
+
+TEST(driver_core, a_card_that_stops_answering_behind_a_slow_check_is_let_go)
+{
+    SlowSdServiceBench bench;
+    ASSERT_NOT_NULL(boundCard(*bench.m_mgr));
+    int removed = g_removed_events;
+
+    bench.m_card->m_present = false;
+    bench.m_spi.m_exchange_ms = DEVICE_SCAN_PROBE_MAX_MS;
+    bench.m_mgr->scan();
+
+    const driver_device_t *dev = bench.m_mgr->find(SERIAL_IFACE_SPI, 12);
+    ASSERT_NOT_NULL(dev);
+    ASSERT_EQ((int)dev->m_state, (int)DEVICE_STATE_ABSENT);
+    ASSERT_NULL(dev->m_instance);
+    ASSERT_TRUE(dev->m_unscanned);
+    ASSERT_EQ(g_removed_events, removed + 1);
+    ASSERT_FALSE(__i_fs.isFileExist(SD_NODE));
+}
+
+TEST(driver_core, a_card_still_answering_behind_a_slow_check_stays_bound_and_is_left_out)
+{
+    SlowSdServiceBench bench;
+    int removed = g_removed_events;
+
+    bench.m_spi.m_exchange_ms = DEVICE_SCAN_PROBE_MAX_MS;
+    bench.m_mgr->scan();
+
+    const driver_device_t *dev = bench.m_mgr->find(SERIAL_IFACE_SPI, 12);
+    ASSERT_EQ((int)dev->m_state, (int)DEVICE_STATE_BOUND);
+    ASSERT_TRUE(dev->m_unscanned);
+    ASSERT_EQ(g_removed_events, removed);
+    ASSERT_NOT_NULL(boundCard(*bench.m_mgr));
+}
+
+TEST(driver_core, a_card_let_go_after_a_slow_check_is_bound_by_a_trigger_once_it_answers_again)
+{
+    SlowSdServiceBench bench;
+    bench.m_card->m_present = false;
+    bench.m_spi.m_exchange_ms = DEVICE_SCAN_PROBE_MAX_MS;
+    bench.m_mgr->scan();
+
+    bench.m_spi.m_exchange_ms = 0;
+    bench.m_card->reinsert();
+    bench.m_mgr->scan();
+    ASSERT_EQ((int)bench.m_mgr->find(SERIAL_IFACE_SPI, 12)->m_state, (int)DEVICE_STATE_ABSENT);
+
+    bench.m_mgr->trigger();
+
+    iBlockDriverInterface *card = boundCard(*bench.m_mgr);
+    ASSERT_NOT_NULL(card);
+    ASSERT_EQ((int)card->blocks(), (int)SD_BLOCKS);
+    ASSERT_FALSE(bench.m_mgr->find(SERIAL_IFACE_SPI, 12)->m_unscanned);
 }
 
 TEST(driver_core, a_card_that_misses_one_status_answer_stays_bound)
@@ -2834,14 +2931,74 @@ TEST(driver_core, mmc_spi_writes_and_reads_back_several_blocks)
     ASSERT_EQ(bench.m_card->m_writes, 3);
 }
 
+TEST(driver_core, mmc_spi_moves_several_blocks_with_one_command_each_way_and_stops_it)
+{
+    SdBench bench;
+    writeDevicesConf(SD_LINE);
+    DeviceManager mgr;
+    mgr.trigger();
+    iBlockDriverInterface *card = boundCard(mgr);
+    ASSERT_NOT_NULL(card);
+    std::vector<uint8_t> out(4 * SD_BLOCK_SIZE, 0x5A), back(4 * SD_BLOCK_SIZE);
+    memset(bench.m_card->m_commands, 0, sizeof(bench.m_card->m_commands));
+
+    ASSERT_EQ((int)card->writeBlocks(20, out.data(), 4), 4);
+    ASSERT_EQ((int)card->readBlocks(20, back.data(), 4), 4);
+
+    ASSERT_EQ(0, memcmp(out.data(), back.data(), out.size()));
+    ASSERT_EQ(bench.m_card->m_commands[25], 1);
+    ASSERT_EQ(bench.m_card->m_commands[24], 0);
+    ASSERT_EQ(bench.m_card->m_commands[18], 1);
+    ASSERT_EQ(bench.m_card->m_commands[17], 0);
+    ASSERT_EQ(bench.m_card->m_commands[12], 1);
+
+    ASSERT_EQ((int)card->readBlocks(20, back.data(), 1), 1);
+    ASSERT_EQ(bench.m_card->m_commands[17], 1);
+}
+
+TEST(driver_core, mmc_spi_names_a_read_that_fails_part_way_and_reads_on_afterwards)
+{
+    SdBench bench;
+    writeDevicesConf(SD_LINE);
+    DeviceManager mgr;
+    mgr.trigger();
+    iBlockDriverInterface *card = boundCard(mgr);
+    ASSERT_NOT_NULL(card);
+    std::vector<uint8_t> back(4 * SD_BLOCK_SIZE);
+
+    bench.m_card->m_fail_read_at = bench.m_card->m_reads + 2;
+    ASSERT_EQ((int)card->readBlocks(0, back.data(), 4), (int)PDI_ERR_IO);
+
+    ASSERT_EQ((int)card->readBlocks(0, back.data(), 3), 3);
+}
+
+TEST(driver_core, mmc_spi_names_a_write_the_card_refuses_in_a_run_and_writes_on_afterwards)
+{
+    SdBench bench;
+    writeDevicesConf(SD_LINE);
+    DeviceManager mgr;
+    mgr.trigger();
+    iBlockDriverInterface *card = boundCard(mgr);
+    ASSERT_NOT_NULL(card);
+    std::vector<uint8_t> out(3 * SD_BLOCK_SIZE, 0x33), back(3 * SD_BLOCK_SIZE);
+
+    bench.m_card->m_write_response = 0x0B;
+    ASSERT_EQ((int)card->writeBlocks(40, out.data(), 3), (int)PDI_ERR_CRC);
+
+    bench.m_card->m_write_response = 0x05;
+    ASSERT_EQ((int)card->writeBlocks(40, out.data(), 3), 3);
+    ASSERT_EQ((int)card->readBlocks(40, back.data(), 3), 3);
+    ASSERT_EQ(0, memcmp(out.data(), back.data(), out.size()));
+}
+
 TEST(driver_core, a_bound_card_is_a_disk_under_dev_only_root_may_open)
 {
     SdServiceBench bench;
     pditest::Shell sh;
 
-    std::string out = sh.run("ls /dev");
+    std::string out = sh.run("ls -la /dev");
     ASSERT_TRUE(pditest::saw(out, "mmcblk0"));
-    ASSERT_TRUE(pditest::saw(out, "-rw-------"));
+    ASSERT_TRUE(pditest::saw(out, "brw-------"));
     ASSERT_TRUE(pditest::saw(out, "4194304"));
     ASSERT_EQ((int)__i_fs.getFileSize(SD_NODE), (int)(SD_BLOCKS * SD_BLOCK_SIZE));
 }
@@ -2961,7 +3118,7 @@ TEST(driver_core, blkid_and_lsblk_name_a_card_formatted_whole)
     std::string list = sh.run("lsblk");
     ASSERT_TRUE(pditest::saw(list, "FSTYPE"));
     ASSERT_TRUE(pditest::saw(list, "vfat"));
-    ASSERT_FALSE(pditest::saw(sh.run("ls /dev"), "mmcblk0p1"));
+    ASSERT_FALSE(pditest::saw(sh.run("ls -la /dev"), "mmcblk0p1"));
 }
 
 TEST(driver_core, a_partitioned_card_gives_each_partition_a_node_and_a_sys_block_entry)
@@ -2972,7 +3129,7 @@ TEST(driver_core, a_partitioned_card_gives_each_partition_a_node_and_a_sys_block
     rebind(bench);
     pditest::Shell sh;
 
-    std::string dev = sh.run("ls /dev");
+    std::string dev = sh.run("ls -la /dev");
     ASSERT_TRUE(pditest::saw(dev, "mmcblk0p1"));
     ASSERT_TRUE(pditest::saw(dev, "2097152"));
     std::string ids = sh.run("blkid");
@@ -3068,7 +3225,7 @@ TEST(driver_core, a_bound_card_gives_its_size_in_sectors_under_sys_block)
     SdServiceBench bench;
     pditest::Shell sh;
 
-    ASSERT_TRUE(pditest::saw(sh.run("ls /sys/block"), "mmcblk0"));
+    ASSERT_TRUE(pditest::saw(sh.run("ls -la /sys/block"), "mmcblk0"));
     ASSERT_TRUE(pditest::saw(sh.run("cat /sys/block/mmcblk0/size"), "8192"));
 }
 
@@ -3192,11 +3349,13 @@ TEST(driver_core, a_mounted_fat_card_holds_directories_listings_and_sizes)
     ASSERT_TRUE(__i_fs.isDirExist("/mnt/logs"));
     ASSERT_EQ((int)__i_fs.getFileSize("/mnt/logs/a.log"), 18);
     ASSERT_TRUE(pditest::saw(sh.run("cat /mnt/b.log"), "second line"));
-    std::string list = sh.run("ls /mnt");
+    std::string list = sh.run("ls -la /mnt");
     ASSERT_TRUE(pditest::saw(list, "logs"));
     ASSERT_TRUE(pditest::saw(list, "b.log"));
 
-    sh.run("rm /mnt/logs");
+    ASSERT_TRUE(pditest::saw(sh.run("rm /mnt/logs"), "Directory not empty"));
+    ASSERT_TRUE(__i_fs.isFileExist("/mnt/logs/a.log"));
+    sh.run("rm -r /mnt/logs");
     ASSERT_FALSE(__i_fs.isDirExist("/mnt/logs"));
     ASSERT_TRUE(__i_fs.isFileExist("/mnt/b.log"));
 }
@@ -3224,7 +3383,7 @@ TEST(driver_core, the_text_commands_read_lines_on_the_card_as_on_the_flash)
 
     sh.run("echo echo ran from the card > /mnt/run.sh");
     sh.run("echo echo second card line >> /mnt/run.sh");
-    std::string listed = sh.run("ls /mnt");
+    std::string listed = sh.run("ls -la /mnt");
     ASSERT_TRUE(pditest::saw(listed, " ..\r") || pditest::saw(listed, " ..\n"));
     ASSERT_TRUE(pditest::saw(listed, " .\r") || pditest::saw(listed, " .\n"));
     std::string ran = sh.run("source /mnt/run.sh");
@@ -3361,7 +3520,7 @@ TEST(driver_core, only_root_may_mount_a_card)
     FatCardBench bench;
     pditest::Shell sh(1000, 1000);
 
-    ASSERT_TRUE(pditest::saw(sh.run("mount /dev/mmcblk0 /mnt"), "mount: /dev/mmcblk0 : -12"));
+    ASSERT_TRUE(pditest::saw(sh.run("mount /dev/mmcblk0 /mnt"), "mount: /dev/mmcblk0 : Permission denied"));
     ASSERT_FALSE(pditest::saw(pditest::Shell().run("mount"), "vfat"));
 }
 
@@ -3507,7 +3666,7 @@ TEST(driver_core, only_root_may_unmount_a_card)
     MountedFatBench bench;
     ASSERT_EQ((int)bench.mounted, (int)PDI_OK);
 
-    ASSERT_TRUE(pditest::saw(pditest::Shell(1000, 1000).run("umount /mnt"), "umount: /mnt : -12"));
+    ASSERT_TRUE(pditest::saw(pditest::Shell(1000, 1000).run("umount /mnt"), "umount: /mnt : Permission denied"));
     ASSERT_TRUE(pditest::saw(pditest::Shell().run("mount"), "vfat"));
     ASSERT_FALSE(pditest::saw(pditest::Shell().run("umount /mnt"), "CmdErr"));
     ASSERT_FALSE(pditest::saw(pditest::Shell().run("mount"), "vfat"));
@@ -3899,7 +4058,7 @@ TEST(driver_core, only_root_reads_or_writes_the_raw_card_and_its_partitions)
         ASSERT_EQ(__i_fs.readFile("/dev/mmcblk0p1", 64, any), (int)PDI_ERR_PERM);
         ASSERT_EQ(__i_fs.editFile("/dev/mmcblk0", 0, "x", 1), (int)PDI_ERR_PERM);
         ASSERT_EQ(__i_fs.writeFile("/dev/mmcblk0p1", "x", 1), (int)PDI_ERR_PERM);
-        ASSERT_TRUE(pditest::saw(pditest::Shell(7, 7).run("dd if=/dev/mmcblk0 of=/tmp/b.bin count=1"), "-12"));
+        ASSERT_TRUE(pditest::saw(pditest::Shell(7, 7).run("dd if=/dev/mmcblk0 of=/tmp/b.bin count=1"), "Permission denied"));
     }
     ASSERT_EQ(0, memcmp(bench.m_card->data(), card.data(), card.size()));
     ASSERT_EQ(__i_fs.readFile("/dev/mmcblk0", 64, [](char *, uint32_t) -> bool { return false; }), 64);
@@ -3976,7 +4135,7 @@ TEST(driver_core, the_shell_mounts_and_unmounts_a_card_with_a_trailing_slash_on_
     ASSERT_TRUE(pditest::saw(sh.run("mount"), "vfat"));
     ASSERT_FALSE(pditest::saw(sh.run("umount /mnt/"), "CmdErr"));
     ASSERT_FALSE(pditest::saw(sh.run("mount"), "vfat"));
-    ASSERT_TRUE(pditest::saw(sh.run("umount /mnt"), "umount: /mnt : -6"));
+    ASSERT_TRUE(pditest::saw(sh.run("umount /mnt"), "umount: /mnt : Not found"));
     ASSERT_TRUE(pditest::saw(sh.run("umount"), "-3602"));
 }
 
@@ -4004,7 +4163,7 @@ TEST(driver_core, dd_names_an_output_it_cannot_open_by_its_code)
 
     std::string out = pditest::Shell().run("dd if=/tmp/src.txt of=/mnt/ro.txt");
 
-    ASSERT_TRUE(pditest::saw(out, "dd: /mnt/ro.txt : -4807"));
+    ASSERT_TRUE(pditest::saw(out, "dd: /mnt/ro.txt : Access denied or directory full"));
     ASSERT_STREQ(readAll("/mnt/ro.txt").c_str(), "keep");
     __i_fs.deleteFile("/tmp/src.txt");
 }
@@ -4016,9 +4175,9 @@ TEST(driver_core, dd_names_a_disk_that_fails_a_read_or_a_write_by_its_code)
     bench.m_card->m_present = false;
 
     std::string in = sh.run("dd if=/dev/mmcblk0 of=/tmp/blk.bin count=1");
-    ASSERT_TRUE(pditest::saw(in, "dd: /dev/mmcblk0 : -6"));
+    ASSERT_TRUE(pditest::saw(in, "dd: /dev/mmcblk0 : Not found"));
     std::string out = sh.run("dd if=/dev/zero of=/dev/mmcblk0 count=1");
-    ASSERT_TRUE(pditest::saw(out, "dd: /dev/mmcblk0 : -6"));
+    ASSERT_TRUE(pditest::saw(out, "dd: /dev/mmcblk0 : Not found"));
     ASSERT_TRUE(pditest::saw(out, "0+0 records out"));
     __i_fs.deleteFile("/tmp/blk.bin");
 }
@@ -4029,7 +4188,7 @@ TEST(driver_core, dd_refuses_more_operands_than_it_takes)
 
     std::string out = sh.run("dd if=/a of=/b bs=1 count=1 skip=0 seek=0 extra=1");
 
-    ASSERT_TRUE(pditest::saw(out, "too many arguments"));
+    ASSERT_TRUE(pditest::saw(out, "extra operand : extra=1"));
 }
 
 TEST(driver_core, udevadm_info_marks_a_device_left_out_of_the_scan)
@@ -4073,10 +4232,10 @@ TEST(driver_core, sys_block_lists_a_disk_and_each_partition_with_their_attribute
     rebind(bench);
     pditest::Shell sh;
 
-    std::string disk = sh.run("ls /sys/block/mmcblk0");
+    std::string disk = sh.run("ls -la /sys/block/mmcblk0");
     ASSERT_TRUE(pditest::saw(disk, "size"));
     ASSERT_TRUE(pditest::saw(disk, "mmcblk0p1"));
-    std::string part = sh.run("ls /sys/block/mmcblk0/mmcblk0p1");
+    std::string part = sh.run("ls -la /sys/block/mmcblk0/mmcblk0p1");
     ASSERT_TRUE(pditest::saw(part, "size"));
     ASSERT_TRUE(pditest::saw(part, "start"));
 }
@@ -4123,7 +4282,7 @@ TEST(driver_core, the_fat_disk_glue_answers_each_question_fatfs_asks_of_a_mounte
     bench.m_card->m_present = true;
 }
 
-TEST(driver_core, a_card_bound_again_while_mounted_is_refused_until_it_is_mounted_again)
+TEST(driver_core, a_card_bound_again_while_mounted_is_unmounted_untouched_and_mounts_again_by_hand)
 {
     MountedFatBench bench;
     ASSERT_EQ(__i_fs.writeFile("/mnt/before.txt", "before", 6), 6);
@@ -4131,11 +4290,9 @@ TEST(driver_core, a_card_bound_again_while_mounted_is_refused_until_it_is_mounte
 
     rebind(bench);
 
-    ASSERT_EQ(__i_fs.readFile("/mnt/before.txt", 16, [](char *, uint32_t) -> bool { return true; }), (int)PDI_ERR_NOT_FOUND);
-    ASSERT_EQ(__i_fs.writeFile("/mnt/after.txt", "after", 5), (int)PDI_ERR_NOT_FOUND);
+    ASSERT_EQ((int)__i_fs.umount("/mnt"), (int)PDI_ERR_NOT_FOUND);
     ASSERT_EQ(0, memcmp(bench.m_card->data(), card.data(), card.size()));
 
-    ASSERT_EQ((int)__i_fs.umount("/mnt"), (int)PDI_OK);
     ASSERT_EQ((int)FatFsInterfaceImpl::mountDisk("/dev/mmcblk0", "/mnt"), (int)PDI_OK);
     ASSERT_STREQ(readAll("/mnt/before.txt").c_str(), "before");
 }
@@ -4154,23 +4311,55 @@ TEST(driver_core, each_block_driver_made_carries_a_serial_of_its_own)
     ASSERT_NE(second->serial(), before);
 }
 
-TEST(driver_core, a_mounted_card_taken_out_and_put_back_answers_not_found_until_mounted_again)
+TEST(driver_core, a_mounted_card_taken_out_is_unmounted_and_keeps_its_files_for_the_next_mount)
 {
     MountedFatBench bench;
     ASSERT_EQ(__i_fs.writeFile("/mnt/kept.txt", "kept", 4), 4);
 
     bench.m_card->m_present = false;
     bench.m_mgr->scan();
-    ASSERT_EQ(__i_fs.readFile("/mnt/kept.txt", 16, [](char *, uint32_t) -> bool { return true; }), (int)PDI_ERR_NOT_FOUND);
+    ASSERT_EQ((int)__i_fs.umount("/mnt"), (int)PDI_ERR_NOT_FOUND);
 
     bench.m_card->reinsert();
     bench.m_mgr->scan();
     ASSERT_NOT_NULL(boundCard(*bench.m_mgr));
-    ASSERT_EQ(__i_fs.readFile("/mnt/kept.txt", 16, [](char *, uint32_t) -> bool { return true; }), (int)PDI_ERR_NOT_FOUND);
+    ASSERT_EQ((int)__i_fs.umount("/mnt"), (int)PDI_ERR_NOT_FOUND);
 
-    ASSERT_EQ((int)__i_fs.umount("/mnt"), (int)PDI_OK);
     ASSERT_EQ((int)FatFsInterfaceImpl::mountDisk("/dev/mmcblk0", "/mnt"), (int)PDI_OK);
     ASSERT_STREQ(readAll("/mnt/kept.txt").c_str(), "kept");
+}
+
+TEST(driver_core, a_session_inside_a_card_that_goes_is_moved_to_the_root)
+{
+    MountedFatBench bench;
+    pditest::Shell sh;
+    sh.run("cd /mnt");
+    ASSERT_TRUE(pditest::saw(sh.run("pwd"), "/mnt"));
+
+    bench.m_card->m_present = false;
+    bench.m_mgr->scan();
+
+    ASSERT_FALSE(pditest::saw(sh.run("pwd"), "/mnt"));
+    bench.m_card->reinsert();
+}
+
+TEST(driver_core, a_file_open_on_a_card_that_goes_leaves_the_mount_at_once_and_lets_it_go_on_close)
+{
+    MountedFatBench bench;
+    pdi_fhandle_t handle = __i_fs.openFile("/mnt/open.txt", FILE_OPEN_WRITE | FILE_OPEN_CREATE);
+    ASSERT_TRUE(handle >= 0);
+
+    bench.m_card->m_present = false;
+    bench.m_mgr->scan();
+
+    ASSERT_EQ((int)__i_fs.umount("/mnt"), (int)PDI_ERR_NOT_FOUND);
+    ASSERT_TRUE(__i_fs.writeFileHandle(handle, "abc", 3) < 0);
+    __i_fs.closeFile(handle);
+
+    bench.m_card->reinsert();
+    bench.m_mgr->scan();
+    ASSERT_EQ((int)FatFsInterfaceImpl::mountDisk("/dev/mmcblk0", "/mnt"), (int)PDI_OK);
+    ASSERT_EQ((int)__i_fs.umount("/mnt"), (int)PDI_OK);
 }
 
 TEST(driver_core, a_mount_past_the_volumes_fat_keeps_is_refused_as_full)
@@ -4267,7 +4456,7 @@ TEST(driver_core, wipefs_without_a_lists_the_signatures_and_erases_nothing)
     ASSERT_TRUE(pditest::saw(out, "vfat"));
     ASSERT_FALSE(pditest::saw(out, "erased"));
     ASSERT_EQ((int)bench.m_card->data()[510], 0x55);
-    ASSERT_TRUE(pditest::saw(pditest::Shell(7, 7).run("wipefs /dev/mmcblk0"), "wipefs: /dev/mmcblk0 : -12"));
+    ASSERT_TRUE(pditest::saw(pditest::Shell(7, 7).run("wipefs /dev/mmcblk0"), "wipefs: /dev/mmcblk0 : Permission denied"));
 }
 
 TEST(driver_core, wipefs_takes_the_partition_table_away_and_leaves_the_data)
@@ -4295,13 +4484,13 @@ TEST(driver_core, wipefs_of_a_blank_card_says_nothing_and_refuses_what_it_must)
     ASSERT_FALSE(pditest::saw(blank, "erased"));
     ASSERT_FALSE(pditest::saw(blank, "CmdErr"));
 
-    ASSERT_TRUE(pditest::saw(sh.run("wipefs /dev/null"), "wipefs: /dev/null : -6"));
-    ASSERT_TRUE(pditest::saw(pditest::Shell(7, 7).run("wipefs -a /dev/mmcblk0"), "wipefs: /dev/mmcblk0 : -12"));
+    ASSERT_TRUE(pditest::saw(sh.run("wipefs /dev/null"), "wipefs: /dev/null : Not found"));
+    ASSERT_TRUE(pditest::saw(pditest::Shell(7, 7).run("wipefs -a /dev/mmcblk0"), "wipefs: /dev/mmcblk0 : Permission denied"));
 
     putFatVolume(bench.m_card, 0, SD_BLOCKS);
     rebind(bench);
     ASSERT_EQ((int)FatFsInterfaceImpl::mountDisk("/dev/mmcblk0", "/mnt"), (int)PDI_OK);
-    ASSERT_TRUE(pditest::saw(sh.run("wipefs -a /dev/mmcblk0"), "wipefs: /dev/mmcblk0 : -10"));
+    ASSERT_TRUE(pditest::saw(sh.run("wipefs -a /dev/mmcblk0"), "wipefs: /dev/mmcblk0 : Busy"));
     ASSERT_EQ((int)bench.m_card->data()[510], 0x55);
 }
 
@@ -4383,7 +4572,7 @@ TEST(driver_core, sfdisk_delete_keeps_the_numbers_of_the_partitions_left)
     ASSERT_TRUE(pditest::saw(one, "The partition table has been altered."));
     ASSERT_FALSE(pditest::saw(list, "mmcblk0p1"));
     ASSERT_TRUE(pditest::saw(list, "mmcblk0p2"));
-    ASSERT_TRUE(pditest::saw(sh.run("sfdisk --delete /dev/mmcblk0 1"), "sfdisk: /dev/mmcblk0 : -6"));
+    ASSERT_TRUE(pditest::saw(sh.run("sfdisk --delete /dev/mmcblk0 1"), "sfdisk: /dev/mmcblk0 : Not found"));
 
     sh.run("sfdisk --delete /dev/mmcblk0");
     ASSERT_FALSE(pditest::saw(sh.run("lsblk"), "mmcblk0p"));
@@ -4404,9 +4593,9 @@ TEST(driver_core, sfdisk_writes_nothing_when_a_line_or_the_disk_is_wrong)
     ASSERT_EQ((int)bench.m_card->data()[510], 0);
 
     ASSERT_TRUE(pditest::saw(sh.run("sfdisk /dev/mmcblk0"), "sfdisk: no partitions given"));
-    ASSERT_TRUE(pditest::saw(pditest::Shell(7, 7).run("echo \",,c\" | sfdisk /dev/mmcblk0"), "sfdisk: /dev/mmcblk0 : -12"));
+    ASSERT_TRUE(pditest::saw(pditest::Shell(7, 7).run("echo \",,c\" | sfdisk /dev/mmcblk0"), "sfdisk: /dev/mmcblk0 : Permission denied"));
     sh.run("echo \",,c\" | sfdisk /dev/mmcblk0");
-    ASSERT_TRUE(pditest::saw(sh.run("echo \",,c\" | sfdisk /dev/mmcblk0p1"), "sfdisk: /dev/mmcblk0p1 : -2"));
+    ASSERT_TRUE(pditest::saw(sh.run("echo \",,c\" | sfdisk /dev/mmcblk0p1"), "sfdisk: /dev/mmcblk0p1 : Invalid argument"));
 }
 
 TEST(driver_core, mkfs_vfat_formats_a_partition_that_then_mounts_and_holds_files)
@@ -4447,18 +4636,18 @@ TEST(driver_core, mkfs_refuses_a_type_it_cannot_make_a_mounted_disk_and_a_user)
     BlankCardBench bench;
     pditest::Shell sh;
 
-    ASSERT_TRUE(pditest::saw(sh.run("mkfs -t ext4 /dev/mmcblk0"), "mkfs: /dev/mmcblk0 : -7"));
-    ASSERT_TRUE(pditest::saw(sh.run("mkfs -t vfat /dev/null"), "mkfs: /dev/null : -6"));
+    ASSERT_TRUE(pditest::saw(sh.run("mkfs -t ext4 /dev/mmcblk0"), "mkfs: /dev/mmcblk0 : Not supported"));
+    ASSERT_TRUE(pditest::saw(sh.run("mkfs -t vfat /dev/null"), "mkfs: /dev/null : Not found"));
     ASSERT_TRUE(pditest::saw(sh.run("mkfs /dev/mmcblk0"), "CmdErr"));
-    ASSERT_TRUE(pditest::saw(pditest::Shell(7, 7).run("mkfs -t vfat /dev/mmcblk0"), "mkfs: /dev/mmcblk0 : -12"));
+    ASSERT_TRUE(pditest::saw(pditest::Shell(7, 7).run("mkfs -t vfat /dev/mmcblk0"), "mkfs: /dev/mmcblk0 : Permission denied"));
     sh.run("echo \",,c\" | sfdisk /dev/mmcblk0");
     std::string partitioned = sh.run("mkfs -t vfat /dev/mmcblk0");
-    ASSERT_TRUE(pditest::saw(partitioned, "mkfs: /dev/mmcblk0 : -13"));
+    ASSERT_TRUE(pditest::saw(partitioned, "mkfs: /dev/mmcblk0 : File exists"));
     ASSERT_FALSE(pditest::saw(partitioned, "this may take some time"));
     sh.run("wipefs -a /dev/mmcblk0");
     sh.run("mkfs -t vfat /dev/mmcblk0");
     ASSERT_EQ((int)FatFsInterfaceImpl::mountDisk("/dev/mmcblk0", "/mnt"), (int)PDI_OK);
-    ASSERT_TRUE(pditest::saw(sh.run("mkfs -t vfat /dev/mmcblk0"), "mkfs: /dev/mmcblk0 : -10"));
+    ASSERT_TRUE(pditest::saw(sh.run("mkfs -t vfat /dev/mmcblk0"), "mkfs: /dev/mmcblk0 : Busy"));
 }
 
 TEST(driver_core, mkfs_littlefs_makes_a_partition_that_mounts_and_keeps_its_files)
@@ -4482,7 +4671,7 @@ TEST(driver_core, mkfs_littlefs_makes_a_partition_that_mounts_and_keeps_its_file
 
     ASSERT_FALSE(pditest::saw(sh.run("mount /dev/mmcblk0p1 /mnt"), "mount:"));
     ASSERT_TRUE(pditest::saw(sh.run("cat /mnt/logs/a.txt"), "kept on the card"));
-    ASSERT_TRUE(pditest::saw(sh.run("ls /mnt/logs"), "-rw-------"));
+    ASSERT_TRUE(pditest::saw(sh.run("ls -la /mnt/logs"), "-rw-------"));
 }
 
 TEST(driver_core, mkfs_littlefs_makes_a_whole_card_and_wipefs_takes_it_away)
@@ -4509,9 +4698,9 @@ TEST(driver_core, a_mounted_littlefs_disk_is_busy_for_mkfs_wipefs_and_an_open_fi
     sh.run("mkfs -t littlefs /dev/mmcblk0");
     sh.run("mount /dev/mmcblk0 /mnt");
 
-    ASSERT_TRUE(pditest::saw(sh.run("mkfs -t littlefs /dev/mmcblk0"), "mkfs: /dev/mmcblk0 : -10"));
-    ASSERT_TRUE(pditest::saw(sh.run("wipefs -a /dev/mmcblk0"), "wipefs: /dev/mmcblk0 : -10"));
-    ASSERT_TRUE(pditest::saw(sh.run("mount /dev/mmcblk0 /mnt"), "mount: /dev/mmcblk0 : -10"));
+    ASSERT_TRUE(pditest::saw(sh.run("mkfs -t littlefs /dev/mmcblk0"), "mkfs: /dev/mmcblk0 : Busy"));
+    ASSERT_TRUE(pditest::saw(sh.run("wipefs -a /dev/mmcblk0"), "wipefs: /dev/mmcblk0 : Busy"));
+    ASSERT_TRUE(pditest::saw(sh.run("mount /dev/mmcblk0 /mnt"), "mount: /dev/mmcblk0 : Busy"));
     pdi_fhandle_t handle = __i_fs.openFile("/mnt/open.txt", FILE_OPEN_WRITE | FILE_OPEN_CREATE);
     ASSERT_TRUE(handle >= 0);
     ASSERT_EQ((int)__i_fs.umount("/mnt"), (int)PDI_ERR_BUSY);
@@ -4570,6 +4759,18 @@ TEST(driver_core, fstab_mounts_a_listed_partition_when_its_card_comes)
     ASSERT_TRUE(pditest::saw(mounts, "vfat      mmcblk0p1"));
 }
 
+TEST(driver_core, a_listed_card_whose_declaration_goes_for_a_moment_is_mounted_again)
+{
+    MountedFatBench bench;
+    ASSERT_EQ(__i_fs.writeFile("/mnt/stay.txt", "stay", 4), 4);
+    FstabFile fstab("/dev/mmcblk0  /mnt  vfat  defaults  0  0\n");
+
+    rebind(bench);
+
+    ASSERT_STREQ(readAll("/mnt/stay.txt").c_str(), "stay");
+    ASSERT_EQ((int)__i_fs.umount("/mnt"), (int)PDI_OK);
+}
+
 TEST(driver_core, mount_a_mounts_what_fstab_lists_and_skips_noauto_and_what_is_mounted)
 {
     BlankCardBench bench;
@@ -4604,7 +4805,7 @@ TEST(driver_core, mount_a_names_a_failing_line_unless_it_is_nofail)
 
     {
         FstabFile fstab("/dev/mmcblk0p3 /mnt auto defaults 0 0\n");
-        ASSERT_TRUE(pditest::saw(sh.run("mount -a"), "mount: /dev/mmcblk0p3 : -6"));
+        ASSERT_TRUE(pditest::saw(sh.run("mount -a"), "mount: /dev/mmcblk0p3 : Not found"));
     }
     {
         FstabFile fstab("/dev/mmcblk0p3 /mnt auto defaults,nofail 0 0\n");
@@ -4614,8 +4815,8 @@ TEST(driver_core, mount_a_names_a_failing_line_unless_it_is_nofail)
     }
     {
         FstabFile fstab("/dev/mmcblk0p1 /mnt littlefs defaults 0 0\n");
-        ASSERT_TRUE(pditest::saw(sh.run("mount -a"), "mount: /dev/mmcblk0p1 : -7"));
-        ASSERT_TRUE(pditest::saw(pditest::Shell(7, 7).run("mount -a"), "mount: /etc/fstab : -12"));
+        ASSERT_TRUE(pditest::saw(sh.run("mount -a"), "mount: /dev/mmcblk0p1 : Not supported"));
+        ASSERT_TRUE(pditest::saw(pditest::Shell(7, 7).run("mount -a"), "mount: /etc/fstab : Permission denied"));
     }
     ASSERT_FALSE(pditest::saw(sh.run("mount"), "mmcblk0p1"));
 }
@@ -4634,7 +4835,7 @@ TEST(driver_core, mount_a_tries_a_line_whose_directory_holds_another_device)
 
     std::string out = sh.run("mount -a");
 
-    ASSERT_TRUE(pditest::saw(out, "mount: /dev/mmcblk0p1 : -13"));
+    ASSERT_TRUE(pditest::saw(out, "mount: /dev/mmcblk0p1 : File exists"));
     ASSERT_TRUE(pditest::saw(sh.run("mount"), "mmcblk0p2"));
 }
 
@@ -4657,7 +4858,7 @@ TEST(driver_core, sys_block_lists_each_partition_of_a_card_by_its_own_name)
     sh.run("sfdisk /dev/mmcblk0 < /w_two.txt");
     __i_fs.deleteFile("/w_two.txt");
 
-    std::string listed = sh.run("ls /sys/block/mmcblk0");
+    std::string listed = sh.run("ls -la /sys/block/mmcblk0");
 
     ASSERT_TRUE(pditest::saw(listed, "mmcblk0p1"));
     ASSERT_TRUE(pditest::saw(listed, "mmcblk0p2"));
@@ -5079,8 +5280,8 @@ TEST(driver_core, a_bound_mic_appears_under_dev_snd)
     bench.m_mgr->trigger();
     pditest::Shell sh;
 
-    ASSERT_TRUE(pditest::saw(sh.run("ls /dev"), "snd"));
-    ASSERT_TRUE(pditest::saw(sh.run("ls /dev/snd"), "pcmC0D0c"));
+    ASSERT_TRUE(pditest::saw(sh.run("ls -la /dev"), "snd"));
+    ASSERT_TRUE(pditest::saw(sh.run("ls -la /dev/snd"), "pcmC0D0c"));
 }
 
 TEST(driver_core, reading_the_capture_node_gives_samples)
@@ -5118,7 +5319,7 @@ TEST(driver_core, a_mic_that_goes_takes_its_dev_node_with_it)
     bench.m_mgr->trigger();
     pditest::Shell sh;
 
-    ASSERT_FALSE(pditest::saw(sh.run("ls /dev"), "snd"));
+    ASSERT_FALSE(pditest::saw(sh.run("ls -la /dev"), "snd"));
     ASSERT_FALSE(__i_fs.isFileExist("/dev/snd/pcmC0D0c"));
 }
 #endif
@@ -5383,7 +5584,7 @@ TEST(driver_core, sysfs_lists_the_bus_of_each_interface_the_port_has)
     ServiceBench bench;
     pditest::Shell sh;
 
-    std::string out = sh.run("ls /sys/bus");
+    std::string out = sh.run("ls -la /sys/bus");
 
     ASSERT_TRUE(pditest::saw(out, "i2c"));
     ASSERT_TRUE(pditest::saw(out, "usb"));
@@ -5396,7 +5597,7 @@ TEST(driver_core, a_found_device_has_a_directory_under_its_bus)
     bench.scan();
     pditest::Shell sh;
 
-    ASSERT_TRUE(pditest::saw(sh.run("ls /sys/bus/i2c/devices"), "0-0050"));
+    ASSERT_TRUE(pditest::saw(sh.run("ls -la /sys/bus/i2c/devices"), "0-0050"));
     ASSERT_TRUE(pditest::saw(sh.run("cat /sys/bus/i2c/devices/0-0050/driver"), "testchip"));
     ASSERT_TRUE(pditest::saw(sh.run("cat /sys/bus/i2c/devices/0-0050/state"), "bound"));
 }
@@ -5422,7 +5623,7 @@ TEST(driver_core, a_device_that_leaves_loses_its_sysfs_directory)
     bench.scan();
     pditest::Shell sh;
 
-    ASSERT_FALSE(pditest::saw(sh.run("ls /sys/bus/i2c/devices"), "0-0050"));
+    ASSERT_FALSE(pditest::saw(sh.run("ls -la /sys/bus/i2c/devices"), "0-0050"));
 }
 
 TEST(driver_core, sysfs_lists_the_drivers_of_each_bus)
@@ -5430,8 +5631,8 @@ TEST(driver_core, sysfs_lists_the_drivers_of_each_bus)
     ServiceBench bench;
     pditest::Shell sh;
 
-    ASSERT_TRUE(pditest::saw(sh.run("ls /sys/bus/i2c/drivers"), "testchip"));
-    ASSERT_TRUE(pditest::saw(sh.run("ls /sys/bus/usb/drivers"), "testhid"));
+    ASSERT_TRUE(pditest::saw(sh.run("ls -la /sys/bus/i2c/drivers"), "testchip"));
+    ASSERT_TRUE(pditest::saw(sh.run("ls -la /sys/bus/usb/drivers"), "testhid"));
 }
 
 TEST(driver_core, writing_rescan_looks_for_devices_at_once)

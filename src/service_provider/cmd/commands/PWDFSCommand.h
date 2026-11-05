@@ -26,6 +26,7 @@ struct PWDFSCommand  : public CommandBase {
 	PWDFSCommand (){
 		Clear();
 		SetCommand(CMD_NAME_PWD);
+		setArgs(RODT_ATTR(""), 0);
 	}
 
 	/**

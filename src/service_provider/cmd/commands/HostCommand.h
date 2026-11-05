@@ -29,6 +29,7 @@ struct HostCommand : public CommandBase {
 	HostCommand(){
 		Clear();
 		SetCommand(CMD_NAME_HOST);
+		setArgs(RODT_ATTR(""), 1);
 		setAcceptArgsOptions(true);
 	}
 

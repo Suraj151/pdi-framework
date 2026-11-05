@@ -25,6 +25,7 @@ struct MoveFSCommand : public CommandBase {
 	MoveFSCommand(){
 		Clear();
 		SetCommand(CMD_NAME_MOVE);
+		setArgs(RODT_ATTR(""), 2);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
@@ -39,7 +40,7 @@ struct MoveFSCommand : public CommandBase {
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("mv <src> <dst>  move or rename a file/directory");
+		return RODT_ATTR("mv <src> <dst>  move or rename a file/directory (into a directory keeps its name)");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -67,19 +68,36 @@ struct MoveFSCommand : public CommandBase {
 				nullptr != cmdoptn2 && nullptr != cmdoptn2->optionval && cmdoptn2->optionvalsize > 0){
 				pdiutil::string oldname = resolveArgPath(cmdoptn1);
 				pdiutil::string newname = resolveArgPath(cmdoptn2);
-				if( !oldname.empty() && !newname.empty() ){
+				if( __i_fs.isDirectory(newname.c_str()) ){
+					__i_fs.appendFileSeparator(newname);
+					newname += __i_fs.basename(oldname.c_str());
+				}
 
-					int iStatus = __i_fs.rename(oldname.c_str(), newname.c_str());
-					if (iStatus < 0) {
-						result = CMD_ERROR_FAILED;
-						m_terminal->putln();
-						m_terminal->write_ro(RODT_ATTR("Failed to rename file: "));
-						m_terminal->write(oldname.c_str());
-						m_terminal->write_ro(RODT_ATTR(" : "));
-						m_terminal->write(newname.c_str());
-						m_terminal->write_ro(RODT_ATTR(" : "));
-						m_terminal->write((int32_t)iStatus);
-					}
+				if( __are_str_equals(oldname.c_str(), newname.c_str()) ){
+					m_terminal->putln();
+					m_terminal->write_ro(RODT_ATTR("mv: "));
+					m_terminal->write(oldname.c_str());
+					m_terminal->write_ro(RODT_ATTR(" and "));
+					m_terminal->write(newname.c_str());
+					m_terminal->write_ro(RODT_ATTR(" are the same file"));
+					return CMD_ERROR_FAILED;
+				}
+
+				const char *failed = oldname.c_str();
+				int iStatus = PDI_OK;
+				if( !__i_fs.isFileExist(oldname.c_str()) && !__i_fs.isDirectory(oldname.c_str()) ){
+					iStatus = PDI_ERR_NOT_FOUND;
+				}else if( __i_fs.isFileExist(newname.c_str()) || __i_fs.isDirectory(newname.c_str()) ){
+					failed = newname.c_str();
+					iStatus = PDI_ERR_EXISTS;
+				}else{
+					failed = newname.c_str();
+					iStatus = __i_fs.rename(oldname.c_str(), newname.c_str());
+				}
+				if (iStatus < 0) {
+					result = CMD_ERROR_FAILED;
+					m_terminal->putln();
+					writeFailure(RODT_ATTR("mv: "), failed, (int32_t)iStatus);
 				}
 			}else{
 				result = CMD_ERROR_INVAL;

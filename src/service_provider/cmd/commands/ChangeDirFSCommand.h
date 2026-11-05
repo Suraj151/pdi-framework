@@ -30,6 +30,7 @@ struct ChangeDirFSCommand : public CommandBase {
 	ChangeDirFSCommand(){
 		Clear();
 		SetCommand(CMD_NAME_CD);
+		setArgs(RODT_ATTR(""), 1);
 		setAcceptArgsOptions(true);
 	}
 
@@ -52,6 +53,19 @@ struct ChangeDirFSCommand : public CommandBase {
 #endif
 
 	/* execute command with provided options */
+	/**
+	 * @brief Why a directory could not be entered: not one, not there, or not allowed.
+	 */
+	int32_t failureOf(const pdiutil::string &dir){
+		if( dir.empty() || (!__i_fs.isDirectory(dir.c_str()) && !__i_fs.isFileExist(dir.c_str())) ){
+			return PDI_ERR_NOT_FOUND;
+		}
+		if( !__i_fs.isDirectory(dir.c_str()) ){
+			return STORAGE_ERROR_NOT_A_DIRECTORY;
+		}
+		return PDI_ERR_PERM;
+	}
+
 	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -85,8 +99,7 @@ struct ChangeDirFSCommand : public CommandBase {
 				if(!bStatus){
 					result = CMD_ERROR_FAILED;
 					m_terminal->putln();
-					m_terminal->write_ro(RODT_ATTR("Failed to change directory: "));
-					m_terminal->write(dirname.c_str());
+					writeFailure(RODT_ATTR("Failed to change directory: "), dirname.c_str(), failureOf(dirname));
 				}
 			}else{
 				// POSIX-style: bare `cd` goes to the home directory.
@@ -95,8 +108,7 @@ struct ChangeDirFSCommand : public CommandBase {
 				if( SessionManager::changeDirectory(homedir.c_str()) == false ){
 					result = CMD_ERROR_FAILED;
 					m_terminal->putln();
-					m_terminal->write_ro(RODT_ATTR("Failed to change directory: "));
-					m_terminal->write(homedir.c_str());
+					writeFailure(RODT_ATTR("Failed to change directory: "), homedir.c_str(), failureOf(homedir));
 				}
 			}
 		}

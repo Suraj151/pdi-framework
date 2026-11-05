@@ -27,6 +27,7 @@ struct ChownCommand : public CommandBase {
 	ChownCommand(){
 		Clear();
 		SetCommand(CMD_NAME_CHOWN);
+		setArgs(RODT_ATTR(""), 2);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
@@ -54,7 +55,7 @@ struct ChownCommand : public CommandBase {
 
 		if( nullptr == uopt || nullptr == uopt->optionval || 0 >= uopt->optionvalsize ||
 		    nullptr == popt || nullptr == popt->optionval || 0 >= popt->optionvalsize ){
-			return CMD_ERROR_INVAL;
+			return CMD_ERROR_ARGS_MISSING;
 		}
 
 		// Parse "<uid>" or "<uid>:<gid>". Colon is optional; if absent, gid = uid.
@@ -64,18 +65,25 @@ struct ChownCommand : public CommandBase {
 			if( uopt->optionval[i] == ':' ){ colonAt = i; hasColon = true; break; }
 		}
 
-		uint16_t uid = StringToUint16(uopt->optionval, hasColon ? (uint8_t)colonAt : (uint8_t)uopt->optionvalsize);
-		uint16_t gid = uid;
-		if( hasColon && (colonAt + 1) < uopt->optionvalsize ){
-			gid = StringToUint16(uopt->optionval + colonAt + 1, (uint8_t)(uopt->optionvalsize - colonAt - 1));
+		uint32_t uid = 0;
+		uint32_t gid = 0;
+		bool uidok = ParseUint32(uopt->optionval, hasColon ? colonAt : (uint16_t)uopt->optionvalsize, uid) && uid <= 0xFFFF;
+		gid = uid;
+		bool gidok = !hasColon || (colonAt + 1) >= uopt->optionvalsize ||
+					 ( ParseUint32(uopt->optionval + colonAt + 1, (uint16_t)(uopt->optionvalsize - colonAt - 1), gid) && gid <= 0xFFFF );
+		if( !uidok || !gidok ){
+			m_terminal->writeln();
+			m_terminal->write_ro(RODT_ATTR("chown: invalid user : "));
+			m_terminal->write(uopt->optionval, (uint32_t)uopt->optionvalsize);
+			return CMD_ERROR_INVAL;
 		}
 
 		pdiutil::string path = resolveArgPath(popt);
 
-		int rc = __i_fs.setFileOwner(path.c_str(), uid, gid);
+		int rc = __i_fs.setFileOwner(path.c_str(), (uint16_t)uid, (uint16_t)gid);
 		if( rc < 0 ){
 			m_terminal->writeln();
-			m_terminal->write_ro(RODT_ATTR("chown: permission denied or not found"));
+			writeFailure(RODT_ATTR("chown: "), path.c_str(), (int32_t)rc);
 			return CMD_ERROR_FAILED;
 		}
 		return PDI_OK;

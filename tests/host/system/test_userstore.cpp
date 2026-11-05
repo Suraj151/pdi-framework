@@ -383,3 +383,108 @@ TEST(userstore, a_differing_group_resolves_on_its_own)
     forget("peggy");
     forget("quinn");
 }
+
+namespace
+{
+
+/**
+ * Appends a line to a store file longer than the heap will hold whole while
+ * capped to a 2 KB block, and hands back the file as it then stands.
+ */
+pdiutil::string appendLongLine(const char *path)
+{
+    pdiutil::string line = "zlong:";
+    line.append(6000, 'x');
+    line += '\n';
+    __i_fs.beginPrivileged();
+    __i_fs.writeFile(path, line.c_str(), line.size(), true);
+    __i_fs.endPrivileged();
+    return slurp(path);
+}
+
+void dropLongLine(const char *path)
+{
+    __i_fs.beginPrivileged();
+    pdiutil::string content = slurp(path);
+    pdiutil::string::size_type at = content.find("zlong:");
+    if (pdiutil::string::npos != at)
+    {
+        pdiutil::string::size_type end = content.find('\n', at);
+        content.erase(at, (pdiutil::string::npos == end) ? pdiutil::string::npos : end - at + 1);
+        file_info_t meta;
+        bool havemeta = (PDI_OK == __i_fs.getFileMeta(path, meta));
+        __i_fs.deleteFile(path);
+        __i_fs.createFile(path, content.c_str());
+        if (havemeta)
+        {
+            __i_fs.setFilePermissions(path, meta.m_perms);
+        }
+    }
+    __i_fs.endPrivileged();
+}
+
+} // namespace
+
+TEST(userstore, a_password_change_that_cannot_copy_a_line_whole_leaves_the_store_as_it_was)
+{
+    UserStoreService *users = store();
+    forget("ursula");
+    ASSERT_TRUE(users->addUser(makeRecord("ursula", 1031, 1031), "firstpass"));
+
+    __i_fs.beginPrivileged();
+    pdiutil::string before = appendLongLine(USER_STORE_SHADOW_PATH);
+    pdiutil::enable_heap_check();
+    __i_dvc_ctrl.capMaxFreeBlock(2048);
+    bool changed = users->setPassword("ursula", "secondpass");
+    __i_dvc_ctrl.capMaxFreeBlock(0);
+    pdiutil::string after = slurp(USER_STORE_SHADOW_PATH);
+    __i_fs.endPrivileged();
+
+    ASSERT_FALSE(changed);
+    ASSERT_TRUE(before == after);
+    ASSERT_TRUE(users->verifyPassword("ursula", "firstpass"));
+
+    dropLongLine(USER_STORE_SHADOW_PATH);
+    forget("ursula");
+}
+
+TEST(userstore, a_removal_that_cannot_copy_a_line_whole_leaves_the_store_as_it_was)
+{
+    UserStoreService *users = store();
+    forget("victor");
+    ASSERT_TRUE(users->addUser(makeRecord("victor", 1032, 1032), "victorpass"));
+
+    pdiutil::string before = appendLongLine(USER_STORE_PASSWD_PATH);
+    pdiutil::enable_heap_check();
+    __i_dvc_ctrl.capMaxFreeBlock(2048);
+    bool removed = users->removeUser("victor");
+    __i_dvc_ctrl.capMaxFreeBlock(0);
+
+    ASSERT_FALSE(removed);
+    ASSERT_TRUE(before == slurp(USER_STORE_PASSWD_PATH));
+
+    dropLongLine(USER_STORE_PASSWD_PATH);
+    forget("victor");
+}
+
+TEST(userstore, a_password_change_keeps_every_other_record_and_replaces_its_own_in_place)
+{
+    UserStoreService *users = store();
+    forget("wendy");
+    forget("xavier");
+    ASSERT_TRUE(users->addUser(makeRecord("wendy", 1033, 1033), "wendypass"));
+    ASSERT_TRUE(users->addUser(makeRecord("xavier", 1034, 1034), "xavierpass"));
+
+    ASSERT_TRUE(users->setPassword("wendy", "wendynew"));
+
+    ASSERT_TRUE(users->verifyPassword("wendy", "wendynew"));
+    ASSERT_FALSE(users->verifyPassword("wendy", "wendypass"));
+    ASSERT_TRUE(users->verifyPassword("xavier", "xavierpass"));
+    __i_fs.beginPrivileged();
+    pdiutil::string shadow = slurp(USER_STORE_SHADOW_PATH);
+    __i_fs.endPrivileged();
+    ASSERT_TRUE(shadow.find("wendy:") == shadow.rfind("wendy:"));
+
+    forget("wendy");
+    forget("xavier");
+}

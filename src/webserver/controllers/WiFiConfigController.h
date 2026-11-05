@@ -150,8 +150,24 @@ public:
 
 #endif
 
-    if (_enable_flash)
-      concat_flash_message_div(_page, _is_error ? RODT_ATTR("Invalid length error(3-20)") : RODT_ATTR("Config saved Successfully..applying new configs."), _is_error ? ALERT_DANGER : ALERT_SUCCESS);
+    if (_enable_flash && _is_error)
+    {
+      char _limits[100];
+      memset(_limits, 0, sizeof(_limits));
+#ifdef ALLOW_WIFI_CONFIG_MODIFICATION
+      pdiutil::string _limits_fmt = CHARPTR_WRAP("Not saved: a name takes %d to %d characters, a password up to %d and an address up to %d.");
+      __snprintf(_limits, sizeof(_limits), _limits_fmt.c_str(), (int)(MIN_ACCEPTED_ARG_SIZE + 1), (int)(WIFI_CONFIGS_BUF_SIZE - 1),
+                 (int)(WIFI_CONFIGS_BUF_SIZE - 1), (int)(WIFI_CONFIGS_IP_BUF_SIZE - 1));
+#else
+      pdiutil::string _limits_fmt = CHARPTR_WRAP("Not saved: a name or password takes up to %d characters.");
+      __snprintf(_limits, sizeof(_limits), _limits_fmt.c_str(), (int)(WIFI_CONFIGS_BUF_SIZE - 1));
+#endif
+      concat_flash_message_div(_page, _limits, ALERT_DANGER);
+    }
+    else if (_enable_flash)
+    {
+      concat_flash_message_div(_page, RODT_ATTR("Config saved Successfully..applying new configs."), ALERT_SUCCESS);
+    }
     strcat_ro(_page, WEB_SERVER_FOOTER_HTML);
     CONTINUE_SEND_IN_CHUNK(_page);
   }
@@ -210,7 +226,7 @@ public:
       LogI("ap subnet : %s\n\n", _ap_sip.c_str());
       __i_dvc_ctrl.yield();
 
-      const uint8_t _ip_max = 20;
+      const uint8_t _ip_max = WIFI_CONFIGS_IP_BUF_SIZE;
 
       if (_sta_ssid.size() < WIFI_CONFIGS_BUF_SIZE && _sta_pswd.size() < WIFI_CONFIGS_BUF_SIZE
 

@@ -25,6 +25,7 @@ struct SuCommand : public CommandBase {
 	SuCommand(){
 		Clear();
 		SetCommand(CMD_NAME_SU);
+		setArgs(RODT_ATTR(""), 2);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 		reservePositionalSlots(2);

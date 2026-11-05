@@ -20,6 +20,7 @@ struct PasswdCommand : public CommandBase {
 	PasswdCommand(){
 		Clear();
 		SetCommand(CMD_NAME_PASSWD);
+		setArgs(RODT_ATTR(""), 3, true);
 		AddOption(CMD_OPTION_NAME_P);
 		AddOption(CMD_OPTION_NAME_N);
 		AddOption(CMD_OPTION_NAME_C);

@@ -36,6 +36,57 @@ static void compute_ssh_mac(uint8_t mac_len, const uint8_t *key, const uint8_t *
     }
 }
 
+/**
+ * The MAC of a received packet, its sequence number then its bytes, computed where
+ * the bytes lie; false when the heap cannot hold the copy a MAC without a running form needs.
+ */
+static bool compute_packet_mac(uint8_t mac_len, const uint8_t *key, uint32_t seq, const uint8_t *data, uint32_t data_len, uint8_t *out){
+    uint8_t seqbuf[4];
+    Uint32ToBytesBE(seq, &seqbuf[0]);
+    if (mac_len == 32) {
+        hmac_sha256_context ctx;
+        hmac_sha256_init(&ctx, key, mac_len);
+        hmac_sha256_update(&ctx, seqbuf, sizeof(seqbuf));
+        hmac_sha256_update(&ctx, data, data_len);
+        hmac_sha256_final(&ctx, out);
+        return true;
+    }
+    pdiutil::vector<uint8_t> input;
+    input.reserve(4 + data_len);
+    if (input.capacity() < 4 + data_len) {
+        return false;
+    }
+    input.insert(input.end(), seqbuf, seqbuf + 4);
+    input.insert(input.end(), data, data + data_len);
+    hmac_sha1(key, mac_len, input.data(), input.size(), out);
+    return true;
+}
+
+
+namespace {
+
+/**
+ * Waits, yielding, until the socket holds at least count bytes; false once the
+ * client is gone or nothing more has come for SSH_RX_STALL_MS.
+ */
+bool waitForBytes(LWSSHSession* session, uint32_t count) {
+    uint32_t lastat = __i_dvc_ctrl.millis_now();
+    int32_t seen = session->m_client->available();
+    while (seen < 0 || (uint32_t)seen < count) {
+        if (!session->m_client->connected() || (__i_dvc_ctrl.millis_now() - lastat) > SSH_RX_STALL_MS) {
+            return false;
+        }
+        __i_dvc_ctrl.yield();
+        int32_t now = session->m_client->available();
+        if (now != seen) {
+            seen = now;
+            lastat = __i_dvc_ctrl.millis_now();
+        }
+    }
+    return true;
+}
+
+}
 
 /**
  * @brief Parses the received SSH packet.
@@ -65,8 +116,19 @@ int LWSSH::parse_received_packet(LWSSHSession* session, ssh_packet &packet){
     // Read the next byte for padding length
     uint8_t padding_length = session->m_client->read();
 
+    if ((uint32_t)padding_length + 1 > packet_length) {
+        return PDI_ERR_CORRUPT;
+    }
+
     // Read the payload (packet_length - padding_length - 1)
     uint32_t payload_length = packet_length - padding_length - 1;
+    if (!waitForBytes(session, payload_length + padding_length)) {
+        return PDI_ERR_TIMEOUT;
+    }
+    packet.payload.reserve(payload_length);
+    if (packet.payload.capacity() < payload_length) {
+        return PDI_ERR_NO_MEM;
+    }
     for (uint32_t i = 0; i < payload_length && session->m_client->available() > 0; ++i) {
         packet.payload.push_back(session->m_client->read());
         __i_dvc_ctrl.yield();
@@ -134,188 +196,72 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
         return PDI_ERR_NULL_PTR; // No active session or client
     }
     
-    // check whether it has minimum length as per negotiated MAC + payload
-    if (session->m_client->available() < (4 + session->mac_len)) {
-        return 1; // Not enough data available for a valid packet
+    pdiutil::vector<uint8_t> &partial = session->m_rxpacket;
+    uint32_t now = __i_dvc_ctrl.millis_now();
+
+    if (partial.empty()) {
+
+        if (0 == session->m_rxwanted) {
+
+            if (session->m_client->available() < (4 + session->mac_len)) {
+                return 1;
+            }
+
+            session->m_client->read(session->m_rxheader, 4);
+            uint8_t length[4];
+            memcpy(length, session->m_rxheader, sizeof(length));
+            AES_ctx temp = session->aes_ctx_ctos;
+            AES_CTR_xcrypt_buffer(&temp, length, sizeof(length));
+            uint32_t packet_length = BytesToUint32BE(&length[0]);
+
+            if (packet_length > (uint32_t)SSH_RX_PACKET_MAX + SSH_RX_PACKET_SLACK) {
+                return PDI_ERR_RANGE;
+            }
+            session->m_rxwanted = 4 + packet_length + session->mac_len;
+            session->m_rxprogressat = now;
+        }
+
+        partial.reserve(session->m_rxwanted);
+        if (partial.capacity() < session->m_rxwanted) {
+            partial = pdiutil::vector<uint8_t>();
+            if ((now - session->m_rxprogressat) > SSH_RX_STALL_MS) {
+                session->m_rxwanted = 0;
+                return PDI_ERR_NO_MEM;
+            }
+            return 1;
+        }
+        partial.insert(partial.end(), session->m_rxheader, session->m_rxheader + 4);
+        session->m_rxprogressat = now;
     }
 
-    // take header part to get packet length
-    uint8_t header[4];
-    session->m_client->read(header, 4);
-    __i_dvc_ctrl.yield();
+    int32_t got = readBlock(session, partial, session->m_rxwanted - (uint32_t)partial.size());
+    if (got < 0) {
+        partial.clear();
+        session->m_rxwanted = 0;
+        return got;
+    }
+    if (got > 0) {
+        session->m_rxprogressat = now;
+    }
+    if (partial.size() < session->m_rxwanted) {
+        if (!session->m_client->connected() || (now - session->m_rxprogressat) > SSH_RX_STALL_MS) {
+            partial.clear();
+            session->m_rxwanted = 0;
+            return PDI_ERR_TIMEOUT;
+        }
+        return 1;
+    }
+
     pdiutil::vector<uint8_t> packetvec;
-    for (uint32_t i = 0; i < 4; ++i) {
-        packetvec.push_back(header[i]);
-    }
-    AES_ctx temp = session->aes_ctx_ctos;
-    AES_CTR_xcrypt_buffer(&temp, packetvec.data(), packetvec.size());
-    uint32_t packet_length = BytesToUint32BE(&packetvec[0]);
-
-    // Once decrypt packet length reset the header part as it was received
-    packetvec.clear();
-    for (uint32_t i = 0; i < 4; ++i) {
-        packetvec.push_back(header[i]);
-    }
-
-    // Handle if more size channel data packets received while provided blous chunk handler
-    // Here we will not verify the packet as we will be considering it is 
-    // intentionally processed for bolus chunks to support in
-    // minimum sftp packet size of 32768 bytes which might be difficult to handle
-    // in single packet read. So to avoid OOM we will be considering that whenever sftp layer 
-    // adding this callback it is intentionally to handle bolus chunks.
-    if(session->current_channel.doHandleBolusChannelDataChunksCb){
-
-        bool _continue = true;
-        bool _handlerContinue = true;
-        bool _parsedInitialSSHHeader = false;
-        uint32_t _totalBytesRead = 0;
-        uint8_t padding_length = 0;
-        uint32_t now = __i_dvc_ctrl.millis_now();
-        uint32_t hold = 4 + SSH_RX_CHUNK + UINT8_MAX + session->mac_len;
-        packetvec.reserve(hold);
-        if (packetvec.capacity() < hold) {
-            return PDI_ERR_NO_MEM;
-        }
-
-        do{
-            bool islastchunk = false;
-
-            // read next chunk of data. max 512 bytes
-            uint32_t _left = (packet_length + session->mac_len) - _totalBytesRead;
-            int32_t _got = readBlock(session, packetvec, (_left > SSH_RX_CHUNK) ? SSH_RX_CHUNK : _left);
-            if (_got < 0) {
-                return _got;
-            }
-            _totalBytesRead += (uint32_t)_got;
-
-            islastchunk = _totalBytesRead == (packet_length + session->mac_len);
-
-            uint32_t bytes_remaining = (packet_length + session->mac_len) - _totalBytesRead;
-            if( bytes_remaining > 0 && bytes_remaining <= (padding_length + session->mac_len) ){
-                __i_dvc_ctrl.yield();
-                continue;
-            }
-
-            // check whether last chunk
-            if( islastchunk ){
-
-                // seperate out MAC data
-                pdiutil::vector<uint8_t> recv_mac(session->mac_len);
-                for (int32_t i = session->mac_len; i > 0; i--) {
-                    recv_mac[i-1] = packetvec.back();
-                    packetvec.pop_back();
-                }
-
-                // decrypt received payload seperated from MAC
-                AES_CTR_xcrypt_buffer(&session->aes_ctx_ctos, packetvec.data(), packetvec.size(), true);
-
-                // Prepare sequence number (big-endian)
-                uint8_t _packetseqbuf[4];
-                Uint32ToBytesBE(session->packets_seq_num_ctos, &_packetseqbuf[0]);
-
-                // Prepare MAC input: [packet sequence][encrypted header][encrypted rest]
-                pdiutil::vector<uint8_t> _mac_input;
-                _mac_input.insert(_mac_input.end(), _packetseqbuf, _packetseqbuf + 4);
-                _mac_input.insert(_mac_input.end(), packetvec.begin(), packetvec.end());
-
-                uint8_t _computed_mac[32];
-                compute_ssh_mac(session->mac_len, session->derived_mac_key_ctos, _mac_input.data(), _mac_input.size(), _computed_mac);
-
-                // Intentionally considering MAC verification succeeded. 
-                // as we are unable to provide big bolus data to MAC calculation
-                session->packets_seq_num_ctos++;
-
-                // Get initial padding length byte
-                if( !_parsedInitialSSHHeader ){
-                    padding_length = packetvec[4];
-                }
-
-                // seperate out pading length bytes
-                for (int32_t i = 0; i < padding_length; i++) {
-                    packetvec.pop_back();
-                }
-
-                _continue = false;
-            }else{
-
-                // decrypt received payload seperated from MAC
-                AES_CTR_xcrypt_buffer(&session->aes_ctx_ctos, packetvec.data(), packetvec.size(), false);
-            }
-
-            if( !_parsedInitialSSHHeader && packetvec[5] == SSH2_MSG_CHANNEL_DATA ){
-
-                // Skip initial headers
-                size_t sshoffset = 4;
-
-                // Skip padding length byte
-                padding_length = packetvec[sshoffset];
-                sshoffset += 1;
-
-                // Skip message type (already checked == 94)
-                sshoffset += 1;
-
-                // Parse recipient channel (uint32)
-                sshoffset += 4;
-
-                // Parse data len(SSH string)
-                uint32_t data_len = BytesToUint32BE(&packetvec[sshoffset]);
-                sshoffset += 4;
-
-                // Remove headers from string from first initial paylod chunk
-                packetvec.erase(packetvec.begin(), packetvec.begin() + sshoffset);
-                _parsedInitialSSHHeader = true;
-                consume_channel_window(session, data_len);
-            }
-
-            if( !_parsedInitialSSHHeader ){
-                _continue = false; // not intended to process further
-            }
-
-            while (packetvec.size()){
-                _handlerContinue = session->current_channel.doHandleBolusChannelDataChunksCb(packetvec);
-            }
-            
-            if( !_handlerContinue ){
-                _continue = false;
-            }
-
-            // Update and check time when data is not received
-            if( session->m_client->available() > 0 ){
-                now = __i_dvc_ctrl.millis_now();
-            }else{
-                if( (__i_dvc_ctrl.millis_now() - now) > 3000 ){
-                    // timeout of 3 seconds
-                    _continue = false;
-                    _handlerContinue = false;
-                }
-            }
-            __i_dvc_ctrl.yield();
-        } while (_continue);
-
-        if( !_handlerContinue ){
-            session->current_channel.doHandleBolusChannelDataChunksCb = nullptr; // Reset the callback after handling bolus chunks
-        }
-        return 1; // Bolus chunks handled, no need to parse further
-    }
-
-    // take next packet_len bytes + MAC part to form complete packet
-    uint32_t wanted = packet_length + session->mac_len;
-    uint32_t taken = 0;
-    int32_t got = 0;
-    packetvec.reserve(packetvec.size() + wanted);
-    if (packetvec.capacity() < packetvec.size() + wanted) {
-        return PDI_ERR_NO_MEM;
-    }
-    do {
-        got = readBlock(session, packetvec, wanted - taken);
-        if (got < 0) {
-            return got;
-        }
-        taken += (uint32_t)got;
-    } while (got > 0 && taken < wanted);
+    packetvec.swap(partial);
+    uint32_t packet_length = session->m_rxwanted - 4 - session->mac_len;
+    session->m_rxwanted = 0;
 
     // seperate out MAC data
     pdiutil::vector<uint8_t> recv_mac(session->mac_len);
+    if (recv_mac.size() != session->mac_len) {
+        return PDI_ERR_NO_MEM;
+    }
     for (int32_t i = session->mac_len; i > 0; i--) {
         recv_mac[i-1] = packetvec.back();
         packetvec.pop_back();
@@ -324,17 +270,11 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
     // decrypt received payload seperated from MAC
     AES_CTR_xcrypt_buffer(&session->aes_ctx_ctos, packetvec.data(), packetvec.size());
 
-    // Prepare sequence number (big-endian)
-    uint8_t packetseqbuf[4];
-    Uint32ToBytesBE(session->packets_seq_num_ctos, &packetseqbuf[0]);
-
-    // Prepare MAC input: [packet sequence][encrypted header][encrypted rest]
-    pdiutil::vector<uint8_t> mac_input;
-    mac_input.insert(mac_input.end(), packetseqbuf, packetseqbuf + 4);
-    mac_input.insert(mac_input.end(), packetvec.begin(), packetvec.end());
-
     uint8_t computed_mac[32];
-    compute_ssh_mac(session->mac_len, session->derived_mac_key_ctos, mac_input.data(), mac_input.size(), computed_mac);
+    if (!compute_packet_mac(session->mac_len, session->derived_mac_key_ctos, session->packets_seq_num_ctos,
+                            packetvec.data(), (uint32_t)packetvec.size(), computed_mac)) {
+        return PDI_ERR_NO_MEM;
+    }
 
     if (memcmp(recv_mac.data(), computed_mac, session->mac_len) != 0) {
         // MAC verification failed
@@ -348,12 +288,18 @@ int LWSSH::parse_encrypted_packet(LWSSHSession* session, ssh_packet &packet) {
 
     // Parse payload
     uint8_t padding_length = packetvec.size() > 4 ? packetvec[4] : 0;
+    if ((uint32_t)padding_length + 1 > packet_length) {
+        return PDI_ERR_CORRUPT;
+    }
     uint32_t payload_length = packet_length - padding_length - 1;
 
-    packet.payload.clear();
-    for (uint32_t i = 0; i < payload_length && (5 + i) < packetvec.size(); ++i) {
-        packet.payload.push_back(packetvec[5 + i]);
+    if (packetvec.size() < 5 + (size_t)payload_length) {
+        return PDI_ERR_CORRUPT;
     }
+    packetvec.erase(packetvec.begin(), packetvec.begin() + 5);
+    packetvec.resize(payload_length);
+    packet.payload.clear();
+    packet.payload.swap(packetvec);
 
     bool bStatus = (!packet.payload.empty() && packet.payload.size() == payload_length && packet.payload[0] < 101);
 
@@ -562,10 +508,47 @@ bool LWSSH::send_server_ssh_packet(LWSSHSession* session, pdiutil::vector<uint8_
     // Encrypt if provided
     if(encrypt && session->m_state > LWSSHSession::SESSION_STATE_NEWKEYS_RECEIVED){
 
+        uint32_t whole = payload.size() + SSH_PACKET_WRAP_MAX + session->mac_len;
+        payload.reserve(whole);
+        if (payload.capacity() < whole) {
+            return false;
+        }
+
         prepare_ssh_packet(payload, 16);
         encrypt_ssh_payload(session, payload);
-        
-        if(!sendPacket(session->m_client, payload.data(), payload.size())) return false;
+
+        while (!session->m_txpending.empty() &&
+               (session->m_txpending.size() - session->m_txsent) + payload.size() > SSH_TX_QUEUE_MAX) {
+            if (drain_ssh_output(session)) {
+                break;
+            }
+            if (LWSSHSession::SESSION_STATE_SESSION_CLOSE == session->m_state) {
+                return false;
+            }
+            __i_dvc_ctrl.yield();
+        }
+        if (!session->m_txpending.empty()) {
+            size_t had = session->m_txpending.size();
+            session->m_txpending.reserve(had + payload.size());
+            if (session->m_txpending.capacity() < had + payload.size()) {
+                while (!session->m_txpending.empty() && !drain_ssh_output(session)) {
+                    if (LWSSHSession::SESSION_STATE_SESSION_CLOSE == session->m_state) {
+                        return false;
+                    }
+                    __i_dvc_ctrl.yield();
+                }
+            } else {
+                session->m_txpending.insert(session->m_txpending.end(), payload.begin(), payload.end());
+            }
+        }
+        if (session->m_txpending.empty()) {
+            session->m_txpending.swap(payload);
+            session->m_txsent = 0;
+            session->m_txprogressat = __i_dvc_ctrl.millis_now();
+        }
+        session->packets_seq_num_stoc++;
+        drain_ssh_output(session);
+        return LWSSHSession::SESSION_STATE_SESSION_CLOSE != session->m_state;
     }else{
 
         // --- SSH packet wrapper ---
@@ -600,6 +583,62 @@ bool LWSSH::send_server_ssh_packet(LWSSHSession* session, pdiutil::vector<uint8_
     session->packets_seq_num_stoc++;    
 
     return true;
+}
+
+/**
+ * Sends what the session's output queue holds as far as the connection takes it now;
+ * true once nothing is left, false while bytes wait or once the session was closed.
+ */
+bool LWSSH::drain_ssh_output(LWSSHSession* session) {
+    if (!session || !session->m_client) {
+        return false;
+    }
+    pdiutil::vector<uint8_t> &pending = session->m_txpending;
+    uint32_t now = __i_dvc_ctrl.millis_now();
+    while (session->m_txsent < pending.size()) {
+        uint32_t piece = (uint32_t)pending.size() - session->m_txsent;
+        piece = (piece > TCP_WRITE_CHUNK_MAX) ? TCP_WRITE_CHUNK_MAX : piece;
+        if (!session->m_client->connected()) {
+            session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+            return false;
+        }
+        if (!session->m_client->availableforwrite(piece)) {
+            break;
+        }
+        int32_t sent = session->m_client->write(pending.data() + session->m_txsent, piece);
+        if (sent < 0) {
+            SysLogE("SSH: session closed, output could not be written: %d\n", (int)sent);
+            session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+            return false;
+        }
+        if (0 == sent) {
+            break;
+        }
+        session->m_txsent += (uint32_t)sent;
+        session->m_txprogressat = now;
+    }
+    if (session->m_txsent >= pending.size()) {
+        pdiutil::vector<uint8_t>().swap(pending);
+        session->m_txsent = 0;
+        return true;
+    }
+    if ((now - session->m_txprogressat) > SSH_TX_STALL_MS) {
+        SysLogE("SSH: session closed, %u bytes of output could not be sent for %u ms\n",
+                (unsigned int)(pending.size() - session->m_txsent), (unsigned int)SSH_TX_STALL_MS);
+        session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+    }
+    return false;
+}
+
+/**
+ * Whether channel data of this length can be sent now: nothing waits in the output
+ * queue and the client's window has room for it.
+ */
+bool LWSSH::can_send_channel_data(LWSSHSession* session, uint32_t length) {
+    if (!session) {
+        return false;
+    }
+    return session->m_txpending.empty() && length <= session->current_channel.window_size;
 }
 
 /**
@@ -770,7 +809,12 @@ bool LWSSH::send_channel_data(LWSSHSession *session, const char *data, uint32_t 
     append_ssh_string(chdatapayload, data, length); // This adds 4-byte length + data
 
     // Send the packet (encrypted)
-    return send_server_ssh_packet(session, chdatapayload, true);
+    if (!send_server_ssh_packet(session, chdatapayload, true)) {
+        return false;
+    }
+    session->current_channel.window_size = (length < session->current_channel.window_size) ?
+        session->current_channel.window_size - length : 0;
+    return true;
 }
 
 /**
@@ -805,8 +849,9 @@ void LWSSH::append_mpint(pdiutil::vector<uint8_t>& out, const uint8_t* data, int
  * @param server_ecdh_pub The server's ECDH public key.
  * @param shared_secret The shared secret (Curve25519).
  * @param hash_output The output buffer for the SHA-256 hash.
+ * @return false when the heap could not hold the hash input whole.
  */
-void LWSSH::build_exchange_hash(
+bool LWSSH::build_exchange_hash(
     const pdiutil::string& client_version, // e.g. "SSH-2.0-OpenSSH_9.0"
     const pdiutil::string& server_version, // e.g. "SSH-2.0-LWSSH_0.1"
     const pdiutil::vector<uint8_t>& client_kexinit, // raw KEXINIT payload (not SSH packet)
@@ -818,13 +863,19 @@ void LWSSH::build_exchange_hash(
     uint8_t *hash_output // output buffer for SHA-256 hash
 ) {
     pdiutil::vector<uint8_t> hash_input;
-    pdiutil::vector<uint8_t> cversion(client_version.begin(), client_version.end());
-    pdiutil::vector<uint8_t> sversion(server_version.begin(), server_version.end());
+    uint32_t whole = (4 + client_version.size()) + (4 + server_version.size()) +
+                     (4 + client_kexinit.size()) + (4 + server_kexinit.size()) +
+                     (4 + server_host_key_sshformat.size()) + (4 + client_ecdh_pub.size()) +
+                     (4 + server_ecdh_pub.size()) + (4 + 1 + 32);
+    hash_input.reserve(whole);
+    if (hash_input.capacity() < whole) {
+        return false;
+    }
 
     // string V_C (without CRLF)
-    append_ssh_string(hash_input, cversion);
+    append_ssh_string(hash_input, client_version.c_str(), client_version.size());
     // string V_S (without CRLF)
-    append_ssh_string(hash_input, sversion);
+    append_ssh_string(hash_input, server_version.c_str(), server_version.size());
     // string I_C
     append_ssh_string(hash_input, client_kexinit);
     // string I_S
@@ -840,6 +891,7 @@ void LWSSH::build_exchange_hash(
 
     // Now hash_input contains the data to hash
     sha256(hash_input.data(), hash_input.size(), hash_output); // Use your SHA-256 implementation
+    return true;
 }
 
 /**
@@ -912,11 +964,17 @@ bool LWSSH::prepare_server_ecdh_reply(LWSSHSession* session,
     // server host key blob (as SSH string)
     pdiutil::vector<uint8_t> hostkey_blob;
     pdiutil::string keytype = CHARPTR_WRAP("ssh-ed25519");
-    append_ssh_string(hostkey_blob, pdiutil::vector<uint8_t>(keytype.begin(), keytype.end()));
+    uint32_t blobsize = 4 + keytype.length() + 4 + server_host_pubkey.size();
+    hostkey_blob.reserve(blobsize);
+    if (hostkey_blob.capacity() < blobsize) {
+        crypto_set_yield_hook(nullptr);
+        return false;
+    }
+    append_ssh_string(hostkey_blob, keytype.c_str(), keytype.length());
     append_ssh_string(hostkey_blob, server_host_pubkey);
 
     // 3. Build exchange hash H (see RFC 4253, section 8, and RFC 8731)
-    build_exchange_hash(
+    bool hashed = build_exchange_hash(
         session->m_client_version, 
         session->m_server_version,
         session->m_client_kexinit.payload,
@@ -927,19 +985,35 @@ bool LWSSH::prepare_server_ecdh_reply(LWSSHSession* session,
         session->m_shared_secret_key,
         session->m_exchange_hash_h
     );
+    pdiutil::vector<uint8_t> signature(64);
+    if (!hashed || signature.size() != 64) {
+        crypto_set_yield_hook(nullptr);
+        return false;
+    }
 
     __i_dvc_ctrl.yield();
 
     // 4. Sign exchange hash with Ed25519 host key
-    pdiutil::vector<uint8_t> signature(64);
     ed25519_sign(signature.data(), session->m_exchange_hash_h, 32,
                  server_host_pubkey.data(), server_host_privkey.data());
 
     crypto_set_yield_hook(nullptr);
     __i_dvc_ctrl.yield();
 
+    // c. signature (as SSH string, must be in SSH format: type + signature)
+    pdiutil::vector<uint8_t> sig_blob;
+    uint32_t sigsize = 4 + keytype.length() + 4 + signature.size();
+    sig_blob.reserve(sigsize);
+    uint32_t replysize = 1 + (4 + hostkey_blob.size()) + (4 + session->m_server_ephermeral_pubkey.size()) + (4 + sigsize);
+    payload.reserve(payload.size() + replysize);
+    if (sig_blob.capacity() < sigsize || payload.capacity() < payload.size() + replysize) {
+        return false;
+    }
+    // Format: string "ssh-ed25519" + string raw signature
+    append_ssh_string(sig_blob, keytype.c_str(), keytype.length());
+    append_ssh_string(sig_blob, signature);
+
     // 5. Build SSH_MSG_KEX_ECDH_REPLY payload
-    // pdiutil::vector<uint8_t> payload;
     payload.push_back(SSH2_MSG_KEXDH_REPLY); // SSH_MSG_KEX_ECDH_REPLY
 
     // a. server host key (as SSH string)
@@ -948,11 +1022,6 @@ bool LWSSH::prepare_server_ecdh_reply(LWSSHSession* session,
     // b. server ephemeral pubkey (as SSH string)
     append_ssh_string(payload, session->m_server_ephermeral_pubkey);
 
-    // c. signature (as SSH string, must be in SSH format: type + signature)
-    pdiutil::vector<uint8_t> sig_blob;
-    // Format: string "ssh-ed25519" + string raw signature
-    append_ssh_string(sig_blob, pdiutil::vector<uint8_t>(keytype.begin(), keytype.end()));
-    append_ssh_string(sig_blob, signature);
     append_ssh_string(payload, sig_blob);
 
     return true;
@@ -1002,7 +1071,7 @@ bool LWSSH::prepare_server_ecdh_reply_rsa(LWSSHSession* session,
     build_rsa_hostkey_blob(key, hostkey_blob);
 
     // 4. Build exchange hash H
-    build_exchange_hash(
+    bool hashed = build_exchange_hash(
         session->m_client_version,
         session->m_server_version,
         session->m_client_kexinit.payload,
@@ -1013,6 +1082,10 @@ bool LWSSH::prepare_server_ecdh_reply_rsa(LWSSHSession* session,
         session->m_shared_secret_key,
         session->m_exchange_hash_h
     );
+    if (!hashed) {
+        crypto_set_yield_hook(nullptr);
+        return false;
+    }
 
     __i_dvc_ctrl.yield();
 
@@ -1031,16 +1104,22 @@ bool LWSSH::prepare_server_ecdh_reply_rsa(LWSSHSession* session,
         return false;
     }
 
+    // signature blob: string(sig-algo-name) + string(raw signature)
+    pdiutil::vector<uint8_t> sig_blob;
+    uint32_t sigsize = 4 + signame.length() + 4 + siglen;
+    sig_blob.reserve(sigsize);
+    uint32_t replysize = 1 + (4 + hostkey_blob.size()) + (4 + session->m_server_ephermeral_pubkey.size()) + (4 + sigsize);
+    payload.reserve(payload.size() + replysize);
+    if (hostkey_blob.empty() || sig_blob.capacity() < sigsize || payload.capacity() < payload.size() + replysize) {
+        return false;
+    }
+    append_ssh_string(sig_blob, signame.c_str(), signame.length());
+    append_ssh_string(sig_blob, (const char *)sigbuf, (uint32_t)siglen);
+
     // 6. Build SSH_MSG_KEX_ECDH_REPLY payload
     payload.push_back(SSH2_MSG_KEXDH_REPLY);
     append_ssh_string(payload, hostkey_blob);
     append_ssh_string(payload, session->m_server_ephermeral_pubkey);
-
-    // signature blob: string(sig-algo-name) + string(raw signature)
-    pdiutil::vector<uint8_t> sig_blob;
-    append_ssh_string(sig_blob, signame.c_str(), signame.length());
-    pdiutil::vector<uint8_t> sigvec(sigbuf, sigbuf + siglen);
-    append_ssh_string(sig_blob, sigvec);
     append_ssh_string(payload, sig_blob);
 
     return true;
@@ -1155,6 +1234,10 @@ static void bn_to_vec(const bignum& b, pdiutil::vector<uint8_t>& out) {
     int32_t nb = bn_num_bytes(&b);
     if (nb <= 0) return;
     out.resize(nb);
+    if ((int32_t)out.size() != nb) {
+        out.clear();
+        return;
+    }
     bn_to_bytes(&b, out.data(), nb);
 }
 
@@ -1174,10 +1257,16 @@ static void append_bn_string(pdiutil::vector<uint8_t>& out, const bignum& b) {
 void LWSSH::build_rsa_hostkey_blob(const rsa_key& key, pdiutil::vector<uint8_t>& out) {
     out.clear();
     pdiutil::string keytype = CHARPTR_WRAP(SSH_RSA_KEY_TYPE_STR);
-    append_ssh_string(out, keytype.c_str(), keytype.length());
     pdiutil::vector<uint8_t> eb, nb;
     bn_to_vec(key.e, eb);
     bn_to_vec(key.n, nb);
+    uint32_t whole = (4 + keytype.length()) + (4 + 1 + eb.size()) + (4 + 1 + nb.size());
+    out.reserve(whole);
+    if (eb.empty() || nb.empty() || out.capacity() < whole) {
+        out.clear();
+        return;
+    }
+    append_ssh_string(out, keytype.c_str(), keytype.length());
     append_mpint(out, eb.data(), (int32_t)eb.size());
     append_mpint(out, nb.data(), (int32_t)nb.size());
 }
@@ -1710,25 +1799,29 @@ bool LWSSH::parse_channel_request_pty_req(LWSSHSession *session, const pdiutil::
  * @brief Parse the channel data request.
  * @param payload received payload of channel data request
  * @param datareq channel data request structure to fill.
+ * @return 0 when filled, the data moved out of the payload rather than copied,
+ *         or PDI_ERR_CORRUPT for a malformed request.
  */
-bool LWSSH::parse_channel_data_request(const pdiutil::vector<uint8_t> &payload, SSHChannelData &datareq){
+int LWSSH::parse_channel_data_request(pdiutil::vector<uint8_t> &payload, SSHChannelData &datareq){
     size_t offset = 1; // skip message type (already checked == 94)
 
     // Parse recipient channel (uint32)
-    if (offset + 4 > payload.size()) return false;
+    if (offset + 4 > payload.size()) return PDI_ERR_CORRUPT;
     datareq.recipient_channel =
         BytesToUint32BE(&payload[offset]);
     offset += 4;
 
     // Parse data (SSH string)
-    if (offset + 4 > payload.size()) return false;
+    if (offset + 4 > payload.size()) return PDI_ERR_CORRUPT;
     uint32_t data_len = BytesToUint32BE(&payload[offset]);
     offset += 4;
-    if (data_len > (payload.size() - offset)) return false;
-    datareq.data.assign(payload.begin() + offset, payload.begin() + offset + data_len);
-    offset += data_len;
+    if (data_len > (payload.size() - offset)) return PDI_ERR_CORRUPT;
+    payload.erase(payload.begin(), payload.begin() + offset);
+    payload.resize(data_len);
+    datareq.data.clear();
+    datareq.data.swap(payload);
 
-    return true;
+    return 0;
 }
 
 #endif // ENABLE_SSH_SERVICE

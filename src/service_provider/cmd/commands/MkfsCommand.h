@@ -31,6 +31,7 @@ struct MkfsCommand : public CommandBase {
 	MkfsCommand(){
 		Clear();
 		SetCommand(CMD_NAME_MKFS);
+		setArgs(RODT_ATTR("t"), 2);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}

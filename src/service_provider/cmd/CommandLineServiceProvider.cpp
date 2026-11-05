@@ -106,6 +106,12 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   HeadFSCommand::RegisterCommand();
   TailFSCommand::RegisterCommand();
   GrepFSCommand::RegisterCommand();
+  DuCommand::RegisterCommand();
+  FindCommand::RegisterCommand();
+  StatCommand::RegisterCommand();
+  SortCommand::RegisterCommand();
+  TeeCommand::RegisterCommand();
+  DiffCommand::RegisterCommand();
   ReadCommand::RegisterCommand();
 
   m_termhistoryfile = CHARPTR_WRAP_RO(CMD_TERMINAL_HISTORY_STATIC_FILEPATH);
@@ -159,6 +165,8 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   UptimeCommand::RegisterCommand();
   UnameCommand::RegisterCommand();
   HostnameCommand::RegisterCommand();
+#ifdef ENABLE_MQTT_SERVICE
+#endif
   EchoCommand::RegisterCommand();
   EnvCommand::RegisterCommand();
   ExportCommand::RegisterCommand();
@@ -172,8 +180,10 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   CrontabCommand::RegisterCommand();
 #endif
   #endif
+#ifdef DEVICE_SUPPORTS_NTP
   DateCommand::RegisterCommand();
   TimedatectlCommand::RegisterCommand();
+#endif
 #ifdef ENABLE_DRIVER_CORE
   UdevadmCommand::RegisterCommand();
   LsblkCommand::RegisterCommand();
@@ -563,18 +573,24 @@ pdi_err_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface *t
 
         //terminal->write(c);  // echo
 
+        uint32_t heldbefore = session->m_linebuf.size();
         session->m_linebuf.insert(session->m_cursor, 1, c);
-        session->m_cursor++;
 
-        if(!dontecho && !ownRender){
-          // Echo only the newly inserted char plus any tail to its right,
-          // then walk the cursor back so it sits after the new char. For
-          // typing at end-of-line this collapses to a single byte written.
-          uint16_t tailRemaining = session->m_linebuf.size() - session->m_cursor;
-          uint16_t writeSize = tailRemaining + 1;
-          terminal->write((char*)(session->m_linebuf.c_str() + session->m_cursor - 1), writeSize);
-          if(tailRemaining > 0){
-            terminal->csi_cursor_move_left(tailRemaining);
+        if( session->m_linebuf.size() == heldbefore ){
+          session->m_linecut = true;
+        }else{
+          session->m_cursor++;
+
+          if(!dontecho && !ownRender){
+            // Echo only the newly inserted char plus any tail to its right,
+            // then walk the cursor back so it sits after the new char. For
+            // typing at end-of-line this collapses to a single byte written.
+            uint16_t tailRemaining = session->m_linebuf.size() - session->m_cursor;
+            uint16_t writeSize = tailRemaining + 1;
+            terminal->write((char*)(session->m_linebuf.c_str() + session->m_cursor - 1), writeSize);
+            if(tailRemaining > 0){
+              terminal->csi_cursor_move_left(tailRemaining);
+            }
           }
         }
       }
@@ -619,6 +635,26 @@ pdi_err_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface *t
     ){
       session->m_linebuf.clear();
       session->m_cursor = 0;
+      session->m_linecut = false;
+    }
+
+    if( inseq == CMD_TERM_INSEQ_UP_ARROW || inseq == CMD_TERM_INSEQ_DOWN_ARROW ){
+      session->m_linecut = false;
+    }
+
+    int16_t waitingIdx = getCommandWaitingForUserInput();
+    bool waitingKeepsLine = ( waitingIdx != -1 && nullptr != m_cmdlist[waitingIdx] &&
+                              m_cmdlist[waitingIdx]->preservesLineBuffer() );
+
+    if( inseq == CMD_TERM_INSEQ_ENTER && session->m_linecut && !waitingKeepsLine ){
+      session->m_linebuf.clear();
+      session->m_cursor = 0;
+      terminal->writeln();
+      terminal->write_ro(RODT_ATTR("line too long, not run"));
+    }
+
+    if( inseq == CMD_TERM_INSEQ_ENTER ){
+      session->m_linecut = false;
     }
 
     SessionManager::clearInterrupt();
@@ -695,17 +731,23 @@ pdi_err_t CommandLineServiceProvider::runLine(pdiutil::string &line, bool &named
         res = CMD_ERROR_INVAL;
       }else{
         cmd_t* cmd_to_exec = getCommandToExecute(text.c_str());
-        res = ( nullptr != cmd_to_exec ) ?
-              cmd_to_exec->executeCommand((char*)text.c_str(), text.size()) :
-              (pdi_err_t)CMD_ERROR_NOENT;
+        if( nullptr == cmd_to_exec ){
+          reportUnknownCommand(text.c_str(), (uint16_t)text.size());
+          named_noent = true;
+        }else{
+          res = cmd_to_exec->executeCommand((char*)text.c_str(), text.size());
+        }
       }
     }else{
 
       cmd_t* cmd_to_exec = getCommandToExecute(line.c_str());
 
-      res = ( nullptr != cmd_to_exec ) ?
-            cmd_to_exec->executeCommand((char*)line.c_str(), line.size()) :
-            (pdi_err_t)CMD_ERROR_NOENT;
+      if( nullptr == cmd_to_exec ){
+        reportUnknownCommand(line.c_str(), (uint16_t)line.size());
+        named_noent = true;
+      }else{
+        res = cmd_to_exec->executeCommand((char*)line.c_str(), line.size());
+      }
     }
   }else{
 
@@ -745,6 +787,10 @@ pdi_err_t CommandLineServiceProvider::runLine(pdiutil::string &line, bool &named
   if(nullptr != cmd_to_exec){
 
     res = cmd_to_exec->executeCommand((char*)line.c_str(), line.size());
+  }else{
+
+    reportUnknownCommand(line.c_str(), (uint16_t)line.size());
+    named_noent = true;
   }
   #endif
 
@@ -771,8 +817,6 @@ pdi_err_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cmd_t
   int16_t waitingCmdIndex = getCommandWaitingForUserInput();
   bool is_executing_lastcommand = (waitingCmdIndex != -1);
 
-  // the pipeline path names the segment it could not find, so the whole line
-  // is not named a second time on its behalf
   bool reported_noent = false;
 
   // process the known inseq 
@@ -916,12 +960,15 @@ pdi_err_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cmd_t
           uint32_t origCtime = 0;
           __i_instance.getFileSystemInstance().getFileAttr(m_termhistoryfile.c_str(), FILE_ATTR_CTIME, &origCtime, sizeof(origCtime));
 
+          bool copied = true;
           int iStatus = __i_instance.getFileSystemInstance().readFile(m_termhistoryfile.c_str(), 100, [&](char* data, uint32_t size)->bool{
-            __i_instance.getFileSystemInstance().writeFile(tempFilePath.c_str(), data, size, true);
-            return true;
+            copied = ( __i_instance.getFileSystemInstance().writeFile(tempFilePath.c_str(), data, size, true) == (int)size );
+            return copied;
           }, remove_upto_index+1);
 
-          if( iStatus >= 0 ){
+          if( iStatus < 0 || !copied ){
+            __i_instance.getFileSystemInstance().deleteFile(tempFilePath.c_str());
+          }else{
             __i_instance.getFileSystemInstance().deleteFile(m_termhistoryfile.c_str());
             __i_instance.getFileSystemInstance().moveFile(tempFilePath.c_str(), m_termhistoryfile.c_str());
             if( origCtime ){
@@ -998,11 +1045,6 @@ pdi_err_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cmd_t
     }
   }
   #endif
-
-  if( CMD_ERROR_NOENT == res && !reported_noent && nullptr != cmd && cmd->size() ){
-
-    reportUnknownCommand(cmd->c_str(), (uint16_t)cmd->size());
-  }
 
   if(
     !is_executing_lastcommand ||
@@ -1406,11 +1448,18 @@ pdi_err_t CommandLineServiceProvider::runPipeline(const char *line, const ShellP
 
       iTerminalInterface *sink = SessionManager::getFd(PDI_FD_STDOUT);
 
-      if( nullptr != sink && sink->disconnect() < 0 ){
+      int16_t closed = ( nullptr != sink ) ? sink->disconnect() : (int16_t)0;
+      if( closed < 0 ){
 
         m_terminal->writeln();
         m_terminal->write_ro(RODT_ATTR("cannot write "));
-        m_terminal->writeln(outpath.c_str());
+        m_terminal->write(outpath.c_str());
+        const char *reason = ErrorToText(closed);
+        if( nullptr != reason ){
+          m_terminal->write_ro(RODT_ATTR(" : "));
+          m_terminal->write_ro(reason);
+        }
+        m_terminal->putln();
         res = CMD_ERROR_FAILED;
       }
     }

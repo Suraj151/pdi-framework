@@ -100,6 +100,15 @@ public:
     pdiutil::task_id_t updateInterval(pdiutil::task_id_t _task_id, CallBackVoidArgFn _task_fn, pdiutil::millis_t _duration, pdiutil::task_priority_t _task_priority = DEFAULT_TASK_PRIORITY, pdiutil::millis_t _last_millis = 0, pdiutil::attempts_t _max_attempts = -1, const char* _name = nullptr, uint8_t _owner = 0);
 
     /**
+     * @brief Changes only how often a registered task runs, leaving its callable untouched,
+     *        so a task may change its own pace while it runs.
+     * @param _task_id The task to change.
+     * @param _duration The new interval in milliseconds.
+     * @return False when no such task is registered.
+     */
+    bool setTaskInterval(pdiutil::task_id_t _task_id, pdiutil::millis_t _duration);
+
+    /**
      * @brief Clears a one-time timeout task.
      *
      * @param _id The unique ID of the task to clear.

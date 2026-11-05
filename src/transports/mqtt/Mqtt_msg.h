@@ -86,6 +86,11 @@ uint8_t mqtt_get_connect_return_code(uint8_t* buffer, uint16_t length);
 
 mqtt_message_t* mqtt_msg_connect(mqtt_connection_t* connection, mqtt_connect_info_t* info);
 mqtt_message_t* mqtt_msg_publish(mqtt_connection_t* connection, const char* topic, const char* data, size_t data_length, uint8_t qos, uint8_t retain, uint16_t* message_id);
+
+/**
+ * The bytes a publish of this topic and payload takes in a buffer, its largest header included.
+ */
+uint32_t mqtt_publish_length(const char* topic, size_t data_length, uint8_t qos);
 mqtt_message_t* mqtt_msg_puback(mqtt_connection_t* connection, uint16_t message_id);
 mqtt_message_t* mqtt_msg_pubrec(mqtt_connection_t* connection, uint16_t message_id);
 mqtt_message_t* mqtt_msg_pubrel(mqtt_connection_t* connection, uint16_t message_id);

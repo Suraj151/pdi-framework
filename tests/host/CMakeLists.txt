@@ -19,6 +19,9 @@ option(PDI_BUILD_FUZZ "Also build the libFuzzer harnesses for the pre-auth parse
 add_compile_definitions(MOCK_DEVICE_TEST)
 # a small ssh channel window, so the transfer tests cross several window top ups
 add_compile_definitions(SSH_CHANNEL_WINDOW=16384)
+add_compile_definitions(SSH_RX_PACKET_MAX=4096)
+add_compile_definitions(SSH_RX_STALL_MS=3000)
+add_compile_definitions(SSH_TX_STALL_MS=3000)
 
 include_directories(
   ${PDI_ROOT}

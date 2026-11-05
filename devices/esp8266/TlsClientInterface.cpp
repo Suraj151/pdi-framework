@@ -1171,10 +1171,11 @@ void TlsClientInterface::pumpEngine() {
         #endif
         bool push = (0 == m_unacked) || (toSend >= TCP_MSS);
         err_t wrote = tcp_write(m_pcb, buf, toSend, TCP_WRITE_FLAG_COPY | (push ? 0 : TCP_WRITE_FLAG_MORE));
-        err_t pushed = ERR_OK;
         if (ERR_OK == wrote) {
             m_unacked += toSend;
-            pushed = push ? tcp_output(m_pcb) : ERR_OK;
+            if (push) {
+                tcp_output(m_pcb);
+            }
         }
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
         __lwip_mutex.critical_unlock();
@@ -1185,7 +1186,7 @@ void TlsClientInterface::pumpEngine() {
         }
         __i_dvc_ctrl.yield();
 
-        err_t err = (ERR_OK != wrote) ? wrote : pushed;
+        err_t err = wrote;
 
         if (err != ERR_OK) {
             SysLogE("TLS pumpEngine: tcp_write err=%d\n", (int)err);

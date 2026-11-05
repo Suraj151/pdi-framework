@@ -20,6 +20,7 @@ struct TailFSCommand : public CommandBase {
 	TailFSCommand(){
 		Clear();
 		SetCommand(CMD_NAME_TAIL);
+		setArgs(RODT_ATTR(""), 2);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
@@ -31,7 +32,7 @@ struct TailFSCommand : public CommandBase {
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("tail <file> [N]  print last N lines (default 10)");
+		return RODT_ATTR("tail [<file>] [N]  print last N lines of a file or the piped input (default 10)");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -60,9 +61,8 @@ struct TailFSCommand : public CommandBase {
 												   fileoptn->optionvalsize > 0 ) ? fileoptn : countoptn;
 
 				uint32_t count = 10;
-				if(nullptr != streamcountoptn && nullptr != streamcountoptn->optionval && streamcountoptn->optionvalsize > 0){
-					uint32_t parsed = StringToUint32(streamcountoptn->optionval, streamcountoptn->optionvalsize);
-					if(parsed > 0) count = parsed;
+				if( !takeCount(streamcountoptn, count) ){
+					return CMD_ERROR_INVAL;
 				}
 
 				// a stream cannot be rewound, so the last lines are the only
@@ -72,6 +72,9 @@ struct TailFSCommand : public CommandBase {
 				pdiutil::vector<pdiutil::string> kept;
 
 				readCommandLines(pdiutil::string(), m_terminal, [&](const pdiutil::string &line)->bool{
+					if( 0 == count ){
+						return true;
+					}
 					if(kept.size() == (size_t)count){
 						kept.erase(kept.begin());
 					}
@@ -89,9 +92,8 @@ struct TailFSCommand : public CommandBase {
 			}else if(nullptr != fileoptn && nullptr != fileoptn->optionval && fileoptn->optionvalsize > 0){
 
 				uint32_t count = 10;
-				if(nullptr != countoptn && nullptr != countoptn->optionval && countoptn->optionvalsize > 0){
-					uint32_t parsed = StringToUint32(countoptn->optionval, countoptn->optionvalsize);
-					if(parsed > 0) count = parsed;
+				if( !takeCount(countoptn, count) ){
+					return CMD_ERROR_INVAL;
 				}
 
 				pdiutil::string filepath = resolveArgPath(fileoptn);
@@ -100,34 +102,26 @@ struct TailFSCommand : public CommandBase {
 
 					m_terminal->putln();
 
-					if(!__i_fs.isFileExist(filename)){
+					if(__i_fs.isDirectory(filename)){
 						result = CMD_ERROR_FAILED;
-						m_terminal->write_ro(RODT_ATTR("Not found : "));
-						m_terminal->write(filename);
+						writeFailure(RODT_ATTR(CMD_MSG_FAILED), filename, (int32_t)STORAGE_ERROR_NOT_A_FILE);
+					}else if(!__i_fs.isFileExist(filename)){
+						result = CMD_ERROR_FAILED;
+						m_terminal->write_ro(RODT_ATTR(CMD_MSG_NOT_FOUND));
+						writeName(filename);
 					}else{
 						int64_t fs = __i_fs.getFileSize(filename);
-						if(fs > 0){
-							int64_t startOffset = __i_fs.getOffsetFromLineNumber(filename, -(int32_t)count, [&](void){
+						if(fs > 0 && count > 0){
+							int32_t back = (count > (uint32_t)INT32_MAX) ? INT32_MAX : (int32_t)count;
+							int64_t startOffset = __i_fs.getOffsetFromLineNumber(filename, -back, [&](void){
 								__i_dvc_ctrl.yield();
 							});
 							if(startOffset < 0) startOffset = 0;
 
 							uint64_t offset = (uint64_t)startOffset;
-							pdiutil::string linedata;
 							while(offset < (uint64_t)fs && !commandStopped(m_terminal)){
-								linedata.clear();
-								int bytes = __i_fs.readFile(filename, 200, [&](char *data, uint32_t size) -> bool {
-									linedata += pdiutil::string(data, size);
-									return !commandStopped(m_terminal);
-								}, offset, "\n");
+								int bytes = writeFileLine(m_terminal, filename, offset);
 								if(bytes < 0) break;
-
-								if(!linedata.empty() && linedata.back() == '\r'){
-									linedata.pop_back();
-								}
-
-								m_terminal->write(linedata.c_str());
-								m_terminal->putln();
 
 								offset += (uint64_t)bytes + 1;
 								__i_dvc_ctrl.yield();
@@ -141,6 +135,25 @@ struct TailFSCommand : public CommandBase {
 		}
 
 		return stoppedResult(result);
+	}
+
+private:
+
+	/**
+	 * Reads the line count given, if one was; false, after saying why, when it is
+	 * not a whole number that fits.
+	 */
+	bool takeCount(const CommandOption *opt, uint32_t &count){
+		if( nullptr == opt || nullptr == opt->optionval || opt->optionvalsize <= 0 ){
+			return true;
+		}
+		if( ParseUint32(opt->optionval, (uint16_t)opt->optionvalsize, count) ){
+			return true;
+		}
+		m_terminal->putln();
+		m_terminal->write_ro(RODT_ATTR("invalid count : "));
+		m_terminal->write(opt->optionval, (uint32_t)opt->optionvalsize);
+		return false;
 	}
 };
 

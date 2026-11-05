@@ -52,6 +52,8 @@ created Date    : 1st Jan 2026
  */
 #define PDI_MAX_SESSIONS              5
 #define SSH_MAX_SESSIONS              2
+#define SSH_RX_PACKET_MAX             4096
+#define SSH_TX_QUEUE_MAX              4096
 #define TELNET_MAX_SESSIONS           2
 
 /**

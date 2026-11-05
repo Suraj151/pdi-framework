@@ -18,6 +18,7 @@ struct UnsetCommand : public CommandBase {
 	UnsetCommand(){
 		Clear();
 		SetCommand(CMD_NAME_UNSET);
+		setArgs(RODT_ATTR(""), 1);
 		setAcceptArgsOptions(true);
 	}
 

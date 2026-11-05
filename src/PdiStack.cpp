@@ -105,7 +105,7 @@ void PDIStack::initialize(){
     terminal->writeln();
 		terminal->with_timestamp()->writeln_ro(RODT_ATTR(" Starting PDIStack !"));
 		terminal->with_timestamp()->write_ro(RODT_ATTR(" Release: "));
-    terminal->write(RELEASE);
+    terminal->write(PDI_RELEASE);
 		terminal->write_ro(RODT_ATTR(", config "));
     terminal->writeln(CONFIG_VERSION);
 

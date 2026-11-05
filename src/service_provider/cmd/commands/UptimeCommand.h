@@ -18,6 +18,7 @@ struct UptimeCommand : public CommandBase {
 	UptimeCommand(){
 		Clear();
 		SetCommand(CMD_NAME_UPTIME);
+		setArgs(RODT_ATTR(""), 0);
 	}
 
 	static void RegisterCommand(){

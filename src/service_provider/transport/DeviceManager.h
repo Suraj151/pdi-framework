@@ -168,7 +168,7 @@ private:
 
   /**
    * Takes a device whose probe held the scan too long out of later scans, until
-   * udevadm trigger probes it again.
+   * udevadm trigger probes it again; what that probe answered still stands.
    */
   void leaveOutOfScan(driver_device_t &dev, uint32_t took);
 
@@ -245,6 +245,7 @@ private:
   uint32_t m_probe_ms;
 #if defined(ENABLE_DISK_FS) && defined(ENABLE_DEVFS)
   int16_t m_fstab_listener;
+  int16_t m_lost_listener;
 #endif
 };
 

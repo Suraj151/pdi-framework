@@ -28,7 +28,7 @@ created Date    : 1st June 2019
 #endif
 
 __status_wifi_t __status_wifi = {
-  false, false, 0, {0}
+  false, false, false, 0, {0}
 };
 
 /**
@@ -101,6 +101,8 @@ bool WiFiServiceProvider::initService( void *arg ){
     if( this->m_ap_enabled ){
       line->write_ro(RODT_ATTR(", access point "));
       line->write(_wifi_credentials.ap_ssid);
+      line->write_ro(RODT_ATTR(" at "));
+      line->write(((pdiutil::string)this->m_wifi->softAPIP()).c_str());
     }else{
       line->write_ro(RODT_ATTR(", access point off"));
     }
@@ -531,6 +533,7 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
       this->m_reconnect_attempt = 0;
     }
     __status_wifi.wifi_connected = true;
+    __status_wifi.wifi_joined_since_boot = true;
 
     LogI("IP address: gateway(%s) : local(%s) : softap(%s)\n",
       ((pdiutil::string)this->m_wifi->gatewayIP()).c_str(),
@@ -560,7 +563,7 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
   } else if( down_ms < WIFI_RECONNECT_TIER3_DURATION ){
     tier = 3; attempt_gap_ms = WIFI_RECONNECT_TIER3_GAP;
 #ifdef ALLOW_DEVICE_RESET_ON_WIFI_CONNECT_FAILURES    
-  } else if( down_ms < WIFI_RECONNECT_TIER4_DURATION ){
+  } else if( down_ms < WIFI_RECONNECT_TIER4_DURATION || !__status_wifi.wifi_joined_since_boot ){
     tier = 4; attempt_gap_ms = WIFI_RECONNECT_TIER4_GAP;
   } else {
     tier = 5;
@@ -764,7 +767,7 @@ void WiFiServiceProvider::printStatusToTerminal(iTerminalInterface *terminal){
 
     terminal->putln();
 
-    terminal->writeln_ro((RODT_ATTR("accespoint : ")));
+    terminal->writeln_ro((RODT_ATTR("access point : ")));
     
     writeStatusKey(terminal, RODT_ATTR("ssid"), 4);
     terminal->writeln(apname.c_str());

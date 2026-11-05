@@ -30,6 +30,7 @@ struct WgetCommand : public CommandBase {
 	WgetCommand(){
 		Clear();
 		SetCommand(CMD_NAME_WGET);
+		setArgs(RODT_ATTR(""), 2);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}

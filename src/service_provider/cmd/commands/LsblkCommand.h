@@ -25,6 +25,7 @@ struct LsblkCommand : public CommandBase {
 	LsblkCommand(){
 		Clear();
 		SetCommand(CMD_NAME_LSBLK);
+		setArgs(RODT_ATTR(""), 0);
 	}
 
 	static void RegisterCommand(){

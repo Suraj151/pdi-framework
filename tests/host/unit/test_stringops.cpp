@@ -629,3 +629,59 @@ TEST(stringops, strip_trailing_keeps_a_lone_root)
     __strip_trailing(plain, '/');
     ASSERT_STREQ(plain.c_str(), "/etc");
 }
+
+static bool glob(const char *pattern, const char *name)
+{
+    return __glob_match(pattern, (uint32_t)strlen(pattern), name, (uint32_t)strlen(name));
+}
+
+TEST(stringops, glob_star_matches_any_run_including_none)
+{
+    ASSERT_TRUE(glob("*.txt", "a.txt"));
+    ASSERT_TRUE(glob("*.txt", ".txt"));
+    ASSERT_TRUE(glob("*", ""));
+    ASSERT_TRUE(glob("a*b*c", "aXXbYYc"));
+    ASSERT_FALSE(glob("*.txt", "a.txt.bak"));
+    ASSERT_FALSE(glob("a*b", "ac"));
+}
+
+TEST(stringops, glob_question_mark_takes_exactly_one)
+{
+    ASSERT_TRUE(glob("f?.c", "f1.c"));
+    ASSERT_FALSE(glob("f?.c", "f.c"));
+    ASSERT_FALSE(glob("f?.c", "f12.c"));
+}
+
+TEST(stringops, glob_sets_ranges_and_their_complement)
+{
+    ASSERT_TRUE(glob("[abc]x", "bx"));
+    ASSERT_FALSE(glob("[abc]x", "dx"));
+    ASSERT_TRUE(glob("log[0-9]", "log7"));
+    ASSERT_FALSE(glob("log[0-9]", "loga"));
+    ASSERT_TRUE(glob("[!0-9]*", "a1"));
+    ASSERT_FALSE(glob("[!0-9]*", "1a"));
+    ASSERT_TRUE(glob("[]]", "]"));
+}
+
+TEST(stringops, glob_backslash_and_unclosed_bracket_are_literal)
+{
+    ASSERT_TRUE(glob("a\\*", "a*"));
+    ASSERT_FALSE(glob("a\\*", "ab"));
+    ASSERT_TRUE(glob("[ab", "[ab"));
+}
+
+TEST(stringops, glob_is_exact_without_wildcards_and_refuses_null)
+{
+    ASSERT_TRUE(glob("name", "name"));
+    ASSERT_FALSE(glob("name", "Name"));
+    ASSERT_FALSE(__glob_match(nullptr, 0, "x", 1));
+    ASSERT_FALSE(__glob_match("x", 1, nullptr, 0));
+}
+
+TEST(stringops, hash32_is_fnv1a_and_tells_lines_apart)
+{
+    ASSERT_EQ(__hash32("", 0), (uint32_t)2166136261u);
+    ASSERT_EQ(__hash32("a", 1), (uint32_t)0xe40c292cu);
+    ASSERT_EQ(__hash32("foobar", 6), (uint32_t)0xbf9cf968u);
+    ASSERT_NE(__hash32("line one", 8), __hash32("line two", 8));
+}

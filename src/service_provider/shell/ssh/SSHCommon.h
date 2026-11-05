@@ -109,10 +109,14 @@
 #define SSH_FXP_EXTENDED          200
 #define SSH_FXP_EXTENDED_REPLY    201
 
-#define SSH_SFTP_MAX_RX_PACKET    32768
+#define SSH_SFTP_MAX_RX_PACKET    SSH_RX_PACKET_MAX /* longest sftp request other than a write that is held whole */
+#define SSH_SFTP_WRITE_MAX        (SSH_RX_PACKET_MAX - 64) /* file bytes a client is told one sftp write may carry, so a write fits one packet */
+#define SSH_SFTP_HANDLE_MAX       256      /* longest handle a request may carry */
+#define SSH_SFTP_EXT_LIMITS       "limits@openssh.com" /* the extension that tells a client the sizes the server takes */
 #define SSH_SFTP_READ_REPLY_HEADER 13      /* length, type, request id and data length before a read reply's bytes */
 #define SSH_SFTP_READ_PACKET_OVERHEAD 64   /* room a read reply leaves in the client's largest packet for the channel and ssh framing */
 #define SSH_CHANNEL_DATA_OVERHEAD 37       /* channel header, packet header, most padding and sequence number around channel data */
+#define SSH_PACKET_WRAP_MAX 28             /* packet header, most padding and sequence number an encrypted packet adds to its payload */
 
 // File attributes for SSH_FXP_ATTRS
 #define SSH_FILEXFER_ATTR_SIZE            0x00000001

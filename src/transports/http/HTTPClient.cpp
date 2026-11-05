@@ -14,6 +14,23 @@ created Date    : 1st Jan 2024
 
 #include "HTTPClient.h"
 
+/**
+ * Reads the size a chunk's size line names, false where the line is not whole,
+ * names no size or names one wider than 32 bits.
+ */
+static bool chunkSizeOf(const char *line, int len, uint32_t &size)
+{
+    if (len < 1 || '\n' != line[len - 1]) return false;
+
+    uint8_t digits = 0;
+    uint64_t value = StringToHex64(line, (uint8_t)len, &digits);
+
+    if (0 == digits || digits > 16 || value > 0xFFFFFFFFULL) return false;
+
+    size = (uint32_t)value;
+    return true;
+}
+
 
 /**
  * http request structure
@@ -659,6 +676,10 @@ int16_t Http_Client::SendRequest(const char *type, const char *url, const char *
                 // __i_dvc_ctrl.wait(100);
                 // m_client->setTimeout(m_request.timeout);
                 bStatus = connectToServer(m_client, m_request.host, m_request.port, m_request.timeout);
+                if (!bStatus)
+                {
+                    SysLogE("Http_Client: could not connect to %s:%u\n", nullptr != m_request.host ? m_request.host : "", (unsigned)m_request.port);
+                }
             }
         }
 
@@ -973,7 +994,7 @@ int16_t Http_Client::handleResponse()
 
                 if (m_stream_writer && HTTP_RESP_OK == m_response.status_code)
                 {
-                    streamBodyTo(max_timeout);
+                    if (!streamBodyTo(max_timeout)) m_stream_writer = nullptr;
                     break;
                 }
 
@@ -994,11 +1015,16 @@ int16_t Http_Client::handleResponse()
                             char sizeLine[32]; 
                             int len = readPacket(m_client, (uint8_t*)sizeLine, sizeof(sizeLine)-1, max_timeout, '\n'); 
                             sizeLine[len] = '\0'; 
-                            uint16_t chunkSize = StringToHex16(sizeLine, len-2); 
-                            if (chunkSize == 0) break; 
+                            uint32_t chunkSize = 0;
+                            if (!chunkSizeOf(sizeLine, len, chunkSize) || chunkSize == 0) break; 
                             
                             // read chunk data 
-                            m_client->readStringUntil(body, 0, false, nullptr, chunkSize);
+                            uint32_t room = (uint32_t)(m_response.max_resp_length - body.size());
+                            m_client->readStringUntil(body, 0, false, nullptr, chunkSize < room ? chunkSize : room);
+                            if (chunkSize > room) {
+                                SysLogW("Http_Client: reply cut at %u bytes\n", (unsigned)m_response.max_resp_length);
+                                break;
+                            }
                             
                             // consume trailing CRLF 
                             pdiutil::string crlf;
@@ -1006,7 +1032,7 @@ int16_t Http_Client::handleResponse()
                         }
 
                         memset(m_response.response, 0, m_response.max_resp_length + 1);
-                        uint16_t copyLen = pdistd::min(m_response.max_resp_length, (uint16_t)body.size());
+                        uint16_t copyLen = (body.size() > (size_t)m_response.max_resp_length) ? m_response.max_resp_length : (uint16_t)body.size();
                         strncpy(m_response.response, body.c_str(), copyLen);
                         m_response.resp_length = copyLen;
                         break;
@@ -1028,12 +1054,21 @@ int16_t Http_Client::handleResponse()
                     {
                         body_cap = (uint16_t)length;
                     }
+                    else if (length > body_cap)
+                    {
+                        SysLogW("Http_Client: reply cut at %u of %u bytes\n", (unsigned)body_cap, (unsigned)length);
+                    }
                 }
             }
         }
 
         // Update the remaining time
         max_timeout -= (int32_t)(__i_dvc_ctrl.millis_now() - now);
+    }
+
+    if (HTTP_RESP_MAX == m_response.status_code)
+    {
+        SysLogE("Http_Client: no status line came back from %s\n", nullptr != m_request.host ? m_request.host : "");
     }
 
     return m_response.status_code;
@@ -1050,9 +1085,10 @@ int64_t Http_Client::DownloadStream(const char *url, CallBackBytesArgBoolRetFn w
     pdiutil::string method_get = CHARPTR_WRAP("GET");
     int16_t status = SendRequest(method_get.c_str(), url);
 
+    bool whole = (bool)m_stream_writer;
     m_stream_writer = nullptr;
 
-    if (HTTP_RESP_OK == status) return m_stream_bytes_written;
+    if (HTTP_RESP_OK == status) return whole ? m_stream_bytes_written : (int64_t)HTTP_ERROR_BODY_INCOMPLETE;
     if (HTTP_RESP_MAX == status) return HTTP_ERROR_CONNECTION_FAILED;
     return HTTP_ERROR_UNEXPECTED_STATUS;
 }
@@ -1089,6 +1125,8 @@ bool Http_Client::streamBodyTo(int32_t &max_timeout)
 
     if (is_chunked) {
 
+        bool finished = false;
+
         while (ok && m_client && Connected() && max_timeout > 0) {
 
             __i_dvc_ctrl.yield();
@@ -1098,8 +1136,13 @@ bool Http_Client::streamBodyTo(int32_t &max_timeout)
             if (slen <= 0) { ok = false; break; }
             max_timeout = HTTP_CLIENT_MAX_READ_MS;
             sizeLine[slen] = '\0';
-            uint32_t chunk_size = StringToHex16(sizeLine, slen >= 2 ? slen - 2 : slen);
-            if (chunk_size == 0) break;
+            uint32_t chunk_size = 0;
+            if (!chunkSizeOf(sizeLine, slen, chunk_size)) {
+                SysLogE("Http_Client: bad chunk size line\n");
+                ok = false;
+                break;
+            }
+            if (chunk_size == 0) { finished = true; break; }
 
             uint32_t remaining = chunk_size;
             while (remaining > 0 && ok) {
@@ -1126,7 +1169,15 @@ bool Http_Client::streamBodyTo(int32_t &max_timeout)
             }
 
             uint8_t crlf[2];
-            readPacket(m_client, crlf, 2, max_timeout, 0);
+            if (ok && (2 != readPacket(m_client, crlf, 2, max_timeout, 0) || '\r' != crlf[0] || '\n' != crlf[1])) {
+                SysLogE("Http_Client: chunk not ended by CRLF\n");
+                ok = false;
+            }
+        }
+
+        if (ok && !finished) {
+            SysLogE("Http_Client: chunked body ended before its last chunk\n");
+            ok = false;
         }
 
     } else {

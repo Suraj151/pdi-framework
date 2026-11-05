@@ -317,6 +317,65 @@ def sftp_upload_beyond_the_window(t):
         t.run("rm /%s" % name)
 
 
+def deep_body(size):
+    """Random bytes of a fixed seed, so a lost, doubled or reordered piece shows."""
+    import random
+    rng = random.Random(size)
+    return bytes(bytearray(rng.getrandbits(8) for _ in range(size)))
+
+
+@test("a download with every read in flight at once arrives whole", needs=("rm",), slow=True)
+def sftp_download_with_many_reads_in_flight(t):
+    import hashlib
+    name = "sftp_deep_read.bin"
+    body = deep_body(786432)
+
+    t.run("rm /%s" % name)
+    need_room(t, len(body))
+    client, sftp = sftp_open(t)
+    try:
+        with sftp.open("/%s" % name, "wb") as fh:
+            fh.set_pipelined(True)
+            fh.write(body)
+        with sftp.open("/%s" % name, "rb") as fh:
+            pieces = list(fh.readv([(offset, 16384) for offset in range(0, len(body), 16384)]))
+        got = b"".join(pieces)
+        if hashlib.md5(got).hexdigest() != hashlib.md5(body).hexdigest():
+            raise AssertionError("%d reads in flight gave %d bytes back, not the %d written"
+                                 % (len(pieces), len(got), len(body)))
+    finally:
+        sftp.close()
+        client.close()
+        t.run("rm /%s" % name)
+
+
+@test("an upload with its writes pipelined arrives whole and reads back the same", needs=("rm",), slow=True)
+def sftp_upload_with_many_writes_in_flight(t):
+    import hashlib
+    name = "sftp_deep_write.bin"
+    body = deep_body(786433)
+
+    t.run("rm /%s" % name)
+    need_room(t, len(body))
+    client, sftp = sftp_open(t)
+    try:
+        with sftp.open("/%s" % name, "wb") as fh:
+            fh.set_pipelined(True)
+            for offset in range(0, len(body), 32768):
+                fh.write(body[offset:offset + 32768])
+        if sftp.stat("/%s" % name).st_size != len(body):
+            raise AssertionError("the upload stored %d bytes, not %d" % (sftp.stat("/%s" % name).st_size, len(body)))
+        with sftp.open("/%s" % name, "rb") as fh:
+            fh.prefetch()
+            got = fh.read()
+        if hashlib.md5(got).hexdigest() != hashlib.md5(body).hexdigest():
+            raise AssertionError("a pipelined upload read back as %d different bytes" % len(got))
+    finally:
+        sftp.close()
+        client.close()
+        t.run("rm /%s" % name)
+
+
 @test("a transfer dropped without closing its file does not keep the file open",
       needs=("dd", "rm", "echo"), slow=True)
 def sftp_dropped_transfer_releases_the_file(t):

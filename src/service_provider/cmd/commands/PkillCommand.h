@@ -34,6 +34,7 @@ struct PkillCommand : public CommandBase {
 	PkillCommand(){
 		Clear();
 		SetCommand(CMD_NAME_PKILL);
+		setArgs(RODT_ATTR(""), 2);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
@@ -82,22 +83,15 @@ struct PkillCommand : public CommandBase {
 		CommandOption *sOpt = have1 ? a0 : nullptr;
 		CommandOption *nOpt = have1 ? a1 : a0;
 
-		signal_t sig = defaultSignal();
-		if( nullptr != sOpt ){
-			sig = (signal_t)StringToUint16(sOpt->optionval, sOpt->optionvalsize);
+		uint32_t sig = defaultSignal();
+		if( nullptr != sOpt && !ParseUint32(sOpt->optionval, (uint16_t)sOpt->optionvalsize, sig) ){
+			sig = SIG_NONE;
 		}
 		if( sig != SIG_TERM && sig != SIG_KILL && sig != SIG_STOP && sig != SIG_CONT ){
-			m_terminal->putln();
-			m_terminal->writeln_ro(RODT_ATTR("unsupported signal (9/15/18/19 only)"));
-			return CMD_ERROR_FAILED;
+			return refuseArg(RODT_ATTR("unsupported signal : "), sOpt->optionval, sOpt->optionvalsize, CMD_ERROR_INVAL);
 		}
 
-		// Copy the name option into a local NUL-terminated buffer so
-		// sendSignalByName can strlen it safely.
-		char name[32];
-		uint16_t nlen = nOpt->optionvalsize < sizeof(name) ? nOpt->optionvalsize : (sizeof(name) - 1);
-		memcpy(name, nOpt->optionval, nlen);
-		name[nlen] = '\0';
+		pdiutil::string name(nOpt->optionval, (pdiutil::string::size_type)nOpt->optionvalsize);
 
 		bool isRoot = false;
 		uint8_t cur_sid = 0;
@@ -109,7 +103,7 @@ struct PkillCommand : public CommandBase {
 		isRoot = true; // no auth compiled in — no restriction
 #endif
 
-		uint16_t hits = __task_scheduler.sendSignalByName(name, sig, cur_sid, isRoot);
+		uint16_t hits = __task_scheduler.sendSignalByName(name.c_str(), (signal_t)sig, cur_sid, isRoot);
 
 		m_terminal->putln();
 		m_terminal->write_ro(RODT_ATTR("signaled "));
@@ -130,6 +124,7 @@ struct KillallCommand : public PkillCommand {
 	KillallCommand(){
 		Clear();
 		SetCommand(CMD_NAME_KILLALL);
+		setArgs(RODT_ATTR(""), 2);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}

@@ -13,6 +13,8 @@ created Date    : 16th Aug 2026
 
 #include <StringTerminal.h>
 #include <devices/posix/SerialInterface.h>
+#include <devices/posix/DeviceControlInterface.h>
+#include <utility/SafeAlloc.h>
 #include <pditest.h>
 
 #include <unistd.h>
@@ -137,6 +139,43 @@ TEST(ioiface, write_pad_truncates_a_value_wider_than_the_column)
     ASSERT_STREQ(terminal.captured().c_str(), "abcd");
 }
 
+TEST(ioiface, write_column_pads_a_short_value_and_ends_the_column_with_a_space)
+{
+    pditest::StringTerminal terminal;
+    terminal.write_column("ab", 5);
+    ASSERT_STREQ(terminal.captured().c_str(), "ab    ");
+}
+
+TEST(ioiface, write_column_pads_before_a_value_aligned_right)
+{
+    pditest::StringTerminal terminal;
+    terminal.write_column("42", 5, true);
+    ASSERT_STREQ(terminal.captured().c_str(), "   42 ");
+}
+
+TEST(ioiface, write_column_never_cuts_a_value_wider_than_the_column)
+{
+    pditest::StringTerminal terminal;
+    terminal.write_column("18446744073709551615", 4, true);
+    ASSERT_STREQ(terminal.captured().c_str(), "18446744073709551615 ");
+}
+
+TEST(ioiface, write_column_of_an_exact_width_value_still_ends_with_the_space)
+{
+    pditest::StringTerminal terminal;
+    terminal.write_column("abcd", 4);
+    ASSERT_STREQ(terminal.captured().c_str(), "abcd ");
+}
+
+TEST(ioiface, write_column_of_empty_or_missing_text_is_all_padding)
+{
+    pditest::StringTerminal terminal;
+    terminal.write_column("", 3);
+    terminal.write_column(nullptr, 2, true);
+    terminal.write_column("", 0);
+    ASSERT_STREQ(terminal.captured().c_str(), "        ");
+}
+
 TEST(ioiface, write_pad_of_an_exact_width_value_adds_nothing)
 {
     pditest::StringTerminal terminal;
@@ -214,6 +253,30 @@ TEST(ioiface, read_string_until_keeps_a_nul_in_the_payload)
     terminal.readStringUntil(out, '\n');
     ASSERT_EQ(out.size(), (size_t)3);
     ASSERT_EQ(out[1], '\0');
+}
+
+TEST(ioiface, read_string_until_leaves_unread_what_the_heap_cannot_hold)
+{
+    pditest::StringTerminal terminal;
+    pdiutil::string out;
+    pdiutil::string payload;
+    for (uint32_t i = 0; i < 3000; i++)
+    {
+        payload += (char)('a' + (i % 26));
+    }
+    terminal.feed((const uint8_t *)payload.c_str(), payload.size());
+
+    pdiutil::enable_heap_check();
+    __i_dvc_ctrl.capMaxFreeBlock(1000);
+    terminal.readStringUntil(out, '#');
+    __i_dvc_ctrl.capMaxFreeBlock(0);
+
+    ASSERT_TRUE(out.size() < payload.size());
+    ASSERT_EQ((size_t)terminal.available(), payload.size() - out.size());
+
+    terminal.readStringUntil(out, '#');
+    ASSERT_EQ(out.size(), payload.size());
+    ASSERT_TRUE(out == payload);
 }
 
 TEST(ioiface, read_line_strips_the_line_ending)
@@ -416,6 +479,8 @@ TEST(terminal, device_status_report_emits_its_sequence)
  * would throw away whatever was typed while that command ran.
  */
 
+#ifdef ENABLE_SERIAL_SERVICE
+
 static int pipe_with(const char *bytes, int &writeend)
 {
     int fds[2];
@@ -492,6 +557,8 @@ TEST(flushtype, flushing_both_discards_unread_input)
     close(readend);
     close(writeend);
 }
+
+#endif
 
 TEST(flushtype, the_side_tests_only_answer_for_the_side_asked_about)
 {

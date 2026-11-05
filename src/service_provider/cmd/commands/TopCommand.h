@@ -31,6 +31,7 @@ struct TopCommand : public CommandBase {
 	TopCommand(){
 		Clear();
 		SetCommand(CMD_NAME_TOP);
+		setArgs(RODT_ATTR(""), 3, true);
 		AddOption(CMD_OPTION_NAME_I);
 		AddOption(CMD_OPTION_NAME_N);
 		AddOption(CMD_OPTION_NAME_U);
@@ -48,7 +49,7 @@ struct TopCommand : public CommandBase {
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("top [i=<ms>,n=<iters>,u=<sid>]  refreshed ps view; Ctrl+C to stop");
+		return RODT_ATTR("top [i=<ms>,n=<iters>,u=<sid>]  refreshed ps view (i 500 or more); Ctrl+C to stop");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -82,16 +83,21 @@ struct TopCommand : public CommandBase {
 		CommandOption *ncmdoptn = RetrieveOption(CMD_OPTION_NAME_N);
 		CommandOption *ucmdoptn = RetrieveOption(CMD_OPTION_NAME_U);
 
-		if( nullptr != icmdoptn && nullptr != icmdoptn->optionval && icmdoptn->optionvalsize > 0 ){
-			interval = StringToUint32(icmdoptn->optionval, icmdoptn->optionvalsize);
-			if( interval < 500 ) interval = 500;
+		pdi_err_t taken = PDI_OK;
+		uint32_t number = 0;
+		if( optionGiven(icmdoptn) ){
+			taken = takeNumber(RODT_ATTR("invalid interval : "), icmdoptn->optionval, icmdoptn->optionvalsize, 500, INT32_MAX, interval);
 		}
-		if( nullptr != ncmdoptn && nullptr != ncmdoptn->optionval && ncmdoptn->optionvalsize > 0 ){
-			iterations = (int32_t)StringToUint32(ncmdoptn->optionval, ncmdoptn->optionvalsize);
-			if( iterations < 1 ) iterations = 1;
+		if( PDI_OK == taken && optionGiven(ncmdoptn) ){
+			taken = takeNumber(RODT_ATTR("invalid count : "), ncmdoptn->optionval, ncmdoptn->optionvalsize, 1, INT32_MAX, number);
+			iterations = (int32_t)number;
 		}
-		if( nullptr != ucmdoptn && nullptr != ucmdoptn->optionval && ucmdoptn->optionvalsize > 0 ){
-			m_filter_owner = (uint8_t)StringToUint16(ucmdoptn->optionval, ucmdoptn->optionvalsize);
+		if( PDI_OK == taken && optionGiven(ucmdoptn) ){
+			taken = takeNumber(RODT_ATTR("invalid sid : "), ucmdoptn->optionval, ucmdoptn->optionvalsize, 0, 0xFE, number);
+			m_filter_owner = (uint8_t)number;
+		}
+		if( PDI_OK != taken ){
+			return taken;
 		}
 
 		__task_scheduler.remove_task(m_toptaskid);

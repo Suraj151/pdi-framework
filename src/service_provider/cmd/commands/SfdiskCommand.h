@@ -27,6 +27,7 @@ struct SfdiskCommand : public CommandBase {
 	SfdiskCommand(){
 		Clear();
 		SetCommand(CMD_NAME_SFDISK);
+		setArgs(nullptr, 3);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}

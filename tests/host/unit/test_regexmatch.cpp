@@ -133,3 +133,24 @@ TEST(regex, matches_binary_text_with_embedded_nul)
     const char text[] = {'a', '\0', 'b', 'c'};
     ASSERT_EQ(regex_match("bc$", text, 4), 2);
 }
+
+TEST(regex, valid_takes_every_form_the_matcher_reads)
+{
+    ASSERT_TRUE(regex_valid(""));
+    ASSERT_TRUE(regex_valid("a.b*c+d?"));
+    ASSERT_TRUE(regex_valid("^[a-z]+$"));
+    ASSERT_TRUE(regex_valid("[^0-9]"));
+    ASSERT_TRUE(regex_valid("\\["));
+    ASSERT_TRUE(regex_valid("a\\\\"));
+    ASSERT_TRUE(regex_valid("]"));
+}
+
+TEST(regex, valid_refuses_an_open_bracket_or_a_lone_escape)
+{
+    ASSERT_FALSE(regex_valid("["));
+    ASSERT_FALSE(regex_valid("a[bc"));
+    ASSERT_FALSE(regex_valid("[^"));
+    ASSERT_FALSE(regex_valid("a\\"));
+    ASSERT_FALSE(regex_valid("\\"));
+    ASSERT_FALSE(regex_valid(nullptr));
+}

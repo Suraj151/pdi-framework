@@ -31,6 +31,32 @@ uint32_t safe_alloc_refusals() {
     return s_refusals;
 }
 
+/**
+ * @brief Counts one refused allocation, for a caller that judged the heap itself.
+ */
+void note_refusal() {
+    s_refusals++;
+}
+
+/**
+ * @brief The most bytes one allocation could take right now under the same two
+ *        checks as has_heap_for(); the largest size_t when the check is not armed or the port reports neither figure.
+ */
+size_t heap_room() {
+    if (!s_heap_check_armed) return (size_t)-1;
+    iUtilityInterface &utility = __i_instance.getUtilityInstance();
+    size_t room = (size_t)-1;
+    uint32_t free_heap = utility.get_free_heap();
+    if (free_heap != 0) {
+        room = (free_heap > PDI_SAFE_ALLOC_HEAP_MARGIN) ? (size_t)(free_heap - PDI_SAFE_ALLOC_HEAP_MARGIN) : 0;
+    }
+    uint32_t largest_block = utility.get_max_free_block();
+    if (largest_block != 0 && (size_t)largest_block < room) {
+        room = largest_block;
+    }
+    return room;
+}
+
 bool has_heap_for(size_t bytes) {
     if (!s_heap_check_armed) return true;
 

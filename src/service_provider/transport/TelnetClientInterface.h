@@ -37,7 +37,8 @@ public:
     int8_t connected() override;
 
     /**
-     * Sends the bytes with every 0xFF doubled, reporting the caller's byte count.
+     * Sends the bytes with every 0xFF doubled, reporting how many of the caller's
+     * bytes went out; a send the connection took only in part ends it there.
      */
     int32_t write(const uint8_t *c_str, uint32_t size) override;
 
@@ -68,6 +69,13 @@ public:
     void setTimeout(uint32_t timeout) override;
 
 private:
+
+    /**
+     * The caller's bytes that went out when a send stopped part way: the error
+     * itself when nothing did.
+     */
+    int32_t sentSoFar(uint32_t start, int32_t sent);
+
     iTcpClientInterface *m_tcpClient;
 };
 

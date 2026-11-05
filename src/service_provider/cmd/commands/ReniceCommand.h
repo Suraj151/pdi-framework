@@ -38,6 +38,7 @@ struct ReniceCommand : public CommandBase {
 	ReniceCommand(){
 		Clear();
 		SetCommand(CMD_NAME_RENICE);
+		setArgs(nullptr, 2);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
@@ -77,25 +78,22 @@ struct ReniceCommand : public CommandBase {
 			return CMD_ERROR_ARGS_MISSING;
 		}
 
-		// Parse signed nice manually — StringToUintN doesn't accept a leading '-'.
-		const char *nv = nOpt->optionval;
-		uint16_t nvsize = nOpt->optionvalsize;
-		bool negative = false;
-		if( nv[0] == '-' ){
-			negative = true;
-			nv++;
-			nvsize--;
+		int64_t nice = 0;
+		if( !ParseInt64(nOpt->optionval, (uint16_t)nOpt->optionvalsize, nice) || nice < -20 || nice > 19 ){
+			refuseArg(RODT_ATTR("invalid nice : "), nOpt->optionval, nOpt->optionvalsize, CMD_ERROR_INVAL);
+			writeRange(-20, 19);
+			return CMD_ERROR_INVAL;
 		}
-		int8_t nice = (int8_t)StringToUint8(nv, nvsize);
-		if( negative ) nice = -nice;
 
-		pdiutil::task_id_t pid = (pdiutil::task_id_t)StringToUint16(pOpt->optionval, pOpt->optionvalsize);
+		uint32_t pid = 0;
+		pdi_err_t taken = takeNumber(RODT_ATTR("invalid pid : "), pOpt->optionval, pOpt->optionvalsize, 0, INT16_MAX, pid);
+		if( PDI_OK != taken ){
+			return taken;
+		}
 
-		task_t *t = __task_scheduler.get_task(pid);
+		task_t *t = __task_scheduler.get_task((pdiutil::task_id_t)pid);
 		if( nullptr == t || t->m_state == TASK_STATE_ZOMBIE ){
-			m_terminal->putln();
-			m_terminal->writeln_ro(RODT_ATTR("no such pid"));
-			return CMD_ERROR_FAILED;
+			return refuseArg(RODT_ATTR("no such pid : "), pOpt->optionval, pOpt->optionvalsize, CMD_ERROR_FAILED);
 		}
 		uint8_t task_owner = t->m_owner;
 
@@ -112,7 +110,7 @@ struct ReniceCommand : public CommandBase {
 		}
 #endif
 
-		if( !__task_scheduler.setTaskNice(pid, nice) ){
+		if( !__task_scheduler.setTaskNice((pdiutil::task_id_t)pid, (int8_t)nice) ){
 			m_terminal->putln();
 			m_terminal->writeln_ro(RODT_ATTR("setTaskNice failed"));
 			return CMD_ERROR_FAILED;

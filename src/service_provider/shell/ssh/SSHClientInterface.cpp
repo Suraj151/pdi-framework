@@ -79,36 +79,82 @@ int8_t SSHClientInterface::connected(){
 int32_t SSHClientInterface::write(const uint8_t* c_str, uint32_t size){
     if(m_tcpClient && m_client_session && m_client_session->current_channel.ischannelreqsuccess > 1){
 
-
+        uint32_t held = m_written_data.size();
         m_written_data.insert(m_written_data.end(), c_str, c_str+size);
+        if( m_written_data.size() != held + size ){
+            commit();
+            held = m_written_data.size();
+            m_written_data.insert(m_written_data.end(), c_str, c_str+size);
+            if( m_written_data.size() != held + size ){
+                closeOnRefusedOutput(size);
+                return 0;
+            }
+        }
 
         int32_t datasize = m_written_data.size();
         if( datasize > (0.75*m_minSizeToWritePayload) ){
-
-            if(send_channel_data(m_client_session, (const char*)m_written_data.data(), datasize)){
-                m_written_data.clear();
-                return size;
-            }
+            commit();
         }else{
-
             // Schedule commiting written data task in queue, only when none is
             // pending. A pending commit already covers writes that follow it.
-            if( m_writeCommitTaskId < 0 ){
-                m_writeCommitTaskId = __task_scheduler.setTimeout( [&]() {
-                    this->commit();
-                    m_writeCommitTaskId = -1;
-                }, 1, __i_dvc_ctrl.millis_now() );
-
-                ServiceProvider *sshsvc = ServiceProvider::getService(SERVICE_SSH);
-                if( nullptr != sshsvc ){
-                    sshsvc->trackServiceTask(m_writeCommitTaskId);
-                }
-            }
-
-            return size;
+            scheduleCommit(1);
         }
+        return size;
     }
     return 0;
+}
+
+/**
+ * @brief Queues a commit of the written data, when none is pending yet.
+ * @param delayms How long from now the commit runs.
+ */
+void SSHClientInterface::scheduleCommit(uint32_t delayms){
+    if( m_writeCommitTaskId >= 0 ){
+        return;
+    }
+    m_writeCommitTaskId = __task_scheduler.setTimeout( [&]() {
+        m_writeCommitTaskId = -1;
+        this->commit();
+    }, delayms, __i_dvc_ctrl.millis_now() );
+
+    ServiceProvider *sshsvc = ServiceProvider::getService(SERVICE_SSH);
+    if( nullptr != sshsvc ){
+        sshsvc->trackServiceTask(m_writeCommitTaskId);
+    }
+}
+
+/**
+ * @brief Keeps output that could not be sent and tries it again shortly; output
+ * kept for longer than SSH_TX_STALL_MS closes the session, logged.
+ */
+void SSHClientInterface::holdUnsent(){
+    uint32_t now = __i_dvc_ctrl.millis_now();
+    if( 0 == m_unsentSince ){
+        m_unsentSince = (0 == now) ? 1 : now;
+    }
+    if( LWSSHSession::SESSION_STATE_SESSION_CLOSE == m_client_session->m_state ){
+        m_written_data.clear();
+        m_unsentSince = 0;
+        return;
+    }
+    if( (now - m_unsentSince) > SSH_TX_STALL_MS ){
+        SysLogE("SSH: session closed, %u bytes of output could not be sent\n", (unsigned int)m_written_data.size());
+        m_written_data.clear();
+        m_unsentSince = 0;
+        m_client_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+        return;
+    }
+    scheduleCommit(SSH_TX_RETRY_MS);
+}
+
+/**
+ * @brief Closes the session on output the heap could not hold, so no output is
+ * ever shown with a part of it missing.
+ * @param size The bytes that could not be held.
+ */
+void SSHClientInterface::closeOnRefusedOutput(uint32_t size){
+    SysLogE("SSH: session closed, %u bytes of output could not be held\n", (unsigned int)size);
+    m_client_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
 }
 
 /**
@@ -286,21 +332,30 @@ int32_t SSHClientInterface::commit(){
     if( datasize > 0 && m_client_session ){
 
         if(send_channel_data(m_client_session, (const char*)m_written_data.data(), datasize)){
+            m_written_data.clear();
+            m_unsentSince = 0;
+            return datasize;
         }
-        m_written_data.clear();
-        return datasize;
+        holdUnsent();
+        return PDI_ERR_AGAIN;
     }
     return PDI_ERR_NOT_INITIALIZED;
 }
 
 /** 
  * @brief set received decrypted payload from client
+ * @return whether the payload was held whole
  */
-void SSHClientInterface::setReceivedChannelData(pdiutil::vector<uint8_t> &recvpayload){
+bool SSHClientInterface::setReceivedChannelData(pdiutil::vector<uint8_t> &recvpayload){
+    size_t held = m_received_data.size();
     m_received_data.insert(m_received_data.end(), recvpayload.begin(), recvpayload.end());
+    if(m_received_data.size() != held + recvpayload.size()){
+        return false;
+    }
     if(m_client_session){
         m_client_session->markActive();
     }
+    return true;
 }
 
 

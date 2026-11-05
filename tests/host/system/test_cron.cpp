@@ -14,12 +14,14 @@ created Date    : 7th Sep 2026
 ******************************************************************************/
 
 #include <MountedStack.h>
+#include <StringTerminal.h>
 #include <pditest.h>
 
 #ifdef ENABLE_CRON_SERVICE
 
 #include <service_provider/cron/CronServiceProvider.h>
 #include <service_provider/session/SessionManager.h>
+#include <service_provider/ServiceProvider.h>
 
 namespace
 {
@@ -254,6 +256,48 @@ TEST(cron, the_service_holds_no_jobs_while_the_clock_is_not_valid)
     __i_fs.deleteFile(CRONTAB_FILE_PATH);
 }
 
+TEST(cron, a_job_leaves_the_session_it_interrupted_current_and_writes_nothing_on_it)
+{
+    pditest::mountedVfs();
+
+    // a session part way through a command when the minute comes round: the
+    // job runs between two of its steps, so the session must find itself
+    // current and on its own terminal again afterwards
+    pditest::StringTerminal terminal;
+    session_t *user = SessionManager::attach(&terminal);
+    ASSERT_TRUE(nullptr != user);
+    SessionManager::setCurrent(user);
+    iTerminalInterface *shell = ServiceProvider::getTerminal();
+    ServiceProvider::setTerminal(&terminal);
+
+    const char *rows = "* * * * * echo jobspoke\n";
+    writeCrontab(rows, (uint32_t)strlen(rows));
+
+    datetime_t moment;
+    moment.m_valid = true;
+    moment.m_minute = 0;
+    moment.m_hour = 0;
+    moment.m_day = 1;
+    moment.m_month = 1;
+    moment.m_weekday = 0;
+
+    uint32_t ran = (uint32_t)__cron_service.runDueJobs(moment);
+
+    session_t *after = SessionManager::current();
+    iTerminalInterface *afterterm = ServiceProvider::getTerminal();
+    std::string seen = terminal.captured();
+
+    ServiceProvider::setTerminal(shell);
+    SessionManager::detach(&terminal);
+    SessionManager::setCurrent(nullptr);
+    __i_fs.deleteFile(CRONTAB_FILE_PATH);
+
+    ASSERT_EQ(ran, 1u);
+    ASSERT_TRUE(after == user);
+    ASSERT_TRUE(afterterm == &terminal);
+    ASSERT_TRUE(seen.find("jobspoke") == std::string::npos);
+}
+
 #endif
 
 TEST(cron, starting_the_service_leaves_a_table_to_edit)
@@ -318,6 +362,7 @@ TEST(cron, a_restart_does_not_leave_a_second_listener_behind)
     __i_fs.deleteFile(CRONTAB_FILE_PATH);
 }
 
+#ifdef ENABLE_SERIAL_SERVICE
 TEST(cron, a_job_fires_even_while_the_console_holds_a_session)
 {
     VfsDispatcher *fs = pditest::mountedVfs();
@@ -357,3 +402,4 @@ TEST(cron, a_job_fires_even_while_the_console_holds_a_session)
 
     ASSERT_TRUE(landed);
 }
+#endif

@@ -57,6 +57,22 @@ public:
   void handleMqttSubScribe(void);
 
   /**
+   * Runs the client's timer every MQTT_DRAIN_INTERVAL_MS while it has work pending, so
+   * a queue empties at the pace the broker answers rather than once per tick.
+   */
+  void startDrain(void);
+
+  /**
+   * Puts the timer back to MQTT_TIMER_INTERVAL_MS once nothing is pending; called from the timer itself.
+   */
+  void settleDrain(void);
+
+  /**
+   * Puts the timer back to MQTT_TIMER_INTERVAL_MS whatever is pending, for a client being torn down.
+   */
+  void stopDrain(void);
+
+  /**
    * Copy what the next publish should carry into the buffer this service owns,
    * refusing while it holds none and when the text does not fit.
    */
@@ -98,6 +114,7 @@ public:
    * @var	int16_t|0 m_mqtt_subscribe_cb_id
    */
   pdiutil::task_id_t m_mqtt_subscribe_cb_id;
+  bool m_mqtt_draining;
   /**
    * @var	MqttPublishDataCallback  m_mqtt_publish_data_cb
    */

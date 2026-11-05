@@ -53,6 +53,11 @@ extern portMUX_TYPE __pdi_critical_mux;
 #define SCRIPT_MAX_DEPTH            4
 #define TCP_WRITE_DRAIN_TIMEOUT_MS  (MILLISECOND_DURATION_1000/2)
 #define SSH_SFTP_READ_MAX           16384
+#define SSH_RX_PACKET_MAX           16384
+#define SSH_TX_QUEUE_MAX            32768
+#define MQTT_PACKET_MAX             8192
+#define MQTT_SEND_QUEUE_MAX         16384
+#define MQTT_INFLIGHT_MAX           8
 #define TCP_WRITE_CHUNK_MAX         1436
 #define TCP_UNACKED_MAX             TCP_SND_BUF
 

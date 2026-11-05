@@ -59,15 +59,15 @@ def ls_argument(t):
     t.run("touch listed.txt")
     t.run("cd /")
 
-    expect_in("listed.txt", t.run("ls %s" % path), "ls with a path")
+    expect_in("listed.txt", t.run("ls -la %s" % path), "ls -la with a path")
 
 
-@test("ls shows the dot entries and the mode", needs=("ls", "touch"))
+@test("ls -la shows the dot entries and the mode", needs=("ls", "touch"))
 def ls_mode(t):
     t.workspace(W + "lsmode")
     t.run("touch moded.txt")
 
-    out = t.run("ls")
+    out = t.run("ls -la")
     expect_in("..", out, "parent entry")
     expect_in("-rw-", out, "mode column")
 
@@ -77,8 +77,8 @@ def mkdir_creates(t):
     t.workspace(W + "mkdir")
     t.run("mkdir sub")
 
-    expect_in("sub", t.run("ls"), "ls after mkdir")
-    expect_in("d", t.run("ls"), "directory mode")
+    expect_in("sub", t.run("ls -la"), "ls -la after mkdir")
+    expect_in("d", t.run("ls -la"), "directory mode")
 
 
 @test("touch creates an empty file", needs=("touch", "wc"))
@@ -86,7 +86,7 @@ def touch_creates(t):
     t.workspace(W + "touch")
     t.run("touch fresh.txt")
 
-    expect_in("fresh.txt", t.run("ls"), "ls after touch")
+    expect_in("fresh.txt", t.run("ls -la"), "ls -la after touch")
     expect_in("0", t.run("wc fresh.txt"), "size of an empty file")
 
 
@@ -99,10 +99,21 @@ def missing_argument(t):
     expect_in("CmdErr", t.run("mkdir"), "mkdir with no argument")
 
 
+@test("every command missing its argument reports the same code", needs=("cat", "head", "chmod", "chown"))
+def missing_argument_one_code(t):
+    import re
+    codes = {}
+    for line in ("cat", "head", "chmod", "chown", "chmod 0644"):
+        found = re.search(r"CmdErr\s*:\s*(-?\d+)", t.run(line))
+        codes[line] = found.group(1) if found else None
+    if None in codes.values() or 1 != len(set(codes.values())):
+        raise AssertionError("a missing argument is reported differently: %r" % codes)
+
+
 @test("a command that needs no argument still runs", needs=("pwd", "ls"))
 def no_argument_needed(t):
     expect_in("/", t.run("pwd"), "pwd")
-    expect_in(".", t.run("ls"), "ls")
+    expect_in(".", t.run("ls -la"), "ls -la")
 
 
 @test("echo prints its argument", needs=("echo",))
@@ -115,7 +126,7 @@ def echo_redirects(t):
     t.workspace(W + "echo")
     t.run("echo written by echo > note.txt")
 
-    expect_in("note.txt", t.run("ls"), "ls after redirect")
+    expect_in("note.txt", t.run("ls -la"), "ls -la after redirect")
     expect_in("written by echo", t.run("cat note.txt"), "cat")
 
 
@@ -211,7 +222,7 @@ def cp_both(t):
     t.run("echo copy me > src.txt")
     t.run("cp src.txt dst.txt")
 
-    listing = t.run("ls")
+    listing = t.run("ls -la")
     expect_in("src.txt", listing, "source still there")
     expect_in("dst.txt", listing, "copy made")
     expect_in("copy me", t.run("cat dst.txt"), "contents copied")
@@ -223,7 +234,7 @@ def mv_renames(t):
     t.run("echo move me > before.txt")
     t.run("mv before.txt after.txt")
 
-    listing = t.run("ls")
+    listing = t.run("ls -la")
     expect_not_in("before.txt", listing, "old name gone")
     expect_in("after.txt", listing, "new name there")
     expect_in("move me", t.run("cat after.txt"), "contents moved")
@@ -233,21 +244,21 @@ def mv_renames(t):
 def rm_file(t):
     t.workspace(W + "rm")
     t.run("touch doomed.txt")
-    expect_in("doomed.txt", t.run("ls"), "before rm")
+    expect_in("doomed.txt", t.run("ls -la"), "before rm")
 
     t.run("rm doomed.txt")
-    expect_not_in("doomed.txt", t.run("ls"), "after rm")
+    expect_not_in("doomed.txt", t.run("ls -la"), "after rm")
 
 
 @test("rm removes a directory", needs=("mkdir", "rm"))
 def rm_directory(t):
     t.workspace(W + "rmdir")
     t.run("mkdir gone")
-    expect_in("gone", t.run("ls"), "before rm")
+    expect_in("gone", t.run("ls -la"), "before rm")
 
     # rm here takes a directory without a flag, deliberately
     t.run("rm gone")
-    expect_not_in("gone", t.run("ls"), "after rm")
+    expect_not_in("gone", t.run("ls -la"), "after rm")
 
 
 @test("a file written by one command is read by another", needs=("echo", "cp", "mv", "cat", "wc"))
@@ -292,7 +303,7 @@ def sysfs_value_write(t):
     # read that as the value rather than as the terminator; a pin a declared
     # device holds is not listed, so the first one listed is free to use
     import re
-    pins = re.findall(r"^d\S+.*\s(\d+)\s*$", t.run("ls /sys/class/gpio"), re.M)
+    pins = re.findall(r"^d\S+.*\s(\d+)\s*$", t.run("ls -la /sys/class/gpio"), re.M)
     if not pins:
         raise Skip("this target lists no gpio pin under /sys/class/gpio")
     mode = "/sys/class/gpio/%s/mode" % pins[0]
@@ -391,7 +402,7 @@ def fedit_save_keeps_permissions(t):
     t.run("echo secret > %s" % path)
     t.run("chmod 600 %s" % path)
 
-    expect_in("-rw-------", t.run("ls"), "the file starts unreadable to others")
+    expect_in("-rw-------", t.run("ls -la"), "the file starts unreadable to others")
 
     t.shell.send_line("fedit %s" % path)
     t.shell.expect("ESC", t.timeout)
@@ -404,7 +415,7 @@ def fedit_save_keeps_permissions(t):
     t.shell.expect("saved", t.timeout)
     t.shell.expect(PROMPT, t.timeout)
 
-    expect_in("-rw-------", t.run("ls"),
+    expect_in("-rw-------", t.run("ls -la"),
               "the saved file kept its permissions")
 
 

@@ -39,6 +39,11 @@ public:
   const pdiutil::string &node() const { return m_node; }
   uint32_t serial() const { return m_serial; }
 
+  /**
+   * Whether the node still reaches the disk of the serial the window was made for.
+   */
+  bool present();
+
 private:
   /**
    * The disk and its first block for whole sectors inside the window, or the
@@ -83,6 +88,11 @@ public:
   static bool holds(uint32_t serial);
 
   void unmounted() override;
+
+  /**
+   * Whether the disk the volume was mounted from is still there.
+   */
+  bool diskPresent() override { return m_window.present(); }
 
 private:
   /**

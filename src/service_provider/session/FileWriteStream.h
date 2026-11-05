@@ -47,7 +47,8 @@ public:
   uint32_t written() const { return m_written; }
 
   /**
-   * Commits what is buffered and reports whether it landed.
+   * Commits what is buffered and reports whether everything written landed:
+   * zero, or the first error storage gave.
    */
   int16_t disconnect() override;
 
@@ -120,6 +121,7 @@ private:
   bool m_append;
   bool m_started;
   bool m_failed;
+  int16_t m_error;
 
   // Held open for the life of the stream when the backend has handles, so a
   // block costs one write instead of an open, a seek and a close. Negative when

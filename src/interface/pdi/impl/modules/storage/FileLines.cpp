@@ -239,7 +239,8 @@ int FileLines::getLineNumbersInFile(iFileSystemInterface &fs, const char* path, 
 
 /**
  * Reads a line of a file, negative numbers counting from the end, matched to
- * pattern when given; the bytes read.
+ * pattern when given; the bytes read, or PDI_ERR_NO_MEM for a line the heap
+ * could not hold whole.
  */
 int FileLines::readLineInFile(iFileSystemInterface &fs, const char* path, int32_t linenumber, pdiutil::string &linedata, const char* pattern, CallBackVoidArgFn yield){
 
@@ -303,15 +304,47 @@ int FileLines::readLineInFile(iFileSystemInterface &fs, const char* path, int32_
         if(lineoffset >= filesize) return PDI_ERR_NOT_FOUND;
     }
 
-    int bytesReadedOrError = fs.readFile(path, 250, [&](char *data, uint32_t size) -> bool {
-        linedata += pdiutil::string(data, size);
-        return true;
-    }, (uint64_t)lineoffset, "\n");
+    bool cut = false;
+    int bytesReadedOrError = readLineAt(fs, path, (uint64_t)lineoffset, linedata, &cut, nullptr, 250);
 
-    if( !linedata.empty() && linedata.back() == '\r' ){
-        linedata.pop_back();
+    if( cut ){
+        return PDI_ERR_NO_MEM;
+    }
+
+    if( bytesReadedOrError > 0 && (int)linedata.size() < bytesReadedOrError ){
         bytesReadedOrError--;
     }
 
     return bytesReadedOrError;
+}
+
+/**
+ * Reads the line starting at offset without its line end; cut is set when the
+ * heap could not hold it whole, and keepgoing can end the read early. The
+ * bytes the line spans, or a negative error code.
+ */
+int FileLines::readLineAt(iFileSystemInterface &fs, const char* path, uint64_t offset, pdiutil::string &linedata,
+                          bool *cut, CallBackVoidArgBoolRetFn keepgoing, uint32_t chunk){
+
+    linedata.clear();
+    bool refused = false;
+
+    int bytes = fs.readFile(path, chunk, [&](char *data, uint32_t size) -> bool {
+        if( !refused ){
+            pdiutil::string::size_type held = linedata.size();
+            linedata.append(data, size);
+            refused = ( linedata.size() != held + size );
+        }
+        return !keepgoing || keepgoing();
+    }, offset, "\n");
+
+    if( bytes >= 0 && !refused && !linedata.empty() && linedata.back() == '\r' ){
+        linedata.pop_back();
+    }
+
+    if( nullptr != cut ){
+        *cut = refused;
+    }
+
+    return bytes;
 }

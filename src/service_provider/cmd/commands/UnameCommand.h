@@ -22,6 +22,7 @@ struct UnameCommand : public CommandBase {
 	UnameCommand(){
 		Clear();
 		SetCommand(CMD_NAME_UNAME);
+		setArgs(RODT_ATTR("asnrvm"), 0);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
@@ -111,7 +112,7 @@ private:
 				break;
 			}
 			case UNAME_FIELD_RELEASE:
-				out = CHARPTR_WRAP(RELEASE);
+				out = CHARPTR_WRAP(PDI_RELEASE);
 				break;
 			case UNAME_FIELD_VERSION:
 				out = CHARPTR_WRAP(CONFIG_VERSION);

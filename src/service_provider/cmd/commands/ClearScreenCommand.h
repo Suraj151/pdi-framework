@@ -25,6 +25,7 @@ struct ClearScreenCommand : public CommandBase {
 	ClearScreenCommand(){
 		Clear();
 		SetCommand(CMD_NAME_CLS);
+		setArgs(RODT_ATTR(""), 0);
 	}
 
 	/**

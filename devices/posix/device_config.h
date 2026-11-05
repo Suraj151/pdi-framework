@@ -41,6 +41,9 @@ created Date    : 16th Aug 2026
 
 #define CMD_SIZE_MAX                16  /* longest command name plus its terminator */
 #define CMD_OPTION_MAX              6   /* most options one command takes */
+#ifndef SSH_RX_PACKET_MAX
+#define SSH_RX_PACKET_MAX           32768 /* most channel data one packet from an ssh client may carry */
+#endif
 
 /**
  * gpio pin counts

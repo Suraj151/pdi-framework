@@ -347,6 +347,14 @@ iBlockDriverInterface *FatFsInterfaceImpl::disk(uint32_t &first, uint32_t &span)
     return found;
 }
 
+/**
+ * Whether the disk the volume was mounted from is still there.
+ */
+bool FatFsInterfaceImpl::diskPresent() {
+    uint32_t first = 0, span = 0;
+    return nullptr != disk(first, span);
+}
+
 void FatFsInterfaceImpl::unmounted() {
     unmountVolume();
     release();

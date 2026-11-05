@@ -62,17 +62,14 @@ def each_mount_round_trips(t):
         expect_in("MOUNTOK", out, "a file on %s" % prefix)
 
 
-@test("a rename over an existing file replaces it", needs=("echo", "cat", "mv", "rm"))
+@test("a rename over an existing file is refused and both files stay", needs=("echo", "cat", "mv", "rm"))
 def rename_over_existing(t):
     ws = t.workspace("fe_rename")
     t.run("echo source > %s/a" % ws)
     t.run("echo target > %s/b" % ws)
-    t.run("mv %s/a %s/b" % (ws, ws))
-    out = t.run("cat %s/b" % ws)
-    expect_in("source", out, "the moved file's content")
-    expect_not_in("target", out, "the replaced file's old content")
-    if "source" in t.run("cat %s/a" % ws):
-        raise AssertionError("the source still exists after mv replaced the target")
+    expect_in("mv: %s/b : File exists" % ws, t.run("mv %s/a %s/b" % (ws, ws)), "mv over a file")
+    expect_in("target", t.run("cat %s/b" % ws), "the file mv was refused over")
+    expect_in("source", t.run("cat %s/a" % ws), "the file mv was refused for")
 
 
 @test("two sessions writing one file do not corrupt it", needs=("echo", "cat", "rm"))
@@ -156,9 +153,6 @@ def full_append_is_reported(t):
     message, a failing status, or both. Taking the line, keeping nothing and
     reporting success loses data without anyone knowing.
     """
-    import os
-    if os.environ.get("PDI_KNOWN_FINDINGS", "") != "1":
-        raise Skip("open finding F16, recorded in TESTING_PLAN.md; set PDI_KNOWN_FINDINGS=1 to run it")
     if "/tmp" not in t.caps.mounts:
         raise Skip("the target has no /tmp to fill")
     path = "/tmp/fe_full"
@@ -179,6 +173,9 @@ def full_append_is_reported(t):
         after = t.run("wc %s" % path).split()
     finally:
         t.run("rm %s" % path)
+    for counts in (before, after):
+        if len(counts) < 3 or not all(c.isdigit() for c in counts[:3]):
+            raise AssertionError("wc gave no counts, so growth cannot be judged:\n%s" % " ".join(counts))
     grew = before[:3] != after[:3]
     status = [l for l in out.splitlines() if l.strip().startswith("rc=")]
     reported = ("cannot write" in out) or (status and status[-1].strip() != "rc=0")
@@ -223,3 +220,65 @@ def disk_full_is_clean(t):
     if free is not None and free < 200:
         raise AssertionError("/tmp reports %d free after the filler was removed; the room did not "
                              "come back" % free)
+
+
+def root_free(t):
+    for ln in t.run("df").splitlines():
+        cols = ln.split()
+        if len(cols) >= 5 and cols[0] == "/" and cols[4].isdigit():
+            return int(cols[4])
+    return None
+
+
+@test("userdel on a full disk never drops another account", needs=("useradd", "userdel", "cat", "df", "echo", "rm"),
+      slow=True)
+def userdel_full_disk_keeps_others(t):
+    from .test_sftp import sftp_open
+    keep = ["fkeep1", "fkeep2"]
+    gone = "fgone"
+    filler = "/fe_rootfill.bin"
+    t.run("rm %s" % filler)
+    free = root_free(t)
+    if free is None:
+        raise Skip("df names no root free size")
+    if free > 1024 * 1024:
+        raise Skip("the root disk is too large to fill in a test (%d B free); filling a board's flash takes most of an hour and wears it" % free)
+    for name in keep + [gone]:
+        t.run("userdel u=%s" % name)
+        t.run("useradd u=%s p=Strong#Pass123" % name)
+    free = root_free(t) or 0
+    try:
+        client, sftp = sftp_open(t)
+        try:
+            with sftp.open(filler, "wb") as fh:
+                left = max(0, free - 8192)
+                block = b"F" * 4096
+                while left > 0:
+                    piece = block[:min(left, len(block))]
+                    fh.write(piece)
+                    left -= len(piece)
+        except IOError:
+            pass
+        finally:
+            sftp.close()
+            client.close()
+        for _ in range(80):
+            t.run("echo %s >> %s" % ("z" * 200, filler))
+            now = root_free(t)
+            if now is not None and now <= 4096:
+                break
+        left = root_free(t)
+        if left is None or left > 4096:
+            raise Skip("the root disk did not fill (%s B left)" % left)
+        t.run("userdel u=%s" % gone, timeout=30)
+    finally:
+        t.run("rm %s" % filler)
+    passwd = t.run("cat /etc/passwd", timeout=30)
+    shadow = t.run("cat /etc/shadow", timeout=30)
+    try:
+        for name in keep + ["pdiStack"]:
+            expect_in(name + ":", passwd, "userdel on a full disk dropped %s from /etc/passwd" % name)
+            expect_in(name + ":", shadow, "userdel on a full disk dropped %s from /etc/shadow" % name)
+    finally:
+        for name in keep + [gone]:
+            t.run("userdel u=%s" % name)

@@ -18,6 +18,7 @@ struct EnvCommand : public CommandBase {
 	EnvCommand(){
 		Clear();
 		SetCommand(CMD_NAME_ENV);
+		setArgs(RODT_ATTR(""), 0);
 	}
 
 	static void RegisterCommand(){

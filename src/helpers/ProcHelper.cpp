@@ -11,6 +11,7 @@ created Date    : 27th Aug 2026
 #include "ProcHelper.h"
 #include <utility/DataTypeConversions.h>
 #include <utility/TaskRecord.h>
+#include <interface/pdi/impl/modules/storage/FileLines.h>
 
 /**
  * Hands every line of a file to the callback in turn, stopping where it answers
@@ -35,21 +36,13 @@ bool readProcLines(const char *path, pdiutil::function<bool(pdiutil::string &)> 
 
   while (offset < (uint64_t)total)
   {
-    linedata.clear();
-    int bytes = __i_fs.readFile(path, 64, [&](char *data, uint32_t size) -> bool {
-      linedata += pdiutil::string(data, size);
-      return true;
-    }, offset, "\n");
+    bool cut = false;
+    int bytes = FileLines::readLineAt(__i_fs, path, offset, linedata, &cut, nullptr, 64);
     if (bytes < 0) break;
 
     offset += (uint64_t)bytes + 1;
 
-    if (!linedata.empty() && linedata.back() == '\r')
-    {
-      linedata.pop_back();
-    }
-
-    if (!linedata.empty() && !online(linedata)) break;
+    if (!cut && !linedata.empty() && !online(linedata)) break;
 
     __i_dvc_ctrl.yield();
   }
@@ -157,23 +150,26 @@ void writeStatRow(iTerminalInterface *terminal, const pdiutil::string &line, uin
 }
 
 /**
- * Writes the header the table is read under, summary line first.
+ * Writes the header the table is read under, summary line first when asked for.
  */
-void writeHeader(iTerminalInterface *terminal, uint64_t now_ms, uint16_t shown, uint32_t freeheap)
+void writeHeader(iTerminalInterface *terminal, uint64_t now_ms, uint16_t shown, uint32_t freeheap, bool summary)
 {
   char buf[24];
 
   terminal->writeln();
-  terminal->write_ro(RODT_ATTR("top - up "));
-  Int64ToString((int64_t)(now_ms / 1000), buf, sizeof(buf), 0);
-  terminal->write(buf);
-  terminal->write_ro(RODT_ATTR("s, "));
-  Int32ToString((int32_t)shown, buf, sizeof(buf), 0);
-  terminal->write(buf);
-  terminal->write_ro(RODT_ATTR(" tasks, "));
-  Int32ToString((int32_t)freeheap, buf, sizeof(buf), 0);
-  terminal->write(buf);
-  terminal->writeln_ro(RODT_ATTR(" bytes free heap"));
+  if (summary)
+  {
+    terminal->write_ro(RODT_ATTR("top - up "));
+    Int64ToString((int64_t)(now_ms / 1000), buf, sizeof(buf), 0);
+    terminal->write(buf);
+    terminal->write_ro(RODT_ATTR("s, "));
+    Int32ToString((int32_t)shown, buf, sizeof(buf), 0);
+    terminal->write(buf);
+    terminal->write_ro(RODT_ATTR(" tasks, "));
+    Int32ToString((int32_t)freeheap, buf, sizeof(buf), 0);
+    terminal->write(buf);
+    terminal->writeln_ro(RODT_ATTR(" bytes free heap"));
+  }
 
   terminal->write_ro(RODT_ATTR("PID  "));
   terminal->write_ro(RODT_ATTR("OWN  "));
@@ -190,9 +186,10 @@ void writeHeader(iTerminalInterface *terminal, uint64_t now_ms, uint16_t shown, 
 }
 
 /**
- * Writes the process table a session may see, filtered to one owner or to all.
+ * Writes the process table a session may see, filtered to one owner or to all,
+ * under the top summary line when asked for.
  */
-void printProcessTable(iTerminalInterface *terminal, uint8_t filter_owner)
+void printProcessTable(iTerminalInterface *terminal, uint8_t filter_owner, bool summary)
 {
   if (nullptr == terminal) return;
 
@@ -219,7 +216,7 @@ void printProcessTable(iTerminalInterface *terminal, uint8_t filter_owner)
     shown++;
   }
 
-  writeHeader(terminal, now, shown, __i_dvc_ctrl.get_free_heap());
+  writeHeader(terminal, now, shown, __i_dvc_ctrl.get_free_heap(), summary);
 
   for (uint32_t i = 0; i < items.size(); i++)
   {
@@ -245,7 +242,7 @@ void printProcessTable(iTerminalInterface *terminal, uint8_t filter_owner)
     shown++;
   }
 
-  writeHeader(terminal, now, shown, __i_dvc_ctrl.get_free_heap());
+  writeHeader(terminal, now, shown, __i_dvc_ctrl.get_free_heap(), summary);
 
   pdiutil::string line;
 

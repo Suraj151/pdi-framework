@@ -84,10 +84,10 @@ def chmod_changes(t):
     t.run("touch f.txt")
 
     t.run("chmod 400 f.txt")
-    expect_in("-r--", t.run("ls"), "mode after chmod 400")
+    expect_in("-r--", t.run("ls -la"), "mode after chmod 400")
 
     t.run("chmod 640 f.txt")
-    expect_in("-rw-r--", t.run("ls"), "mode after chmod 640")
+    expect_in("-rw-r--", t.run("ls -la"), "mode after chmod 640")
 
 
 @test("chown changes the owner", needs=("chown", "touch", "ls"))
@@ -96,7 +96,7 @@ def chown_changes(t):
     t.run("touch owned.txt")
 
     t.run("chown 7 owned.txt")
-    expect_in("7", t.run("ls"), "owner column after chown")
+    expect_in("7", t.run("ls -la"), "owner column after chown")
 
 
 @test("chown takes a separate group", needs=("chown", "touch", "ls"))
@@ -105,7 +105,7 @@ def chown_group(t):
     t.run("touch grouped.txt")
 
     t.run("chown 7:9 grouped.txt")
-    out = t.run("ls")
+    out = t.run("ls -la")
     expect_in("7", out, "owner column")
     expect_in("9", out, "group column")
 
@@ -133,7 +133,7 @@ def umask_applies(t):
         t.run("umask 077")
         t.run("touch masked.txt")
 
-        out = t.run("ls")
+        out = t.run("ls -la")
         expect_in("-rw-------", out, "a file made under umask 077")
         expect_not_in("-rw-r--r--", out, "no group or other bits")
     finally:

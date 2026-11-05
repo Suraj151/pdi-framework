@@ -51,7 +51,8 @@ int8_t TelnetClientInterface::connected()
 }
 
 /**
- * Sends the bytes with every 0xFF doubled, reporting the caller's byte count.
+ * Sends the bytes with every 0xFF doubled, reporting how many of the caller's
+ * bytes went out; a send the connection took only in part ends it there.
  */
 int32_t TelnetClientInterface::write(const uint8_t *c_str, uint32_t size)
 {
@@ -64,16 +65,36 @@ int32_t TelnetClientInterface::write(const uint8_t *c_str, uint32_t size)
         if (0xFF != c_str[i]) {
             continue;
         }
-        if (i + 1 > start) {
-            m_tcpClient->write(c_str + start, i + 1 - start);
+        int32_t len = (int32_t)(i + 1 - start);
+        int32_t sent = m_tcpClient->write(c_str + start, len);
+        if (sent != len) {
+            return sentSoFar(start, sent);
         }
-        m_tcpClient->write((uint8_t)0xFF);
+        if (1 != m_tcpClient->write((uint8_t)0xFF)) {
+            return (int32_t)i;
+        }
         start = i + 1;
     }
     if (size > start) {
-        m_tcpClient->write(c_str + start, size - start);
+        int32_t len = (int32_t)(size - start);
+        int32_t sent = m_tcpClient->write(c_str + start, len);
+        if (sent != len) {
+            return sentSoFar(start, sent);
+        }
     }
     return (int32_t)size;
+}
+
+/**
+ * The caller's bytes that went out when a send stopped part way: the error
+ * itself when nothing did.
+ */
+int32_t TelnetClientInterface::sentSoFar(uint32_t start, int32_t sent)
+{
+    if (sent < 0) {
+        return (0 == start) ? sent : (int32_t)start;
+    }
+    return (int32_t)(start + (uint32_t)sent);
 }
 
 /**

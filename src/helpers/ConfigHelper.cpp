@@ -13,23 +13,32 @@ created Date    : 1st Aug 2026
 #if defined(ENABLE_STORAGE_SERVICE)
 
 #include "ConfigHelper.h"
+#include <interface/pdi/impl/modules/storage/FileLines.h>
 
 /* generic config file support functions */
 
-static int readConfigLine(const char *path, uint64_t offset, pdiutil::string &linedata)
+static int readConfigLine(const char *path, uint64_t offset, pdiutil::string &linedata, bool &cut)
 {
-  linedata.clear();
-  int bytes = __i_fs.readFile(path, 128, [&](char *data, uint32_t size) -> bool {
-    linedata += pdiutil::string(data, size);
-    return true;
-  }, offset, "\n");
+  int bytes = FileLines::readLineAt(__i_fs, path, offset, linedata, &cut);
 
-  if (bytes >= 0 && !linedata.empty() && linedata.back() == '\r')
+  if (cut)
   {
-    linedata.pop_back();
+    SysLogW("config: %s line at %u longer than the heap could hold, not taken\n", path, (unsigned)offset);
   }
 
   return bytes;
+}
+
+/**
+ * Logs an option whose value was refused, so a value too long or unreadable is
+ * not kept from the reader in silence.
+ */
+static void logRefusedConfigValue(const pdiutil::string &key, const pdiutil::string &value)
+{
+  if (!value.empty())
+  {
+    SysLogW("config: %s value refused, the old one kept\n", key.c_str());
+  }
 }
 
 static bool splitConfigLine(const pdiutil::string &linedata, pdiutil::string &key, pdiutil::string &value)
@@ -54,7 +63,7 @@ static bool splitConfigLine(const pdiutil::string &linedata, pdiutil::string &ke
   return true;
 }
 
-static void buildConfigLine(pdiutil::string &out, const char *key, const char *value)
+static bool buildConfigLine(pdiutil::string &out, const char *key, const char *value)
 {
   out.clear();
   out += key;
@@ -64,6 +73,8 @@ static void buildConfigLine(pdiutil::string &out, const char *key, const char *v
     out += value;
   }
   out += TERMINAL_NEW_LINE;
+
+  return out.size() == strlen(key) + 1 + (nullptr != value ? strlen(value) : 0) + strlen(TERMINAL_NEW_LINE);
 }
 
 static bool parseConfigNumber(const pdiutil::string &value, uint32_t maxvalue, uint32_t &out)
@@ -144,13 +155,14 @@ bool loadConfigFile(const char *path, pdiutil::vector<config_kv_t> &out)
 
   while (offset < (uint64_t)fs)
   {
-    int bytes = readConfigLine(path, offset, linedata);
+    bool cut = false;
+    int bytes = readConfigLine(path, offset, linedata, cut);
     if (bytes < 0) break;
 
     offset += (uint64_t)bytes + 1;
 
     config_kv_t kv;
-    if (splitConfigLine(linedata, kv.m_key, kv.m_value))
+    if (!cut && splitConfigLine(linedata, kv.m_key, kv.m_value))
     {
       out.push_back(kv);
     }
@@ -182,12 +194,13 @@ bool getConfigValue(const char *path, const char *key, pdiutil::string &out)
 
   while (offset < (uint64_t)fs)
   {
-    int bytes = readConfigLine(path, offset, linedata);
+    bool cut = false;
+    int bytes = readConfigLine(path, offset, linedata, cut);
     if (bytes < 0) break;
 
     offset += (uint64_t)bytes + 1;
 
-    if (splitConfigLine(linedata, linekey, linevalue) && linekey == key)
+    if (!cut && splitConfigLine(linedata, linekey, linevalue) && linekey == key)
     {
       out = linevalue;
       return true;
@@ -211,7 +224,10 @@ bool setConfigValue(const char *path, const char *key, const char *value)
   }
 
   pdiutil::string newline;
-  buildConfigLine(newline, key, value);
+  if (!buildConfigLine(newline, key, value))
+  {
+    return false;
+  }
 
   if (!__i_fs.isFileExist(path))
   {
@@ -239,12 +255,13 @@ bool setConfigValue(const char *path, const char *key, const char *value)
   uint64_t offset = 0;
   bool replaced = false;
   bool writeok = true;
-  pdiutil::string linedata, linekey, linevalue, outline;
+  pdiutil::string linedata, linekey, linevalue;
 
   while (writeok && fs > 0 && offset < (uint64_t)fs)
   {
-    int bytes = readConfigLine(path, offset, linedata);
-    if (bytes < 0)
+    bool cut = false;
+    int bytes = readConfigLine(path, offset, linedata, cut);
+    if (bytes < 0 || cut)
     {
       writeok = false;
       break;
@@ -256,15 +273,14 @@ bool setConfigValue(const char *path, const char *key, const char *value)
     {
       if (!replaced)
       {
-        writeok = (__i_fs.writeFile(temppath.c_str(), newline.c_str(), newline.size(), true) >= 0);
+        writeok = (__i_fs.writeFile(temppath.c_str(), newline.c_str(), newline.size(), true) == (int)newline.size());
         replaced = true;
       }
     }
     else
     {
-      outline = linedata;
-      outline += TERMINAL_NEW_LINE;
-      writeok = (__i_fs.writeFile(temppath.c_str(), outline.c_str(), outline.size(), true) >= 0);
+      writeok = (__i_fs.writeFile(temppath.c_str(), linedata.c_str(), linedata.size(), true) == (int)linedata.size() &&
+                 __i_fs.writeFile(temppath.c_str(), TERMINAL_NEW_LINE, strlen(TERMINAL_NEW_LINE), true) == (int)strlen(TERMINAL_NEW_LINE));
     }
 
     __i_dvc_ctrl.yield();
@@ -272,7 +288,7 @@ bool setConfigValue(const char *path, const char *key, const char *value)
 
   if (writeok && !replaced)
   {
-    writeok = (__i_fs.writeFile(temppath.c_str(), newline.c_str(), newline.size(), true) >= 0);
+    writeok = (__i_fs.writeFile(temppath.c_str(), newline.c_str(), newline.size(), true) == (int)newline.size());
   }
 
   if (!writeok)
@@ -309,33 +325,54 @@ bool saveConfigFile(const char *path, const pdiutil::vector<config_kv_t> &kvs, c
 
   file_info_t original;
   bool haveoriginal = (__i_fs.isFileExist(path) && PDI_OK == __i_fs.getFileMeta(path, original));
-  if (haveoriginal)
+
+  pdiutil::string temppath = pdiutil::string(path) + CONFIG_TEMP_SUFFIX;
+  if (__i_fs.isFileExist(temppath.c_str()))
   {
-    __i_fs.deleteFile(path);
+    __i_fs.deleteFile(temppath.c_str());
   }
 
-  if (__i_fs.createFile(path, "", 0) < 0)
+  if (__i_fs.createFile(temppath.c_str(), "", 0) < 0)
   {
     return false;
+  }
+
+  if (haveoriginal)
+  {
+    restoreConfigMeta(temppath.c_str(), original, false);
+  }
+  else if (0 != mode)
+  {
+    applyConfigMeta(temppath.c_str(), mode, FILE_OWNER_ROOT_UID, FILE_OWNER_ROOT_GID, false);
   }
 
   bool writeok = true;
   if (nullptr != header && 0 != header[0])
   {
-    writeok = (__i_fs.writeFile(path, header, strlen(header), true) >= 0);
+    writeok = (__i_fs.writeFile(temppath.c_str(), header, strlen(header), true) == (int)strlen(header));
   }
 
   pdiutil::string line;
   for (size_t i = 0; writeok && i < kvs.size(); i++)
   {
-    buildConfigLine(line, kvs[i].m_key.c_str(), kvs[i].m_value.c_str());
-    writeok = (__i_fs.writeFile(path, line.c_str(), line.size(), true) >= 0);
+    writeok = buildConfigLine(line, kvs[i].m_key.c_str(), kvs[i].m_value.c_str()) &&
+              (__i_fs.writeFile(temppath.c_str(), line.c_str(), line.size(), true) == (int)line.size());
     __i_dvc_ctrl.yield();
   }
 
   if (!writeok)
   {
+    __i_fs.deleteFile(temppath.c_str());
+    return false;
+  }
+
+  if (haveoriginal)
+  {
     __i_fs.deleteFile(path);
+  }
+
+  if (PDI_OK != __i_fs.moveFile(temppath.c_str(), path))
+  {
     return false;
   }
 
@@ -459,8 +496,14 @@ bool findConfigValue(const pdiutil::vector<config_kv_t> &kvs, const pdiutil::str
 bool takeConfigText(const pdiutil::vector<config_kv_t> &kvs, const pdiutil::string &key, char *field, uint16_t size)
 {
   pdiutil::string value;
-  if (nullptr == field || !findConfigValue(kvs, key, value) || value.size() >= size)
+  if (nullptr == field || !findConfigValue(kvs, key, value))
   {
+    return false;
+  }
+
+  if (value.size() >= size)
+  {
+    logRefusedConfigValue(key, value);
     return false;
   }
 
@@ -485,6 +528,7 @@ bool takeConfigAddress(const pdiutil::vector<config_kv_t> &kvs, const pdiutil::s
   pdiutil::string rendered = address;
   if (rendered != value)
   {
+    logRefusedConfigValue(key, value);
     return false;
   }
 
@@ -533,8 +577,14 @@ bool takeConfigNumber(const pdiutil::vector<config_kv_t> &kvs, const pdiutil::st
   pdiutil::string value;
   uint32_t parsed = 0;
 
-  if (nullptr == field || !findConfigValue(kvs, key, value) || !parseConfigNumber(value, maxvalue, parsed))
+  if (nullptr == field || !findConfigValue(kvs, key, value))
   {
+    return false;
+  }
+
+  if (!parseConfigNumber(value, maxvalue, parsed))
+  {
+    logRefusedConfigValue(key, value);
     return false;
   }
 
@@ -551,8 +601,14 @@ bool takeConfigNumber(const pdiutil::vector<config_kv_t> &kvs, const pdiutil::st
   pdiutil::string value;
   uint32_t parsed = 0;
 
-  if (nullptr == field || !findConfigValue(kvs, key, value) || !parseConfigNumber(value, maxvalue, parsed))
+  if (nullptr == field || !findConfigValue(kvs, key, value))
   {
+    return false;
+  }
+
+  if (!parseConfigNumber(value, maxvalue, parsed))
+  {
+    logRefusedConfigValue(key, value);
     return false;
   }
 

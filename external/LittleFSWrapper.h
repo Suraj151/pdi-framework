@@ -277,6 +277,12 @@ public:
     uint64_t getFreeSize() override;
 
     /**
+     * @brief Gets the size of the unit the file system stores a file in.
+     * @return Bytes per block.
+     */
+    uint32_t getBlockSize() override;
+
+    /**
      * @brief Set a custom attribute on a file or directory.
      * @param path The path of the file or directory.
      * @param type User-defined attribute identifier (0-255).

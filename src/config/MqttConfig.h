@@ -48,7 +48,7 @@ created Date    : 1st June 2019
 #endif
 
 #ifndef MQTT_SEND_TIMEOUT_MS
-#define MQTT_SEND_TIMEOUT_MS       MILLISECOND_DURATION_5000 /* unused: counted down per tick, but nothing acts on it yet */
+#define MQTT_SEND_TIMEOUT_MS       MILLISECOND_DURATION_5000 /* how long the connection may take nothing from the send queue before the client reconnects */
 #endif
 
 #ifndef MQTT_PACKET_READ_WAIT_MS
@@ -60,6 +60,31 @@ created Date    : 1st June 2019
 
 #ifndef MQTT_RECV_PACKETS_PER_TASK
 #define MQTT_RECV_PACKETS_PER_TASK 3 /* packets read from the broker in one task before yielding to the rest */
+#endif
+
+#ifndef MQTT_PACKET_MAX
+#define MQTT_PACKET_MAX            1024 /* largest packet the client builds for a publish */
+#endif
+
+#ifndef MQTT_SEND_QUEUE_MAX
+#define MQTT_SEND_QUEUE_MAX        2048 /* most packet bytes waiting in the send queue at once */
+#endif
+
+typedef struct {
+  uint8_t *m_data;
+  uint16_t m_len;
+} mqtt_packet_t;
+
+#ifndef MQTT_INFLIGHT_MAX
+#define MQTT_INFLIGHT_MAX          4 /* qos 1 publishes sent and not yet acknowledged before the client waits for an answer */
+#endif
+
+#ifndef MQTT_SEND_ROOM_WAIT_MS
+#define MQTT_SEND_ROOM_WAIT_MS     200 /* how long one pass waits for the connection to take the next packet before leaving it queued */
+#endif
+
+#ifndef MQTT_DRAIN_INTERVAL_MS
+#define MQTT_DRAIN_INTERVAL_MS     10 /* how often the client's timer runs while a message waits to go or a broker answer is due */
 #endif
 
 #ifndef MQTT_SEND_PACKETS_PER_TASK

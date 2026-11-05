@@ -34,6 +34,7 @@ struct DeviceIotCommand : public CommandBase {
 	DeviceIotCommand(){
 		Clear();
 		SetCommand(CMD_NAME_IOT);
+		setArgs(RODT_ATTR(""), 1);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_COMMA);
 	}
@@ -136,8 +137,7 @@ struct DeviceIotCommand : public CommandBase {
 					return CMD_ERROR_ARGS_MISSING;
 				}
 			}else{
-				// subverb parsed but did not match any known keyword
-				result = CMD_ERROR_OPT;
+				result = refuseArg(RODT_ATTR(CMD_MSG_UNKNOWN_SUBCOMMAND), cmdoptn1->optionval, cmdoptn1->optionvalsize, CMD_ERROR_OPT);
 			}
 		}else{
 			result = CMD_ERROR_INVAL;

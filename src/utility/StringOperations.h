@@ -53,6 +53,25 @@ int __strstr_unquoted(const char *str, const char *substr, int _len = 300);
 int32_t __strstr(const char *str, uint32_t _strlen, const char *substr, uint32_t _substrlen, uint32_t _from = 0);
 
 /**
+ * @brief Whether a name matches a shell glob: `*` any run, `?` one character, `[...]` a set
+ * or range, `[!...]` its complement, and a backslash taking the next character literally.
+ * @param _pattern The glob to match against.
+ * @param _plen The length of the glob.
+ * @param _str The name to test.
+ * @param _slen The length of the name.
+ * @return True when the whole name matches the whole glob.
+ */
+bool __glob_match(const char *_pattern, uint32_t _plen, const char *_str, uint32_t _slen);
+
+/**
+ * @brief The 32 bit FNV-1a hash of a run of bytes, for telling lines apart cheaply.
+ * @param _data The bytes to hash.
+ * @param _len The number of bytes.
+ * @return The hash value.
+ */
+uint32_t __hash32(const char *_data, uint32_t _len);
+
+/**
  * Appends text as one fixed width column, padding it out or truncating it to
  * the width, the way iTerminalInterface::write_pad writes one.
  */

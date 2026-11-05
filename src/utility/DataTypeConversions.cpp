@@ -120,17 +120,23 @@ int32_t StringToInt32(const char *pString, uint8_t _len)
         n++;
     }
 
-    int32_t value = 0;
+    int64_t value = 0;
 
     while ((*pString >= '0' && *pString <= '9') && n < _len)
     {
-        value *= 10;
-        value += *pString - '0';
+        if (value <= (int64_t)INT32_MAX + 1)
+        {
+            value = value * 10 + (*pString - '0');
+        }
         pString++;
         n++;
     }
 
-    return negative ? -value : value;
+    if (negative)
+    {
+        return (value > (int64_t)INT32_MAX + 1) ? INT32_MIN : (int32_t)(-value);
+    }
+    return (value > (int64_t)INT32_MAX) ? INT32_MAX : (int32_t)value;
 }
 
 uint32_t StringToUint32(const char *pString, uint8_t _len)
@@ -270,6 +276,59 @@ uint16_t StringToHex16(const char *pString, uint8_t _strlen)
         pString++;
     }
     return hexValue;
+}
+
+/**
+ * @brief Converts a hexadecimal string to a 64-bit value.
+ *        Leading spaces and quotes are skipped; the first non-hex character ends it.
+ * @param pString The string to convert.
+ * @param _len The maximum length of the string.
+ * @param _digits Where the count of hex digits read is put, when given; more than 16 means the value did not fit.
+ * @return The parsed 64-bit value.
+ */
+uint64_t StringToHex64(const char *pString, uint8_t _len, uint8_t *_digits)
+{
+    uint64_t value = 0;
+    uint8_t digits = 0;
+
+    if (nullptr != pString)
+    {
+        uint8_t n = 0;
+
+        while (n < _len && (*pString == ' ' || *pString == '"')) { pString++; n++; }
+
+        while (n < _len)
+        {
+            char c = *pString;
+            uint8_t nibble;
+
+            if (c >= '0' && c <= '9') nibble = (uint8_t)(c - '0');
+            else if (c >= 'a' && c <= 'f') nibble = (uint8_t)(10 + c - 'a');
+            else if (c >= 'A' && c <= 'F') nibble = (uint8_t)(10 + c - 'A');
+            else break;
+
+            value = (value << 4) | nibble;
+            if (digits < 0xFF) digits++;
+            pString++;
+            n++;
+        }
+    }
+
+    if (nullptr != _digits) *_digits = digits;
+    return value;
+}
+
+/**
+ * @brief Converts a hexadecimal string to a 32-bit value.
+ *        Leading spaces and quotes are skipped; the first non-hex character ends it.
+ * @param pString The string to convert.
+ * @param _len The maximum length of the string.
+ * @param _digits Where the count of hex digits read is put, when given; more than 8 means the value did not fit.
+ * @return The parsed 32-bit value.
+ */
+uint32_t StringToHex32(const char *pString, uint8_t _len, uint8_t *_digits)
+{
+    return (uint32_t)StringToHex64(pString, _len, _digits);
 }
 
 /**
@@ -537,11 +596,12 @@ pdiutil::string BytesToMacString(const uint8_t *bytes, uint8_t bytelen, char sep
 /**
  * @brief Renders a permission bitmask in the ten character `ls -l` form.
  */
-void FilePermsToString(uint16_t perms, bool isdir, char *out)
+void FilePermsToString(uint16_t perms, file_type_t type, char *out)
 {
     if (nullptr == out) return;
     static const char kRwx[3] = { 'r', 'w', 'x' };
-    out[0] = isdir ? 'd' : '-';
+    static const char kType[FILE_TYPE_MAX] = { '-', 'd', 'l', 'c', 'b' };
+    out[0] = (type < FILE_TYPE_MAX) ? kType[type] : '-';
     for (uint8_t b = 0; b < 9; b++) {
         out[1 + b] = (perms & (1 << (8 - b))) ? kRwx[b % 3] : '-';
     }
@@ -573,6 +633,36 @@ bool HexStringToBytes(const char *hex, uint8_t bytelen, uint8_t *out)
         out[i] = (hi << 4) | lo;
     }
     return true;
+}
+
+/**
+ * @brief Reads the number a string starts with: blanks, a sign, digits and a fraction.
+ * @param pString The string to read.
+ * @return The number read, or zero when the string starts with none.
+ */
+double StringToDouble(const char *pString)
+{
+    if (nullptr == pString) return 0;
+
+    while (' ' == *pString || '\t' == *pString) pString++;
+    bool negative = ('-' == *pString);
+    if ('-' == *pString || '+' == *pString) pString++;
+
+    double value = 0;
+    while (*pString >= '0' && *pString <= '9') {
+        value = value * 10 + (*pString - '0');
+        pString++;
+    }
+    if ('.' == *pString) {
+        pString++;
+        double scale = 0.1;
+        while (*pString >= '0' && *pString <= '9') {
+            value += (*pString - '0') * scale;
+            scale /= 10;
+            pString++;
+        }
+    }
+    return negative ? -value : value;
 }
 
 /**
@@ -1142,6 +1232,71 @@ bool ParseUint32(const char *pString, uint16_t _len, uint32_t &out)
 }
 
 /**
+ * @brief Reads a number written as nothing but octal digits, no larger than max.
+ * @param pString The digits.
+ * @param _len How many characters to read.
+ * @param max The largest value taken.
+ * @param out The number, set only when the digits are one.
+ * @return Whether every character was an octal digit and the number fit max.
+ */
+bool ParseOctal(const char *pString, uint16_t _len, uint32_t max, uint32_t &out)
+{
+    if (nullptr == pString || 0 == _len) {
+        return false;
+    }
+    uint32_t value = 0;
+    for (uint16_t i = 0; i < _len; i++) {
+        if (pString[i] < '0' || pString[i] > '7') {
+            return false;
+        }
+        value = (value << 3) | (uint32_t)(pString[i] - '0');
+        if (value > max) {
+            return false;
+        }
+    }
+    out = value;
+    return true;
+}
+
+/**
+ * @brief Reads a whole number, an optional sign then nothing but digits, that
+ *        fits 64 bits.
+ * @param pString The text.
+ * @param _len How many characters to read.
+ * @param out The number, set only when the text is one.
+ * @return Whether the text was a number and it fit.
+ */
+bool ParseInt64(const char *pString, uint16_t _len, int64_t &out)
+{
+    if (nullptr == pString || 0 == _len) {
+        return false;
+    }
+    uint16_t i = 0;
+    bool negative = false;
+    if ('-' == pString[0] || '+' == pString[0]) {
+        negative = ('-' == pString[0]);
+        i = 1;
+    }
+    if (i >= _len) {
+        return false;
+    }
+    uint64_t limit = negative ? (uint64_t)INT64_MAX + 1 : (uint64_t)INT64_MAX;
+    uint64_t value = 0;
+    for (; i < _len; i++) {
+        if (pString[i] < '0' || pString[i] > '9') {
+            return false;
+        }
+        uint64_t digit = (uint64_t)(pString[i] - '0');
+        if (value > (limit - digit) / 10) {
+            return false;
+        }
+        value = value * 10 + digit;
+    }
+    out = negative ? (int64_t)(0 - value) : (int64_t)value;
+    return true;
+}
+
+/**
  * @brief Writes a size in bytes as fdisk, lsblk and df -h do: "3.7G" short, "3.75
  * GiB" long.
  * @param bytes The size.
@@ -1154,17 +1309,34 @@ void BytesToSizeString(uint64_t bytes, bool shortform, char *out, uint8_t outsiz
   if( nullptr == out || 0 == outsize ){
     return;
   }
-  const char units[] = {'B', 'K', 'M', 'G', 'T'};
+  const char units[] = {'B', 'K', 'M', 'G', 'T', 'P', 'E'};
   uint8_t unit = 0;
   uint64_t whole = bytes;
-  while( unit < 4 && whole >= 1024 ){
+  while( unit < 6 && whole >= 1024 ){
     whole /= 1024;
     unit++;
   }
-  uint8_t decimals = shortform ? ((whole < 10 && unit > 0) ? 1 : 0) : ((unit > 0) ? 2 : 0);
-  uint64_t scale = (1 == decimals) ? 10 : (2 == decimals) ? 100 : 1;
-  uint64_t divisor = (uint64_t)1 << (10 * unit);
-  uint64_t scaled = (bytes * scale + divisor / 2) / divisor;
+  uint8_t decimals = 0;
+  uint64_t scale = 1;
+  uint64_t scaled = 0;
+  for( ;; ){
+    decimals = shortform ? ((whole < 10 && unit > 0) ? 1 : 0) : ((unit > 0) ? 2 : 0);
+    scale = (1 == decimals) ? 10 : (2 == decimals) ? 100 : 1;
+    uint64_t divisor = (uint64_t)1 << (10 * unit);
+    uint64_t rest = bytes % divisor;
+    uint64_t part = divisor;
+    while( part > ((uint64_t)1 << 40) ){
+      rest >>= 10;
+      part >>= 10;
+    }
+    scaled = (bytes / divisor) * scale + (rest * scale + part / 2) / part;
+    if( unit > 0 && unit < 6 && scaled >= 1024 * scale ){
+      unit++;
+      whole = bytes >> (10 * unit);
+      continue;
+    }
+    break;
+  }
   uint64_t integer = scaled / scale;
   uint64_t fraction = scaled % scale;
   if( 2 == decimals && 0 == fraction % 10 ){
@@ -1199,7 +1371,7 @@ void BytesToSizeString(uint64_t bytes, bool shortform, char *out, uint8_t outsiz
   if( shortform ){
     if( at + 1 < outsize ) out[at++] = units[unit];
   }else{
-    const char *suffix = (0 == unit) ? " B" : (1 == unit) ? " KiB" : (2 == unit) ? " MiB" : (3 == unit) ? " GiB" : " TiB";
+    const char *suffix = (0 == unit) ? " B" : (1 == unit) ? " KiB" : (2 == unit) ? " MiB" : (3 == unit) ? " GiB" : (4 == unit) ? " TiB" : (5 == unit) ? " PiB" : " EiB";
     for( const char *c = suffix; '\0' != *c && at + 1 < outsize; c++ ) out[at++] = *c;
   }
   out[at] = '\0';

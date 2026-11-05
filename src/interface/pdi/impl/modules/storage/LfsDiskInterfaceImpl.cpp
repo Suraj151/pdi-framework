@@ -69,6 +69,15 @@ pdi_err_t LfsDiskWindow::locate(uint64_t address, uint64_t size, iBlockDriverInt
     return PDI_OK;
 }
 
+/**
+ * Whether the node still reaches the disk of the serial the window was made for.
+ */
+bool LfsDiskWindow::present() {
+    uint32_t first = 0, span = 0;
+    iBlockDriverInterface *disk = __i_devfs.blockWindow(m_node.c_str(), first, span);
+    return nullptr != disk && disk->serial() == m_serial;
+}
+
 LfsDiskInterfaceImpl::LfsDiskInterfaceImpl(const char *node, uint32_t serial, uint32_t span)
     : LfsDiskWindowHolder(node, serial, span), FileSystemInterfaceImpl(m_window, false) {
 }

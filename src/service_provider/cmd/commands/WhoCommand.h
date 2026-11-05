@@ -32,6 +32,7 @@ struct WhoCommand : public CommandBase {
 	WhoCommand(){
 		Clear();
 		SetCommand(CMD_NAME_WHO);
+		setArgs(RODT_ATTR(""), 0);
 	}
 
 	static void RegisterCommand(){

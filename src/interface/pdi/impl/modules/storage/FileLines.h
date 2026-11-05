@@ -41,8 +41,17 @@ struct FileLines {
   static int getLineNumbersInFile(iFileSystemInterface &fs, const char* path, pdiutil::vector<uint32_t> &linenumberindices, int maxlinenumbers, int linenumberoffset, CallBackVoidArgFn yield);
 
   /**
+   * Reads the line starting at offset without its line end; cut is set when the
+   * heap could not hold it whole, and keepgoing can end the read early. The
+   * bytes the line spans, or a negative error code.
+   */
+  static int readLineAt(iFileSystemInterface &fs, const char* path, uint64_t offset, pdiutil::string &linedata,
+                        bool *cut = nullptr, CallBackVoidArgBoolRetFn keepgoing = nullptr, uint32_t chunk = 128);
+
+  /**
    * Reads a line of a file, negative numbers counting from the end, matched to
-   * pattern when given; the bytes read.
+   * pattern when given; the bytes read, or PDI_ERR_NO_MEM for a line the heap
+   * could not hold whole.
    */
   static int readLineInFile(iFileSystemInterface &fs, const char* path, int32_t linenumber, pdiutil::string &linedata, const char* pattern, CallBackVoidArgFn yield);
 };

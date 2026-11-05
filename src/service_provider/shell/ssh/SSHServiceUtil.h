@@ -60,12 +60,15 @@ struct SSHSubsystemRequest {
         pdiutil::string filepath;
         pdiutil::string handle; // Handle for the sftp, if needed. currently supporting 1 only at a time
         pdi_fhandle_t file = -1;
-        uint32_t fxp_write_totalrecvd = 0; // Total bytes received for current write operation
-        uint32_t fxp_write_expectedrecvlen = 0; // Expected total length for current
-        uint8_t fxp_write_header[28] = {0}; // per-session reassembled SSH_FXP_WRITE header
-        uint64_t fxp_write_headeroffset = 0; // per-session base file offset for the write
+        uint32_t write_left = 0;
+        uint64_t write_at = 0;
+        uint32_t write_id = 0;
+        uint32_t write_status = 0;
+        bool held = false;
+        uint32_t reply_held_at = 0;
 
         pdiutil::vector<uint8_t> rx_accum;
+        pdiutil::vector<uint8_t> reply_held;
 
         // Directory-handle state for SSH_FXP_OPENDIR/READDIR.
         struct Entry {
@@ -100,7 +103,6 @@ struct SSHChannel {
     SSHPtyReq pty_req;
     SSHSubsystemRequest subsystem_req;
     int ischannelreqsuccess = -1;
-    pdiutil::function<bool(pdiutil::vector<uint8_t> &)> doHandleBolusChannelDataChunksCb = nullptr; // If provided, handle client bolus chunks
 };
 
 // SSH key exchange initialization fields
@@ -244,6 +246,14 @@ struct LWSSHSession {
     uint32_t packets_seq_num_ctos; // Sequence number for client-to-server packets
     uint32_t packets_seq_num_stoc; // Sequence number for server-to-client packets
 
+    pdiutil::vector<uint8_t> m_txpending;
+    uint32_t m_txsent = 0;
+    uint32_t m_txprogressat = 0;
+    pdiutil::vector<uint8_t> m_rxpacket;
+    uint8_t m_rxheader[4] = {0};
+    uint32_t m_rxwanted = 0;
+    uint32_t m_rxprogressat = 0;
+
     SSHChannel current_channel; // For single-channel servers. currently keeping single channle only.
     ssh_config_t m_ssh_config;  // Per-session auth policy, loaded lazily before userauth.
     bool m_ssh_config_loaded = false;
@@ -279,7 +289,7 @@ bool parse_kex_ecdh_init(const pdiutil::vector<uint8_t>& payload, EcdhInitPacket
 bool parse_channel_open_request(LWSSHSession* session, ssh_packet &packet);
 bool parse_channel_request(const pdiutil::vector<uint8_t>& payload, SSHChannelRequest& req);
 bool parse_channel_request_pty_req(LWSSHSession* session, const pdiutil::vector<uint8_t>& data);
-bool parse_channel_data_request(const pdiutil::vector<uint8_t>& payload, SSHChannelData& datareq);
+int parse_channel_data_request(pdiutil::vector<uint8_t>& payload, SSHChannelData& datareq);
 
 void append_name_list(pdiutil::vector<uint8_t>& out, const ssh_name_list& names);
 void append_ssh_string(pdiutil::vector<uint8_t>& out, const pdiutil::vector<uint8_t>& data);
@@ -290,6 +300,18 @@ void prepare_server_kexinit(pdiutil::vector<uint8_t> &payload);
 void encrypt_ssh_payload(LWSSHSession* session, pdiutil::vector<uint8_t> &payload);
 void prepare_ssh_packet(pdiutil::vector<uint8_t> &payload, int32_t block_size = 8);
 bool send_server_ssh_packet(LWSSHSession* session, pdiutil::vector<uint8_t> &payload, bool encrypt = false);
+
+/**
+ * Sends what the session's output queue holds as far as the connection takes it now;
+ * true once nothing is left, false while bytes wait or once the session was closed.
+ */
+bool drain_ssh_output(LWSSHSession* session);
+
+/**
+ * Whether channel data of this length can be sent now: nothing waits in the output
+ * queue and the client's window has room for it.
+ */
+bool can_send_channel_data(LWSSHSession* session, uint32_t length);
 bool read_ssh_string(const pdiutil::vector<uint8_t>& payload, pdiutil::string& str, int32_t &offset);
 bool read_ssh_string(const pdiutil::vector<uint8_t>& payload, pdiutil::vector<uint8_t>& str, int32_t &offset);
 bool send_channel_open_confirmation(LWSSHSession* session, uint32_t window_size, uint32_t max_packet);
@@ -301,7 +323,7 @@ bool send_channel_open_confirmation(LWSSHSession* session, uint32_t window_size,
 bool consume_channel_window(LWSSHSession* session, uint32_t bytes);
 bool send_channel_data(LWSSHSession* session, const char* data, uint32_t length);
 
-void build_exchange_hash(
+bool build_exchange_hash(
     const pdiutil::string &client_version,           // e.g. "SSH-2.0-OpenSSH_9.0"
     const pdiutil::string &server_version,           // e.g. "SSH-2.0-LWSSH_0.1"
     const pdiutil::vector<uint8_t> &client_kexinit,  // raw KEXINIT payload (not SSH packet)

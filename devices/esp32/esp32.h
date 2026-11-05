@@ -13,6 +13,7 @@ created Date    : 1st Jan 2024
 
 #include <Arduino.h>
 #include <Esp.h>
+#include <esp_heap_caps.h>
 #include "spi_flash_mmap.h"
 #include "esp_rom_spiflash.h"
 #include <esp_mac.h>
@@ -117,6 +118,22 @@ created Date    : 1st Jan 2024
 #define tcp_connect(pcb, ip, port, connected) TCP_LOCKED_CALL_RETVAL(tcp_connect(pcb, ip, port, connected))
 
 #define NAPT_INIT_DURATION_AFTER_WIFI_CONNECT MILLISECOND_DURATION_5000
+
+/**
+ * A received chain moved into one heap buffer, so the network driver's receive
+ * buffers it arrived in are free at once; the chain as it was when the heap cannot take it.
+ */
+static inline struct pbuf *pdiOwnReceived(struct pbuf *p){
+    if (nullptr == p) {
+        return p;
+    }
+    struct pbuf *own = pbuf_clone(PBUF_RAW, PBUF_RAM, p);
+    if (nullptr == own) {
+        return p;
+    }
+    pbuf_free(p);
+    return own;
+}
 
 #include <interface/pdi/impl/log/LogMacros.h>
 

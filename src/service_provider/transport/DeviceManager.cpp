@@ -159,6 +159,12 @@ DeviceManager::DeviceManager() : m_held_pins(0), m_held_buses(0), m_conf_size(0)
       SysLogW("DEV: %s not mounted from fstab: %d\n", device.c_str(), (int)code);
     });
   });
+  m_lost_listener = __utl_event.add_event_listener(EVENT_DEVICE_REMOVED, [](void *e){
+    uint8_t released = __i_fs.releaseLostMounts();
+    if( released > 0 ){
+      SysLogW("DEV: %u mount(s) lost their disk and were unmounted\n", (unsigned)released);
+    }
+  });
 #endif
 }
 
@@ -170,6 +176,7 @@ DeviceManager::~DeviceManager()
 {
 #if defined(ENABLE_DISK_FS) && defined(ENABLE_DEVFS)
   __utl_event.remove_event_listener(m_fstab_listener);
+  __utl_event.remove_event_listener(m_lost_listener);
 #endif
   if( anyBusy() ){
     uint32_t began = __i_dvc_ctrl.millis_now();
@@ -862,12 +869,11 @@ void DeviceManager::look(serial_iface_t bus, iSerialInterface *iface)
 
 /**
  * Takes a device whose probe held the scan too long out of later scans, until
- * udevadm trigger probes it again.
+ * udevadm trigger probes it again; what that probe answered still stands.
  */
 void DeviceManager::leaveOutOfScan(driver_device_t &dev, uint32_t took)
 {
   dev.m_unscanned = true;
-  dev.m_seen = (DEVICE_STATE_ABSENT != dev.m_state);
   pdiutil::string id;
   pdiutil::string bus;
   deviceId(dev, id);
@@ -1150,13 +1156,24 @@ void DeviceManager::loadConf()
   pdiutil::vector<driver_device_t> buslines;
   pdiutil::string path = CHARPTR_WRAP(DEVICES_CONF_PATH);
   pdiutil::string line;
+  bool cut = false;
 
   __i_fs.beginPrivileged();
   if( __i_fs.isFileExist(path.c_str()) ){
     __i_fs.readFile(path.c_str(), 64, [&](char *data, uint32_t size)->bool{
       for( uint32_t i = 0; i < size; i++ ){
         if( '\n' != data[i] ){
-          line += data[i];
+          if( !cut ){
+            pdiutil::string::size_type held = line.size();
+            line += data[i];
+            cut = ( line.size() == held );
+          }
+          continue;
+        }
+        if( cut ){
+          SysLogW("DEV: %s line longer than the heap could hold, not taken\n", path.c_str());
+          line.clear();
+          cut = false;
           continue;
         }
         driver_device_t dev;
@@ -1174,6 +1191,11 @@ void DeviceManager::loadConf()
     });
   }
   __i_fs.endPrivileged();
+
+  if( cut ){
+    SysLogW("DEV: %s line longer than the heap could hold, not taken\n", path.c_str());
+    line.clear();
+  }
 
   driver_device_t last;
   bool parsed = parseLine(line.c_str(), (uint16_t)line.size(), last);

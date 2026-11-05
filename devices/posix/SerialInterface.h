@@ -241,13 +241,16 @@ public:
   int m_reads;
   int m_writes;
   int m_clocks_deselected;
+  int m_commands[64];
 
 private:
-  enum SimState : uint8_t { SIM_COMMAND = 0, SIM_WRITE_TOKEN, SIM_WRITE_DATA, SIM_BUSY };
+  enum SimState : uint8_t { SIM_COMMAND = 0, SIM_WRITE_TOKEN, SIM_WRITE_DATA, SIM_BUSY, SIM_READ_MULTI, SIM_WRITE_MULTI };
 
   void command();
   void queue(uint8_t b);
   void queueBlock(const uint8_t *block, uint32_t len, bool data);
+  void queueNextRead();
+  void takeCommandByte(uint8_t in);
   bool blockAt(uint32_t arg, uint32_t &offset) const;
   void csd(uint8_t *out) const;
 
@@ -269,7 +272,9 @@ private:
   uint8_t m_in[SD_BLOCK_SIZE + 2];
   uint32_t m_inlen;
   uint32_t m_write_offset;
+  uint32_t m_read_offset;
   int m_busy_left;
+  uint8_t m_after_busy;
 };
 
 /**

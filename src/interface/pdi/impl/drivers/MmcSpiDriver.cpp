@@ -21,6 +21,8 @@ namespace {
 const uint8_t s_sd_idle = 0x01;
 const uint8_t s_sd_illegal = 0x04;
 const uint8_t s_sd_data_token = 0xFE;
+const uint8_t s_sd_multi_token = 0xFC;
+const uint8_t s_sd_stop_token = 0xFD;
 const uint8_t s_sd_accepted = 0x05;
 const uint8_t s_sd_crc_rejected = 0x0B;
 const uint8_t s_sd_answer_wait = 8;
@@ -458,6 +460,34 @@ pdi_err_t MmcSpiDriver::readBlock(uint32_t block, uint8_t *buf)
 }
 
 /**
+ * Sends one block behind the token given and waits for the card to store it.
+ */
+pdi_err_t MmcSpiDriver::sendBlock(uint8_t token, const uint8_t *buf)
+{
+  uint8_t lead[2] = {0xFF, token};
+  m_bus->exchange(lead, nullptr, sizeof(lead));
+  m_bus->exchange(buf, nullptr, SD_BLOCK_SIZE);
+  uint16_t sum = crc16CcittUpdate(0, buf, SD_BLOCK_SIZE);
+  uint8_t crc[2] = {(uint8_t)(sum >> 8), (uint8_t)(sum & 0xFF)};
+  m_bus->exchange(crc, nullptr, sizeof(crc));
+
+  uint8_t response = 0xFF;
+  m_bus->exchange(nullptr, &response, 1);
+
+  if( 0xFF == response ){
+    return PDI_ERR_NOT_FOUND;
+  }
+  if( s_sd_crc_rejected == (response & 0x1F) ){
+    return PDI_ERR_CRC;
+  }
+  if( s_sd_accepted != (response & 0x1F) ){
+    SysLogW("SD: card refused a write with response %x\n", (unsigned int)response);
+    return PDI_ERR_IO;
+  }
+  return waitStored();
+}
+
+/**
  * Stores one block.
  */
 pdi_err_t MmcSpiDriver::writeBlock(uint32_t block, const uint8_t *buf)
@@ -473,30 +503,92 @@ pdi_err_t MmcSpiDriver::writeBlock(uint32_t block, const uint8_t *buf)
     return answerError(r1);
   }
 
-  uint8_t lead[2] = {0xFF, s_sd_data_token};
-  m_bus->exchange(lead, nullptr, sizeof(lead));
-  m_bus->exchange(buf, nullptr, SD_BLOCK_SIZE);
-  uint16_t sum = crc16CcittUpdate(0, buf, SD_BLOCK_SIZE);
-  uint8_t crc[2] = {(uint8_t)(sum >> 8), (uint8_t)(sum & 0xFF)};
-  m_bus->exchange(crc, nullptr, sizeof(crc));
-
-  uint8_t response = 0xFF;
-  m_bus->exchange(nullptr, &response, 1);
-
-  pdi_err_t stored = PDI_OK;
-  if( 0xFF == response ){
-    stored = PDI_ERR_NOT_FOUND;
-  }else if( s_sd_crc_rejected == (response & 0x1F) ){
-    stored = PDI_ERR_CRC;
-  }else if( s_sd_accepted != (response & 0x1F) ){
-    SysLogW("SD: card refused a write with response %x\n", (unsigned int)response);
-    stored = PDI_ERR_IO;
-  }else{
-    stored = waitStored();
-  }
-
+  pdi_err_t stored = sendBlock(s_sd_data_token, buf);
   finish();
   return stored;
+}
+
+/**
+ * Ends a multiple block read: CMD12, the byte the card sends before its answer
+ * skipped, then its busy wait.
+ */
+pdi_err_t MmcSpiDriver::stopReading()
+{
+  uint8_t frame[6] = {(uint8_t)(0x40 | 12), 0, 0, 0, 0, 0};
+  frame[5] = (uint8_t)((crc7(frame, 5) << 1) | 0x01);
+  m_bus->exchange(frame, nullptr, sizeof(frame));
+  m_bus->exchange(nullptr, nullptr, 1);
+
+  for( uint8_t i = 0; i < s_sd_answer_wait; i++ ){
+    uint8_t r1 = 0xFF;
+    m_bus->exchange(nullptr, &r1, 1);
+    if( 0 == (r1 & 0x80) ){
+      return (0 == r1) ? waitStored() : PDI_ERR_IO;
+    }
+  }
+  return PDI_ERR_NOT_FOUND;
+}
+
+/**
+ * Reads the blocks given with one CMD18, each block's token and CRC checked, a
+ * yield between blocks.
+ */
+pdi_err_t MmcSpiDriver::readRun(uint32_t block, uint8_t *buf, uint32_t count)
+{
+  pdi_err_t opened = m_bus->begin(m_cs, m_clock, 0);
+  if( PDI_OK != opened ){
+    return opened;
+  }
+
+  int16_t r1 = command(18, address(block));
+  if( 0 != r1 ){
+    finish();
+    return answerError(r1);
+  }
+
+  pdi_err_t got = PDI_OK;
+  for( uint32_t i = 0; i < count && PDI_OK == got; i++ ){
+    got = receive(buf + i * SD_BLOCK_SIZE, SD_BLOCK_SIZE);
+    if( PDI_OK == got && i + 1 < count ){
+      __i_dvc_ctrl.yield();
+    }
+  }
+
+  pdi_err_t stopped = stopReading();
+  finish();
+  return (PDI_OK != got) ? got : stopped;
+}
+
+/**
+ * Stores the blocks given with one CMD25, each block's response and busy wait
+ * checked, ended by the stop token.
+ */
+pdi_err_t MmcSpiDriver::writeRun(uint32_t block, const uint8_t *buf, uint32_t count)
+{
+  pdi_err_t opened = m_bus->begin(m_cs, m_clock, 0);
+  if( PDI_OK != opened ){
+    return opened;
+  }
+
+  int16_t r1 = command(25, address(block));
+  if( 0 != r1 ){
+    finish();
+    return answerError(r1);
+  }
+
+  pdi_err_t stored = PDI_OK;
+  for( uint32_t i = 0; i < count && PDI_OK == stored; i++ ){
+    stored = sendBlock(s_sd_multi_token, buf + i * SD_BLOCK_SIZE);
+    if( PDI_OK == stored && i + 1 < count ){
+      __i_dvc_ctrl.yield();
+    }
+  }
+
+  uint8_t stop[2] = {s_sd_stop_token, 0xFF};
+  m_bus->exchange(stop, nullptr, sizeof(stop));
+  pdi_err_t done = waitStored();
+  finish();
+  return (PDI_OK != stored) ? stored : done;
 }
 
 /**
@@ -513,20 +605,14 @@ int32_t MmcSpiDriver::readBlocks(uint32_t block, uint8_t *buf, uint32_t count)
   if( block >= m_blocks || count > m_blocks - block ){
     return PDI_ERR_NO_SPACE;
   }
+  if( 0 == count ){
+    return 0;
+  }
 
   m_busy = true;
-  for( uint32_t i = 0; i < count; i++ ){
-    pdi_err_t got = readBlock(block + i, buf + i * SD_BLOCK_SIZE);
-    if( PDI_OK != got ){
-      m_busy = false;
-      return got;
-    }
-    if( i + 1 < count ){
-      __i_dvc_ctrl.yield();
-    }
-  }
+  pdi_err_t got = (1 == count) ? readBlock(block, buf) : readRun(block, buf, count);
   m_busy = false;
-  return (int32_t)count;
+  return (PDI_OK == got) ? (int32_t)count : got;
 }
 
 /**
@@ -543,20 +629,14 @@ int32_t MmcSpiDriver::writeBlocks(uint32_t block, const uint8_t *buf, uint32_t c
   if( block >= m_blocks || count > m_blocks - block ){
     return PDI_ERR_NO_SPACE;
   }
+  if( 0 == count ){
+    return 0;
+  }
 
   m_busy = true;
-  for( uint32_t i = 0; i < count; i++ ){
-    pdi_err_t stored = writeBlock(block + i, buf + i * SD_BLOCK_SIZE);
-    if( PDI_OK != stored ){
-      m_busy = false;
-      return stored;
-    }
-    if( i + 1 < count ){
-      __i_dvc_ctrl.yield();
-    }
-  }
+  pdi_err_t stored = (1 == count) ? writeBlock(block, buf) : writeRun(block, buf, count);
   m_busy = false;
-  return (int32_t)count;
+  return (PDI_OK == stored) ? (int32_t)count : stored;
 }
 
 #endif

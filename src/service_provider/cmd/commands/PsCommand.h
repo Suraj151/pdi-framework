@@ -26,6 +26,7 @@ struct PsCommand : public CommandBase {
 	PsCommand(){
 		Clear();
 		SetCommand(CMD_NAME_PS);
+		setArgs(RODT_ATTR(""), 1);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
@@ -58,11 +59,16 @@ struct PsCommand : public CommandBase {
 
 		uint8_t filter_owner = 0xFF;
 		CommandOption *ucmdoptn = &m_options[0];
-		if( nullptr != ucmdoptn && nullptr != ucmdoptn->optionval && ucmdoptn->optionvalsize > 0 ){
-			filter_owner = (uint8_t)StringToUint16(ucmdoptn->optionval, ucmdoptn->optionvalsize);
+		if( optionGiven(ucmdoptn) ){
+			uint32_t sid = 0;
+			pdi_err_t taken = takeNumber(RODT_ATTR("invalid sid : "), ucmdoptn->optionval, ucmdoptn->optionvalsize, 0, 0xFE, sid);
+			if( PDI_OK != taken ){
+				return taken;
+			}
+			filter_owner = (uint8_t)sid;
 		}
 
-		printProcessTable(m_terminal, filter_owner);
+		printProcessTable(m_terminal, filter_owner, false);
 		return PDI_OK;
 	}
 };

@@ -13,6 +13,8 @@ created Date    : 1st June 2019
 #include "Common.h"
 
 #define WIFI_CONFIGS_BUF_SIZE 30
+/* bytes a typed address may take on the wifi page, with its terminator */
+#define WIFI_CONFIGS_IP_BUF_SIZE 20
 
 #define DEFAULT_USERNAME     USER
 #define DEFAULT_PASSWORD     PASSPHRASE
@@ -41,6 +43,7 @@ const uint8_t DEFAULT_AP_SUBNET    [] = {255, 255, 255, 0};
  */
 typedef struct {
   bool wifi_connected;
+  bool wifi_joined_since_boot;
   bool internet_available;
   uint32_t last_internet_millis;
   uint8_t ignore_bssid[6];

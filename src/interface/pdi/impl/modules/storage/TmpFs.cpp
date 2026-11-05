@@ -126,7 +126,14 @@ int TmpFs::putContent(const pdiutil::string& norm, const char* content, uint32_t
         n.m_type = FILE_TYPE_REG;
         stampNew(n, FILE_PERM_DEFAULT_FILE);
         if (content && size > 0) n.m_data.append(content, size);
+        if (n.m_data.length() != (content ? size : 0)) return PDI_ERR_NO_MEM;
+        uint32_t count = (uint32_t)m_nodes.size();
         m_nodes.push_back(n);
+        if (m_nodes.size() != count + 1) return PDI_ERR_NO_MEM;
+        if (m_nodes.back().m_data.length() != n.m_data.length()) {
+            m_nodes.pop_back();
+            return PDI_ERR_NO_MEM;
+        }
         return (int)size;
     }
 
@@ -136,7 +143,12 @@ int TmpFs::putContent(const pdiutil::string& norm, const char* content, uint32_t
     if (newused > TMPFS_MAX_BYTES) return PDI_ERR_NO_SPACE;
 
     if (!append) node.m_data.clear();
+    uint32_t kept = (uint32_t)node.m_data.length();
     if (content && size > 0) node.m_data.append(content, size);
+    if (content && size > 0 && node.m_data.length() != kept + size) {
+        node.m_data.resize(kept);
+        return PDI_ERR_NO_MEM;
+    }
     node.m_mtime = nowEpoch();
     return (int)size;
 }
@@ -168,6 +180,10 @@ int TmpFs::editFile(const char* path, uint64_t offset, const char* content, uint
     if (end > oldlen) {
         if (usedBytes() - oldlen + end > TMPFS_MAX_BYTES) return PDI_ERR_NO_SPACE;
         node.m_data.resize(end, '\0');
+        if (node.m_data.length() != end) {
+            node.m_data.resize(oldlen);
+            return PDI_ERR_NO_MEM;
+        }
     }
     for (uint32_t i = 0; i < size; ++i) {
         node.m_data[(uint32_t)offset + i] = content[i];
@@ -299,8 +315,15 @@ pdi_err_t TmpFs::copyFile(const char* sourcePath, const char* destPath, CallBack
     n.m_path = dst;
     n.m_type = FILE_TYPE_REG;
     n.m_data = m_nodes[sidx].m_data;
+    if (n.m_data.length() != len) return PDI_ERR_NO_MEM;
     stampNew(n, FILE_PERM_DEFAULT_FILE);
+    uint32_t count = (uint32_t)m_nodes.size();
     m_nodes.push_back(n);
+    if (m_nodes.size() != count + 1) return PDI_ERR_NO_MEM;
+    if (m_nodes.back().m_data.length() != len) {
+        m_nodes.pop_back();
+        return PDI_ERR_NO_MEM;
+    }
     return 0;
 }
 

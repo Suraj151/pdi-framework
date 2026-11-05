@@ -33,7 +33,8 @@ import re
 
 from .registry import test, expect_in, expect_not_in, Skip
 from ..driver.mdns import local_address_towards
-from ..driver.http_origin import Origin
+from ..driver.http_origin import Origin, chunked_body, patterned_body
+from .test_sftp import sftp_open
 
 W = "wt_"
 
@@ -401,3 +402,74 @@ def shell_is_not_left_behind(t):
                       "the shell is a command behind after a download")
     finally:
         cleanup(t, "i.bin")
+
+
+def stored(t, dest):
+    """The bytes the download left on the target, read back over sftp."""
+    client, sftp = sftp_open(t)
+    try:
+        with sftp.open(dest, "rb") as fh:
+            return fh.read()
+    finally:
+        sftp.close()
+        client.close()
+
+
+def expect_same_bytes(t, dest, body):
+    import hashlib
+    got = stored(t, dest)
+    if hashlib.md5(got).hexdigest() != hashlib.md5(body).hexdigest():
+        raise AssertionError("the stored file is not the body: %d bytes stored, %d sent, md5 %s against %s"
+                             % (len(got), len(body), hashlib.md5(got).hexdigest(),
+                                hashlib.md5(body).hexdigest()))
+
+
+def expect_whole_chunked(t, name, path):
+    body = chunked_body(path)
+    dest, out = fetch(t, name, path, timeout=240.0)
+    try:
+        text = outcome(out)
+        expect_in("saved %d bytes" % len(body), text, "the size reported is not the body's")
+        expect_same_bytes(t, dest, body)
+    finally:
+        cleanup(t, name)
+
+
+@test("a chunked body with chunks of 64 KiB and more is stored byte for byte", needs=("wget",))
+def chunked_wide_chunks(t):
+    expect_whole_chunked(t, "cw.bin", "/chunked-wide.bin")
+
+
+@test("a chunked body whose size lines carry an extension is stored byte for byte", needs=("wget",))
+def chunked_extension(t):
+    expect_whole_chunked(t, "ce.bin", "/chunked-ext.bin")
+
+
+@test("a chunked body whose size lines and chunk ends arrive in pieces is stored byte for byte",
+      needs=("wget",))
+def chunked_split_lines(t):
+    expect_whole_chunked(t, "cs.bin", "/chunked-split.bin")
+
+
+@test("a chunked body cut before its last chunk fails and leaves no file", needs=("wget",))
+def chunked_cut(t):
+    dest, out = fetch(t, "cc.bin", "/chunked-cut.bin", timeout=240.0)
+    try:
+        text = outcome(out)
+        expect_not_in("saved", text, "a cut chunked body was reported as saved")
+        expect_in("Failed to download", text, "a cut chunked body was not reported as failed")
+        expect_not_in("wt_cc.bin", t.run("ls /"), "a cut chunked body left a file behind")
+    finally:
+        cleanup(t, "cc.bin")
+
+
+@test("a body shorter than its declared length fails and leaves no file", needs=("wget",))
+def short_body(t):
+    dest, out = fetch(t, "sb.bin", "/short.bin", timeout=240.0)
+    try:
+        text = outcome(out)
+        expect_not_in("saved", text, "a short body was reported as saved")
+        expect_in("Failed to download", text, "a short body was not reported as failed")
+        expect_not_in("wt_sb.bin", t.run("ls /"), "a short body left a file behind")
+    finally:
+        cleanup(t, "sb.bin")

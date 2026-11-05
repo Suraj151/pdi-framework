@@ -20,6 +20,7 @@ struct UseraddCommand : public CommandBase {
 	UseraddCommand(){
 		Clear();
 		SetCommand(CMD_NAME_USERADD);
+		setArgs(RODT_ATTR(""), 2, true);
 		AddOption(CMD_OPTION_NAME_U);
 		AddOption(CMD_OPTION_NAME_P);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);

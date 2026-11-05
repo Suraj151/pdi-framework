@@ -33,6 +33,7 @@ struct NetworkCommand : public CommandBase {
 	NetworkCommand(){
 		Clear();
 		SetCommand(CMD_NAME_NETWORK);
+		setArgs(RODT_ATTR(""), 1);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_COMMA);
 	}
@@ -149,8 +150,7 @@ struct NetworkCommand : public CommandBase {
 
 				m_terminal->writeln_ro(RODT_ATTR("Check Station Status after 10 second using 'net ip' command"));
 			}else{
-				// subverb parsed but did not match any known keyword
-				result = CMD_ERROR_OPT;
+				result = refuseArg(RODT_ATTR(CMD_MSG_UNKNOWN_SUBCOMMAND), cmdoptn1->optionval, cmdoptn1->optionvalsize, CMD_ERROR_OPT);
 			}
 		}else{
 			result = CMD_ERROR_INVAL;

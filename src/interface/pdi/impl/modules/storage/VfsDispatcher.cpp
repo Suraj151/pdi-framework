@@ -13,6 +13,7 @@ Created Date    : 20th July 2026
 #ifdef ENABLE_STORAGE_SERVICE
 
 #include "VfsDispatcher.h"
+#include <utility/StringOperations.h>
 
 #include <service_provider/session/SessionManager.h>
 
@@ -369,6 +370,54 @@ pdi_err_t VfsDispatcher::umount(const char* prefix) {
     backend->unmounted();
     return PDI_OK;
 }
+
+/**
+ * Takes every disk mount whose disk is gone out of the namespace, as a lazy umount does;
+ * one holding open files is let go when the last closes. How many were taken out.
+ */
+uint8_t VfsDispatcher::releaseLostMounts() {
+    VFS_GUARD();
+
+    uint8_t released = 0;
+    for (uint8_t i = 0; i < m_mount_count; ++i) {
+        vfs_mount_t& m = m_mounts[i];
+        if (nullptr == m.m_backend || !m.m_removable || 0 == m.m_prefix_len || m.m_backend->diskPresent()) {
+            continue;
+        }
+
+        for (uint8_t s = 0; s < SessionManager::maxSessions(); ++s) {
+            session_t* session = SessionManager::getByIndex(s);
+            if (nullptr == session || SESSION_STATE_FREE == session->m_state) continue;
+            const char* cwd = session->m_cwd.c_str();
+            if (0 == strncmp(cwd, m.m_prefix, m.m_prefix_len) &&
+                ('\0' == cwd[m.m_prefix_len] || PATH_SEPARATOR_CHAR == cwd[m.m_prefix_len])) {
+                session->m_cwd = s_root_path;
+            }
+        }
+
+        m.m_prefix[0] = '\0';
+        m.m_prefix_len = 0;
+        finishLostMount(i);
+        released++;
+    }
+    return released;
+}
+
+/**
+ * Lets go of a mount taken out of the namespace once nothing is open on it.
+ */
+void VfsDispatcher::finishLostMount(uint8_t idx) {
+    if (idx >= m_mount_count) {
+        return;
+    }
+    vfs_mount_t& m = m_mounts[idx];
+    if (nullptr == m.m_backend || 0 != m.m_prefix_len || m.m_backend->openCount() > 0) {
+        return;
+    }
+    iFileSystemInterface* backend = m.m_backend;
+    m = vfs_mount_t();
+    backend->unmounted();
+}
 pdi_err_t VfsDispatcher::deleteDirectory(const char* path) {
     VFS_GUARD();
     if (!checkAccess(path, VFS_ACCESS_W)) return PDI_ERR_PERM;
@@ -388,7 +437,66 @@ int64_t VfsDispatcher::getFileSize(const char* path) {
 int VfsDispatcher::getDirFileList(const char* path, pdiutil::vector<file_info_t>& items, const char* pattern) {
     VFS_GUARD();
     if (!checkAccess(path, VFS_ACCESS_R)) return PDI_ERR_PERM;
-    VFS_ROUTE_PATH(getDirFileList, path, STORAGE_ERROR_NOT_MOUNTED, items, pattern);
+    const char* rel = nullptr;
+    iFileSystemInterface* b = resolve(path, &rel);
+    if (!b) return STORAGE_ERROR_NOT_MOUNTED;
+    int rc = b->getDirFileList(rel, items, pattern);
+    if (rc >= 0) {
+        addMountPoints(path, items, pattern);
+    }
+    return rc;
+}
+
+/**
+ * Adds an entry for each mount whose mount point sits directly in the listed
+ * directory, the way a linux listing shows a mount point as a directory.
+ */
+void VfsDispatcher::addMountPoints(const char* path, pdiutil::vector<file_info_t>& items, const char* pattern) {
+    if (nullptr == path) {
+        return;
+    }
+    uint32_t dirlen = (uint32_t)strlen(path);
+    while (dirlen > 1 && PATH_SEPARATOR_CHAR == path[dirlen - 1]) dirlen--;
+
+    for (uint8_t i = 0; i < m_mount_count; ++i) {
+        const vfs_mount_t& m = m_mounts[i];
+        if (nullptr == m.m_backend || m.m_prefix_len <= 1) continue;
+
+        uint32_t cut = m.m_prefix_len;
+        while (cut > 0 && PATH_SEPARATOR_CHAR != m.m_prefix[cut - 1]) cut--;
+        uint32_t parentlen = (cut > 1) ? cut - 1 : 1;
+        if (parentlen != dirlen || 0 != strncmp(m.m_prefix, path, dirlen)) continue;
+
+        const char* name = m.m_prefix + cut;
+        uint32_t namelen = (uint32_t)m.m_prefix_len - cut;
+        if (0 == namelen) continue;
+        if (nullptr != pattern && !__glob_match(pattern, (uint32_t)strlen(pattern), name, namelen)) continue;
+
+        bool listed = false;
+        for (uint16_t j = 0; j < items.size() && !listed; j++) {
+            listed = (nullptr != items[j].m_name && strlen(items[j].m_name) == namelen &&
+                      0 == strncmp(items[j].m_name, name, namelen));
+        }
+        if (listed) continue;
+
+        file_info_t entry;
+        memset(&entry, 0, sizeof(entry));
+        if (0 != m.m_backend->getFileMeta(s_root_path, entry)) {
+            memset(&entry, 0, sizeof(entry));
+            entry.m_perms = FILE_PERM_DEFAULT_DIR;
+        }
+        entry.m_type = FILE_TYPE_DIR;
+        entry.m_size = 0;
+        entry.m_name = pdiutil::safe_new_array<char>(namelen + 1);
+        if (nullptr == entry.m_name) continue;
+        memcpy(entry.m_name, name, namelen);
+        entry.m_name[namelen] = '\0';
+        uint32_t count = (uint32_t)items.size();
+        items.push_back(entry);
+        if (items.size() != count + 1) {
+            pdiutil::safe_delete_array(entry.m_name);
+        }
+    }
 }
 bool VfsDispatcher::isFileExist(const char* path) {
     VFS_GUARD();
@@ -608,7 +716,9 @@ pdi_err_t VfsDispatcher::closeFile(pdi_fhandle_t handle) {
         return PDI_ERR_INVALID_ARG;
     }
 
-    return backend->closeFile(bh);
+    pdi_err_t closed = backend->closeFile(bh);
+    finishLostMount((uint8_t)(((handle >> VFS_HANDLE_MOUNT_SHIFT) & VFS_HANDLE_MOUNT_MAX) - 1));
+    return closed;
 }
 
 int VfsDispatcher::crossCopy(iFileSystemInterface* sb, const char* srel, iFileSystemInterface* db, const char* drel,
@@ -626,7 +736,7 @@ int VfsDispatcher::crossCopy(iFileSystemInterface* sb, const char* srel, iFileSy
     int rc = sb->readFile(srel, 128, [&](char* data, uint32_t n)->bool {
         int w = (out >= 0) ? db->writeFileHandle(out, data, n) : db->writeFile(drel, data, n, !first);
         first = false;
-        if (w < 0 || (out >= 0 && (uint32_t)w != n)) { ok = false; return false; }
+        if (w < 0 || (uint32_t)w != n) { ok = false; return false; }
         stopped = (nullptr != keepgoing) && !keepgoing();
         return !stopped;
     });
@@ -692,6 +802,11 @@ uint64_t VfsDispatcher::getTotalSize() {
     VFS_GUARD();
     iFileSystemInterface* r = rootBackend();
     return r ? r->getTotalSize() : 0;
+}
+uint32_t VfsDispatcher::getBlockSize() {
+    VFS_GUARD();
+    iFileSystemInterface* r = rootBackend();
+    return r ? r->getBlockSize() : 0;
 }
 uint64_t VfsDispatcher::getUsedSize() {
     VFS_GUARD();

@@ -32,6 +32,8 @@ IOT = "/device-register-config"
 WIFI_TEXT = 30
 EMAIL_TEXT = 50
 IP_TEXT = 20
+IOT_ID_TEXT = 100
+IOT_HOST_TEXT = 50
 
 
 def page_or_skip(portal, path):
@@ -136,6 +138,54 @@ def wifi_refuses_long_fields(t):
                            "ap_ssid", "ap_pswd", "ap_lip", "ap_gip", "ap_sip"))
 
 
+def wifi_refusal_says(t, field, value, expect):
+    """Posts the wifi page with one field changed and checks the reply names the limits."""
+    if not on_host(t):
+        raise Skip("the wifi page takes a board off the network, so it runs against the host process only")
+    portal = t.portal()
+    page_or_skip(portal, WIFI)
+    before = read_form(portal, WIFI)
+    fields = dict(before)
+    fields[field] = value
+    body = write_form(portal, WIFI, fields).body
+    if "Config saved" in body:
+        raise AssertionError("a %d byte %s was reported saved" % (len(value), field))
+    for text in expect:
+        if text not in body:
+            raise AssertionError("the refusal of a %d byte %s does not say %r" % (len(value), field, text))
+    if read_form(t.portal(), WIFI) != before:
+        raise AssertionError("a refused %s changed the page" % field)
+
+
+WIFI_LIMITS = ("Not saved", "4 to %d characters" % (WIFI_TEXT - 1), "password up to %d" % (WIFI_TEXT - 1),
+               "address up to %d" % (IP_TEXT - 1))
+
+
+@test("a wifi name too long for its buffer is refused with the limits in the reply")
+def wifi_long_name_says_limits(t):
+    wifi_refusal_says(t, "sta_ssid", "n" * WIFI_TEXT, WIFI_LIMITS)
+
+
+@test("a wifi name shorter than the least it takes is refused with the limits in the reply")
+def wifi_short_name_says_limits(t):
+    wifi_refusal_says(t, "sta_ssid", "abc", WIFI_LIMITS)
+
+
+@test("a wifi password too long for its buffer is refused with the limits in the reply")
+def wifi_long_password_says_limits(t):
+    wifi_refusal_says(t, "sta_pswd", "p" * WIFI_TEXT, WIFI_LIMITS)
+
+
+@test("an access point name far past its buffer is refused with the limits in the reply")
+def wifi_long_ap_name_says_limits(t):
+    wifi_refusal_says(t, "ap_ssid", OVERSIZE, WIFI_LIMITS)
+
+
+@test("a wifi address too long for its buffer is refused with the limits in the reply")
+def wifi_long_address_says_limits(t):
+    wifi_refusal_says(t, "sta_gip", "1" * IP_TEXT, WIFI_LIMITS)
+
+
 @test("a wifi name that fills its buffer is refused and one short of it is saved")
 def wifi_name_boundary(t):
     boundary(t, WIFI, "sta_ssid", WIFI_TEXT)
@@ -158,3 +208,37 @@ def iot_refuses_long_fields(t):
     answer = portal.post(IOT, {"csrf": portal.csrf(IOT), "duid": "id", "dhst": OVERSIZE})
     if "too long" not in answer.body:
         raise AssertionError("a %d byte host was not refused: %r" % (len(OVERSIZE), answer.body[:200]))
+
+
+def iot_refusal_says(t, duid, host, expect, unexpected):
+    portal = t.portal()
+    page_or_skip(portal, IOT)
+    before = read_form(portal, IOT)
+    body = portal.post(IOT, {"csrf": portal.csrf(IOT), "duid": duid, "dhst": host}).body
+    if '"status":false' not in body:
+        raise AssertionError("a %d byte id and %d byte host were not refused: %r" % (len(duid), len(host), body[:200]))
+    if expect not in body:
+        raise AssertionError("the refusal does not say %r: %r" % (expect, body[:200]))
+    if unexpected in body:
+        raise AssertionError("the refusal names the field that fits, %r: %r" % (unexpected, body[:200]))
+    if read_form(t.portal(), IOT) != before:
+        raise AssertionError("a refused registration changed the page")
+
+
+IOT_ID_LIMIT = "Device id is too long: up to %d characters" % (IOT_ID_TEXT - 1)
+IOT_HOST_LIMIT = "Registry host is too long: up to %d characters" % (IOT_HOST_TEXT - 1)
+
+
+@test("a device id that fills its buffer is refused with its limit in the reply")
+def iot_full_id_says_limit(t):
+    iot_refusal_says(t, "i" * IOT_ID_TEXT, "iot.example.com", IOT_ID_LIMIT, "Registry host")
+
+
+@test("a registry host that fills its buffer is refused with its limit in the reply")
+def iot_full_host_says_limit(t):
+    iot_refusal_says(t, "id", "h" * IOT_HOST_TEXT, IOT_HOST_LIMIT, "Device id")
+
+
+@test("a device id and host both too long are refused naming the id first")
+def iot_both_long_says_id_limit(t):
+    iot_refusal_says(t, OVERSIZE, OVERSIZE, IOT_ID_LIMIT, "Registry host")

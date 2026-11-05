@@ -62,6 +62,11 @@ public:
 
   void unmounted() override;
 
+  /**
+   * Whether the disk the volume was mounted from is still there.
+   */
+  bool diskPresent() override;
+
   pdiutil::string getPWD() const override { return m_dir; }
   bool setPWD(const char *path) override { return false; }
   pdiutil::string getLastPWD() const override { return m_dir; }

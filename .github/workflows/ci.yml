@@ -97,7 +97,7 @@ jobs:
           name: fuzz-findings
           path: tests/fuzz/findings/
 
-  # the three ports disagree on the c++ standard: arduinouno gnu++11, esp8266
+  # the three ports disagree on the c++ standard: arduinomega gnu++11, esp8266
   # gnu++17, esp32 gnu++2a. shared headers have to hold at the gnu++11 floor and
   # nothing else in the build checks that.
   syntax-matrix:

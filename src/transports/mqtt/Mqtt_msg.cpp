@@ -453,6 +453,14 @@ mqtt_message_t* mqtt_msg_publish(mqtt_connection_t* connection, const char* topi
   return fini_message(connection, MQTT_MSG_TYPE_PUBLISH, 0, qos, retain);
 }
 
+/**
+ * The bytes a publish of this topic and payload takes in a buffer, its largest header included.
+ */
+uint32_t mqtt_publish_length(const char* topic, size_t data_length, uint8_t qos){
+
+  return MQTT_MAX_FIXED_HEADER_SIZE + 2 + (nullptr == topic ? 0 : strlen(topic)) + (qos > 0 ? 2 : 0) + data_length;
+}
+
 mqtt_message_t* mqtt_msg_puback(mqtt_connection_t* connection, uint16_t message_id){
 
   if( nullptr == connection ){

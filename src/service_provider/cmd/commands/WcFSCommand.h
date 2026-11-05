@@ -20,6 +20,7 @@ struct WcFSCommand : public CommandBase {
 	WcFSCommand(){
 		Clear();
 		SetCommand(CMD_NAME_WC);
+		setArgs(RODT_ATTR(""), 1);
 		setAcceptArgsOptions(true);
 	}
 
@@ -30,7 +31,7 @@ struct WcFSCommand : public CommandBase {
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("wc <file>  print line / word / byte counts");
+		return RODT_ATTR("wc [<file>]  print line / word / byte counts of a file or the piped input");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -79,7 +80,7 @@ struct WcFSCommand : public CommandBase {
 
 					if(iStatus < 0){
 						result = CMD_ERROR_FAILED;
-						writeFailure(RODT_ATTR("Failed : "), filename.c_str(), (int32_t)iStatus);
+						writeFailure(RODT_ATTR(CMD_MSG_FAILED), filename.c_str(), (int32_t)iStatus);
 					}else if( SessionManager::interrupted() ){
 						result = CMD_ERROR_CANCELED;
 					}else{

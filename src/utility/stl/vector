@@ -130,7 +130,7 @@ namespace pdistd{
 				data_[i] = x.data_[i];
 			}
 			for(size_type i = common; i < x.elements; ++i){
-				::new(static_cast<void*>(data_ + i)) T(x.data_[i]);
+				Allocator().construct(data_ + i, x.data_[i]);
 			}
 			downsize(x.elements);
 			elements = x.elements;
@@ -165,8 +165,8 @@ namespace pdistd{
 		 * Replaces the contents with a copy of every element in the range.
 		 */
 		template <class InputIterator> void assign(InputIterator first, InputIterator last){
-			clear();
-			insert(end(), first, last);
+			typedef typename __is_integer<InputIterator>::type __some_type;
+			_dispatch_assign(first, last, __some_type());
 		}
 
 		/**
@@ -348,12 +348,12 @@ namespace pdistd{
 					return;
 				}
 				for(size_type i = elements; i < sz; ++i){
-					::new(static_cast<void*>(fresh + i)) T(c);
+					Allocator().construct(fresh + i, c);
 				}
 				_relocate(fresh, grown);
 			}else{
 				for(size_type i = elements; i < sz; ++i){
-					::new(static_cast<void*>(data_ + i)) T(c);
+					Allocator().construct(data_ + i, c);
 				}
 			}
 			elements = sz;
@@ -439,7 +439,7 @@ namespace pdistd{
 		 */
 		template <class... Args> void emplace_back(Args&&... args){
 			if(elements < data_size){
-				::new(static_cast<void*>(data_ + elements)) T(pdistd::forward<Args>(args)...);
+				Allocator().construct(data_ + elements, pdistd::forward<Args>(args)...);
 				++elements;
 				return;
 			}
@@ -449,7 +449,7 @@ namespace pdistd{
 			if(0 == fresh){
 				return;
 			}
-			::new(static_cast<void*>(fresh + elements)) T(pdistd::forward<Args>(args)...);
+			Allocator().construct(fresh + elements, pdistd::forward<Args>(args)...);
 			_relocate(fresh, grown);
 			++elements;
 		}
@@ -597,7 +597,7 @@ namespace pdistd{
 		 */
 		void _relocate(T* fresh, size_type freshsize){
 			for(size_type i = 0; i < elements; ++i){
-				::new(static_cast<void*>(fresh + i)) T(pdistd::move(data_[i]));
+				Allocator().construct(fresh + i, pdistd::move(data_[i]));
 				data_[i].~T();
 			}
 			if(0 != data_){
@@ -633,7 +633,7 @@ namespace pdistd{
 			}
 			data_size = x.elements;
 			for(size_type i = 0; i < x.elements; ++i){
-				::new(static_cast<void*>(data_ + i)) T(x.data_[i]);
+				Allocator().construct(data_ + i, x.data_[i]);
 			}
 			elements = x.elements;
 		}
@@ -666,7 +666,16 @@ namespace pdistd{
 		 * Inserts a copy of every element in the range before position.
 		 */
 		template <class InputIterator>
-			void _insert_from_iterator(iterator position, InputIterator first, InputIterator last)
+			inline void _insert_from_iterator(iterator position, InputIterator first, InputIterator last)
+		{
+			_insert_range(position, first, last, typename iterator_traits<InputIterator>::iterator_category());
+		}
+
+		/**
+		 * Inserts a range that can be walked only once, an element at a time.
+		 */
+		template <class InputIterator>
+			void _insert_range(iterator position, InputIterator first, InputIterator last, input_iterator_tag)
 		{
 			size_type index = position - data_;
 			size_type before = elements;
@@ -675,6 +684,96 @@ namespace pdistd{
 				++first;
 			}
 			_rotate_last_to(index, elements - before);
+		}
+
+		/**
+		 * Inserts a range whose length is known before it is copied: room for all
+		 * of it is taken first, so it lands whole or the vector is left as it was.
+		 */
+		template <class ForwardIterator>
+			void _insert_range(iterator position, ForwardIterator first, ForwardIterator last, forward_iterator_tag)
+		{
+			size_type index = position - data_;
+			size_type count = (size_type)pdistd::distance(first, last);
+			if(0 == count){
+				return;
+			}
+			if(elements + count > data_size){
+				size_type grown = _grown_capacity(elements + count);
+				T* fresh = Allocator().allocate(grown);
+				if(0 == fresh){
+					return;
+				}
+				T* at = fresh + elements;
+				for(; first != last; ++first, ++at){
+					Allocator().construct(at, *first);
+				}
+				_relocate(fresh, grown);
+			}else{
+				T* at = data_ + elements;
+				for(; first != last; ++first, ++at){
+					Allocator().construct(at, *first);
+				}
+			}
+			elements += count;
+			_rotate_last_to(index, count);
+		}
+
+		/**
+		 * Replaces the contents with a range that can be walked only once.
+		 */
+		template <class InputIterator>
+			void _assign_range(InputIterator first, InputIterator last, input_iterator_tag)
+		{
+			clear();
+			_insert_range(end(), first, last, input_iterator_tag());
+		}
+
+		/**
+		 * Replaces the contents with a range whose length is known: a range that
+		 * needs more room than held is built in fresh storage, so a refusal keeps
+		 * the old contents.
+		 */
+		template <class ForwardIterator>
+			void _assign_range(ForwardIterator first, ForwardIterator last, forward_iterator_tag)
+		{
+			size_type count = (size_type)pdistd::distance(first, last);
+			if(count <= data_size){
+				clear();
+				_insert_range(end(), first, last, forward_iterator_tag());
+				return;
+			}
+			T* fresh = Allocator().allocate(count);
+			if(0 == fresh){
+				return;
+			}
+			T* at = fresh;
+			for(; first != last; ++first, ++at){
+				Allocator().construct(at, *first);
+			}
+			_release();
+			data_ = fresh;
+			data_size = count;
+			elements = count;
+		}
+
+		/**
+		 * Replaces the contents with count copies of a value given as two integers.
+		 */
+		template <class InputIterator>
+			inline void _dispatch_assign(InputIterator first, InputIterator last, __true_type)
+		{
+			clear();
+			_insert_fill(end(), first, last);
+		}
+
+		/**
+		 * Replaces the contents with a copy of every element in the range.
+		 */
+		template <class InputIterator>
+			inline void _dispatch_assign(InputIterator first, InputIterator last, __false_type)
+		{
+			_assign_range(first, last, typename iterator_traits<InputIterator>::iterator_category());
 		}
 
 		/**

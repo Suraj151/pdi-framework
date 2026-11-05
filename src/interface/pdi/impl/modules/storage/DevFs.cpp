@@ -167,10 +167,11 @@ void DevFs::listDriverNodes(const char* p, pdiutil::vector<file_info_t>& items) 
 
         file_info_t info;
         memset(&info, 0, sizeof(info));
-        info.m_type = (nullptr == end) ? FILE_TYPE_REG : FILE_TYPE_DIR;
+        info.m_type = (nullptr == end) ? FILE_TYPE_CHR : FILE_TYPE_DIR;
         info.m_perms = (nullptr == end) ? 0444 : 0555;
         iBlockDriverInterface* disk = (nullptr == end) ? iBlockDriverInterface::diskOf(dev) : nullptr;
         if (nullptr != disk) {
+            info.m_type = FILE_TYPE_BLK;
             info.m_perms = 0600;
             info.m_size = (int64_t)disk->blocks() * disk->blockSize();
         }
@@ -185,7 +186,7 @@ void DevFs::listDriverNodes(const char* p, pdiutil::vector<file_info_t>& items) 
             pdiutil::string name = blockPartitionName(pdiutil::string(rest, namelen).c_str(), n);
             file_info_t part;
             memset(&part, 0, sizeof(part));
-            part.m_type = FILE_TYPE_REG;
+            part.m_type = FILE_TYPE_BLK;
             part.m_perms = 0600;
             part.m_size = (int64_t)disk->partition(n)->m_blocks * SD_BLOCK_SIZE;
             part.m_name = pdiutil::safe_new_array<char>(name.size() + 1);
@@ -582,7 +583,7 @@ int DevFs::getDirFileList(const char* path, pdiutil::vector<file_info_t>& items,
     for (uint8_t i = 0; i < s_dev_file_count; ++i) {
         file_info_t info;
         memset(&info, 0, sizeof(info));
-        info.m_type = FILE_TYPE_REG;
+        info.m_type = FILE_TYPE_CHR;
         info.m_size = 0;
         // Callers (ls) delete[] m_name — allocate a heap copy of the literal.
         uint32_t nlen = strlen(s_dev_files[i]);
@@ -642,11 +643,12 @@ pdi_err_t DevFs::getFileMeta(const char* path, file_info_t& out) {
     }
 
     if (k != DEV_INVALID) {
-        out.m_type  = FILE_TYPE_REG;
+        out.m_type  = FILE_TYPE_CHR;
         out.m_size  = 0;
         out.m_perms = (k == DEV_DRIVER_NODE) ? 0444 : 0666;
 #ifdef ENABLE_DRIVER_CORE
         if ((k == DEV_DRIVER_NODE || k == DEV_PARTITION) && isDisk(path)) {
+            out.m_type = FILE_TYPE_BLK;
             out.m_size = (int64_t)diskSize(path);
             out.m_perms = 0600;
         }

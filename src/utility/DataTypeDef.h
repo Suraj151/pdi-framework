@@ -772,6 +772,8 @@ enum file_type_t : uint8_t {
     FILE_TYPE_REG = 0, ///< Regular file
     FILE_TYPE_DIR, ///< Directory
     FILE_TYPE_LINK, ///< Symbolic link
+    FILE_TYPE_CHR, ///< Character device
+    FILE_TYPE_BLK, ///< Block device
     FILE_TYPE_MAX
 };
 
@@ -1138,7 +1140,7 @@ struct session_t {
                   , m_uid(0), m_gid(0)
 #endif
 #ifdef ENABLE_CMD_SERVICE
-                  , m_fdtable(nullptr), m_lastExit(PDI_OK), m_interrupted(false), m_inputPolledAt(0)
+                  , m_fdtable(nullptr), m_lastExit(PDI_OK), m_interrupted(false), m_linecut(false), m_inputPolledAt(0)
 #ifdef ENABLE_SCRIPT_RUNNER
                   , m_script_exitonprompt(true)
 #endif
@@ -1180,6 +1182,7 @@ struct session_t {
         m_env.clear();
         m_typeahead.clear();
         m_interrupted = false;
+        m_linecut = false;
         m_inputPolledAt = 0;
 #ifdef ENABLE_SCRIPT_RUNNER
         m_scripts.clear();
@@ -1231,6 +1234,9 @@ struct session_t {
 
     /** ctrl+c reached the terminal since the line being run began */
     bool m_interrupted;
+
+    /** a key typed on this line was dropped because the line could not grow */
+    bool m_linecut;
 
     /** when a command last looked at the terminal for ctrl+c */
     uint32_t m_inputPolledAt;

@@ -71,9 +71,9 @@ TEST(background, watch_runs_its_command_as_the_user_who_started_it)
     root.run("pwd");
     user.terminal().forget();
     root.terminal().forget();
-    pumpUntilShown(user, std::to_string((int)PDI_ERR_PERM).c_str());
+    pumpUntilShown(user, "Permission denied");
 
-    ASSERT_TRUE(saw(user.terminal().captured(), std::to_string((int)PDI_ERR_PERM).c_str()));
+    ASSERT_TRUE(saw(user.terminal().captured(), "Permission denied"));
     ASSERT_FALSE(saw(user.terminal().captured(), "top secret"));
     ASSERT_FALSE(saw(root.terminal().captured(), "top secret"));
     __i_fs.deleteFile("/bg_secret.txt");

@@ -290,13 +290,12 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
         __lwip_mutex.critical_lock();
         #endif
-        err = m_pcb ? tcp_output(m_pcb) : ERR_CLSD; // Ensure the data is sent
+        if (m_pcb) {
+            tcp_output(m_pcb);
+        }
         #ifdef ENABLE_CONTEXTUAL_EXECUTION
         __lwip_mutex.critical_unlock();
         #endif
-        if (err != ERR_OK) {
-            return PDI_ERR_FROM_LWIP(err); // Return error code if write fails
-        }
     }
 
     __i_dvc_ctrl.yield();
@@ -467,10 +466,17 @@ void TcpClientInterface::readStringUntil(pdiutil::string &_outstr, char _delimit
                 }
             }
 
+            uint32_t before = _outstr.size();
             _outstr.append((const char *)head, blocklen);
-            consumeRxBuffer(blocklen + (delimiterfound ? 1 : 0));
-            len += blocklen;
-            blockread = true;
+            uint32_t stored = _outstr.size() - before;
+            delimiterfound = delimiterfound && (stored == blocklen);
+            if (delimiterfound && _keepdelimiterinstr) {
+                _outstr += _delimiter;
+                delimiterfound = (_outstr.size() == before + blocklen + 1);
+            }
+            consumeRxBuffer(stored + (delimiterfound ? 1 : 0));
+            len += stored;
+            blockread = (stored == blocklen);
         }
 
         if (!blockread) {
@@ -478,9 +484,6 @@ void TcpClientInterface::readStringUntil(pdiutil::string &_outstr, char _delimit
         }
 
         if (delimiterfound) {
-            if (_keepdelimiterinstr) {
-                _outstr += _delimiter;
-            }
             break;
         }
 

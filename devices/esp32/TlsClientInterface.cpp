@@ -812,9 +812,9 @@ err_t TlsClientInterface::onReceive(void* arg, struct tcp_pcb*, struct pbuf* p, 
         return ERR_OK;
     }
 
-    // The chain is kept as delivered, so nothing is copied and no heap is taken.
-    // The tcp window stays closed until the engine consumes it, which is what
-    // holds the sender back.
+    // The data is held in a heap copy so the driver's receive buffer is free at
+    // once; the tcp window stays closed until the engine consumes it.
+    p = pdiOwnReceived(p);
     TCP_GUARD_BEGIN
     if (self->m_rxBuf != nullptr) {
 

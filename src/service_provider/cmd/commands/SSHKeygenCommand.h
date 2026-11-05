@@ -38,6 +38,7 @@ struct SSHKeygenCommand : public CommandBase {
 	SSHKeygenCommand(){
 		Clear();
 		SetCommand(CMD_NAME_SSHKEYGEN);
+		setArgs(RODT_ATTR(""), 2, true);
 		AddOption(CMD_OPTION_NAME_T);
 		AddOption(CMD_OPTION_NAME_F);
 	}

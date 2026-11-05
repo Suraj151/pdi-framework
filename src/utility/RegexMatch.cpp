@@ -107,3 +107,24 @@ int regex_match(const char *pattern, const char *text, int textlen) {
 	}
 	return -1;
 }
+
+
+/**
+ * True when the pattern can be matched as written: every bracket closed and no
+ * escape left without the character it escapes.
+ */
+bool regex_valid(const char *pattern) {
+	if (nullptr == pattern) return false;
+
+	int plen = 0;
+	while (pattern[plen]) plen++;
+
+	int i = 0;
+	while (i < plen) {
+		if (pattern[i] == '\\' && i + 1 >= plen) return false;
+		if (pattern[i] == '[' && token_length(pattern + i, plen - i) == 1) return false;
+		int step = token_length(pattern + i, plen - i);
+		i += (step > 0) ? step : 1;
+	}
+	return true;
+}

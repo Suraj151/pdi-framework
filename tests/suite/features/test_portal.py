@@ -328,7 +328,7 @@ def listing_carries_an_awkward_name(t):
     t.run("echo portal > %s" % quoted)
 
     try:
-        if name not in t.run("ls /"):
+        if name not in t.run("ls -la /"):
             raise Skip("the shell could not make %r on this target" % name)
 
         names = [item["n"] for item in listing(portal)["lst"]]
@@ -551,7 +551,7 @@ def upload_into_users_home(t):
 
         expect_in("a user's own upload", t.run("cat /home/%s/%s" % (account, name)),
                   "what the user's home holds after the upload")
-        expect_in(account, t.run("ls /home/%s" % account),
+        expect_in(account, t.run("ls -la /home/%s" % account),
                   "the owner of the uploaded file")
     finally:
         t.run("userdel u=%s" % account)
@@ -603,7 +603,7 @@ def refused_upload_leaves_nothing_staged(t):
         portal = t.portal(username=account, password="portalpw1")
         upload(t, portal, name, b"refused\n", location="/storage")
 
-        expect_not_in(name, t.run("ls /temp"), "the staging directory after a refused upload")
+        expect_not_in(name, t.run("ls -la /temp"), "the staging directory after a refused upload")
     finally:
         t.run("rm /%s" % name)
         t.run("rm /temp/%s" % name)
@@ -618,8 +618,8 @@ def csrf_refused_upload_leaves_nothing_staged(t):
         portal = t.portal()
         portal.post_multipart("/storage-fileupload", {"loc": "/storage"},
                               [("nf", name, b"no csrf\n")])
-        expect_not_in(name, t.run("ls /temp"), "the staging directory after an upload with no csrf")
-        expect_not_in(name, t.run("ls /"), "the root after an upload with no csrf")
+        expect_not_in(name, t.run("ls -la /temp"), "the staging directory after an upload with no csrf")
+        expect_not_in(name, t.run("ls -la /"), "the root after an upload with no csrf")
     finally:
         t.run("rm /temp/%s" % name)
         t.run("rm /%s" % name)
@@ -633,7 +633,7 @@ def unknown_field_upload_leaves_nothing_staged(t):
         portal = t.portal()
         portal.post_multipart("/storage-fileupload", {"csrf": portal.csrf(), "loc": "/storage"},
                               [("notthefield", name, b"wrong field\n")])
-        expect_not_in(name, t.run("ls /temp"), "the staging directory after an upload under another field")
+        expect_not_in(name, t.run("ls -la /temp"), "the staging directory after an upload under another field")
     finally:
         t.run("rm /temp/%s" % name)
         t.run("rm /%s" % name)
@@ -677,9 +677,9 @@ def folder_honours_permissions(t):
             "nd": "portal_rootdir",
         })
 
-        expect_in("portal_mine", t.run("ls /home/%s" % account),
+        expect_in("portal_mine", t.run("ls -la /home/%s" % account),
                   "the user's home after making a folder there")
-        expect_not_in("portal_rootdir", t.run("ls /"),
+        expect_not_in("portal_rootdir", t.run("ls -la /"),
                       "the root directory after a user tried to make a folder there")
     finally:
         t.run("rm /portal_rootdir")
@@ -705,7 +705,7 @@ def upload_moves_only_staged_files(t):
         })
 
         expect_in(":0:0:", t.run("cat /etc/passwd"), "/etc/passwd after the forged move")
-        expect_not_in("passwd", t.run("ls /home/%s" % account),
+        expect_not_in("passwd", t.run("ls -la /home/%s" % account),
                       "the user's home after the forged move")
     finally:
         t.run("userdel u=%s" % account)
@@ -771,3 +771,40 @@ def plain_http_not_starved(t):
         held.close()
         if plain is not None:
             plain.close()
+
+
+@test("a portal user is refused a file they may not read and served one they may",
+      needs=("echo", "chmod", "rm", "useradd", "userdel"))
+def portal_download_checks_read_permission(t):
+    from .test_users import scratch_user, drop_user
+    name, password = "f7reader", "F7ReaderPass42"
+    secret, shared = "/f7_secret.txt", "/f7_shared.txt"
+    scratch_user(t, name, password)
+    t.run("echo root only > %s" % secret)
+    t.run("chmod 0600 %s" % secret)
+    t.run("echo for everyone > %s" % shared)
+    t.run("chmod 0644 %s" % shared)
+    try:
+        portal = t.portal(login=False)
+        answer = portal.login(name, password)
+        if portal.session_cookie() is None:
+            import re
+            said = re.findall(r"(Wrong Credentials\.|Too many attempts[^<]*|No session slot free\.)", answer.body)
+            raise AssertionError("the portal refused %s: %s" % (name, said or answer.status))
+        portal.timeout = 8.0
+        try:
+            refused = portal.get(secret, attempts=1)
+        except Exception as err:
+            raise AssertionError("a file the user may not read gave no answer (%s)" % type(err).__name__)
+        if 401 != refused.status:
+            raise AssertionError("a file the user may not read answered %d, not 401" % refused.status)
+        if "root only" in refused.body:
+            raise AssertionError("the refused file's content was sent")
+
+        served = portal.get(shared, attempts=1)
+        if 200 != served.status or "for everyone" not in served.body:
+            raise AssertionError("a file the user may read answered %d: %r" % (served.status, served.body[:60]))
+    finally:
+        t.run("rm %s" % secret)
+        t.run("rm %s" % shared)
+        drop_user(t, name)

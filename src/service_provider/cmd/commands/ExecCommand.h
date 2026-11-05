@@ -22,6 +22,7 @@ struct ExecCommand : public CommandBase {
 	ExecCommand(){
 		Clear();
 		SetCommand(CMD_NAME_EXEC);
+		setArgs(RODT_ATTR(""), 1);
 		setAcceptArgsOptions(true);
 	}
 

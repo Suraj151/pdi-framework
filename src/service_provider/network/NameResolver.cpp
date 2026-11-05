@@ -9,6 +9,7 @@ created Date    : 23rd July 2026
 ******************************************************************************/
 
 #include "NameResolver.h"
+#include <interface/pdi/impl/modules/storage/FileLines.h>
 
 #ifdef ENABLE_NETWORK_SERVICE
 
@@ -53,15 +54,10 @@ bool NameResolver::lookupHostsFile(const char *hostname, ipaddress_t &out)
 
   while (offset < (uint64_t)fs && !found) {
     pdiutil::string linedata;
-    int bytes = __i_fs.readFile(hosts_path.c_str(), 128, [&](char *data, uint32_t size) -> bool {
-      linedata += pdiutil::string(data, size);
-      return true;
-    }, offset, "\n");
+    bool cut = false;
+    int bytes = FileLines::readLineAt(__i_fs, hosts_path.c_str(), offset, linedata, &cut);
     if (bytes < 0) break;
-
-    if (!linedata.empty() && linedata.back() == '\r') {
-      linedata.pop_back();
-    }
+    if (cut) linedata.clear();
 
     const char *line = linedata.c_str();
     int p = 0;

@@ -316,8 +316,8 @@ TEST(vfs, umount_says_why_it_would_not)
     std::string none = sh.run("umount /nowhere");
 
     ASSERT_TRUE(pditest::saw(boot, "umount: /"));
-    ASSERT_TRUE(pditest::saw(boot, "-12"));
-    ASSERT_TRUE(pditest::saw(none, "-6"));
+    ASSERT_TRUE(pditest::saw(boot, "Permission denied"));
+    ASSERT_TRUE(pditest::saw(none, "Not found"));
     ASSERT_NOT_NULL(__i_fs.getMount(0));
 }
 
@@ -456,7 +456,7 @@ TEST(procfs, version_names_the_release)
     pdiutil::string version = slurp(fs, "/proc/version");
 
     ASSERT_TRUE(version.find("PDI Stack version") != pdiutil::string::npos);
-    ASSERT_TRUE(version.find(RELEASE) != pdiutil::string::npos);
+    ASSERT_TRUE(version.find(PDI_RELEASE) != pdiutil::string::npos);
 }
 
 TEST(procfs, uptime_advances_with_the_clock)
@@ -1930,4 +1930,31 @@ TEST(sysfs, a_gpio_leaf_is_still_writable)
     ASSERT_TRUE(fs->getFileAttr("/sys/class/gpio/2/value", FILE_ATTR_PERMS,
                                 &perms, sizeof(perms)) > 0);
     ASSERT_EQ(perms, (uint16_t)0666);
+}
+
+TEST(vfs, a_line_the_heap_cannot_hold_whole_is_refused_rather_than_read_short)
+{
+    VfsDispatcher *fs = pditest::mountedVfs();
+    const char *path = "/vfs_long_line.txt";
+    pdiutil::string content = "first\n";
+    content.append(6000, 'q');
+    content += "\nlast\n";
+    if (fs->isFileExist(path))
+    {
+        fs->deleteFile(path);
+    }
+    fs->createFile(path, content.c_str());
+
+    pdiutil::string line;
+    pdiutil::enable_heap_check();
+    __i_dvc_ctrl.capMaxFreeBlock(2048);
+    int cut = fs->readLineInFile(path, 1, line);
+    int whole = fs->readLineInFile(path, 2, line);
+    __i_dvc_ctrl.capMaxFreeBlock(0);
+
+    ASSERT_EQ(cut, (int)PDI_ERR_NO_MEM);
+    ASSERT_EQ(whole, 4);
+    ASSERT_STREQ(line.c_str(), "last");
+
+    fs->deleteFile(path);
 }

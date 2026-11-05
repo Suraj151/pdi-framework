@@ -82,6 +82,7 @@ public:
   bool isDirectory(const char *path) override;
 
   uint64_t getTotalSize() override { return TMPFS_MAX_BYTES; }
+  uint32_t getBlockSize() override { return 1; }
   uint64_t getUsedSize() override { return usedBytes(); }
   uint64_t getFreeSize() override {
     uint64_t used = usedBytes();

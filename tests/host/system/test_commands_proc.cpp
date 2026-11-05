@@ -12,6 +12,8 @@ created Date    : 16th Aug 2026
 ******************************************************************************/
 
 #include <ShellHarness.h>
+#include <StringTerminal.h>
+#include <helpers/ProcHelper.h>
 #include <utility/TaskScheduler.h>
 #include <pditest.h>
 #include <vector>
@@ -193,15 +195,9 @@ TEST(cmdproc, a_filtered_listing_counts_only_what_it_shows)
     pdiutil::task_id_t theirs = parkTask("countedtwo", 2);
 
     std::string out = shell.run("ps 1");
-
-    // the summary line counts tasks; filtered, it must not report the whole
-    // table while listing one row of it
-    size_t at = out.find(" tasks,");
-    ASSERT_TRUE(at != std::string::npos);
-
-    size_t begin = out.rfind(' ', at - 1);
-    ASSERT_TRUE(begin != std::string::npos);
-    std::string counted = out.substr(begin + 1, at - begin - 1);
+    ASSERT_FALSE(saw(out, "top -"));
+    ASSERT_FALSE(saw(out, "countedtwo"));
+    ASSERT_TRUE(saw(out, "NAME"));
 
     size_t rows = 0;
     for (size_t seek = out.find("countedone"); seek != std::string::npos;
@@ -209,6 +205,15 @@ TEST(cmdproc, a_filtered_listing_counts_only_what_it_shows)
     {
         rows++;
     }
+
+    pditest::StringTerminal summary;
+    printProcessTable(&summary, 1, true);
+    std::string shown = summary.captured();
+    size_t at = shown.find(" tasks,");
+    ASSERT_TRUE(at != std::string::npos);
+    size_t begin = shown.rfind(' ', at - 1);
+    ASSERT_TRUE(begin != std::string::npos);
+    std::string counted = shown.substr(begin + 1, at - begin - 1);
 
     ASSERT_STREQ(counted.c_str(), "1");
     ASSERT_EQ((int)rows, 1);
@@ -315,19 +320,78 @@ TEST(cmdproc, renice_changes_a_live_task_priority)
 }
 
 /**
- * renice documents the range as clamped rather than rejected, so a value past
- * the end lands on the end.
+ * renice takes -20 to 19 and refuses a value past either end, naming it, and
+ * leaves the task's nice as it was.
  */
-TEST(cmdproc, renice_clamps_a_value_past_the_range)
+TEST(cmdproc, renice_refuses_a_value_past_the_range)
 {
     pditest::Shell shell;
     pdiutil::task_id_t id = parkTask("outofrange");
+    char line[48];
 
-    char line[32];
-    snprintf(line, sizeof(line), "renice 99 %d", (int)id);
+    const char *refused[] = { "20", "-21", "99", "-128", "128", "x", "1x", "99999999999999999999" };
+    for (const char *nice : refused)
+    {
+        snprintf(line, sizeof(line), "renice %s %d", nice, (int)id);
+        std::string out = shell.run(line);
+        ASSERT_EQ(shell.result(), CMD_ERROR_INVAL);
+        ASSERT_TRUE(saw(out, (std::string("invalid nice : ") + nice + " (-20 to 19)").c_str()));
+        ASSERT_EQ((int)__task_scheduler.get_task(id)->m_nice, 0);
+    }
+
+    snprintf(line, sizeof(line), "renice 19 %d", (int)id);
     shell.run(line);
     ASSERT_EQ(shell.result(), PDI_OK);
-    ASSERT_TRUE(saw(shell.run("ps"), "19"));
+    ASSERT_EQ((int)__task_scheduler.get_task(id)->m_nice, 19);
+
+    snprintf(line, sizeof(line), "renice -20 %d", (int)id);
+    shell.run(line);
+    ASSERT_EQ(shell.result(), PDI_OK);
+    ASSERT_EQ((int)__task_scheduler.get_task(id)->m_nice, -20);
+
+    shell.run("renice 5 32768");
+    ASSERT_EQ(shell.result(), CMD_ERROR_INVAL);
+    ASSERT_TRUE(saw(shell.run("renice 5 32767"), "no such pid : 32767"));
+
+    release(id);
+    reap();
+}
+
+/**
+ * kill reads its pid and signal strictly and names the word it refuses.
+ */
+TEST(cmdproc, kill_names_a_pid_or_signal_it_refuses)
+{
+    pditest::Shell shell;
+    pdiutil::task_id_t id = parkTask("strictkill");
+    char line[48];
+
+    ASSERT_TRUE(saw(shell.run("kill -1"), "invalid option : -1"));
+    ASSERT_EQ(shell.result(), CMD_ERROR_OPT);
+
+    const char *pids[] = { "x", "32768", "4294967296", "1x" };
+    for (const char *pid : pids)
+    {
+        snprintf(line, sizeof(line), "kill %s", pid);
+        std::string out = shell.run(line);
+        ASSERT_EQ(shell.result(), CMD_ERROR_INVAL);
+        ASSERT_TRUE(saw(out, (std::string("invalid pid : ") + pid).c_str()));
+    }
+
+    const char *signals[] = { "0", "3", "99", "4294967305", "x" };
+    for (const char *sig : signals)
+    {
+        snprintf(line, sizeof(line), "kill %s %d", sig, (int)id);
+        std::string out = shell.run(line);
+        ASSERT_EQ(shell.result(), CMD_ERROR_INVAL);
+        ASSERT_TRUE(saw(out, (std::string("unsupported signal : ") + sig).c_str()));
+        ASSERT_TRUE(nullptr != __task_scheduler.get_task(id));
+        ASSERT_TRUE(TASK_STATE_ZOMBIE != __task_scheduler.get_task(id)->m_state);
+    }
+
+    ASSERT_TRUE(saw(shell.run("kill 32767"), "no such pid : 32767"));
+    ASSERT_TRUE(saw(shell.run("pkill 3 strictkill"), "unsupported signal : 3"));
+    ASSERT_TRUE(TASK_STATE_ZOMBIE != __task_scheduler.get_task(id)->m_state);
 
     release(id);
     reap();
@@ -392,7 +456,7 @@ TEST(cmdmisc, help_prints_a_usage_line_for_each_command)
     std::string out = shell.run("help");
 
     ASSERT_TRUE(saw(out, "print current working directory"));
-    ASSERT_TRUE(saw(out, "list a directory, or one file"));
+    ASSERT_TRUE(saw(out, "list names"));
 }
 
 TEST(cmdmisc, cls_sends_a_clear_sequence)

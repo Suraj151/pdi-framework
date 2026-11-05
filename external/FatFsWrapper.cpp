@@ -660,6 +660,13 @@ uint64_t FatFsWrapper::getFreeSize() {
     return (uint64_t)clusters * clusterBytes();
 }
 
+/**
+ * The bytes one cluster holds, the unit a file is stored in; 0 when not mounted.
+ */
+uint32_t FatFsWrapper::getBlockSize() {
+    return (nullptr == m_fs) ? 0 : (uint32_t)clusterBytes();
+}
+
 uint64_t FatFsWrapper::getUsedSize() {
     uint64_t total = getTotalSize();
     uint64_t freebytes = getFreeSize();

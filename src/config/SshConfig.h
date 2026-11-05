@@ -55,8 +55,36 @@ created Date    : 1st June 2025
 #define SSH_SFTP_READ_MAX 2048         /* most file bytes one sftp read reply carries */
 #endif
 
+#ifndef SSH_SFTP_READ_MIN
+#define SSH_SFTP_READ_MIN 256          /* fewest file bytes a read reply is cut to when the heap is short */
+#endif
+
 #ifndef SSH_RX_CHUNK
 #define SSH_RX_CHUNK 512               /* bytes taken from the socket between two yields while a packet is read */
+#endif
+
+#ifndef SSH_RX_STALL_MS
+#define SSH_RX_STALL_MS 30000          /* how long a packet read waits for its next bytes before the session is closed */
+#endif
+
+#ifndef SSH_TX_STALL_MS
+#define SSH_TX_STALL_MS 30000          /* how long output that could not be sent is kept and retried before the session is closed */
+#endif
+
+#ifndef SSH_TX_RETRY_MS
+#define SSH_TX_RETRY_MS 20             /* gap between two tries at sending held output */
+#endif
+
+#ifndef SSH_RX_PACKET_MAX
+#define SSH_RX_PACKET_MAX 4096         /* most channel data one packet from the client may carry, advertised as the channel's packet size */
+#endif
+
+#ifndef SSH_TX_QUEUE_MAX
+#define SSH_TX_QUEUE_MAX 8192          /* encrypted output a session holds for the connection before its producer waits */
+#endif
+
+#ifndef SSH_RX_PACKET_SLACK
+#define SSH_RX_PACKET_SLACK 1024       /* room past SSH_RX_PACKET_MAX for the other messages a client sends and the packet framing */
 #endif
 
 #ifndef SSH_CHANNEL_WINDOW

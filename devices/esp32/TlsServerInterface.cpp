@@ -55,6 +55,7 @@ int32_t TlsServerInterface::begin(uint16_t port) {
         return PDI_ERR_FROM_LWIP(err);
     }
 
+    tcp_setprio(m_serverPcb, TCP_PRIO_MIN);
     m_serverPcb = tcp_listen_with_backlog(m_serverPcb, 1);
     if (!m_serverPcb) {
         TCP_GUARD_END
@@ -211,6 +212,7 @@ err_t TlsServerInterface::onPendingPoll(void* arg, struct tcp_pcb* pcb) {
 err_t TlsServerInterface::onAccept(void* arg, struct tcp_pcb* newpcb, err_t /*err*/) {
     TlsServerInterface* server = static_cast<TlsServerInterface*>(arg);
     if (!server || !newpcb) return ERR_VAL;
+    tcp_setprio(newpcb, TCP_PRIO_MAX);
 
     if (server->m_clientPcb) {
         struct tcp_pcb* old = server->m_clientPcb;

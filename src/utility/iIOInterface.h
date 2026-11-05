@@ -132,6 +132,32 @@ public:
   virtual int32_t write(const char *c_str, uint32_t size) { if(c_str) return write((const uint8_t *)c_str, size); return 0; }
 
   /**
+   * @brief Writes one column of a table: the text padded with spaces to the width
+   *        given, on the left or the right, then the space that ends the column.
+   *        Unlike write_pad the text is never cut, so a column sized to its widest
+   *        value shows every value whole.
+   * @param c_str The text.
+   * @param width The column width.
+   * @param alignright Pad before the text rather than after it.
+   * @return Number of bytes written.
+   */
+  int32_t write_column(const char *c_str, uint32_t width, bool alignright = false) {
+    uint32_t size = (nullptr != c_str) ? (uint32_t)strlen(c_str) : 0;
+    int32_t written = 0;
+    for (uint32_t i = size; alignright && i < width; i++) {
+      written += write((uint8_t)' ');
+    }
+    if (size > 0) {
+      written += write(c_str);
+    }
+    for (uint32_t i = size; !alignright && i < width; i++) {
+      written += write((uint8_t)' ');
+    }
+    written += write((uint8_t)' ');
+    return written;
+  }
+
+  /**
    * @brief Writes a specified number of characters.
    * @param c_str Pointer to the character string.
    * @param maxsize The maximum number of characters to write.
@@ -349,6 +375,8 @@ public:
    * If the delimiter is found, it stops reading and returns the accumulated string.
    * If the delimiter is not found, it continues reading until no more bytes are available.
    * If a null byte (0) is encountered, it also stops reading.
+   * A byte the string has no room for is left unread, so a growth the heap
+   * refuses ends the read early instead of losing input.
    * @return The accumulated string.
    */
   virtual void readStringUntil(pdiutil::string &_outstr, char _delimiter, bool _keepdelimiterinstr = false, const CallBackVoidArgFn &_yield = nullptr, uint32_t _maxlen = 0) {
@@ -362,6 +390,12 @@ public:
     }
 
     while (available() > 0) {
+      if (_outstr.size() >= _outstr.capacity()) {
+        _outstr.reserve(_outstr.size() + (_outstr.size() >> 1) + 16);
+        if (_outstr.size() >= _outstr.capacity()) {
+          break;
+        }
+      }
       // Read a byte from the input
       c = read();
       if (_delimiter != 0 && c == _delimiter) {

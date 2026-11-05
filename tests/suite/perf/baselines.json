@@ -3,42 +3,84 @@
   "terminal.ssh command round trip": {
    "better": "lower",
    "runs": [
-    20.131945610046387
+    20.131945610046387,
+    20.1432466506958,
+    20.136356353759766
    ],
    "unit": "ms"
   },
   "terminal.ssh output": {
    "better": "higher",
    "runs": [
-    5518.523342819663
+    5518.523342819663,
+    5517.724767842179,
+    5515.888922204513
    ],
    "unit": "lines/s"
   },
   "terminal.telnet command round trip": {
    "better": "lower",
    "runs": [
-    40.99843502044678
+    40.99843502044678,
+    1.1654853820800781,
+    1.2093067169189453
    ],
    "unit": "ms"
   },
   "terminal.telnet output": {
    "better": "higher",
    "runs": [
-    6620.759327427593
+    6620.759327427593,
+    6497.709545239773,
+    6465.377898149161
    ],
    "unit": "lines/s"
   },
   "transfer.sftp download": {
    "better": "higher",
    "runs": [
-    47.547147379699375
+    47.547147379699375,
+    48.76046985515112,
+    1922.0364594521059,
+    1922.0502216080365
    ],
    "unit": "KB/s"
+  },
+  "transfer.sftp stat": {
+   "better": "lower",
+   "runs": [
+    0.9979963302612305,
+    0.9967327117919922
+   ],
+   "unit": "ms"
   },
   "transfer.sftp upload": {
    "better": "higher",
    "runs": [
-    3552.8483356495267
+    3552.8483356495267,
+    3810.621997615127,
+    3814.574981171221
+   ],
+   "unit": "KB/s"
+  },
+  "web.portal page": {
+   "better": "lower",
+   "runs": [
+    0.22864341735839844
+   ],
+   "unit": "ms"
+  },
+  "web.portal upload": {
+   "better": "higher",
+   "runs": [
+    790.3761622942613
+   ],
+   "unit": "KB/s"
+  },
+  "web.wget download": {
+   "better": "higher",
+   "runs": [
+    1311.8922474672192
    ],
    "unit": "KB/s"
   }
@@ -47,60 +89,188 @@
   "terminal.ssh command round trip": {
    "better": "lower",
    "runs": [
-    244.58110332489014
+    246.33922576904297,
+    226.7228126525879,
+    206.7643404006958
    ],
    "unit": "ms"
   },
   "terminal.ssh output": {
    "better": "higher",
    "runs": [
-    95.84911983109839
+    56.82801890314644,
+    59.506864869279106,
+    53.69183807392738
    ],
    "unit": "lines/s"
   },
   "terminal.telnet command round trip": {
    "better": "lower",
    "runs": [
-    184.4045639038086
+    179.60755825042725,
+    184.35134887695312,
+    204.88593578338623
    ],
    "unit": "ms"
   },
   "terminal.telnet output": {
    "better": "higher",
    "runs": [
-    70.7590792215149
+    72.8008642158865,
+    42.89517782797079,
+    61.825770772111795,
+    77.91558627154798,
+    55.28995349824461,
+    48.81512946116589,
+    41.94033736466022
    ],
    "unit": "lines/s"
   },
   "transfer.sftp download": {
    "better": "higher",
    "runs": [
-    23.04204979172189
+    56.358305820997835,
+    50.6279480660566,
+    42.74106238272241
    ],
    "unit": "KB/s"
+  },
+  "transfer.sftp stat": {
+   "better": "lower",
+   "runs": [
+    163.81726264953613,
+    162.39376068115234
+   ],
+   "unit": "ms"
   },
   "transfer.sftp upload": {
    "better": "higher",
    "runs": [
-    12.463036285488034
+    34.52257888698423,
+    27.02707021760563,
+    26.073888730292605,
+    34.113006903286134,
+    34.51189995442305,
+    31.351363826099064
+   ],
+   "unit": "KB/s"
+  },
+  "web.portal page": {
+   "better": "lower",
+   "runs": [
+    1102.3619174957275,
+    869.5785999298096,
+    962.759256362915
+   ],
+   "unit": "ms"
+  },
+  "web.portal upload": {
+   "better": "higher",
+   "runs": [
+    2.8935350989140307,
+    2.8663274880931784,
+    2.9011796774089516
+   ],
+   "unit": "KB/s"
+  },
+  "web.wget download": {
+   "better": "higher",
+   "runs": [
+    9.783002950949713,
+    9.18392028589011,
+    9.755108826869435
    ],
    "unit": "KB/s"
   }
  },
  "pdi-bff549": {
+  "terminal.ssh command round trip": {
+   "better": "lower",
+   "runs": [
+    226.6300916671753,
+    244.48189735412598,
+    226.37009620666504
+   ],
+   "unit": "ms"
+  },
+  "terminal.ssh output": {
+   "better": "higher",
+   "runs": [
+    37.27884775504812,
+    32.33248321921979,
+    37.562006625801615
+   ],
+   "unit": "lines/s"
+  },
+  "terminal.telnet command round trip": {
+   "better": "lower",
+   "runs": [
+    225.28133392333984,
+    204.53073978424072,
+    192.44606494903564
+   ],
+   "unit": "ms"
+  },
+  "terminal.telnet output": {
+   "better": "higher",
+   "runs": [
+    39.95034172401786,
+    29.061750225764815,
+    34.749219702927135
+   ],
+   "unit": "lines/s"
+  },
   "transfer.sftp download": {
    "better": "higher",
    "runs": [
-    5.76528967537996,
-    5.402285839130229
+    5.476850295850611,
+    6.239656468136129,
+    5.617113846913856
    ],
    "unit": "KB/s"
+  },
+  "transfer.sftp stat": {
+   "better": "lower",
+   "runs": [
+    205.73594570159912,
+    137.0579719543457,
+    214.06002044677734
+   ],
+   "unit": "ms"
   },
   "transfer.sftp upload": {
    "better": "higher",
    "runs": [
-    15.758271398024313,
-    18.705503193103795
+    17.267115359392555,
+    19.618426402212467,
+    19.348856841912394
+   ],
+   "unit": "KB/s"
+  },
+  "web.portal page": {
+   "better": "lower",
+   "runs": [
+    141.01266860961914,
+    162.20903396606445,
+    149.34873580932617
+   ],
+   "unit": "ms"
+  },
+  "web.portal upload": {
+   "better": "higher",
+   "runs": [
+    3.256637075380729,
+    3.396860869821164,
+    3.188525863855813
+   ],
+   "unit": "KB/s"
+  },
+  "web.wget download": {
+   "better": "higher",
+   "runs": [
+    8.62374740871986,
+    8.904853230480605,
+    8.231743383598191
    ],
    "unit": "KB/s"
   }

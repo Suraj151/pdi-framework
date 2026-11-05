@@ -698,19 +698,25 @@ uint32_t DeviceControlInterface::random_now()
 }
 
 /**
- * return currently free heap size in bytes
+ * return the free bytes of the heap malloc and new draw from
  */
 uint32_t DeviceControlInterface::get_free_heap()
 {
-    return ESP.getFreeHeap();
+    // ESP.getFreeHeap() reads MALLOC_CAP_INTERNAL, which also counts 32-bit-only IRAM
+    // that malloc and new never hand out, so the heap check trusted bytes it could not get
+    // return ESP.getFreeHeap();
+    return heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
 }
 
 /**
- * return the largest block still allocatable in one piece
+ * return the largest block malloc and new can still take in one piece
  */
 uint32_t DeviceControlInterface::get_max_free_block()
 {
-    return ESP.getMaxAllocHeap();
+    // ESP.getMaxAllocHeap() reads MALLOC_CAP_INTERNAL, so it can name an IRAM block
+    // malloc and new cannot use; MALLOC_CAP_DEFAULT is the pool they draw from
+    // return ESP.getMaxAllocHeap();
+    return heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
 }
 
 /**

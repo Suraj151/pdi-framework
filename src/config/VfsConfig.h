@@ -83,7 +83,7 @@ created Date    : 20th July 2026
 #endif
 
 // RAM-backed scratch filesystem. Holds real file content in the heap, so keep
-// it off (undef in DeviceConfig.h) on tight-RAM ports like Arduino UNO.
+// it off (undef in DeviceConfig.h) on tight-RAM ports like the Arduino Mega 2560.
 #ifndef ENABLE_TMPFS
 #define ENABLE_TMPFS
 #endif

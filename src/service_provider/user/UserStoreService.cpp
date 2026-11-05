@@ -15,6 +15,7 @@ created Date    : 18th July 2026
 #include "UserStoreService.h"
 #include <utility/crypto/hash/sha256.h>
 #include <utility/DataTypeConversions.h>
+#include <interface/pdi/impl/modules/storage/FileLines.h>
 #include <service_provider/database/DatabaseServiceProvider.h>
 #include <stdlib.h>
 #include <string.h>
@@ -108,14 +109,16 @@ bool UserStoreService::addUser(const user_record_t &record, const char *password
   pdiutil::string passwd_path = CHARPTR_WRAP(USER_STORE_PASSWD_PATH);
   pdiutil::string line;
   serializePasswdLine(record, line);
+  pdiutil::string::size_type serialized = line.size();
   line += '\n';
+  if (0 == serialized || line.size() != serialized + 1) return false;
 
   if (!__i_fs.isFileExist(passwd_path.c_str())) {
     if (__i_fs.createFile(passwd_path.c_str(), "") < 0) return false;
   }
 
   int iStatus = __i_fs.writeFile(passwd_path.c_str(), (char*)line.c_str(), line.size(), true);
-  if (iStatus < 0) return false;
+  if (iStatus != (int)line.size()) return false;
 
   if (nullptr != password && 0 != password[0]) {
     if (!setPassword(record.m_username.c_str(), password)) {
@@ -191,16 +194,10 @@ bool UserStoreService::scanPasswdFile(bool matchByUid, uint16_t uid, const char 
   bool found = false;
 
   while (offset < (uint64_t)fs && !found) {
-    linedata.clear();
-    int bytes = __i_fs.readFile(passwd_path.c_str(), 128, [&](char *data, uint32_t size) -> bool {
-      linedata += pdiutil::string(data, size);
-      return true;
-    }, offset, "\n");
+    bool cut = false;
+    int bytes = FileLines::readLineAt(__i_fs, passwd_path.c_str(), offset, linedata, &cut);
     if (bytes < 0) break;
-
-    if (!linedata.empty() && linedata.back() == '\r') {
-      linedata.pop_back();
-    }
+    if (cut) linedata.clear();
 
     user_record_t candidate;
     if (parsePasswdLine(linedata, candidate)) {
@@ -224,10 +221,25 @@ bool UserStoreService::scanPasswdFile(bool matchByUid, uint16_t uid, const char 
 
 bool UserStoreService::removeLineByUsername(const char *filepath, const char *username)
 {
-  if (!__i_fs.isFileExist(filepath)) return false;
+  bool found = false;
+  return rewriteUserLine(filepath, username, nullptr, found) && found;
+}
+
+/**
+ * Rewrites a store file without the user's line, putting replacement in its
+ * place (or at the end when the user has none) when given. The copy takes the
+ * file's permissions before anything is written to it and replaces the file
+ * only once every other line has been copied whole; false leaves the file as it
+ * was, as does a file whose permissions cannot be read. found says whether the
+ * user had a line.
+ */
+bool UserStoreService::rewriteUserLine(const char *filepath, const char *username, const pdiutil::string *replacement, bool &found)
+{
+  found = false;
+  if (nullptr == filepath || nullptr == username || !__i_fs.isFileExist(filepath)) return false;
 
   file_info_t original;
-  bool haveoriginal = (0 == __i_fs.getFileMeta(filepath, original));
+  if (0 != __i_fs.getFileMeta(filepath, original)) return false;
 
   const char *tempdir = __i_fs.getTempDirectory();
   pdiutil::string temppath = pdiutil::string(tempdir) + __i_fs.basename(filepath);
@@ -235,59 +247,65 @@ bool UserStoreService::removeLineByUsername(const char *filepath, const char *us
     __i_fs.deleteFile(temppath.c_str());
   }
 
-  if (haveoriginal && __i_fs.createFile(temppath.c_str(), "") >= 0) {
-    __i_fs.beginPrivileged();
-    __i_fs.setFilePermissions(temppath.c_str(), original.m_perms);
-    __i_fs.endPrivileged();
-  }
+  if (__i_fs.createFile(temppath.c_str(), "") < 0) return false;
+
+  __i_fs.beginPrivileged();
+  __i_fs.setFilePermissions(temppath.c_str(), original.m_perms);
+  __i_fs.endPrivileged();
 
   int64_t fs = __i_fs.getFileSize(filepath);
-  if (fs <= 0) return false;
-
   uint64_t offset = 0;
-  bool removed = false;
+  bool writeok = (fs >= 0);
   pdiutil::string linedata;
   size_t unlen = strlen(username);
 
-  while (offset < (uint64_t)fs) {
-    linedata.clear();
-    int bytes = __i_fs.readFile(filepath, 128, [&](char *data, uint32_t size) -> bool {
-      linedata += pdiutil::string(data, size);
-      return true;
-    }, offset, "\n");
-    if (bytes < 0) break;
+  while (writeok && fs > 0 && offset < (uint64_t)fs) {
+    bool cut = false;
+    int bytes = FileLines::readLineAt(__i_fs, filepath, offset, linedata, &cut);
+    if (bytes < 0 || cut) {
+      writeok = false;
+      break;
+    }
 
     bool matches = ( linedata.size() > unlen &&
                      linedata.compare(0, unlen, username) == 0 &&
                      linedata[unlen] == USER_STORE_FIELD_SEP );
 
     if (matches) {
-      removed = true;
+      if (!found && nullptr != replacement) {
+        writeok = (__i_fs.writeFile(temppath.c_str(), replacement->c_str(), replacement->size(), true) == (int)replacement->size());
+      }
+      found = true;
     } else if (!linedata.empty()) {
-      pdiutil::string outline = linedata;
-      outline += '\n';
-      __i_fs.writeFile(temppath.c_str(), (char*)outline.c_str(), outline.size(), true);
+      writeok = (__i_fs.writeFile(temppath.c_str(), linedata.c_str(), linedata.size(), true) == (int)linedata.size() &&
+                 __i_fs.writeFile(temppath.c_str(), "\n", 1, true) == 1);
     }
 
     offset += (uint64_t)bytes + 1;
     __i_dvc_ctrl.yield();
   }
 
-  if (removed) {
-    __i_fs.deleteFile(filepath);
-    __i_fs.moveFile(temppath.c_str(), filepath);
-
-    if (haveoriginal) {
-      __i_fs.beginPrivileged();
-      __i_fs.setFilePermissions(filepath, original.m_perms);
-      __i_fs.setFileOwner(filepath, original.m_uid, original.m_gid);
-      __i_fs.endPrivileged();
-    }
-  } else {
-    __i_fs.deleteFile(temppath.c_str());
+  if (writeok && !found && nullptr != replacement) {
+    writeok = (__i_fs.writeFile(temppath.c_str(), replacement->c_str(), replacement->size(), true) == (int)replacement->size());
   }
 
-  return removed;
+  if (!writeok || (!found && nullptr == replacement)) {
+    __i_fs.deleteFile(temppath.c_str());
+    return writeok;
+  }
+
+  __i_fs.deleteFile(filepath);
+  if (PDI_OK != __i_fs.moveFile(temppath.c_str(), filepath)) {
+    SysLogE("user store: %s could not be replaced, its copy is %s\n", filepath, temppath.c_str());
+    return false;
+  }
+
+  __i_fs.beginPrivileged();
+  __i_fs.setFilePermissions(filepath, original.m_perms);
+  __i_fs.setFileOwner(filepath, original.m_uid, original.m_gid);
+  __i_fs.endPrivileged();
+
+  return true;
 }
 
 bool UserStoreService::verifyPassword(const char *username, const char *password)
@@ -334,9 +352,10 @@ bool UserStoreService::setPassword(const char *username, const char *password)
   line += hexsalt;
   line += '\n';
 
+  if (line.size() != strlen(username) + 1 + 64 + 1 + USER_STORE_SALT_LEN * 2 + 1) return false;
+
   pdiutil::string shadow_path = CHARPTR_WRAP(USER_STORE_SHADOW_PATH);
   __i_fs.beginPrivileged();
-  removeLineByUsername(shadow_path.c_str(), username);
 
   if (!__i_fs.isFileExist(shadow_path.c_str())) {
     if (__i_fs.createFile(shadow_path.c_str(), "") < 0) {
@@ -346,9 +365,10 @@ bool UserStoreService::setPassword(const char *username, const char *password)
     __i_fs.setFilePermissions(shadow_path.c_str(), 0600);
   }
 
-  int iStatus = __i_fs.writeFile(shadow_path.c_str(), (char*)line.c_str(), line.size(), true);
+  bool found = false;
+  bool written = rewriteUserLine(shadow_path.c_str(), username, &line, found);
   __i_fs.endPrivileged();
-  return (iStatus >= 0);
+  return written;
 }
 
 bool UserStoreService::readShadowRecord(const char *username, uint8_t hashOut[32], uint8_t *saltOut)
@@ -366,16 +386,10 @@ bool UserStoreService::readShadowRecord(const char *username, uint8_t hashOut[32
   bool found = false;
 
   while (offset < (uint64_t)fs && !found) {
-    linedata.clear();
-    int bytes = __i_fs.readFile(shadow_path.c_str(), 128, [&](char *data, uint32_t size) -> bool {
-      linedata += pdiutil::string(data, size);
-      return true;
-    }, offset, "\n");
+    bool cut = false;
+    int bytes = FileLines::readLineAt(__i_fs, shadow_path.c_str(), offset, linedata, &cut);
     if (bytes < 0) break;
-
-    if (!linedata.empty() && linedata.back() == '\r') {
-      linedata.pop_back();
-    }
+    if (cut) linedata.clear();
 
     pdiutil::string::size_type sep1 = linedata.find(USER_STORE_FIELD_SEP);
     if (sep1 != pdiutil::string::npos && sep1 == unlen &&

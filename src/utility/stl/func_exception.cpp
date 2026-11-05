@@ -11,7 +11,6 @@ added by        : Suraj I.
 
 #include "exception"
 #include "func_exception"
-#include "stdexcept"
 #include "cstdlib"
 
 namespace pdistd{

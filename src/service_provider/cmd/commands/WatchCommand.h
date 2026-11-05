@@ -28,6 +28,7 @@ struct WatchCommand : public CommandBase {
 	WatchCommand(){
 		Clear();
 		SetCommand(CMD_NAME_WATCH);
+		setArgs(RODT_ATTR(""), 255);
 		AddOption(CMD_OPTION_NAME_C);
 		AddOption(CMD_OPTION_NAME_I);
 		AddOption(CMD_OPTION_NAME_N);

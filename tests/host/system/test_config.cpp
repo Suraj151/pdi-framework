@@ -45,6 +45,97 @@ pdiutil::string slurpConf(VfsDispatcher *fs)
 
 } // namespace
 
+namespace
+{
+
+const char *LONG_CONF_PATH = "/feature_long.conf";
+
+/**
+ * A config file whose middle line is longer than the heap will hold whole while
+ * capped to a 2 KB block, between two ordinary options.
+ */
+pdiutil::string writeLongConf(VfsDispatcher *fs)
+{
+    pdiutil::string content = "port 2222\r\nnote ";
+    content.append(6000, 'x');
+    content += "\r\nname in memory\r\n";
+    if (fs->isFileExist(LONG_CONF_PATH))
+    {
+        fs->deleteFile(LONG_CONF_PATH);
+    }
+    fs->createFile(LONG_CONF_PATH, content.c_str());
+    return content;
+}
+
+pdiutil::string slurpLongConf(VfsDispatcher *fs)
+{
+    pdiutil::string out;
+    fs->readFile(LONG_CONF_PATH, 256, [&](char *data, uint32_t size) -> bool {
+        out.append(data, size);
+        return true;
+    });
+    return out;
+}
+
+} // namespace
+
+TEST(config, a_rewrite_that_cannot_hold_a_line_whole_leaves_the_file_as_it_was)
+{
+    VfsDispatcher *fs = pditest::mountedVfs();
+    pdiutil::string before = writeLongConf(fs);
+
+    pdiutil::enable_heap_check();
+    __i_dvc_ctrl.capMaxFreeBlock(2048);
+    bool set = setConfigValue(LONG_CONF_PATH, "port", "8022");
+    __i_dvc_ctrl.capMaxFreeBlock(0);
+
+    ASSERT_FALSE(set);
+    ASSERT_TRUE(slurpLongConf(fs) == before);
+
+    fs->deleteFile(LONG_CONF_PATH);
+}
+
+TEST(config, a_line_the_heap_cannot_hold_whole_is_not_read_as_an_option)
+{
+    VfsDispatcher *fs = pditest::mountedVfs();
+    writeLongConf(fs);
+
+    pdiutil::vector<config_kv_t> kvs;
+    pdiutil::enable_heap_check();
+    __i_dvc_ctrl.capMaxFreeBlock(2048);
+    bool loaded = loadConfigFile(LONG_CONF_PATH, kvs);
+    __i_dvc_ctrl.capMaxFreeBlock(0);
+
+    ASSERT_TRUE(loaded);
+    bool sawnote = false, sawname = false;
+    for (size_t i = 0; i < kvs.size(); i++)
+    {
+        sawnote = sawnote || kvs[i].m_key == "note";
+        sawname = sawname || kvs[i].m_key == "name";
+    }
+    ASSERT_FALSE(sawnote);
+    ASSERT_TRUE(sawname);
+
+    fs->deleteFile(LONG_CONF_PATH);
+}
+
+TEST(config, a_saved_file_is_written_whole_or_left_as_it_was)
+{
+    VfsDispatcher *fs = pditest::mountedVfs();
+    writeConf(fs, "port 2222\r\n");
+
+    pdiutil::vector<config_kv_t> kvs;
+    config_kv_t kv;
+    kv.m_key = "port";
+    kv.m_value = "8022";
+    kvs.push_back(kv);
+    ASSERT_TRUE(saveConfigFile(CONF_PATH, kvs, nullptr, 0));
+    ASSERT_STREQ(slurpConf(fs).c_str(), "port 8022\r\n");
+    ASSERT_FALSE(fs->isFileExist((pdiutil::string(CONF_PATH) + CONFIG_TEMP_SUFFIX).c_str()));
+
+    fs->deleteFile(CONF_PATH);
+}
+
 /* ------------------------------------------------------------------ read */
 
 TEST(config, one_option_reads_without_the_rest_of_the_file)

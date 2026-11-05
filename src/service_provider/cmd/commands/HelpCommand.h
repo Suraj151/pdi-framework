@@ -20,6 +20,7 @@ struct HelpCommand : public CommandBase {
 	HelpCommand(){
 		Clear();
 		SetCommand(CMD_NAME_HELP);
+		setArgs(RODT_ATTR(""), 0);
 	}
 
 	static void RegisterCommand(){

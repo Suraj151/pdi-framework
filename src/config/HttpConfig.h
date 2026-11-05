@@ -128,6 +128,14 @@ typedef enum http_method http_method_t;
 #define HTTP_UPLOAD_READ_BLOCK_SIZE 2048
 #endif
 
+#ifndef HTTP_UPLOAD_WRITE_BLOCK_SIZE
+#define HTTP_UPLOAD_WRITE_BLOCK_SIZE 2048  /* upload bytes gathered before one write to the staging file */
+#endif
+
+#ifndef HTTP_UPLOAD_WRITE_BLOCK_MIN
+#define HTTP_UPLOAD_WRITE_BLOCK_MIN 256    /* smallest gathering buffer an upload takes when the heap is short */
+#endif
+
 #ifndef HTTP_MAX_BODY_SIZE
 #define HTTP_MAX_BODY_SIZE 4096
 #endif

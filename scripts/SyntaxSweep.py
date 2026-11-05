@@ -6,7 +6,7 @@ standard and one feature profile, against the mock device.
 
 Two kinds of drift are checked here, and they are separate axes.
 
-Standard: the three ports do not agree. arduinouno is gnu++11, esp8266 is
+Standard: the three ports do not agree. arduinomega is gnu++11, esp8266 is
 gnu++17 and esp32 is gnu++2a. Shared headers therefore have to hold at the
 gnu++11 floor, and nothing in the normal build enforces that -- the host test
 build compiles at C++17 and every board build sees only its own standard.
@@ -19,7 +19,7 @@ with PDI_NO_*, which is what lets a profile switch one off from the command
 line.
 
 With --port posix it also compiles devices/posix itself. Nothing here compiles the esp32,
-esp8266 or arduinouno device layers -- that needs their real toolchains.
+esp8266 or arduinomega device layers -- that needs their real toolchains.
 """
 
 import argparse

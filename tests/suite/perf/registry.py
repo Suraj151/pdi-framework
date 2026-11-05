@@ -234,6 +234,12 @@ def run(lanes, board, only=None, record=False, verbose=False):
         else:
             ok += 1
 
+    for target in lanes.values():
+        try:
+            target.finish()
+        except Exception as err:
+            print("       %scould not undo a suite's setup: %s%s" % (DIM, err, RESET), flush=True)
+
     def commit():
         for item, samples, value, verdict in measured:
             entry = mine.setdefault(item.full_name, {"unit": item.unit, "better": item.better,

@@ -392,3 +392,372 @@ def ssh_falls_back_to_sha1(t):
             raise AssertionError("hmac-sha1 was offered but the session did not authenticate")
     finally:
         transport.close()
+
+
+def _slow_relay(target, port):
+    """
+    A local relay to the ssh server that, once `cut` is set, hands each client
+    write on in 500 byte pieces with a pause between them, the way a busy
+    network delivers a packet larger than one segment.
+    """
+    import socket
+    import threading
+    import time
+
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(1)
+    cut = threading.Event()
+
+    def pump(src, dst, slow):
+        try:
+            while True:
+                data = src.recv(4096)
+                if not data:
+                    break
+                if slow and cut.is_set() and len(data) > 500:
+                    for at in range(0, len(data), 500):
+                        dst.sendall(data[at:at + 500])
+                        time.sleep(0.3)
+                else:
+                    dst.sendall(data)
+        except OSError:
+            pass
+        finally:
+            for s in (src, dst):
+                try:
+                    s.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+
+    def accept():
+        client, _ = listener.accept()
+        server = socket.create_connection((target, port), timeout=15)
+        threading.Thread(target=pump, args=(client, server, True), daemon=True).start()
+        threading.Thread(target=pump, args=(server, client, False), daemon=True).start()
+
+    threading.Thread(target=accept, daemon=True).start()
+    return listener, cut
+
+
+UNREAD_PACKET_LOG = "SSH: session closed, a packet could not be read"
+
+
+def _squeezed_command(t, block, size, pieces, hold=10):
+    """
+    Opens a shell over ssh, squeezes the heap's largest block to block bytes and
+    sends one command of size bytes; whether the session lived, and the
+    session's transport and channel when it did.
+    """
+    import paramiko
+    import socket
+    import time
+    from ..driver import ssh_shell  # noqa: F401  registers curve25519
+
+    if getattr(t.shell, "set_heap", None) is None:
+        raise Skip("only the host process can have its heap squeezed on cue")
+
+    listener, cut = _slow_relay(t.address(), ssh_port(t))
+    sock = socket.create_connection(listener.getsockname(), timeout=15)
+    transport = paramiko.Transport(sock)
+    transport.start_client(timeout=30)
+    transport.auth_password(t.username, t.password)
+    channel = transport.open_session()
+    channel.get_pty()
+    channel.invoke_shell()
+    time.sleep(2.0)
+    while channel.recv_ready():
+        channel.recv(4096)
+
+    try:
+        t.shell.set_heap(block=block)
+        time.sleep(0.3)
+        if pieces:
+            cut.set()
+        channel.settimeout(15)
+        channel.sendall("echo " + "P" * size + "\r")
+        deadline = time.time() + hold
+        while time.time() < deadline and transport.is_active() and not channel.closed:
+            if channel.recv_ready():
+                channel.recv(8192)
+            else:
+                time.sleep(0.1)
+    finally:
+        t.shell.set_heap()
+        time.sleep(0.3)
+    cut.clear()
+    return transport.is_active() and not channel.closed, transport, channel, listener
+
+
+def _unread_packet_logs(t):
+    return t.run("cat /var/log/syslog.error").count(UNREAD_PACKET_LOG)
+
+
+def _answers(channel, command, expect, timeout=8):
+    import time
+    channel.sendall(command + "\r")
+    seen = b""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        flat = seen.replace(b"\r", b"").replace(b"\n", b"")
+        if flat.count(expect) >= 2:
+            return True
+        if channel.recv_ready():
+            seen += channel.recv(8192)
+        else:
+            time.sleep(0.1)
+    return False
+
+
+def _refused_packet_is_logged(t, pieces):
+    require_ssh(t)
+    try:
+        import paramiko  # noqa: F401
+    except ImportError as err:
+        raise Skip("paramiko is not installed: %s" % err)
+    before = _unread_packet_logs(t)
+    alive, transport, channel, listener = _squeezed_command(t, 1000, 1100, pieces)
+    try:
+        if alive:
+            raise AssertionError("a 1100 byte command the heap could not hold left the session open")
+    finally:
+        transport.close()
+        listener.close()
+    if _unread_packet_logs(t) <= before:
+        raise AssertionError("the session closed on a packet it could not hold with nothing in the syslog")
+
+
+@test("an ssh packet the heap cannot hold closes the session and the syslog says why")
+def ssh_refused_packet_is_logged(t):
+    _refused_packet_is_logged(t, False)
+
+
+@test("an ssh packet the heap cannot hold that arrives in pieces closes the session and the syslog says why")
+def ssh_refused_packet_in_pieces_is_logged(t):
+    _refused_packet_is_logged(t, True)
+
+
+@test("an ssh packet a squeezed heap can still hold keeps the session, which answers once the heap is back")
+def ssh_held_packet_keeps_session(t):
+    require_ssh(t)
+    try:
+        import paramiko  # noqa: F401
+    except ImportError as err:
+        raise Skip("paramiko is not installed: %s" % err)
+    alive, transport, channel, listener = _squeezed_command(t, 1300, 900, False)
+    try:
+        if not alive:
+            raise AssertionError("a 900 byte command a 1300 byte block can hold dropped the session")
+        if not _answers(channel, "echo held_" + "Q" * 40, b"held_" + b"Q" * 40):
+            raise AssertionError("the session that kept its packet did not answer once the heap was back")
+    finally:
+        transport.close()
+        listener.close()
+
+
+@test("after an ssh packet the heap could not hold, a new session runs the same command whole")
+def ssh_new_session_after_refused_packet(t):
+    require_ssh(t)
+    try:
+        import paramiko
+    except ImportError as err:
+        raise Skip("paramiko is not installed: %s" % err)
+    import socket
+    from ..driver import ssh_shell  # noqa: F401
+
+    alive, transport, channel, listener = _squeezed_command(t, 1000, 1100, False)
+    transport.close()
+    listener.close()
+
+    sock = socket.create_connection((t.address(), ssh_port(t)), timeout=15)
+    transport = paramiko.Transport(sock)
+    try:
+        transport.start_client(timeout=30)
+        transport.auth_password(t.username, t.password)
+        channel = transport.open_session()
+        channel.get_pty()
+        channel.invoke_shell()
+        import time
+        time.sleep(2.0)
+        while channel.recv_ready():
+            channel.recv(4096)
+        if not _answers(channel, "echo " + "R" * 1100, b"R" * 1100, timeout=15):
+            raise AssertionError("a new session did not answer the 1100 byte command whole")
+    finally:
+        transport.close()
+
+
+def _ssh_log_count(t, text):
+    return t.run("cat /var/log/syslog.error").count(text)
+
+
+@test("ssh output the squeezed heap cannot send for a moment is sent whole once the heap is back")
+def ssh_held_output_is_sent_later(t):
+    require_ssh(t)
+    try:
+        import paramiko  # noqa: F401
+    except ImportError as err:
+        raise Skip("paramiko is not installed: %s" % err)
+    import time
+    alive, transport, channel, listener = _squeezed_command(t, 1100, 900, False, hold=1.0)
+    try:
+        if not alive:
+            raise AssertionError("a squeeze shorter than SSH_TX_STALL_MS closed the session")
+        seen = b""
+        deadline = time.time() + 8
+        want = b"P" * 900
+        while time.time() < deadline and seen.replace(b"\r", b"").replace(b"\n", b"").count(want) < 1:
+            if channel.recv_ready():
+                seen += channel.recv(8192)
+            else:
+                time.sleep(0.1)
+        if want not in seen.replace(b"\r", b"").replace(b"\n", b""):
+            raise AssertionError("output held through a short squeeze never arrived whole (%d bytes back)" % len(seen))
+        if not _answers(channel, "echo after_" + "S" * 30, b"after_" + b"S" * 30):
+            raise AssertionError("the session did not answer after its held output went out")
+    finally:
+        transport.close()
+        listener.close()
+
+
+@test("ssh output that cannot be sent for longer than SSH_TX_STALL_MS closes the session and the syslog says why")
+def ssh_unsendable_output_closes_the_session(t):
+    require_ssh(t)
+    try:
+        import paramiko  # noqa: F401
+    except ImportError as err:
+        raise Skip("paramiko is not installed: %s" % err)
+    text = "of output could not be"
+    before = _ssh_log_count(t, text)
+    alive, transport, channel, listener = _squeezed_command(t, 1100, 900, False, hold=8)
+    transport.close()
+    listener.close()
+    if alive:
+        raise AssertionError("output the heap could not send for 8 s left the session open")
+    if _ssh_log_count(t, text) <= before:
+        raise AssertionError("the session closed on output it could not send with nothing in the syslog")
+
+
+@test("an ssh login while the heap is short completes or is refused with a log, never with a wrong signature")
+def ssh_squeezed_login_is_signed_right_or_refused(t):
+    require_ssh(t)
+    try:
+        import paramiko
+    except ImportError as err:
+        raise Skip("paramiko is not installed: %s" % err)
+    if getattr(t.shell, "set_heap", None) is None:
+        raise Skip("only the host process can have its heap squeezed on cue")
+    import socket
+    import time
+    from ..driver import ssh_shell  # noqa: F401
+
+    for block in (2048, 1600, 1400, 1200):
+        before = _ssh_log_count(t, "SSH: session closed")
+        t.shell.set_heap(block=block)
+        time.sleep(0.3)
+        transport = None
+        outcome = "logged in"
+        try:
+            sock = socket.create_connection((t.address(), ssh_port(t)), timeout=15)
+            transport = paramiko.Transport(sock)
+            transport.start_client(timeout=20)
+            transport.auth_password(t.username, t.password)
+        except paramiko.SSHException as err:
+            outcome = str(err)
+        except EOFError:
+            outcome = "closed"
+        finally:
+            t.shell.set_heap()
+            time.sleep(0.3)
+            if transport is not None:
+                transport.close()
+        if "Signature" in outcome or "signature" in outcome:
+            raise AssertionError("a login squeezed to %d B was signed wrong: %s" % (block, outcome))
+        if "logged in" != outcome and _ssh_log_count(t, "SSH: session closed") <= before:
+            raise AssertionError("a login squeezed to %d B was refused (%s) with nothing in the syslog" % (block, outcome))
+
+
+@test("an ssh packet that arrives in several pieces is read whole and the session goes on")
+def ssh_packet_in_pieces(t):
+    require_ssh(t)
+    try:
+        import paramiko
+    except ImportError as err:
+        raise Skip("paramiko is not installed: %s" % err)
+    import socket
+    import time
+    from ..driver import ssh_shell  # noqa: F401  registers curve25519
+
+    listener, cut = _slow_relay(t.address(), ssh_port(t))
+    sock = socket.create_connection(listener.getsockname(), timeout=15)
+    transport = paramiko.Transport(sock)
+    try:
+        transport.start_client(timeout=30)
+        transport.auth_password(t.username, t.password)
+        channel = transport.open_session()
+        channel.get_pty()
+        channel.invoke_shell()
+        time.sleep(2.0)
+        while channel.recv_ready():
+            channel.recv(4096)
+
+        cut.set()
+        channel.send("echo " + "P" * 1100 + "\r")
+        seen = b""
+        deadline = time.time() + 20
+        while time.time() < deadline and b"P" * 1100 not in seen.replace(b"\r", b"").replace(b"\n", b""):
+            if channel.closed or not transport.is_active():
+                break
+            if channel.recv_ready():
+                seen += channel.recv(8192)
+            else:
+                time.sleep(0.1)
+
+        if not transport.is_active() or channel.closed:
+            raise AssertionError("the server dropped the session on a packet that came in pieces")
+        if b"P" * 1100 not in seen.replace(b"\r", b"").replace(b"\n", b""):
+            raise AssertionError("the command in a packet that came in pieces was not answered (%d bytes back)"
+                                 % len(seen))
+    finally:
+        transport.close()
+        listener.close()
+
+
+@test("an ssh handshake whose packets arrive in pieces still logs in and runs a command")
+def ssh_handshake_in_pieces(t):
+    require_ssh(t)
+    try:
+        import paramiko
+    except ImportError as err:
+        raise Skip("paramiko is not installed: %s" % err)
+    import socket
+    import time
+    from ..driver import ssh_shell  # noqa: F401  registers curve25519
+
+    listener, cut = _slow_relay(t.address(), ssh_port(t))
+    cut.set()
+    sock = socket.create_connection(listener.getsockname(), timeout=30)
+    transport = paramiko.Transport(sock)
+    try:
+        transport.start_client(timeout=60)
+        transport.auth_password(t.username, t.password)
+        channel = transport.open_session()
+        channel.get_pty()
+        channel.invoke_shell()
+        time.sleep(2.0)
+        channel.send("echo handshake$((1+1))pieces\r")
+        seen = b""
+        deadline = time.time() + 20
+        while time.time() < deadline and b"handshake2pieces" not in seen:
+            if channel.closed or not transport.is_active():
+                break
+            if channel.recv_ready():
+                seen += channel.recv(4096)
+            else:
+                time.sleep(0.1)
+        if b"handshake2pieces" not in seen:
+            raise AssertionError("a session whose handshake came in pieces did not run the command")
+    finally:
+        transport.close()
+        listener.close()

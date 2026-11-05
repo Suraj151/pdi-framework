@@ -19,6 +19,7 @@ struct WhoAmICommand : public CommandBase {
 	WhoAmICommand(){
 		Clear();
 		SetCommand(CMD_NAME_WHOAMI);
+		setArgs(RODT_ATTR(""), 0);
 	}
 
 	static void RegisterCommand(){

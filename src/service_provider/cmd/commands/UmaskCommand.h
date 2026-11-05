@@ -27,6 +27,7 @@ struct UmaskCommand : public CommandBase {
 	UmaskCommand(){
 		Clear();
 		SetCommand(CMD_NAME_UMASK);
+		setArgs(RODT_ATTR(""), 1);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
@@ -56,9 +57,15 @@ struct UmaskCommand : public CommandBase {
 		if( nullptr == m_terminal ) return CMD_ERROR_FAILED;
 
 		CommandOption *mopt = &m_options[0];
-		if( nullptr != mopt && nullptr != mopt->optionval && mopt->optionvalsize > 0 ){
-			uint16_t newMask = StringToOctalUint16(mopt->optionval, (uint8_t)mopt->optionvalsize) & 0777;
-			SessionManager::setCurrentUmask(newMask);
+		if( optionGiven(mopt) ){
+			uint32_t newMask = 0;
+			if( !ParseOctal(mopt->optionval, (uint16_t)mopt->optionvalsize, 0777, newMask) ){
+				m_terminal->writeln();
+				m_terminal->write_ro(RODT_ATTR("umask: invalid mode : "));
+				m_terminal->write(mopt->optionval, (uint32_t)mopt->optionvalsize);
+				return CMD_ERROR_INVAL;
+			}
+			SessionManager::setCurrentUmask((uint16_t)newMask);
 		}
 
 		uint16_t cur = SessionManager::getCurrentUmask();

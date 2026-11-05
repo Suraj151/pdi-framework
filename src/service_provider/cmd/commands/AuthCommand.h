@@ -26,6 +26,7 @@ struct LoginCommand : public CommandBase {
 	LoginCommand(){
 		Clear();
 		SetCommand(CMD_NAME_LOGIN);
+		setArgs(RODT_ATTR(""), 2, true);
 		AddOption(CMD_OPTION_NAME_U);
 		AddOption(CMD_OPTION_NAME_P);
 	}
@@ -129,6 +130,7 @@ struct LogoutCommand : public CommandBase {
 	LogoutCommand(){
 		Clear();
 		SetCommand(CMD_NAME_LOGOUT);
+		setArgs(RODT_ATTR(""), 0);
 	}
 
     /**

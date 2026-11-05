@@ -80,7 +80,7 @@ public:
   /**
    * @brief Returns a 32-bit random value. Default is a portable xorshift PRNG
    *        seeded from micros_now() — adequate for non-cryptographic use on
-   *        ports without a hardware RNG (Arduino UNO, mock). Ports with a
+   *        ports without a hardware RNG (Arduino Mega 2560, mock). Ports with a
    *        hardware entropy source override this.
    * @return A pseudo-random 32-bit value.
    */

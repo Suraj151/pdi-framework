@@ -23,6 +23,7 @@ struct GroupsCommand : public CommandBase {
 	GroupsCommand(){
 		Clear();
 		SetCommand(CMD_NAME_GROUPS);
+		setArgs(RODT_ATTR(""), 0);
 	}
 
 	static void RegisterCommand(){

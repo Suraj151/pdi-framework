@@ -270,6 +270,7 @@ void SSHServer::handle() {
         m_sessions[slot] = pdiutil::safe_new<LWSSHSession>(client);
         if (m_sessions[slot] == nullptr) {
             // Not enough heap for another session, drop the accepted client.
+            SysLogE("SSH: session closed, the heap cannot hold a new session\n");
             if (client) {
                 client->close();
                 pdiutil::safe_delete(client);
@@ -277,6 +278,7 @@ void SSHServer::handle() {
             break;
         }
         if (m_sessions[slot]->m_sshclient == nullptr) {
+            SysLogE("SSH: session closed, the heap cannot hold a new session\n");
             pdiutil::safe_delete(m_sessions[slot]);
             break;
         }
@@ -501,6 +503,16 @@ void SSHServer::handleVersionExchange() {
 }
 
 /**
+ * @brief Closes the session on a packet that could not be read, logging why.
+ * @param status The negative answer the packet read gave.
+ */
+void SSHServer::closeOnUnreadPacket(int status){
+
+    SysLogE("SSH: session closed, a packet could not be read: %d\n", status);
+    m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+}
+
+/**
  * @brief Handle key exchange with the client.
  * This function is called when the session state is KEY_EXCHANGE.
  */
@@ -521,7 +533,10 @@ void SSHServer::handleKeyExchange(){
 
                 // Handle key exchange initialization
                 SSHKexInitFields kex_init_fields;
-                if(parse_kex_init_fields(m_session->m_sshpacket.payload, kex_init_fields)){
+                if(m_session->m_client_kexinit.payload.size() != m_session->m_sshpacket.payload.size()){
+
+                    closeOnUnreadPacket(PDI_ERR_NO_MEM);
+                }else if(parse_kex_init_fields(m_session->m_sshpacket.payload, kex_init_fields)){
 
                     pdiutil::string mac_sha2_256 = CHARPTR_WRAP("hmac-sha2-256");
                     pdiutil::string mac_sha1 = CHARPTR_WRAP("hmac-sha1");
@@ -554,7 +569,7 @@ void SSHServer::handleKeyExchange(){
                 }
             }
         }else if(parsestatus < 0){
-            m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+            closeOnUnreadPacket(parsestatus);
         }
     }else if(m_session->m_state == LWSSHSession::SESSION_STATE_KEX_INIT_SEND){
 
@@ -576,11 +591,13 @@ void SSHServer::handleKeyExchange(){
 
         pdiutil::vector<uint8_t> payload;
         bool bstatus = false;
+        bool keysloaded = false;
 
         if (m_session->m_negotiated_hostkey_algo == SSH_KEY_ALGO_ED25519) {
 
             pdiutil::vector<uint8_t> server_host_pubkey, server_host_privkey;
             bstatus = getSSHKeyPairs(SSH_KEY_ALGO_ED25519, server_host_pubkey, server_host_privkey);
+            keysloaded = bstatus;
             if (bstatus) {
                 bstatus = prepare_server_ecdh_reply(
                     m_session,
@@ -595,6 +612,7 @@ void SSHServer::handleKeyExchange(){
             rsa_key *rsakey = pdiutil::safe_new<rsa_key>();
             if (rsakey) {
                 bstatus = load_rsa_host_key(*rsakey);
+                keysloaded = bstatus;
                 if (bstatus) {
                     bstatus = prepare_server_ecdh_reply_rsa(
                         m_session,
@@ -606,6 +624,12 @@ void SSHServer::handleKeyExchange(){
                 }
                 pdiutil::safe_delete(rsakey);
             }
+        }
+
+        if (!bstatus && keysloaded) {
+            SysLogE("SSH: session closed, the key exchange reply could not be built\n");
+            m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+            return;
         }
 
         if (!bstatus) {
@@ -828,7 +852,7 @@ void LWSSH::SSHServer::handleAuthentication(){
                 // __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln();
             }
         }else if(parsestatus < 0){
-            m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+            closeOnUnreadPacket(parsestatus);
         }
     }
 }
@@ -839,6 +863,19 @@ void LWSSH::SSHServer::handleAuthentication(){
 void LWSSH::SSHServer::handleChannelRequest(){
 
     if(m_session->m_state == LWSSHSession::SESSION_STATE_CHANNEL_REQUEST){
+
+        if( !drain_ssh_output(m_session) ){
+            return;
+        }
+
+        auto &sftp = m_session->current_channel.subsystem_req.sftp;
+        if( sftp.held && (!sftp.rx_accum.empty() || !sftp.reply_held.empty()) ){
+            pdiutil::vector<uint8_t> none;
+            handleChannelSubsystemRequest(none);
+            if( sftp.held && !m_session->m_txpending.empty() ){
+                return;
+            }
+        }
 
         int parsestatus = parse_encrypted_packet(m_session, m_session->m_sshpacket);
 
@@ -858,7 +895,7 @@ void LWSSH::SSHServer::handleChannelRequest(){
                 if(bstatus){
 
                     m_session->current_channel.window_used = 0;
-                    bstatus = send_channel_open_confirmation(m_session, SSH_CHANNEL_WINDOW, m_session->current_channel.max_packet_size);
+                    bstatus = send_channel_open_confirmation(m_session, SSH_CHANNEL_WINDOW, SSH_RX_PACKET_MAX);
 
                     if(!bstatus){
 
@@ -974,9 +1011,12 @@ void LWSSH::SSHServer::handleChannelRequest(){
             }else if(msg_type == SSH2_MSG_CHANNEL_DATA){
 
                 SSHChannelData chdata;
-                bool bstatus = parse_channel_data_request(m_session->m_sshpacket.payload, chdata);
+                int datastatus = parse_channel_data_request(m_session->m_sshpacket.payload, chdata);
 
-                if( bstatus ){
+                if( 0 != datastatus ){
+
+                    closeOnUnreadPacket(datastatus);
+                }else{
 
                     consume_channel_window(m_session, (uint32_t)chdata.data.size());
 
@@ -988,8 +1028,10 @@ void LWSSH::SSHServer::handleChannelRequest(){
                     if( m_session->current_channel.req_type == rt_shell ||
                         m_session->current_channel.req_type == rt_pty
                     ){
-                        if( m_session->m_sshclient ){
-                            m_session->m_sshclient->setReceivedChannelData(chdata.data);
+                        if( m_session->m_sshclient && !m_session->m_sshclient->setReceivedChannelData(chdata.data) ){
+
+                            closeOnUnreadPacket(PDI_ERR_NO_MEM);
+                        }else if( m_session->m_sshclient ){
 
                             #ifdef ENABLE_CMD_SERVICE
 
@@ -1065,20 +1107,33 @@ void LWSSH::SSHServer::handleChannelRequest(){
                     m_session->current_channel.ischannelreqsuccess = -1;
                 }
                 m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
-            }else{
-                __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln();
-                __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write_ro(RODT_ATTR("SSH Client channel req else : "));
-                __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln((int32_t)m_session->m_sshpacket.payload.size());
-                for (size_t i = 0; i < m_session->m_sshpacket.payload.size(); i++)
-                {
-                    __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write_ro(RODT_ATTR("0x"));
-                    __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write((uint32_t)m_session->m_sshpacket.payload[i], true, true);
-                    __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write_ro(RODT_ATTR(", "));
+            }else if(msg_type == SSH2_MSG_GLOBAL_REQUEST){
+
+                pdiutil::string request;
+                int32_t at = 1;
+                bool named = read_ssh_string(m_session->m_sshpacket.payload, request, at);
+                if( named && (size_t)at < m_session->m_sshpacket.payload.size() && 0 != m_session->m_sshpacket.payload[at] ){
+                    pdiutil::vector<uint8_t> reply;
+                    reply.push_back(SSH2_MSG_REQUEST_FAILURE);
+                    send_server_ssh_packet(m_session, reply, true);
                 }
-                __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln();
+            }else if(msg_type == SSH2_MSG_CHANNEL_WINDOW_ADJUST){
+
+                const pdiutil::vector<uint8_t> &adjust = m_session->m_sshpacket.payload;
+                if( adjust.size() >= 9 ){
+                    uint32_t more = BytesToUint32BE(&adjust[5]);
+                    uint32_t &window = m_session->current_channel.window_size;
+                    window = (more > UINT32_MAX - window) ? UINT32_MAX : window + more;
+                }
+            }else if(msg_type == SSH2_MSG_IGNORE || msg_type == SSH2_MSG_DEBUG || msg_type == SSH2_MSG_UNIMPLEMENTED){
+            }else{
+                pdiutil::vector<uint8_t> reply;
+                reply.push_back(SSH2_MSG_UNIMPLEMENTED);
+                AppendUint32BE(reply, m_session->packets_seq_num_ctos - 1);
+                send_server_ssh_packet(m_session, reply, true);
             }
         }else if(parsestatus < 0){
-            m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+            closeOnUnreadPacket(parsestatus);
         }
 
         // Once channel establish set the ssh client interface i.e. terminal interface to commandline
@@ -1129,33 +1184,128 @@ void LWSSH::SSHServer::handleChannelSubsystemRequest(pdiutil::vector<uint8_t>& d
     if (m_session->current_channel.subsystem_req.subsystem.find(sftp_str) == 0) {
 
         pdiutil::vector<uint8_t> &accum = m_session->current_channel.subsystem_req.sftp.rx_accum;
-        accum.insert(accum.end(), data.begin(), data.end());
-
-        while (accum.size() >= 4) {
-
-            uint32_t packetlen = BytesToUint32BE(&accum[0]);
-
-            if (packetlen > SSH_SFTP_MAX_RX_PACKET) {
-                accum.clear();
+        size_t used = 0;
+        if (accum.empty()) {
+            used = takeSftpStream(data.data(), data.size());
+            if (used < data.size() && LWSSHSession::SESSION_STATE_SESSION_CLOSE != m_session->m_state) {
+                accum.assign(data.begin() + used, data.end());
+                if (accum.size() != data.size() - used) {
+                    SysLogE("SSH: session closed, %u bytes of sftp data could not be held\n", (unsigned int)(data.size() - used));
+                    m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+                }
+            }
+        } else {
+            size_t had = accum.size();
+            accum.insert(accum.end(), data.begin(), data.end());
+            if (accum.size() != had + data.size()) {
+                SysLogE("SSH: session closed, %u bytes of sftp data could not be held\n", (unsigned int)data.size());
                 m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
-                break;
+            } else {
+                used = takeSftpStream(accum.data(), accum.size());
+                accum.erase(accum.begin(), accum.begin() + used);
             }
-
-            if (accum.size() < (4 + packetlen)) {
-                break;
-            }
-
-            pdiutil::vector<uint8_t> onepacket(accum.begin(), accum.begin() + 4 + packetlen);
-            handleChannelSubsystemSftpRequest(onepacket);
-            accum.erase(accum.begin(), accum.begin() + 4 + packetlen);
+        }
+        if (LWSSHSession::SESSION_STATE_SESSION_CLOSE == m_session->m_state) {
+            accum.clear();
         }
     }
 }
 
 /**
+ * @brief Takes the sftp requests the channel bytes hold: each whole request is
+ *        answered, a write's data goes to its file as it arrives.
+ * @param bytes The bytes not yet taken.
+ * @param size How many.
+ * @return How many were taken; the rest wait for more bytes.
+ */
+size_t LWSSH::SSHServer::takeSftpStream(const uint8_t *bytes, size_t size){
+
+    auto &sftp = m_session->current_channel.subsystem_req.sftp;
+    size_t used = 0;
+    sftp.held = false;
+    if (!sendHeldSftpReply()) {
+        sftp.held = true;
+        return 0;
+    }
+    while (used < size && LWSSHSession::SESSION_STATE_SESSION_CLOSE != m_session->m_state) {
+
+        if (!sftp.reply_held.empty()) {
+            sftp.held = true;
+            break;
+        }
+
+        size_t avail = size - used;
+        const uint8_t *head = bytes + used;
+
+        if (sftp.write_left > 0) {
+            uint32_t piece = (avail < sftp.write_left) ? (uint32_t)avail : sftp.write_left;
+            writeSftpData(head, piece);
+            used += piece;
+            continue;
+        }
+
+        if (avail < 4) {
+            break;
+        }
+        uint32_t packetlen = BytesToUint32BE(head);
+
+        if (avail >= 5 && SSH_FXP_WRITE == head[4]) {
+            if (avail < 13) {
+                break;
+            }
+            uint32_t handlelen = BytesToUint32BE(head + 9);
+            uint32_t header = 1 + 4 + 4 + handlelen + 8 + 4;
+            if (handlelen > SSH_SFTP_HANDLE_MAX || packetlen < header) {
+                SysLogE("SSH: session closed, an sftp write is malformed\n");
+                m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+                break;
+            }
+            if (avail < 4 + header) {
+                break;
+            }
+            const uint8_t *at = head + 13;
+            pdiutil::string handle((const char *)at, handlelen);
+            uint32_t datalen = BytesToUint32BE(at + handlelen + 8);
+            if (packetlen - header != datalen) {
+                SysLogE("SSH: session closed, an sftp write is malformed\n");
+                m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+                break;
+            }
+            sftp.write_id = BytesToUint32BE(head + 5);
+            sftp.write_at = BytesToUint64BE(at + handlelen);
+            sftp.write_status = (!handle.empty() && sftp.handle == handle) ? SSH_FX_OK : SSH_FX_INVALID_HANDLE;
+            sftp.write_left = datalen;
+            used += 4 + header;
+            if (0 == datalen) {
+                writeSftpData(nullptr, 0);
+            }
+            continue;
+        }
+
+        if (packetlen > SSH_SFTP_MAX_RX_PACKET) {
+            SysLogE("SSH: session closed, an sftp request of %u bytes is past %u\n", (unsigned int)packetlen, (unsigned int)SSH_SFTP_MAX_RX_PACKET);
+            m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+            break;
+        }
+        if (avail < 4 + (size_t)packetlen) {
+            break;
+        }
+        if (!can_send_channel_data(m_session, SSH_SFTP_READ_MAX + SSH_SFTP_READ_PACKET_OVERHEAD)) {
+            sftp.held = true;
+            break;
+        }
+
+        pdiutil::vector<uint8_t> onepacket(head, head + 4 + packetlen);
+        used += 4 + packetlen;
+        handleChannelSubsystemSftpRequest(onepacket);
+    }
+    return used;
+}
+
+/**
  * @brief Handle channel subsystem sftp requests from client
  */
-void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t>& data, bool expectReply){
+void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t>& data){
 
     // Parse the exec request packet
     pdiutil::string sftp_str = CHARPTR_WRAP("sftp");
@@ -1205,15 +1355,14 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                     // version field will be 4 byte uint32 type
                     uint32_t sftpversion = request_id;
 
-                    sftp_reply.push_back(0); // placeholder for length
-                    sftp_reply.push_back(0); // placeholder for length
-                    sftp_reply.push_back(0); // placeholder for length
-                    sftp_reply.push_back(5); // length = 1 (type) + 4 (version) = 5
-                    sftp_reply.push_back(SSH_FXP_VERSION); // type = 2
-                    sftp_reply.push_back(0); // version = 3 (big-endian)
-                    sftp_reply.push_back(0);
-                    sftp_reply.push_back(0);
-                    sftp_reply.push_back(3); // version = 3
+                    pdiutil::string limits = CHARPTR_WRAP(SSH_SFTP_EXT_LIMITS);
+                    AppendUint32BE(sftp_reply, 1 + 4 + 4 + (uint32_t)limits.size() + 4 + 1);
+                    sftp_reply.push_back(SSH_FXP_VERSION);
+                    AppendUint32BE(sftp_reply, 3);
+                    AppendUint32BE(sftp_reply, (uint32_t)limits.size());
+                    sftp_reply.insert(sftp_reply.end(), limits.begin(), limits.end());
+                    AppendUint32BE(sftp_reply, 1);
+                    sftp_reply.push_back('1');
                 }else if (packettype == SSH_FXP_REALPATH){
 
                     // Parse original-path
@@ -1416,13 +1565,6 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
 
                             if( istatus < 0 ){
                                 errcode = SSH_FX_NO_SUCH_PATH;
-                            }else{
-                                // This will be used to handle bolus chunks in the future which may receive from client
-                                // along with SSH_FXP_WRITE paket. Reason to handle them in encryption layer is to avoid
-                                // OOM on small devies having memory constraints.
-                                m_session->current_channel.doHandleBolusChannelDataChunksCb = [&](pdiutil::vector<uint8_t> &boluschunk)->bool{
-                                    return handleChannelSftpBolusChunks(boluschunk);
-                                };
                             }
                         }
                     }
@@ -1849,6 +1991,11 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                                             m_session->current_channel.max_packet_size - headroom : 0;
                             uint32_t want = pdistd::min(length, (uint32_t)SSH_SFTP_READ_MAX);
                             want = pdistd::min(want, room);
+                            size_t spare = pdiutil::heap_room() / 2;
+                            spare = (spare > headroom) ? spare - headroom : 0;
+                            if( spare < want && spare >= SSH_SFTP_READ_MIN ){
+                                want = (uint32_t)spare;
+                            }
 
                             sftp_reply.resize(SSH_SFTP_READ_REPLY_HEADER + want);
                             uint8_t *into = sftp_reply.data() + SSH_SFTP_READ_REPLY_HEADER;
@@ -1902,40 +2049,6 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                     }else{
                         errcode = SSH_FX_BAD_MESSAGE;
                     }
-                }else if (packettype == SSH_FXP_WRITE){
-
-                    // Parse handle
-                    pdiutil::string handle;
-                    if (read_ssh_string(data, handle, payloadoffset) && !handle.empty()) {
-
-                        if( m_session->current_channel.subsystem_req.sftp.handle == handle ){
-                            // Parse offset
-                            uint64_t fileoffset = BytesToUint64BE(&data[payloadoffset]);
-                            payloadoffset += 8;
-
-                            // Parse length
-                            uint32_t length = BytesToUint32BE(&data[payloadoffset]);
-                            payloadoffset += 4;
-
-                            auto &sftp = m_session->current_channel.subsystem_req.sftp;
-                            int iStatus = 0;
-                            if( sftp.file >= 0 ){
-                                int64_t at = __i_fs.seekFile(sftp.file, (int64_t)fileoffset, FILE_SEEK_SET);
-                                iStatus = (at < 0) ? (int)at : __i_fs.writeFileHandle(sftp.file, (const char*)&data[payloadoffset], length);
-                            }else{
-                                iStatus = __i_fs.editFile(sftp.filepath.c_str(), fileoffset, (const char*)&data[payloadoffset], length);
-                            }
-                            if( iStatus < 0 ){
-                                errcode = SSH_FX_FAILURE; // Failure if write operation failed
-                            }else{
-                                errcode = SSH_FX_OK; // SSH_FX_OK (0) for successful write
-                            }
-                        }else{
-                            errcode = SSH_FX_INVALID_HANDLE;
-                        }
-                    }else{
-                        errcode = SSH_FX_BAD_MESSAGE;
-                    }
                 }else if (packettype == SSH_FXP_FSETSTAT){ 
 
                     // Parse handle
@@ -1947,8 +2060,6 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                             // too: parse the attributes if present
                             // currently not using until dont support attributes
                             errcode = SSH_FX_OK;
-
-                            m_session->current_channel.doHandleBolusChannelDataChunksCb = nullptr; // reset the bolus chunk handler if any
                         }else{
                             errcode = SSH_FX_INVALID_HANDLE;
                         }
@@ -1965,8 +2076,6 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                             // Successfully closed the file/dir, send success reply
                             errcode = SSH_FX_OK; // SSH_FX_OK (0) for successful close
 
-                            m_session->current_channel.doHandleBolusChannelDataChunksCb = nullptr; // reset the bolus chunk handler if any
-
                             m_session->closeSftpFile();
 
                             // Release dir-handle state if this was an OPENDIR handle
@@ -1981,25 +2090,30 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                     }else{
                         errcode = SSH_FX_BAD_MESSAGE;
                     }
+                }else if (packettype == SSH_FXP_EXTENDED){
+
+                    pdiutil::string request;
+                    pdiutil::string limits = CHARPTR_WRAP(SSH_SFTP_EXT_LIMITS);
+                    if (!read_ssh_string(data, request, payloadoffset)) {
+                        errcode = SSH_FX_BAD_MESSAGE;
+                    } else if (request == limits) {
+                        AppendUint32BE(sftp_reply, 1 + 4 + 8 * 4);
+                        sftp_reply.push_back(SSH_FXP_EXTENDED_REPLY);
+                        AppendUint32BE(sftp_reply, request_id);
+                        AppendUint64BE(sftp_reply, (uint64_t)SSH_RX_PACKET_MAX);
+                        AppendUint64BE(sftp_reply, (uint64_t)SSH_SFTP_READ_MAX);
+                        AppendUint64BE(sftp_reply, (uint64_t)SSH_SFTP_WRITE_MAX);
+                        AppendUint64BE(sftp_reply, (uint64_t)1);
+                    } else {
+                        errcode = SSH_FX_OP_UNSUPPORTED;
+                    }
+                }else{
+                    errcode = SSH_FX_OP_UNSUPPORTED;
                 }
 
                 auto status_reply = [&](uint32_t code){
-                    // Prepare SSH_FXP_STATUS reply (type 101)
-                    uint32_t reply_len = 1 + 4 + 4 + 4 + 4; // type + reqid + code + msglen + lang-tag len
                     sftp_reply.clear();
-                    AppendUint32BE(sftp_reply, reply_len);
-
-                    sftp_reply.push_back(SSH_FXP_STATUS); // type 101
-                    
-                    AppendUint32BE(sftp_reply, request_id);
-
-                    AppendUint32BE(sftp_reply, code);
-
-                    // Empty error message (length 0)
-                    sftp_reply.push_back(0x00); sftp_reply.push_back(0x00); sftp_reply.push_back(0x00); sftp_reply.push_back(0x00);
-
-                    // Empty language tag (length 0)
-                    sftp_reply.push_back(0x00); sftp_reply.push_back(0x00); sftp_reply.push_back(0x00); sftp_reply.push_back(0x00);
+                    appendSftpStatus(sftp_reply, request_id, code);
                 };
 
                 if(errcode != -1){
@@ -2007,24 +2121,11 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
                 }
 
                 // Send the SFTP reply back to the client
-                if( sftp_reply.size() > 0 && expectReply ){
-                    bool sent = send_channel_data(m_session, (const char*)sftp_reply.data(), sftp_reply.size());
+                if( sftp_reply.size() > 0 ){
+                    bool sent = sendSftpReply(sftp_reply);
                     if( !sent && SSH_FXP_STATUS != sftp_reply[4] && m_session->m_client && m_session->m_client->connected() ){
                         status_reply(SSH_FX_FAILURE);
-                        sent = send_channel_data(m_session, (const char*)sftp_reply.data(), sftp_reply.size());
-                    }
-                    if (sent) {
-                        // __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write_ro(RODT_ATTR("SSH SFTP subsystem rply sent : "));
-                        // for (size_t i = 0; i < sftp_reply.size(); i++)
-                        // {
-                        //     __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write_ro(RODT_ATTR("0x"));
-                        //     __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write((uint32_t)sftp_reply[i], true, true);
-                        //     __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->write_ro(RODT_ATTR(", "));
-                        // }
-                        // __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln();
-                    } else {
-                        __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln_ro(RODT_ATTR("Failed to send SFTP subsystem reply."));
-                        // m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+                        sendSftpReply(sftp_reply);
                     }
                 }
             }
@@ -2032,86 +2133,104 @@ void LWSSH::SSHServer::handleChannelSubsystemSftpRequest(pdiutil::vector<uint8_t
     }        
 }
 
-bool LWSSH::SSHServer::handleChannelSftpBolusChunks(pdiutil::vector<uint8_t> &boluschunk){
+/**
+ * @brief Appends an SSH_FXP_STATUS reply for a request, with an empty message.
+ * @param reply The reply to append to.
+ * @param request_id The request it answers.
+ * @param code The SSH_FX_* status.
+ */
+void LWSSH::SSHServer::appendSftpStatus(pdiutil::vector<uint8_t> &reply, uint32_t request_id, uint32_t code){
 
-    uint8_t *sftpheader = m_session->current_channel.subsystem_req.sftp.fxp_write_header;
-    uint64_t &sftpheaderoffset = m_session->current_channel.subsystem_req.sftp.fxp_write_headeroffset;
-    uint32_t &expectedDataLen = m_session->current_channel.subsystem_req.sftp.fxp_write_expectedrecvlen;
-    uint32_t &totalreceived = m_session->current_channel.subsystem_req.sftp.fxp_write_totalrecvd;
-    bool continueReceiving = true;
+    AppendUint32BE(reply, 1 + 4 + 4 + 4 + 4);
+    reply.push_back(SSH_FXP_STATUS);
+    AppendUint32BE(reply, request_id);
+    AppendUint32BE(reply, code);
+    AppendUint32BE(reply, 0);
+    AppendUint32BE(reply, 0);
+}
 
-    // initial chunk
-    if( totalreceived == 0 ){
+/**
+ * @brief Sends one SFTP reply on the channel, pushing it out when no request is
+ *        waiting behind it. A reply the heap has no room to frame now is kept and
+ *        sent before any later request is taken.
+ * @param reply The whole reply.
+ * @return Whether it was sent or kept; false once the session cannot carry it.
+ */
+bool LWSSH::SSHServer::sendSftpReply(pdiutil::vector<uint8_t> &reply){
 
-        memset(sftpheader, 0, 28);
+    bool sent = send_channel_data(m_session, (const char*)reply.data(), reply.size());
+    if (sent && m_session->m_client->available() <= 0) {
+        m_session->m_client->flush(FLUSH_TX);
+    }
+    if (!sent && LWSSHSession::SESSION_STATE_SESSION_CLOSE != m_session->m_state &&
+        m_session->m_client && m_session->m_client->connected()) {
+        auto &sftp = m_session->current_channel.subsystem_req.sftp;
+        sftp.reply_held.swap(reply);
+        sftp.reply_held_at = __i_dvc_ctrl.millis_now();
+        sftp.held = true;
+        return true;
+    }
+    if (!sent) {
+        __i_dvc_ctrl.getTerminal(TERMINAL_TYPE_SERIAL)->writeln_ro(RODT_ATTR("Failed to send SFTP subsystem reply."));
+    }
+    return sent;
+}
 
-        // a chunk too short to name a request type carries nothing to act on
-        if( boluschunk.size() < 5 ){
+/**
+ * @brief Sends the reply kept for want of memory, if any; the session is closed when
+ *        the heap has had no room for it for SSH_TX_STALL_MS.
+ * @return Whether nothing is kept any more.
+ */
+bool LWSSH::SSHServer::sendHeldSftpReply(){
 
-            m_session->current_channel.doHandleBolusChannelDataChunksCb = nullptr;
-            boluschunk.clear();
-            return false;
+    auto &sftp = m_session->current_channel.subsystem_req.sftp;
+    if (sftp.reply_held.empty()) {
+        return true;
+    }
+    if (send_channel_data(m_session, (const char*)sftp.reply_held.data(), sftp.reply_held.size())) {
+        pdiutil::vector<uint8_t>().swap(sftp.reply_held);
+        if (m_session->m_client->available() <= 0) {
+            m_session->m_client->flush(FLUSH_TX);
         }
+        return true;
+    }
+    if (LWSSHSession::SESSION_STATE_SESSION_CLOSE != m_session->m_state &&
+        __i_dvc_ctrl.millis_now() - sftp.reply_held_at >= SSH_TX_STALL_MS) {
+        SysLogE("SSH: session closed, the heap had no room for an sftp reply for %u ms\n", (unsigned int)SSH_TX_STALL_MS);
+        m_session->m_state = LWSSHSession::SESSION_STATE_SESSION_CLOSE;
+    }
+    return false;
+}
 
-        // If the first chunk is not SSH_FXP_WRITE, handle it normally and stop further chunk receiving.
-        // A write too short to carry its own header is not one to reassemble either.
-        if( boluschunk[4] != SSH_FXP_WRITE || boluschunk.size() < 28 ){
+/**
+ * @brief Writes the next bytes of the SSH_FXP_WRITE under way at its offset, keeping
+ *        the first failure as the status the write is answered with.
+ * @param bytes The bytes.
+ * @param size How many.
+ */
+void LWSSH::SSHServer::writeSftpData(const uint8_t *bytes, uint32_t size){
 
-            m_session->current_channel.doHandleBolusChannelDataChunksCb = nullptr; // reset the callback
-            handleChannelSubsystemSftpRequest(boluschunk);
-            boluschunk.clear();
-            return false; // stop receiving further chunks
+    auto &sftp = m_session->current_channel.subsystem_req.sftp;
+    if (SSH_FX_OK == sftp.write_status && size > 0) {
+        int status = 0;
+        if (sftp.file >= 0) {
+            int64_t at = __i_fs.seekFile(sftp.file, (int64_t)sftp.write_at, FILE_SEEK_SET);
+            status = (at < 0) ? (int)at : __i_fs.writeFileHandle(sftp.file, (const char*)bytes, size);
+        } else {
+            status = __i_fs.editFile(sftp.filepath.c_str(), sftp.write_at, (const char*)bytes, size);
         }
-
-        // Prepare SFTP header for SSH_FXP_WRITE from received first chunk
-        memcpy(sftpheader, boluschunk.data(), 28);
-
-        boluschunk.erase(boluschunk.begin(), boluschunk.begin() + 28);
-
-        sftpheaderoffset = BytesToUint64BE(&sftpheader[16]);
-
-        // note the initial total packet length to be received in contineous chunks
-        expectedDataLen  =  BytesToUint32BE(&sftpheader[24]);
-
-        totalreceived = 0;                                    
+        if (status < 0 || (uint32_t)status < size) {
+            sftp.write_status = SSH_FX_FAILURE;
+            SysLogE("SSH: sftp write to %s at %u failed: %d\n", sftp.filepath.c_str(), (unsigned int)sftp.write_at, status);
+        }
     }
-
-    // modify the length field in header as we get the data in chunks
-    uint32_t chunksize = pdistd::min( (uint32_t)(expectedDataLen - totalreceived), (uint32_t)boluschunk.size());
-    uint32_t newlen = 1 + 4 + 4 + 3 + 8 + 4 + chunksize; // type + reqid + handle length + we know handle + offset + data length + data bytes size
-    Uint32ToBytesBE(newlen, &sftpheader[0]);
-
-    // Modify file offset in header as we get the data in chunks
-    uint64_t sftpfileoffset = sftpheaderoffset + totalreceived;
-    Uint64ToBytesBE(sftpfileoffset, &sftpheader[16]);
-
-    // modify the data len bytes in header as we get the data in chunks
-    Uint32ToBytesBE(chunksize, &sftpheader[24]);
-
-    // Insert the modified header and chunk data to file
-    boluschunk.insert(boluschunk.begin(), sftpheader, sftpheader + 28);
-
-    // Update the total received data bytes
-    totalreceived += chunksize;
-
-    // Check whether we received total expected data length
-    if( totalreceived == expectedDataLen ){
-        // todo: currently handling callback reset in close message
-        continueReceiving = false; // indicate all data received
-        totalreceived = 0;
-        expectedDataLen = 0;
+    sftp.write_at += size;
+    sftp.write_left -= size;
+    if (0 == sftp.write_left) {
+        pdiutil::vector<uint8_t> reply;
+        appendSftpStatus(reply, sftp.write_id, sftp.write_status);
+        sendSftpReply(reply);
     }
-
-    // Handle and Continue to receive bolus chunks
-    if( chunksize < (boluschunk.size() - 28) ){
-        pdiutil::vector<uint8_t> temp(boluschunk.begin(), boluschunk.begin() + 28 + chunksize);
-        boluschunk.erase(boluschunk.begin(), boluschunk.begin() + 28 + chunksize);
-        handleChannelSubsystemSftpRequest(temp, !continueReceiving);
-    }else{
-        handleChannelSubsystemSftpRequest(boluschunk, !continueReceiving);
-        boluschunk.clear();
-    }
-    return true;
 }
 
 SSHServer __sshserver_service;

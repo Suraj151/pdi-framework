@@ -30,7 +30,8 @@ public:
         m_tcpClient(tcpclient), 
         m_client_session(nullptr),
         m_minSizeToWritePayload(1024),
-        m_writeCommitTaskId(-1)
+        m_writeCommitTaskId(-1),
+        m_unsentSince(0)
     {}
     
     // Destructor
@@ -172,8 +173,9 @@ public:
     
     /** 
      * @brief set received decrypted payload from client
+     * @return whether the payload was held whole
      */
-    void setReceivedChannelData(pdiutil::vector<uint8_t> &recvpayload);
+    bool setReceivedChannelData(pdiutil::vector<uint8_t> &recvpayload);
 
     /** 
      * @brief set ssh session of client
@@ -189,6 +191,11 @@ private:
     LWSSHSession* m_client_session;
     uint32_t m_minSizeToWritePayload;
     pdiutil::task_id_t m_writeCommitTaskId;
+    uint32_t m_unsentSince;
+
+    void scheduleCommit(uint32_t delayms);
+    void holdUnsent();
+    void closeOnRefusedOutput(uint32_t size);
 };
 
 }

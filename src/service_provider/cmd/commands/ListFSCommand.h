@@ -31,6 +31,7 @@ struct ListFSCommand : public CommandBase {
 	ListFSCommand(){
 		Clear();
 		SetCommand(CMD_NAME_LS);
+		setArgs(RODT_ATTR("lah"), 1);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
@@ -45,7 +46,7 @@ struct ListFSCommand : public CommandBase {
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("ls [<path>]  list a directory, or one file (defaults to current dir)");
+		return RODT_ATTR("ls [-l] [-a] [-h] [<path>]  list names (-l long rows, -a names starting with '.', -h sizes as 1.5K)");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -68,16 +69,34 @@ struct ListFSCommand : public CommandBase {
 		if(nullptr != m_terminal){
 
 			// Optional positional arg: resolve against PWD; missing → PWD itself.
-			CommandOption *cmdoptn = &m_options[0];
-			pdiutil::string target = resolveArgPath(cmdoptn);
+			CommandOption *cmdoptn = nullptr;
+			bool longrows = false, hidden = false, human = false;
+			for( uint8_t i = 0; i < CMD_OPTION_MAX; i++ ){
+				CommandOption *opt = &m_options[i];
+				if( !optionGiven(opt) ){
+					break;
+				}
+				if( opt->optionvalsize > 1 && '-' == opt->optionval[0] ){
+					for( int16_t c = 1; c < opt->optionvalsize; c++ ){
+						longrows = longrows || ('l' == opt->optionval[c]);
+						hidden = hidden || ('a' == opt->optionval[c]);
+						human = human || ('h' == opt->optionval[c]);
+					}
+				}else if( nullptr == cmdoptn ){
+					cmdoptn = opt;
+				}
+			}
+			pdiutil::string target = (nullptr != cmdoptn) ? resolveArgPath(cmdoptn) : pdiutil::string();
 			if( target.empty() ){
 				target = SessionManager::getPWD();
 			}
 
 			pdiutil::vector<file_info_t> itemlist;
 			int resultCode = 0;
+			bool onefile = false;
 			if( __i_fs.isFileExist(target.c_str()) && !__i_fs.isDirectory(target.c_str()) ){
-				bool typed = ( nullptr != cmdoptn->optionval && cmdoptn->optionvalsize > 0 );
+				onefile = true;
+				bool typed = ( nullptr != cmdoptn && nullptr != cmdoptn->optionval && cmdoptn->optionvalsize > 0 );
 				pdiutil::string shown = typed ? pdiutil::string(cmdoptn->optionval, cmdoptn->optionvalsize) : target;
 				resultCode = addEntry(target.c_str(), shown.c_str(), itemlist);
 			}else{
@@ -91,7 +110,23 @@ struct ListFSCommand : public CommandBase {
 
 			if(resultCode < 0){
 				result = CMD_ERROR_FAILED;
-				writeFailure(RODT_ATTR("Failed : "), target.c_str(), (int32_t)resultCode);
+				writeFailure(RODT_ATTR(CMD_MSG_FAILED), target.c_str(), (int32_t)resultCode);
+			}
+
+			if( !hidden && !onefile ){
+				dropHidden(itemlist);
+			}
+
+			if( !longrows ){
+				if( resultCode >= 0 ){
+					m_terminal->putln();
+				}
+				printNames(itemlist);
+				for (uint16_t i = 0; i < itemlist.size(); i++) {
+					pdiutil::safe_delete_array(itemlist[i].m_name);
+				}
+				itemlist.clear();
+				return result;
 			}
 
 			// m_terminal->write_ro(RODT_ATTR("Used : "));
@@ -109,10 +144,27 @@ struct ListFSCommand : public CommandBase {
 			char nowYear[5];
 			EpochToDateTimeString(nowLocal, nowYear, sizeof(nowYear), "%Y");
 
-			for (file_info_t item : itemlist) {
-				printRow(item, nowYear);
+			pdiutil::vector<pdiutil::string> owners;
+			pdiutil::vector<pdiutil::string> groups;
+			uint32_t ownerwidth = 0, groupwidth = 0, sizewidth = 1;
+			for (file_info_t &item : itemlist) {
+				pdiutil::string owner, group;
+				ownerOf(item, owner, group);
+				ownerwidth = pdistd::max(ownerwidth, (uint32_t)owner.size());
+				groupwidth = pdistd::max(groupwidth, (uint32_t)group.size());
+				char sizebuf[24];
+				sizeText(item.m_size, human, sizebuf, sizeof(sizebuf));
+				sizewidth = pdistd::max(sizewidth, (uint32_t)strlen(sizebuf));
+				owners.push_back(owner);
+				groups.push_back(group);
+			}
+
+			for (uint16_t i = 0; i < itemlist.size(); i++) {
+				bool named = (i < owners.size() && i < groups.size());
+				printRow(itemlist[i], nowYear, named ? owners[i].c_str() : "", ownerwidth,
+						 named ? groups[i].c_str() : "", groupwidth, sizewidth, human);
 				// deallocates memory for items
-				pdiutil::safe_delete_array(item.m_name);
+				pdiutil::safe_delete_array(itemlist[i].m_name);
 			}
 
 			itemlist.clear();
@@ -171,32 +223,101 @@ private:
 	}
 
 	/**
-	 * Writes one row the way ls -l does: mode, owner, group, size, time, name.
+	 * Takes out the entries whose name starts with '.', which only -a shows.
 	 */
-	void printRow(const file_info_t &item, const char *nowYear){
+	void dropHidden(pdiutil::vector<file_info_t> &itemlist){
+		uint16_t kept = 0;
+		for( uint16_t i = 0; i < itemlist.size(); i++ ){
+			if( nullptr != itemlist[i].m_name && '.' == itemlist[i].m_name[0] ){
+				pdiutil::safe_delete_array(itemlist[i].m_name);
+				continue;
+			}
+			itemlist[kept++] = itemlist[i];
+		}
+		while( itemlist.size() > kept ){
+			itemlist.pop_back();
+		}
+	}
+
+	/**
+	 * Writes the names alone: down columns as wide as the longest name across
+	 * LS_LINE_WIDTH on the terminal, one per line into a pipe or a file.
+	 */
+	void printNames(const pdiutil::vector<file_info_t> &itemlist){
+		uint16_t count = (uint16_t)itemlist.size();
+		if( 0 == count ){
+			return;
+		}
+		session_t *session = SessionManager::current();
+		bool onterminal = ( nullptr != session && m_terminal == session->m_terminal );
+		uint32_t widest = 1;
+		for( uint16_t i = 0; i < count; i++ ){
+			uint32_t len = ( nullptr != itemlist[i].m_name ) ? (uint32_t)strlen(itemlist[i].m_name) : 0;
+			widest = pdistd::max(widest, len);
+		}
+		uint32_t columns = onterminal ? (uint32_t)LS_LINE_WIDTH / (widest + 2) : 1;
+		columns = pdistd::max(columns, (uint32_t)1);
+		uint32_t rows = (count + columns - 1) / columns;
+		for( uint32_t r = 0; r < rows; r++ ){
+			for( uint32_t c = 0; c < columns; c++ ){
+				uint32_t at = c * rows + r;
+				if( at >= count ){
+					break;
+				}
+				const char *name = ( nullptr != itemlist[at].m_name ) ? itemlist[at].m_name : "";
+				bool last = ( c + 1 == columns ) || ( (c + 1) * rows + r >= count );
+				if( last ){
+					m_terminal->write(name);
+				}else{
+					m_terminal->write_column(name, widest + 1, false);
+				}
+			}
+			m_terminal->putln();
+		}
+	}
+
+	/**
+	 * A size as ls shows it: whole bytes, or with -h a short form such as 1.5K
+	 * from 1024 bytes up.
+	 */
+	void sizeText(uint64_t size, bool human, char *out, uint8_t outsize){
+		if( human && size >= 1024 ){
+			BytesToSizeString(size, true, out, outsize);
+		}else{
+			Uint64ToString(size, out, outsize - 1, 0);
+		}
+	}
+
+	/**
+	 * The owner and group names of an entry, or their ids where names are not kept.
+	 */
+	void ownerOf(const file_info_t &item, pdiutil::string &owner, pdiutil::string &group){
+#if defined(ENABLE_AUTH_SERVICE) && defined(ENABLE_STORAGE_SERVICE)
+		__user_store_service.resolveOwnerNames(item.m_uid, item.m_gid, owner, group);
+#else
+		owner = pdiutil::to_string((uint32_t)item.m_uid);
+		group = pdiutil::to_string((uint32_t)item.m_gid);
+#endif
+	}
+
+	/**
+	 * Writes one row the way ls -l does: mode, owner, group, size, time, name, each
+	 * column as wide as its widest entry in the listing.
+	 */
+	void printRow(const file_info_t &item, const char *nowYear, const char *owner, uint32_t ownerwidth,
+				  const char *group, uint32_t groupwidth, uint32_t sizewidth, bool human){
 		char permbuf[12];
-		FilePermsToString(item.m_perms, item.m_type == FILE_TYPE_DIR, permbuf);
+		FilePermsToString(item.m_perms, item.m_type, permbuf);
 		permbuf[10] = ' ';
 		permbuf[11] = '\0';
 		m_terminal->write(permbuf);
 
-#if defined(ENABLE_AUTH_SERVICE) && defined(ENABLE_STORAGE_SERVICE)
-		pdiutil::string unameStr, gnameStr;
-		__user_store_service.resolveOwnerNames(item.m_uid, item.m_gid, unameStr, gnameStr);
-		m_terminal->write_pad(unameStr.c_str(), 10);
-		m_terminal->write_pad(gnameStr.c_str(), 10);
-#else
-		char fallbackId[8];
-		Uint32ToString((uint32_t)item.m_uid, fallbackId, sizeof(fallbackId) - 1, 0);
-		m_terminal->write_pad(fallbackId, 6);
-		Uint32ToString((uint32_t)item.m_gid, fallbackId, sizeof(fallbackId) - 1, 0);
-		m_terminal->write_pad(fallbackId, 6);
-#endif
+		m_terminal->write_column(owner, ownerwidth, false);
+		m_terminal->write_column(group, groupwidth, false);
 
-		char sizebuf[12];
-		Uint32ToString((uint32_t)item.m_size, sizebuf, sizeof(sizebuf) - 1, 10);
-		m_terminal->write_pad(sizebuf, 10);
-		m_terminal->write(' ');
+		char sizebuf[24];
+		sizeText(item.m_size, human, sizebuf, sizeof(sizebuf));
+		m_terminal->write_column(sizebuf, sizewidth, true);
 
 		char tsbuf[16];
 

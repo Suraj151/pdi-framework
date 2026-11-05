@@ -26,6 +26,7 @@ struct ChmodCommand : public CommandBase {
 	ChmodCommand(){
 		Clear();
 		SetCommand(CMD_NAME_CHMOD);
+		setArgs(RODT_ATTR(""), 2);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
@@ -59,17 +60,23 @@ struct ChmodCommand : public CommandBase {
 
 		if( nullptr == mopt || nullptr == mopt->optionval || 0 >= mopt->optionvalsize ||
 		    nullptr == popt || nullptr == popt->optionval || 0 >= popt->optionvalsize ){
+			return CMD_ERROR_ARGS_MISSING;
+		}
+
+		uint32_t perms = 0;
+		if( !ParseOctal(mopt->optionval, (uint16_t)mopt->optionvalsize, 0777, perms) ){
+			m_terminal->writeln();
+			m_terminal->write_ro(RODT_ATTR("chmod: invalid mode : "));
+			m_terminal->write(mopt->optionval, (uint32_t)mopt->optionvalsize);
 			return CMD_ERROR_INVAL;
 		}
 
-		uint16_t perms = StringToOctalUint16(mopt->optionval, (uint8_t)mopt->optionvalsize) & 0777;
-
 		pdiutil::string path = resolveArgPath(popt);
 
-		int rc = __i_fs.setFilePermissions(path.c_str(), perms);
+		int rc = __i_fs.setFilePermissions(path.c_str(), (uint16_t)perms);
 		if( rc < 0 ){
 			m_terminal->writeln();
-			m_terminal->write_ro(RODT_ATTR("chmod: permission denied or not found"));
+			writeFailure(RODT_ATTR("chmod: "), path.c_str(), (int32_t)rc);
 			return CMD_ERROR_FAILED;
 		}
 		return PDI_OK;

@@ -131,6 +131,106 @@ int32_t __strstr(const char *str, uint32_t _strlen, const char *substr, uint32_t
 }
 
 /**
+ * @brief Whether a name matches a shell glob: `*` any run, `?` one character, `[...]` a set
+ * or range, `[!...]` its complement, and a backslash taking the next character literally.
+ * @param _pattern The glob to match against.
+ * @param _plen The length of the glob.
+ * @param _str The name to test.
+ * @param _slen The length of the name.
+ * @return True when the whole name matches the whole glob.
+ */
+bool __glob_match(const char *_pattern, uint32_t _plen, const char *_str, uint32_t _slen)
+{
+    if (nullptr == _pattern || nullptr == _str) {
+        return false;
+    }
+
+    uint32_t p = 0, s = 0;
+    uint32_t starp = 0, stars = 0;
+    bool starred = false;
+
+    while (s < _slen) {
+
+        if (p < _plen && '*' == _pattern[p]) {
+            starred = true;
+            starp = ++p;
+            stars = s;
+            continue;
+        }
+
+        bool matched = false;
+        uint32_t next = p;
+
+        if (p < _plen && '?' == _pattern[p]) {
+            matched = true;
+            next = p + 1;
+        } else if (p < _plen && '[' == _pattern[p]) {
+            uint32_t q = p + 1;
+            bool negate = (q < _plen && ('!' == _pattern[q] || '^' == _pattern[q]));
+            if (negate) q++;
+            bool inset = false;
+            bool first = true;
+            while (q < _plen && (first || ']' != _pattern[q])) {
+                char lo = _pattern[q];
+                char hi = lo;
+                if (q + 2 < _plen && '-' == _pattern[q + 1] && ']' != _pattern[q + 2]) {
+                    hi = _pattern[q + 2];
+                    q += 2;
+                }
+                if (_str[s] >= lo && _str[s] <= hi) inset = true;
+                q++;
+                first = false;
+            }
+            if (q < _plen) {
+                matched = (inset != negate);
+                next = q + 1;
+            } else {
+                matched = ('[' == _str[s]);
+                next = p + 1;
+            }
+        } else if (p < _plen && '\\' == _pattern[p] && p + 1 < _plen) {
+            matched = (_pattern[p + 1] == _str[s]);
+            next = p + 2;
+        } else if (p < _plen) {
+            matched = (_pattern[p] == _str[s]);
+            next = p + 1;
+        }
+
+        if (matched) {
+            p = next;
+            s++;
+        } else if (starred) {
+            p = starp;
+            s = ++stars;
+        } else {
+            return false;
+        }
+    }
+
+    while (p < _plen && '*' == _pattern[p]) {
+        p++;
+    }
+
+    return p == _plen;
+}
+
+/**
+ * @brief The 32 bit FNV-1a hash of a run of bytes, for telling lines apart cheaply.
+ * @param _data The bytes to hash.
+ * @param _len The number of bytes.
+ * @return The hash value.
+ */
+uint32_t __hash32(const char *_data, uint32_t _len)
+{
+    uint32_t h = 2166136261u;
+    for (uint32_t i = 0; i < _len && nullptr != _data; i++) {
+        h ^= (uint8_t)_data[i];
+        h *= 16777619u;
+    }
+    return h;
+}
+
+/**
  * Appends text as one fixed width column, padding it out or truncating it to
  * the width, the way iTerminalInterface::write_pad writes one.
  */

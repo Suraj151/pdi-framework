@@ -361,6 +361,21 @@ void TcpClientInterface::setTimeout(uint32_t timeout)
 
 void TcpClientInterface::flush(int16_t flushtype)
 {
+    if (m_socket < 0 || !IsFlushTx(flushtype))
+    {
+        return;
+    }
+
+    int nodelay = 0;
+    socklen_t len = sizeof(nodelay);
+    if (getsockopt(m_socket, IPPROTO_TCP, TCP_NODELAY, &nodelay, &len) < 0 || nodelay)
+    {
+        return;
+    }
+
+    int on = 1;
+    setsockopt(m_socket, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on));
+    setsockopt(m_socket, IPPROTO_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay));
 }
 
 ipaddress_t TcpClientInterface::getLocalIp() const

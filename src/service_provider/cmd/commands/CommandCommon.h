@@ -73,7 +73,7 @@ created Date    : 1st June 2019
 #define CMD_NAME_MOVE 			    "mv"
 #define CMD_NAME_COPY 			    "cp"
 #define CMD_NAME_FILE_READ 			"cat"
-#define CMD_NAME_FILE_EDIT 		"fedit"
+#define CMD_NAME_FILE_EDIT 		    "fedit"
 #define CMD_NAME_CLS 			    "cls"
 #define CMD_NAME_PS  			    "ps"
 #define CMD_NAME_TOP  			    "top"
@@ -117,13 +117,23 @@ created Date    : 1st June 2019
 #define CMD_NAME_UDEVADM		    "udevadm"
 #define CMD_NAME_ARECORD		    "arecord"
 #define CMD_NAME_LSBLK			    "lsblk"
-#define CMD_NAME_DD			    "dd"
+#define CMD_NAME_DD			        "dd"
 #define CMD_NAME_UMOUNT			    "umount"
 #define CMD_NAME_BLKID			    "blkid"
 #define CMD_NAME_WIPEFS			    "wipefs"
 #define CMD_NAME_SFDISK			    "sfdisk"
 #define CMD_NAME_MKFS			    "mkfs"
 #define CMD_NAME_WGET			    "wget"
+#define CMD_NAME_DU			        "du"
+#define CMD_NAME_FIND			    "find"
+#define CMD_NAME_STAT			    "stat"
+#define CMD_NAME_SORT			    "sort"
+#define CMD_NAME_TEE			    "tee"
+#define CMD_NAME_DIFF			    "diff"
+
+/* find predicates */
+#define CMD_FIND_PRED_NAME		    "-name"
+#define CMD_FIND_PRED_TYPE		    "-type"
 
 /**
  * Runs a background command's work as the session that started it, on its own
@@ -141,6 +151,14 @@ static inline void runAsOwner(CommandBase *cmd, pdiutil::function<void()> work){
 	work();
 	SessionManager::setCurrent(previous);
 	ServiceProvider::setTerminal(shell);
+}
+
+/**
+ * Whether an option was given on the command line, an empty value such as ""
+ * included; only an option the line did not reach is absent.
+ */
+static inline bool optionGiven(const CommandBase::CommandOption *opt){
+	return nullptr != opt && nullptr != opt->optionval && opt->optionvalsize >= 0;
 }
 
 #ifdef ENABLE_STORAGE_SERVICE
@@ -169,6 +187,7 @@ static inline bool commandStopped(iTerminalInterface *out){
 static inline pdi_err_t stoppedResult(pdi_err_t result){
 	return SessionManager::interrupted() ? (pdi_err_t)CMD_ERROR_CANCELED : result;
 }
+
 
 /**
  * Feeds a command its input in blocks from the named file or the input descriptor,
@@ -243,6 +262,54 @@ static inline int readCommandLines(const pdiutil::string &path, iTerminalInterfa
 	}
 
 	return total;
+}
+
+/**
+ * Writes file bytes to a terminal, a bare newline sent as a line end; previous
+ * carries the last byte across calls.
+ */
+static inline void writeShownBytes(iTerminalInterface *term, const char *data, uint32_t size, char &previous){
+	uint32_t from = 0;
+	for( uint32_t i = 0; i < size; i++ ){
+		if( '\n' == data[i] && '\r' != previous ){
+			if( i > from ){
+				term->write(data + from, i - from);
+			}
+			term->putln();
+			from = i + 1;
+		}
+		previous = data[i];
+	}
+	if( size > from ){
+		term->write(data + from, size - from);
+	}
+}
+
+/**
+ * Writes the line of a file starting at offset to a terminal as it is read, its
+ * line end left off, so a line of any length is printed whole without being
+ * held; the bytes the line spans, or a negative error code.
+ */
+static inline int writeFileLine(iTerminalInterface *term, const char *path, uint64_t offset){
+	bool heldcr = false;
+	int bytes = __i_fs.readFile(path, 200, [&](char *data, uint32_t size) -> bool {
+		if( heldcr ){
+			term->write('\r');
+			heldcr = false;
+		}
+		if( size > 0 && '\r' == data[size - 1] ){
+			heldcr = true;
+			size--;
+		}
+		if( size > 0 ){
+			term->write(data, size);
+		}
+		return !commandStopped(term);
+	}, offset, "\n");
+	if( bytes >= 0 ){
+		term->putln();
+	}
+	return bytes;
 }
 
 /**

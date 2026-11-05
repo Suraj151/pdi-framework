@@ -48,6 +48,7 @@ def rewrite_hosts(t, line):
 
 
 def restore_hosts(t):
+    t.run("rm %s" % HOSTS)
     t.run("mv %s %s" % (BACKUP, HOSTS))
 
     body = t.run("cat %s" % HOSTS)

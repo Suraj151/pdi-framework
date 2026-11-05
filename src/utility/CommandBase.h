@@ -17,6 +17,7 @@ Created Date    : 1st June 2019
 
 #include "StringOperations.h"
 #include "iIOInterface.h"
+#include "ErrorText.h"
 
 //Elliminate any previously defined macro
 #undef min
@@ -45,6 +46,14 @@ typedef enum cmd_status cmd_status_t;
 
 #ifndef CMD_OPTION_SIZE_MAX
 #define CMD_OPTION_SIZE_MAX         3   ///< Maximum size of an option.
+#endif
+
+#define CMD_MSG_INVALID_OPTION "invalid option : " /* what a command prints before an option it does not take */
+#define CMD_MSG_EXTRA_OPERAND "extra operand : " /* what a command prints before an operand past the ones it takes */
+#define CMD_MSG_UNKNOWN_SUBCOMMAND "unknown sub-command : " /* what a command prints before a sub-command it does not have */
+
+#ifndef CMD_ARG_FLAGS_MAX
+#define CMD_ARG_FLAGS_MAX           12  ///< Most flag letters one command declares, with the terminator.
 #endif
 
 #define CMD_OPTION_SEPERATOR_COMMA  "," ///< Comma as a Separator for options.
@@ -138,6 +147,9 @@ typedef struct CommandBase {
     bool m_runinbackground;
     bool m_executing;
     bool m_argsoverflow;                         ///< More free values were given than the options hold.
+    const char* m_argflags;                      ///< Read only flag letters the command takes; nullptr when it reads every word itself.
+    int16_t m_argmax;                            ///< Most operands the command takes; -1 when its words are not checked.
+    bool m_argkeyvalue;                          ///< Every operand is a name=value pair.
 
     /**
      * @brief The registry of every command known to the build.
@@ -423,6 +435,22 @@ typedef struct CommandBase {
     }
 
     /**
+     * @brief Declares the words the command takes, checked before it runs: the
+     *        flag letters it knows ("" for none, nullptr when a leading '-' is
+     *        an operand to it) and the most operands it takes. A flag it does
+     *        not know, an operand past the last, or, for name=value commands, a
+     *        word without '=' is refused, naming the word, and nothing runs.
+     * @param flags Read only flag letters.
+     * @param maxoperands Most operands.
+     * @param keyvalue Every operand is a name=value pair.
+     */
+    void setArgs(const char *flags, int16_t maxoperands, bool keyvalue = false){
+        m_argflags = flags;
+        m_argmax = maxoperands;
+        m_argkeyvalue = keyvalue;
+    }
+
+    /**
      * @brief Sets the command option separator.
      * @param separator The separator string for options.
      */
@@ -511,6 +539,7 @@ typedef struct CommandBase {
     pdi_err_t executeCommand(char *_args, int16_t _len, bool _waiting_option = false, cmd_term_inseq_t inseq = CMD_TERM_INSEQ_NONE){
         m_result = CMD_ERROR_UNSET;
         m_executing = true;
+        pdi_err_t argcheck = PDI_OK;
         if(_args != nullptr){
             if( !_waiting_option ){
                 int16_t cmd_max_len = _len;
@@ -528,6 +557,9 @@ typedef struct CommandBase {
                     memcpy(argcmd, _args+cmd_start_indx,
                            pdistd::min((int)CMD_SIZE_MAX - 1, (int)abs(cmd_end_indx-cmd_start_indx)));
                     if( isValidCommand(argcmd) ){
+                        if( m_argmax >= 0 ){
+                            argcheck = checkArgs(_args, _len);
+                        }
                         char argoptn[CMD_OPTION_SIZE_MAX];
                         // get the option start and end indices
                         int16_t optn_start_indx = cmd_end_indx;
@@ -554,6 +586,9 @@ typedef struct CommandBase {
                                         m_options[validoptnindex].optionvalsize = val_end_index - val_start_index;
                                         m_result = PDI_OK;
                                     }else{
+                                        if( PDI_OK == argcheck ){
+                                            refuseArg(RODT_ATTR(CMD_MSG_INVALID_OPTION), argoptntrimmed, (int16_t)strlen(argoptntrimmed), CMD_ERROR_OPT);
+                                        }
                                         m_result = CMD_ERROR_OPT;
                                         break;
                                     }
@@ -629,6 +664,10 @@ typedef struct CommandBase {
             }
         }
 
+        if( PDI_OK != argcheck ){
+            m_result = argcheck;
+        }
+
         /* execute command if format is ok */
         if( PDI_OK == m_result ){
             // if( nullptr != m_terminal ){
@@ -674,6 +713,9 @@ typedef struct CommandBase {
         m_iterations = 0;
         m_runinbackground = false;
         m_executing = false;
+        m_argflags = nullptr;
+        m_argmax = -1;
+        m_argkeyvalue = false;
     }
 
     /**
@@ -690,8 +732,147 @@ typedef struct CommandBase {
     }
 
     /**
-     * @brief Writes "<prefix><what> : <code>", the way a command names what it
-     *        failed on and the code it failed with; the caller places the line.
+     * @brief Checks the words after the command against the ones it declared,
+     *        quotes kept together as one word.
+     * @param _args The command line.
+     * @param _len Its length.
+     * @return PDI_OK, or CMD_ERROR_OPT / CMD_ERROR_INVAL after naming the word.
+     */
+    pdi_err_t checkArgs(const char *_args, int16_t _len){
+        char flags[CMD_ARG_FLAGS_MAX];
+        memset(flags, 0, sizeof(flags));
+        if( nullptr != m_argflags ){
+            size_t flagslen = strlen_ro(m_argflags);
+            memcpy_ro(flags, m_argflags, pdistd::min(flagslen, sizeof(flags) - 1));
+        }
+
+        int16_t at = 0;
+        int16_t operands = 0;
+        bool first = true;
+        while( at < _len ){
+            while( at < _len && (' ' == _args[at] || '\t' == _args[at]) ) at++;
+            if( at >= _len || '\0' == _args[at] ) break;
+            int16_t start = at;
+            char quote = 0;
+            bool equals = false;
+            while( at < _len && '\0' != _args[at] ){
+                char c = _args[at];
+                if( '\\' == c && quote != '\'' && at + 1 < _len ){
+                    at += 2;
+                    continue;
+                }
+                if( 0 != quote ){
+                    if( c == quote ) quote = 0;
+                }else if( '"' == c || '\'' == c ){
+                    quote = c;
+                }else if( ' ' == c || '\t' == c ){
+                    break;
+                }else if( '=' == c ){
+                    equals = true;
+                }
+                at++;
+            }
+            if( first ){
+                first = false;
+                continue;
+            }
+            int16_t size = at - start;
+            bool flag = ( size > 1 && '-' == _args[start] && nullptr != m_argflags );
+            for( int16_t c = 1; flag && !m_argkeyvalue && c < size; c++ ){
+                if( nullptr == strchr(flags, _args[start + c]) ){
+                    return refuseArg(RODT_ATTR(CMD_MSG_INVALID_OPTION), _args + start, size, CMD_ERROR_OPT);
+                }
+            }
+            if( flag && m_argkeyvalue ){
+                return refuseArg(RODT_ATTR(CMD_MSG_INVALID_OPTION), _args + start, size, CMD_ERROR_OPT);
+            }
+            if( flag ){
+                continue;
+            }
+            if( m_argkeyvalue && !equals ){
+                return refuseArg(RODT_ATTR(CMD_MSG_INVALID_OPTION), _args + start, size, CMD_ERROR_OPT);
+            }
+            if( ++operands > m_argmax ){
+                return refuseArg(RODT_ATTR(CMD_MSG_EXTRA_OPERAND), _args + start, size, CMD_ERROR_INVAL);
+            }
+        }
+        return PDI_OK;
+    }
+
+    /**
+     * @brief Says which word was refused and why.
+     * @param why Read only reason, e.g. CMD_MSG_INVALID_OPTION.
+     * @param word The word.
+     * @param size Its length.
+     * @param code The refusal to give back.
+     * @return code.
+     */
+    pdi_err_t refuseArg(const char *why, const char *word, int16_t size, pdi_err_t code){
+        if( nullptr != m_terminal ){
+            m_terminal->putln();
+            m_terminal->write_ro(why);
+            m_terminal->write(word, (uint32_t)size);
+        }
+        return code;
+    }
+
+    /**
+     * @brief Reads a whole number from what the user typed and refuses it,
+     *        naming the word and the range taken, when it is not a number or
+     *        is outside min..max.
+     * @param why Read only reason, e.g. "invalid pid : ".
+     * @param word The word.
+     * @param size Its length.
+     * @param min The smallest value taken.
+     * @param max The largest value taken.
+     * @param out The number.
+     * @return PDI_OK, or CMD_ERROR_INVAL after naming the word.
+     */
+    pdi_err_t takeNumber(const char *why, const char *word, int16_t size, uint32_t min, uint32_t max, uint32_t &out){
+        if( size <= 0 || !ParseUint32(word, (uint16_t)size, out) || out < min || out > max ){
+            refuseArg(why, word, size, CMD_ERROR_INVAL);
+            writeRange(min, max);
+            return CMD_ERROR_INVAL;
+        }
+        return PDI_OK;
+    }
+
+    /**
+     * @brief Writes " (<min> to <max>)", the range a refused number had to be in.
+     * @param min The smallest value taken.
+     * @param max The largest value taken.
+     */
+    void writeRange(int64_t min, int64_t max){
+        if( nullptr == m_terminal ){
+            return;
+        }
+        m_terminal->write_ro(RODT_ATTR(" ("));
+        m_terminal->write(min);
+        m_terminal->write_ro(RODT_ATTR(" to "));
+        m_terminal->write(max);
+        m_terminal->write_ro(RODT_ATTR(")"));
+    }
+
+    /**
+     * @brief Writes a name the user typed, or '' for an empty one so a given
+     *        empty name still shows in the message.
+     * @param name The name.
+     */
+    void writeName(const char *name){
+        if( nullptr == m_terminal ){
+            return;
+        }
+        if( nullptr == name || '\0' == name[0] ){
+            m_terminal->write_ro(RODT_ATTR("''"));
+        }else{
+            m_terminal->write(name);
+        }
+    }
+
+    /**
+     * @brief Writes "<prefix><what> : <reason>", the way a command names what it
+     *        failed on and why, in words, or by its code when the code has no
+     *        words yet; the caller places the line.
      * @param prefix The read only text before what failed, e.g. "dd: ".
      * @param what What failed, usually a path.
      * @param code The code it failed with.
@@ -701,9 +882,14 @@ typedef struct CommandBase {
             return;
         }
         m_terminal->write_ro(prefix);
-        m_terminal->write(what);
+        writeName(what);
         m_terminal->write_ro(RODT_ATTR(" : "));
-        m_terminal->write(code);
+        const char *reason = ErrorToText(code);
+        if( nullptr != reason ){
+            m_terminal->write_ro(reason);
+        }else{
+            m_terminal->write(code);
+        }
     }
 
     /**

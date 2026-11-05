@@ -338,9 +338,12 @@ def empty_line_is_silent(t):
     expect_in("/", t.run("pwd"), "the shell is still usable")
 
 
-@test("ps reports the free heap", needs=("ps",))
-def ps_shows_free_heap(t):
-    expect_in("free heap", _read_ps(t), "the ps header names the free heap")
+@test("ps prints the task table under its column names and nothing else", needs=("ps",))
+def ps_shows_only_the_table(t):
+    out = _read_ps(t)
+    expect_in("PID", out, "ps names its columns")
+    expect_not_in("top -", out, "ps leaves the summary line to top")
+    expect_not_in("free heap", out, "ps leaves the summary line to top")
 
 
 @test("top renders the process table and stops after n iterations", needs=("top",), slow=True)
@@ -352,7 +355,7 @@ def top_runs_and_stops(t):
     The summary line (with the free heap) is printed first, then the PID..NAME
     header, so reading up to NAME captures all three in one frame.
     """
-    t.shell.send_line("top i=400,n=2")
+    t.shell.send_line("top i=500,n=2")
     frame = t.shell.expect("NAME", timeout=max(t.timeout, 12))
 
     expect_in("PID", frame, "top shows the ps header")
@@ -492,7 +495,7 @@ SAFE_SERVICES = ("MQTT", "OTA", "MDNS", "Email", "GPIO", "FactoryReset")
 
 @test("the syslog service writes log lines to a file", needs=("ls",))
 def syslog_writes_to_file(t):
-    logs = [line for line in t.run("ls /var/log").splitlines() if "syslog." in line]
+    logs = [line for line in t.run("ls -la /var/log").splitlines() if "syslog." in line]
     if not logs:
         raise Skip("no syslog files on this target")
 

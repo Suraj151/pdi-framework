@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 """
-How fast files move over the network: sftp both ways.
+How fast files move over the network: sftp both ways, and how long one sftp
+stat of a file takes.
 
 The file size follows the room the root filesystem has, so a board with a small
 filesystem still measures instead of skipping, and the result is a rate, so a
@@ -89,3 +90,28 @@ def sftp_upload(t):
     if stored != size:
         raise AssertionError("a %d byte upload stored %d bytes" % (size, stored))
     return (size / 1024.0) / took
+
+
+STATS = 10
+
+
+@perf("sftp stat", unit="ms", better="lower", needs=("rm",))
+def sftp_stat(t):
+    path = "/perf_stat.bin"
+    client, sftp = sftp_open(t)
+    try:
+        with sftp.open(path, "wb") as fh:
+            fh.write(patterned(BLOCK))
+        sftp.stat(path)
+        began = time.time()
+        for _ in range(STATS):
+            size = sftp.stat(path).st_size
+        took = time.time() - began
+    finally:
+        sftp.close()
+        client.close()
+        t.run("rm %s" % path)
+
+    if size != BLOCK:
+        raise AssertionError("stat reported %d bytes for a %d byte file" % (size, BLOCK))
+    return 1000.0 * took / STATS

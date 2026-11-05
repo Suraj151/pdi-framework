@@ -78,7 +78,14 @@ typedef struct
 	uint32_t sendTimeout;
 	uint32_t readTimeout;
 	tConnState connState;
-	QUEUE msgQueue;
+	pdiutil::vector<mqtt_packet_t> m_sendq;
+	uint32_t m_sendq_bytes;
+	uint32_t m_last_tick_ms;
+	uint32_t m_send_stalled_ms;
+	bool m_send_stalled;
+	uint16_t m_inflight_ids[MQTT_INFLIGHT_MAX];
+	uint8_t m_inflight;
+	uint32_t m_inflight_tick;
 	uint16_t host_connect_tick;
 	uint32_t m_ping_wait_tick;
 	bool m_ping_awaited;
@@ -124,6 +131,11 @@ public:
 	void MQTT_Task(void);
 
 	bool is_mqtt_connected(void);
+
+	/**
+	 * Whether a connected client has a packet queued to send, a qos 1 publish unacknowledged or an answer due.
+	 */
+	bool has_pending_work(void);
 	bool is_topic_subscribed(char *_topic);
 	void clear_all_subscribed_topics(void);
 	void add_to_subscribed_topics(char *_topic, uint8_t _qos);
@@ -134,6 +146,28 @@ public:
 	 * that is told no has not sent anything and must not record that it did.
 	 */
 	bool queue_packet(uint8_t *_data, uint16_t _len);
+
+	/**
+	 * Releases every packet still waiting to be sent.
+	 */
+	void drop_queue(void);
+
+	/**
+	 * Takes an acknowledged qos 1 publish out of the window; false when the id was not waiting.
+	 */
+	bool release_inflight(uint16_t _id);
+
+	/**
+	 * Sends what the queue holds, up to MQTT_SEND_PACKETS_PER_TASK packets and only while no answer
+	 * from the broker is due; a packet the connection has no room for yet stays queued.
+	 */
+	void send_queued(void);
+
+	/**
+	 * Whether the connection takes the first piece of a packet within MQTT_SEND_ROOM_WAIT_MS; once it
+	 * has taken nothing for MQTT_SEND_TIMEOUT_MS the session is ended as a failed send.
+	 */
+	bool send_room_for(uint16_t _len);
 
 	MQTT_Client m_mqttClient;
 	uint32_t *m_mqttDataCallbackArgs;
@@ -154,7 +188,18 @@ protected:
 	MqttDataCallback m_dataCb;
 
 	bool disconnectServer(void);
-	uint16_t readFullPacket(uint8_t *buffer, uint16_t maxsize, uint16_t timeout);
+
+	/**
+	 * Reads one packet into buffer; one too big for it but within MQTT_PACKET_MAX is read into a
+	 * buffer of its exact size handed back in wide, which the caller frees.
+	 */
+	uint16_t readFullPacket(uint8_t *buffer, uint16_t maxsize, uint16_t timeout, uint8_t **wide);
+	/**
+	 * Gives up on a packet that stopped arriving part way, which leaves the stream
+	 * out of step: the connection is dropped so the client connects afresh, and
+	 * nothing is returned.
+	 */
+	uint16_t lostPacketStep(uint8_t *buffer, uint16_t maxsize, uint32_t got, uint32_t want);
 
 	void mqtt_client_delete(void);
 	void mqtt_send_keepalive(void);

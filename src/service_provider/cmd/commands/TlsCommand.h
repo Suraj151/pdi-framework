@@ -37,6 +37,7 @@ struct TlsCommand : public CommandBase {
     TlsCommand() {
         Clear();
         SetCommand(CMD_NAME_TLS);
+        setArgs(RODT_ATTR(""), 255);
         AddOption(CMD_OPTION_NAME_Q);
         AddOption(CMD_OPTION_NAME_T);
         AddOption(CMD_OPTION_NAME_L);

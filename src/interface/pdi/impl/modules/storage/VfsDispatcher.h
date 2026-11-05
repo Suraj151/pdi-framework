@@ -42,9 +42,15 @@ public:
      */
     pdi_err_t umount(const char* prefix);
 
+    /**
+     * Takes every disk mount whose disk is gone out of the namespace, as a lazy umount does;
+     * one holding open files is let go when the last closes. How many were taken out.
+     */
+    uint8_t releaseLostMounts();
+
     uint8_t getMountCount() const { return m_mount_count; }
     const vfs_mount_t* getMount(uint8_t idx) const {
-        return (idx < m_mount_count && nullptr != m_mounts[idx].m_backend) ? &m_mounts[idx] : nullptr;
+        return (idx < m_mount_count && nullptr != m_mounts[idx].m_backend && 0 != m_mounts[idx].m_prefix_len) ? &m_mounts[idx] : nullptr;
     }
     const vfs_mount_t* findMountForPath(const char* path) const;
 
@@ -77,6 +83,7 @@ public:
     uint64_t getTotalSize() override;
     uint64_t getUsedSize() override;
     uint64_t getFreeSize() override;
+    uint32_t getBlockSize() override;
 
     /**
      * The free bytes of the filesystem the path is on, the way statvfs answers
@@ -176,6 +183,17 @@ protected:
     // a handle came from, packed into the handle itself. Returns nullptr when
     // the handle names no mounted backend.
     iFileSystemInterface* resolveHandle(pdi_fhandle_t handle, pdi_fhandle_t& backend_handle) const;
+
+    /**
+     * Lets go of a mount taken out of the namespace once nothing is open on it.
+     */
+    void finishLostMount(uint8_t idx);
+
+    /**
+     * Adds an entry for each mount whose mount point sits directly in the listed
+     * directory, the way a linux listing shows a mount point as a directory.
+     */
+    void addMountPoints(const char* path, pdiutil::vector<file_info_t>& items, const char* pattern);
 
     vfs_mount_t m_mounts[VFS_MAX_MOUNTS];
     uint8_t m_mount_count;

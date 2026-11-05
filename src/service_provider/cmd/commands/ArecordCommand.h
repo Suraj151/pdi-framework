@@ -26,6 +26,7 @@ struct ArecordCommand : public CommandBase {
 	                   m_error(0), m_rate(0), m_bits(0), m_channels(0) {
 		Clear();
 		SetCommand(CMD_NAME_ARECORD);
+		setArgs(RODT_ATTR("d"), 2);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}

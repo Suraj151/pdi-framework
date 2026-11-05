@@ -63,8 +63,10 @@ created Date    : 1st June 2019
 #ifdef ENABLE_SCRIPT_RUNNER
 #include "commands/SourceCommand.h"
 #endif
+#ifdef DEVICE_SUPPORTS_NTP
 #include "commands/DateCommand.h"
 #include "commands/TimedatectlCommand.h"
+#endif
 #include "commands/HostCommand.h"
 #include "commands/PingCommand.h"
 #include "commands/HexdumpCommand.h"
@@ -74,6 +76,12 @@ created Date    : 1st June 2019
 #include "commands/MountCommand.h"
 #include "commands/UmountCommand.h"
 #include "commands/WcFSCommand.h"
+#include "commands/DuCommand.h"
+#include "commands/FindCommand.h"
+#include "commands/StatCommand.h"
+#include "commands/SortCommand.h"
+#include "commands/TeeCommand.h"
+#include "commands/DiffCommand.h"
 #include "commands/HeadFSCommand.h"
 #include "commands/TailFSCommand.h"
 #include "commands/GrepFSCommand.h"

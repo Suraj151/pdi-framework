@@ -72,6 +72,7 @@ protected:
   uint64_t m_currentclient_lastactivity_timestamp;
   volatile bool m_handlingclientfromcb;
   bool m_close_after_response;
+  bool m_responded;
   #ifdef ENABLE_TLS_SERVICE
   bool m_secure;
   #endif

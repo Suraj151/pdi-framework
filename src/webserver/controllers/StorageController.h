@@ -468,6 +468,7 @@ public:
 				pdiutil::safe_delete_array(item.m_name);
 			}
 			itemlist.clear();
+			this->m_web_resource->m_server->send(HTTP_RESP_SERVICE_UNAVAILABLE);
 			return;
 		}
 
@@ -536,7 +537,7 @@ public:
 				strncat(tempbuffer, _path.c_str(), _path.length());
 
 				char permbuf[11];
-				FilePermsToString(item.m_perms, item.m_type == FILE_TYPE_DIR, permbuf);
+				FilePermsToString(item.m_perms, item.m_type, permbuf);
 
 				jsonresp += CHARPTR_WRAP("{\"n\":\"");
 				__append_json_escaped(jsonresp, (const char*)item.m_name);
@@ -562,7 +563,9 @@ public:
 				pdiutil::safe_delete_array(item.m_name);
 			}
 
-			jsonresp.pop_back(); // remove last comma
+			if( !jsonresp.empty() && ',' == jsonresp.back() ){
+				jsonresp.pop_back();
+			}
 			itemlist.clear();
 		}
 

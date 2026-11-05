@@ -25,7 +25,7 @@ namespace {
  */
 FileWriteStream::FileWriteStream(const char *path, bool append) :
   m_buffer(nullptr), m_fill(0), m_written(0), m_append(append),
-  m_started(false), m_failed(false), m_handle(-1) {
+  m_started(false), m_failed(false), m_error(0), m_handle(-1) {
 
   if (nullptr != path) {
     m_path = path;
@@ -66,6 +66,7 @@ int32_t FileWriteStream::commit() {
 
   if (status < 0) {
     m_failed = true;
+    m_error = (0 == m_error) ? (int16_t)status : m_error;
     m_fill = 0;
     return -1;
   }
@@ -77,7 +78,8 @@ int32_t FileWriteStream::commit() {
 }
 
 /**
- * Commits what is buffered and reports whether it landed.
+ * Commits what is buffered and reports whether everything written landed:
+ * zero, or the first error storage gave.
  */
 int16_t FileWriteStream::disconnect() {
 
@@ -86,14 +88,19 @@ int16_t FileWriteStream::disconnect() {
   // littlefs holds the tail of a written file until the handle closes, so the
   // close belongs here, where a caller is still listening for the result
   if (m_handle >= 0) {
-    if (__i_fs.closeFile(m_handle) < 0) {
+    int32_t closed = __i_fs.closeFile(m_handle);
+    if (closed < 0) {
       m_failed = true;
+      m_error = (0 == m_error) ? (int16_t)closed : m_error;
       status = -1;
     }
     m_handle = -1;
   }
 
-  return (0 == status) ? (int16_t)0 : (int16_t)-1;
+  if (0 == status && !m_failed) {
+    return 0;
+  }
+  return (0 != m_error) ? m_error : (int16_t)PDI_ERR_IO;
 }
 
 /**

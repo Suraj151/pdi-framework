@@ -310,7 +310,7 @@ class Target(object):
         """
         path = "/" + name
         self.run("cd /")
-        self.run("rm %s" % path)
+        self.run("rm -r %s" % path)
         made = self.run("mkdir %s" % path)
         self.run("cd %s" % path)
 
@@ -391,10 +391,10 @@ class Target(object):
         self.resync()
         self.run("cd /")
         for path in self._workspaces:
-            self.run("rm %s" % path)
+            self.run("rm -r %s" % path)
         self._workspaces = []
         for path in reversed(self._made):
-            self.run("rm %s" % path)
+            self.run("rm -r %s" % path)
         self._made = []
 
 
@@ -412,14 +412,14 @@ def root_names(target):
 def dir_names(target, path):
     """The names in a directory, or None when the listing could not be read."""
     try:
-        out = target.run("ls %s" % path)
+        out = target.run("ls -la %s" % path)
     except Exception:
         return None
 
     names = set()
     for line in out.splitlines():
         cols = line.split()
-        if len(cols) >= 6 and cols[0][:1] in ("-", "d"):
+        if len(cols) >= 6 and cols[0][:1] in ("-", "d", "l", "c", "b"):
             names.add(cols[-1])
 
     # every listing carries . and .. — one without them was not a listing, and
@@ -444,7 +444,7 @@ def sweep_root(target, before):
 
     target.run("cd /")
     for name in sorted(after - before - ROOT_KEEP):
-        target.run("rm /%s" % name)
+        target.run("rm -r /%s" % name)
         print("       %sremoved /%s, left behind by the run%s" % (DIM, name, RESET), flush=True)
 
 

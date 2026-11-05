@@ -37,6 +37,7 @@ struct PingCommand : public CommandBase {
 	PingCommand(){
 		Clear();
 		SetCommand(CMD_NAME_PING);
+		setArgs(RODT_ATTR(""), 2);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}

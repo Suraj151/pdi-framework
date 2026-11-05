@@ -134,6 +134,26 @@ pdiutil::task_id_t TaskScheduler::updateInterval(pdiutil::task_id_t _task_id, Ca
 }
 
 /**
+ * @brief Changes only how often a registered task runs, leaving its callable untouched,
+ *        so a task may change its own pace while it runs.
+ * @param _task_id The task to change.
+ * @param _duration The new interval in milliseconds.
+ * @return False when no such task is registered.
+ */
+bool TaskScheduler::setTaskInterval(pdiutil::task_id_t _task_id, pdiutil::millis_t _duration)
+{
+    int16_t _registered_index = this->is_registered_task(_task_id);
+    if (_registered_index < 0)
+    {
+        return false;
+    }
+    CRITICAL_SECTION_ENTER
+    this->m_tasks[_registered_index].m_duration = _duration;
+    CRITICAL_SECTION_EXIT
+    return true;
+}
+
+/**
  * @brief Clears a one-time timeout task.
  *
  * @param _id The unique ID of the task to clear.

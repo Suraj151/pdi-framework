@@ -206,7 +206,7 @@ def passwd_needs_confirmation(t):
 
 @test("the user store is not world readable", needs=("ls",))
 def shadow_is_private(t):
-    out = t.run("ls /etc")
+    out = t.run("ls -la /etc")
     for line in out.splitlines():
         if "shadow" in line:
             expect_in("-rw-------", line, "the hash file's mode")
@@ -216,7 +216,7 @@ def shadow_is_private(t):
 
 
 def _shadow_line(t):
-    for line in t.run("ls /etc").splitlines():
+    for line in t.run("ls -la /etc").splitlines():
         if "shadow" in line:
             return line
     return None

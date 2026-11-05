@@ -1736,3 +1736,244 @@ TEST(pdistl, a_function_is_as_big_as_its_storage_and_tests_as_bool_only_explicit
     ASSERT_FALSE((std::is_convertible<pdiutil::function<void()>, bool>::value));
     ASSERT_TRUE((std::is_constructible<bool, pdiutil::function<void()>>::value));
 }
+
+namespace {
+
+/**
+ * A range that can be walked only once, the way a stream reads.
+ */
+struct OncePass
+{
+    typedef pdistd::input_iterator_tag iterator_category;
+    typedef int value_type;
+    typedef ptrdiff_t difference_type;
+    typedef const int *pointer;
+    typedef const int &reference;
+
+    const int *at;
+    explicit OncePass(const int *p) : at(p) {}
+    const int &operator*() const { return *at; }
+    OncePass &operator++() { ++at; return *this; }
+    bool operator!=(const OncePass &other) const { return at != other.at; }
+    bool operator==(const OncePass &other) const { return at == other.at; }
+};
+
+void fillPattern(uint8_t *out, size_t n)
+{
+    for (size_t i = 0; i < n; i++)
+    {
+        out[i] = (uint8_t)(i * 7 + 3);
+    }
+}
+
+} // namespace
+
+TEST(pdistl, a_range_copied_into_an_empty_vector_takes_one_allocation_of_its_size)
+{
+    uint8_t src[1000];
+    fillPattern(src, sizeof(src));
+    pdiutil::vector<uint8_t> v;
+
+    v.insert(v.end(), src, src + sizeof(src));
+
+    ASSERT_EQ(v.size(), sizeof(src));
+    ASSERT_EQ(v.capacity(), sizeof(src));
+    ASSERT_EQ(0, memcmp(v.data(), src, sizeof(src)));
+}
+
+TEST(pdistl, a_range_the_heap_cannot_hold_whole_leaves_the_vector_as_it_was)
+{
+    uint8_t src[1000];
+    fillPattern(src, sizeof(src));
+    pdiutil::vector<uint8_t> v;
+    v.push_back('a');
+    v.push_back('b');
+
+    pdiutil::enable_heap_check();
+    __i_dvc_ctrl.capMaxFreeBlock(600);
+    v.insert(v.end(), src, src + sizeof(src));
+    __i_dvc_ctrl.capMaxFreeBlock(0);
+
+    ASSERT_EQ(v.size(), (size_t)2);
+    ASSERT_EQ(v[0], (uint8_t)'a');
+    ASSERT_EQ(v[1], (uint8_t)'b');
+}
+
+TEST(pdistl, a_range_a_squeezed_heap_can_hold_is_copied_whole)
+{
+    uint8_t src[1000];
+    fillPattern(src, sizeof(src));
+    pdiutil::vector<uint8_t> v;
+
+    pdiutil::enable_heap_check();
+    __i_dvc_ctrl.capMaxFreeBlock(1100);
+    v.insert(v.end(), src, src + sizeof(src));
+    __i_dvc_ctrl.capMaxFreeBlock(0);
+
+    ASSERT_EQ(v.size(), sizeof(src));
+    ASSERT_EQ(0, memcmp(v.data(), src, sizeof(src)));
+}
+
+TEST(pdistl, an_assign_the_heap_cannot_hold_keeps_the_old_contents)
+{
+    uint8_t src[1000];
+    fillPattern(src, sizeof(src));
+    pdiutil::vector<uint8_t> v;
+    v.push_back('k');
+
+    pdiutil::enable_heap_check();
+    __i_dvc_ctrl.capMaxFreeBlock(600);
+    v.assign(src, src + sizeof(src));
+    __i_dvc_ctrl.capMaxFreeBlock(0);
+
+    ASSERT_EQ(v.size(), (size_t)1);
+    ASSERT_EQ(v[0], (uint8_t)'k');
+}
+
+TEST(pdistl, an_assign_replaces_the_contents_with_the_whole_range)
+{
+    uint8_t src[300];
+    fillPattern(src, sizeof(src));
+    pdiutil::vector<uint8_t> v;
+    v.push_back('k');
+
+    v.assign(src, src + sizeof(src));
+
+    ASSERT_EQ(v.size(), sizeof(src));
+    ASSERT_EQ(0, memcmp(v.data(), src, sizeof(src)));
+}
+
+TEST(pdistl, a_vector_built_from_a_range_the_heap_cannot_hold_is_empty_not_partial)
+{
+    uint8_t src[1000];
+    fillPattern(src, sizeof(src));
+
+    pdiutil::enable_heap_check();
+    __i_dvc_ctrl.capMaxFreeBlock(600);
+    pdiutil::vector<uint8_t> v(src, src + sizeof(src));
+    __i_dvc_ctrl.capMaxFreeBlock(0);
+
+    ASSERT_EQ(v.size(), (size_t)0);
+}
+
+TEST(pdistl, a_range_inserted_in_the_middle_keeps_the_order_across_growth)
+{
+    pdiutil::vector<int> v;
+    v.push_back(1);
+    v.push_back(2);
+    v.push_back(3);
+    v.shrink_to_fit();
+    const int more[] = {7, 8, 9, 10};
+
+    v.insert(v.begin() + 1, more, more + 4);
+
+    const int want[] = {1, 7, 8, 9, 10, 2, 3};
+    ASSERT_EQ(v.size(), (size_t)7);
+    for (size_t i = 0; i < 7; i++)
+    {
+        ASSERT_EQ(v[i], want[i]);
+    }
+}
+
+TEST(pdistl, a_range_inserted_at_the_front_and_at_the_end_lands_there)
+{
+    pdiutil::vector<int> v;
+    v.push_back(5);
+    const int front[] = {1, 2};
+    const int back[] = {8, 9};
+
+    v.insert(v.begin(), front, front + 2);
+    v.insert(v.end(), back, back + 2);
+
+    const int want[] = {1, 2, 5, 8, 9};
+    ASSERT_EQ(v.size(), (size_t)5);
+    for (size_t i = 0; i < 5; i++)
+    {
+        ASSERT_EQ(v[i], want[i]);
+    }
+}
+
+TEST(pdistl, a_vectors_own_range_inserted_into_it_survives_the_growth)
+{
+    pdiutil::vector<int> v;
+    v.push_back(1);
+    v.push_back(2);
+    v.push_back(3);
+    v.shrink_to_fit();
+
+    v.insert(v.end(), v.begin(), v.end());
+
+    const int want[] = {1, 2, 3, 1, 2, 3};
+    ASSERT_EQ(v.size(), (size_t)6);
+    for (size_t i = 0; i < 6; i++)
+    {
+        ASSERT_EQ(v[i], want[i]);
+    }
+}
+
+TEST(pdistl, appending_small_ranges_again_and_again_reallocates_a_bounded_number_of_times)
+{
+    pdiutil::vector<uint8_t> v;
+    const uint8_t word[4] = {1, 2, 3, 4};
+    size_t last = v.capacity();
+    int reallocations = 0;
+
+    for (int i = 0; i < 1000; i++)
+    {
+        v.insert(v.end(), word, word + 4);
+        if (v.capacity() != last)
+        {
+            reallocations++;
+            last = v.capacity();
+        }
+    }
+
+    ASSERT_EQ(v.size(), (size_t)4000);
+    ASSERT_EQ(v[3999], (uint8_t)4);
+    ASSERT_TRUE(reallocations < 30);
+}
+
+TEST(pdistl, an_empty_range_changes_nothing_and_takes_no_heap)
+{
+    const uint8_t none[1] = {0};
+    pdiutil::vector<uint8_t> v;
+
+    pdiutil::enable_heap_check();
+    uint32_t before = pdiutil::safe_alloc_refusals();
+    __i_dvc_ctrl.capFreeHeap(PDI_SAFE_ALLOC_HEAP_MARGIN);
+    v.insert(v.end(), none, none);
+    v.assign(none, none);
+    __i_dvc_ctrl.capFreeHeap(0);
+
+    ASSERT_EQ(v.size(), (size_t)0);
+    ASSERT_EQ(pdiutil::safe_alloc_refusals(), before);
+}
+
+TEST(pdistl, a_range_walked_only_once_is_still_copied_whole)
+{
+    const int src[] = {4, 5, 6, 7, 8};
+    pdiutil::vector<int> v;
+    v.push_back(1);
+
+    v.insert(v.end(), OncePass(src), OncePass(src + 5));
+
+    const int want[] = {1, 4, 5, 6, 7, 8};
+    ASSERT_EQ(v.size(), (size_t)6);
+    for (size_t i = 0; i < 6; i++)
+    {
+        ASSERT_EQ(v[i], want[i]);
+    }
+}
+
+TEST(pdistl, a_range_of_strings_is_copied_and_the_originals_kept)
+{
+    pdiutil::string src[3] = {"first string long enough for storage", "second", "third string long enough for storage"};
+    pdiutil::vector<pdiutil::string> v;
+
+    v.insert(v.end(), src, src + 3);
+
+    ASSERT_EQ(v.size(), (size_t)3);
+    ASSERT_STREQ(v[0].c_str(), src[0].c_str());
+    ASSERT_STREQ(v[2].c_str(), src[2].c_str());
+    ASSERT_STREQ(src[1].c_str(), "second");
+}

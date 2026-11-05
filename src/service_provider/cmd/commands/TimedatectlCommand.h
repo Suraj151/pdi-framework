@@ -27,6 +27,7 @@ struct TimedatectlCommand : public CommandBase {
 	TimedatectlCommand(){
 		Clear();
 		SetCommand(CMD_NAME_TIMEDATECTL);
+		setArgs(RODT_ATTR(""), 0);
 	}
 
 	/**

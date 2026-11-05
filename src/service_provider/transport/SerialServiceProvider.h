@@ -12,6 +12,7 @@ created Date    : 1st June 2019
 #define _SERIAL_SERVICE_H_
 
 #include <service_provider/ServiceProvider.h>
+#include <interface/pdi/modules/serial/iSerialInterface.h>
 
 #ifdef ENABLE_DRIVER_CORE
 #include "DeviceManager.h"

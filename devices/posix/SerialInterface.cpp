@@ -635,8 +635,9 @@ SdCardSim::SdCardSim(bool highcapacity, uint32_t blocks)
       m_no_write_response(false), m_fail_read_at(0), m_reads(0), m_writes(0), m_clocks_deselected(0),
       m_highcapacity(highcapacity), m_blocks(blocks), m_mem(nullptr), m_selected(false),
       m_asleep(false), m_idle(true), m_app(false), m_crc_on(false), m_state(SIM_COMMAND), m_cmdlen(0), m_outhead(0), m_outtail(0),
-      m_inlen(0), m_write_offset(0), m_busy_left(0)
+      m_inlen(0), m_write_offset(0), m_read_offset(0), m_busy_left(0), m_after_busy(SIM_COMMAND)
 {
+    memset(m_commands, 0, sizeof(m_commands));
     m_store.assign((size_t)blocks * SD_BLOCK_SIZE, 0);
     m_mem = m_store.data();
 }
@@ -659,7 +660,8 @@ void SdCardSim::select(bool selected)
     {
         m_cmdlen = 0;
         m_outhead = m_outtail = 0;
-        if (SIM_WRITE_TOKEN == m_state || SIM_WRITE_DATA == m_state)
+        if (SIM_WRITE_TOKEN == m_state || SIM_WRITE_DATA == m_state || SIM_READ_MULTI == m_state ||
+            SIM_WRITE_MULTI == m_state)
         {
             m_state = SIM_COMMAND;
         }
@@ -711,6 +713,46 @@ void SdCardSim::queueBlock(const uint8_t *block, uint32_t len, bool data)
     }
     queue((uint8_t)(crc >> 8));
     queue((uint8_t)(crc & 0xFF));
+}
+
+/**
+ * @brief Queues the next block of a multiple block read, an out of range error
+ *        token once the card has no more.
+ */
+void SdCardSim::queueNextRead()
+{
+    queue(0xFF);
+    m_reads++;
+    if (m_read_offset + SD_BLOCK_SIZE > (uint64_t)m_blocks * SD_BLOCK_SIZE)
+    {
+        queue(0x08);
+        return;
+    }
+    if (0 != m_read_error || m_fail_read_at == m_reads)
+    {
+        queue((0 != m_read_error) ? m_read_error : (uint8_t)0x08);
+        m_read_offset += SD_BLOCK_SIZE;
+        return;
+    }
+    queueBlock(m_mem + m_read_offset, SD_BLOCK_SIZE, true);
+    m_read_offset += SD_BLOCK_SIZE;
+}
+
+/**
+ * @brief Gathers a command frame byte by byte, answering it once whole.
+ */
+void SdCardSim::takeCommandByte(uint8_t in)
+{
+    if (0 == m_cmdlen && 0x40 != (in & 0xC0))
+    {
+        return;
+    }
+    m_cmd[m_cmdlen++] = in;
+    if (sizeof(m_cmd) == m_cmdlen)
+    {
+        m_cmdlen = 0;
+        command();
+    }
 }
 
 /**
@@ -773,6 +815,23 @@ void SdCardSim::command()
     bool app = m_app;
     m_app = false;
     uint32_t offset = 0;
+
+    if (index < 64)
+    {
+        m_commands[index]++;
+    }
+
+    if (12 == index && SIM_READ_MULTI == m_state)
+    {
+        m_outhead = m_outtail = 0;
+        queue(0xFF);
+        queue(0xFF);
+        queue(0x00);
+        m_busy_left = m_busy_bytes;
+        m_after_busy = SIM_COMMAND;
+        m_state = SIM_BUSY;
+        return;
+    }
 
     queue(0xFF);
 
@@ -908,6 +967,27 @@ void SdCardSim::command()
         m_write_offset = offset;
         m_state = SIM_WRITE_TOKEN;
         break;
+    case 18:
+        if (!blockAt(arg, offset))
+        {
+            queue(r1 | s_sd_parameter_error);
+            break;
+        }
+        queue(r1);
+        m_read_offset = offset;
+        m_state = SIM_READ_MULTI;
+        queueNextRead();
+        break;
+    case 25:
+        if (!blockAt(arg, offset))
+        {
+            queue(r1 | s_sd_parameter_error);
+            break;
+        }
+        queue(r1);
+        m_write_offset = offset;
+        m_state = SIM_WRITE_MULTI;
+        break;
     default:
         queue(r1 | s_sd_illegal_command);
         break;
@@ -947,29 +1027,40 @@ uint8_t SdCardSim::exchange(uint8_t in)
         }
         else
         {
-            m_state = SIM_COMMAND;
+            m_state = m_after_busy;
+            m_after_busy = SIM_COMMAND;
         }
+    }
+    else if (SIM_READ_MULTI == m_state)
+    {
+        queueNextRead();
     }
 
     switch (m_state)
     {
     case SIM_COMMAND:
-        if (0 == m_cmdlen && 0x40 != (in & 0xC0))
-        {
-            break;
-        }
-        m_cmd[m_cmdlen++] = in;
-        if (sizeof(m_cmd) == m_cmdlen)
-        {
-            m_cmdlen = 0;
-            command();
-        }
+    case SIM_READ_MULTI:
+        takeCommandByte(in);
         break;
     case SIM_WRITE_TOKEN:
         if (s_sd_data_token == in)
         {
             m_state = SIM_WRITE_DATA;
             m_inlen = 0;
+        }
+        break;
+    case SIM_WRITE_MULTI:
+        if (0xFC == in)
+        {
+            m_after_busy = SIM_WRITE_MULTI;
+            m_state = SIM_WRITE_DATA;
+            m_inlen = 0;
+        }
+        else if (0xFD == in)
+        {
+            m_busy_left = m_busy_bytes;
+            m_after_busy = SIM_COMMAND;
+            m_state = SIM_BUSY;
         }
         break;
     case SIM_WRITE_DATA:
@@ -981,7 +1072,8 @@ uint8_t SdCardSim::exchange(uint8_t in)
             {
                 response = s_sd_crc_rejected;
             }
-            m_state = SIM_COMMAND;
+            bool multi = (SIM_WRITE_MULTI == m_after_busy);
+            m_state = multi ? SIM_WRITE_MULTI : SIM_COMMAND;
             if (m_no_write_response)
             {
                 break;
@@ -991,8 +1083,16 @@ uint8_t SdCardSim::exchange(uint8_t in)
             {
                 memcpy(m_mem + m_write_offset, m_in, SD_BLOCK_SIZE);
                 m_writes++;
+                if (multi)
+                {
+                    m_write_offset += SD_BLOCK_SIZE;
+                }
                 m_state = SIM_BUSY;
                 m_busy_left = m_busy_bytes;
+            }
+            else
+            {
+                m_after_busy = SIM_COMMAND;
             }
         }
         break;

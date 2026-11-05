@@ -9,6 +9,7 @@ created Date    : 16th Aug 2026
 ******************************************************************************/
 
 #include <pditest.h>
+#include <StringTerminal.h>
 #include <utility/CommandBase.h>
 
 /**
@@ -356,3 +357,240 @@ TEST(cmdbase, clear_resets_the_command_name)
     command.Clear();
     ASSERT_FALSE(command.isValidCommand("ssh"));
 }
+
+/**
+ * A positional command declaring the words it takes, with its replies caught.
+ */
+static void makeDeclared(TestCommand &command, pditest::StringTerminal &term, const char *flags,
+                         int16_t operands, bool keyvalue = false)
+{
+    makeCommand(command, "ls", "a", "b");
+    command.setAcceptArgsOptions(true);
+    command.setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
+    command.setArgs(flags, operands, keyvalue);
+    command.SetTerminal(&term);
+    command.forget();
+    term.forget();
+}
+
+TEST(cmdbase, declared_flags_and_operands_run_the_command)
+{
+    TestCommand command;
+    pditest::StringTerminal term;
+    char scratch[64];
+    makeDeclared(command, term, "la", 1);
+
+    ASSERT_EQ(parse(command, "ls -l -a -la /etc", scratch, sizeof(scratch)), PDI_OK);
+    ASSERT_TRUE(command.ran);
+    ASSERT_FALSE(term.sawText(CMD_MSG_INVALID_OPTION));
+
+    makeDeclared(command, term, "la", 1);
+    ASSERT_EQ(parse(command, "ls", scratch, sizeof(scratch)), PDI_OK);
+    ASSERT_TRUE(command.ran);
+}
+
+TEST(cmdbase, an_undeclared_flag_is_named_and_nothing_runs)
+{
+    TestCommand command;
+    pditest::StringTerminal term;
+    char scratch[64];
+    makeDeclared(command, term, "la", 1);
+
+    ASSERT_EQ(parse(command, "ls -Z /etc", scratch, sizeof(scratch)), CMD_ERROR_OPT);
+    ASSERT_FALSE(command.ran);
+    ASSERT_TRUE(term.sawText("invalid option : -Z"));
+
+    makeDeclared(command, term, "la", 1);
+    ASSERT_EQ(parse(command, "ls -laZ", scratch, sizeof(scratch)), CMD_ERROR_OPT);
+    ASSERT_FALSE(command.ran);
+    ASSERT_TRUE(term.sawText("invalid option : -laZ"));
+
+    makeDeclared(command, term, "", 2);
+    ASSERT_EQ(parse(command, "ls --help", scratch, sizeof(scratch)), CMD_ERROR_OPT);
+    ASSERT_FALSE(command.ran);
+    ASSERT_TRUE(term.sawText("invalid option : --help"));
+}
+
+TEST(cmdbase, an_operand_past_the_last_is_named_and_nothing_runs)
+{
+    TestCommand command;
+    pditest::StringTerminal term;
+    char scratch[64];
+    makeDeclared(command, term, "", 0);
+
+    ASSERT_EQ(parse(command, "ls now", scratch, sizeof(scratch)), CMD_ERROR_INVAL);
+    ASSERT_FALSE(command.ran);
+    ASSERT_TRUE(term.sawText("extra operand : now"));
+
+    makeDeclared(command, term, "la", 1);
+    ASSERT_EQ(parse(command, "ls /a /b", scratch, sizeof(scratch)), CMD_ERROR_INVAL);
+    ASSERT_FALSE(command.ran);
+    ASSERT_TRUE(term.sawText("extra operand : /b"));
+}
+
+TEST(cmdbase, quotes_and_escapes_keep_one_operand_whole)
+{
+    TestCommand command;
+    pditest::StringTerminal term;
+    char scratch[64];
+    makeDeclared(command, term, "", 1);
+
+    ASSERT_EQ(parse(command, "ls \"a b c\"", scratch, sizeof(scratch)), PDI_OK);
+    ASSERT_TRUE(command.ran);
+
+    makeDeclared(command, term, "", 1);
+    ASSERT_EQ(parse(command, "ls 'a b' c", scratch, sizeof(scratch)), CMD_ERROR_INVAL);
+    ASSERT_TRUE(term.sawText("extra operand : c"));
+
+    makeDeclared(command, term, "", 1);
+    ASSERT_EQ(parse(command, "ls a\\ b", scratch, sizeof(scratch)), PDI_OK);
+    ASSERT_TRUE(command.ran);
+
+    makeDeclared(command, term, "", 1);
+    ASSERT_EQ(parse(command, "ls \"-Z\"", scratch, sizeof(scratch)), PDI_OK);
+    ASSERT_TRUE(command.ran);
+    ASSERT_STREQ(command.seen[0], "-Z");
+}
+
+TEST(cmdbase, a_given_empty_word_is_an_operand)
+{
+    TestCommand command;
+    pditest::StringTerminal term;
+    char scratch[64];
+    makeDeclared(command, term, "", 1);
+
+    ASSERT_EQ(parse(command, "ls \"\"", scratch, sizeof(scratch)), PDI_OK);
+    ASSERT_TRUE(command.ran);
+
+    makeDeclared(command, term, "", 1);
+    ASSERT_EQ(parse(command, "ls \"\" \"\"", scratch, sizeof(scratch)), CMD_ERROR_INVAL);
+    ASSERT_FALSE(command.ran);
+}
+
+TEST(cmdbase, a_lone_dash_and_a_negative_number_are_operands_where_no_flags_are_declared)
+{
+    TestCommand command;
+    pditest::StringTerminal term;
+    char scratch[64];
+    makeDeclared(command, term, "", 1);
+
+    ASSERT_EQ(parse(command, "ls -", scratch, sizeof(scratch)), PDI_OK);
+    ASSERT_TRUE(command.ran);
+
+    makeDeclared(command, term, nullptr, 2);
+    ASSERT_EQ(parse(command, "ls -20 5", scratch, sizeof(scratch)), PDI_OK);
+    ASSERT_TRUE(command.ran);
+}
+
+TEST(cmdbase, a_name_value_command_refuses_a_word_without_a_value)
+{
+    TestCommand command;
+    pditest::StringTerminal term;
+    char scratch[64];
+    makeDeclared(command, term, "", 2, true);
+
+    ASSERT_EQ(parse(command, "ls a=1 b=2", scratch, sizeof(scratch)), PDI_OK);
+    ASSERT_TRUE(command.ran);
+
+    makeDeclared(command, term, "", 2, true);
+    ASSERT_EQ(parse(command, "ls a=1 junk", scratch, sizeof(scratch)), CMD_ERROR_OPT);
+    ASSERT_FALSE(command.ran);
+    ASSERT_TRUE(term.sawText("invalid option : junk"));
+
+    makeDeclared(command, term, "", 2, true);
+    ASSERT_EQ(parse(command, "ls -Z", scratch, sizeof(scratch)), CMD_ERROR_OPT);
+    ASSERT_FALSE(command.ran);
+
+    makeDeclared(command, term, "", 1, true);
+    ASSERT_EQ(parse(command, "ls a=1 b=2", scratch, sizeof(scratch)), CMD_ERROR_INVAL);
+    ASSERT_FALSE(command.ran);
+    ASSERT_TRUE(term.sawText("extra operand : b=2"));
+}
+
+TEST(cmdbase, a_name_the_command_does_not_have_is_named)
+{
+    TestCommand command;
+    pditest::StringTerminal term;
+    char scratch[64];
+    makeDeclared(command, term, "", 2, true);
+
+    ASSERT_EQ(parse(command, "ls a=1 z=2", scratch, sizeof(scratch)), CMD_ERROR_OPT);
+    ASSERT_FALSE(command.ran);
+    ASSERT_TRUE(term.sawText("invalid option : z"));
+}
+
+TEST(cmdbase, a_300_character_word_is_named_whole)
+{
+    TestCommand command;
+    pditest::StringTerminal term;
+    char scratch[400];
+    makeDeclared(command, term, "", 0);
+
+    std::string word(300, 'w');
+    std::string line = "ls " + word;
+    ASSERT_EQ(parse(command, line.c_str(), scratch, sizeof(scratch)), CMD_ERROR_INVAL);
+    ASSERT_FALSE(command.ran);
+    ASSERT_TRUE(term.sawText((std::string("extra operand : ") + word).c_str()));
+}
+
+TEST(cmdbase, an_undeclared_command_takes_any_word)
+{
+    TestCommand command;
+    pditest::StringTerminal term;
+    char scratch[64];
+    makeCommand(command, "echo", "a");
+    command.setAcceptArgsOptions(true);
+    command.SetTerminal(&term);
+
+    ASSERT_EQ(parse(command, "echo -Z a b c", scratch, sizeof(scratch)), PDI_OK);
+    ASSERT_TRUE(command.ran);
+}
+
+TEST(cmdbase, take_number_reads_the_range_and_names_a_refused_word)
+{
+    TestCommand command;
+    pditest::StringTerminal term;
+    command.SetTerminal(&term);
+    uint32_t out = 9;
+
+    ASSERT_EQ(command.takeNumber("invalid pid : ", "0", 1, 0, 32767, out), PDI_OK);
+    ASSERT_EQ(out, 0u);
+    ASSERT_EQ(command.takeNumber("invalid pid : ", "32767", 5, 0, 32767, out), PDI_OK);
+    ASSERT_EQ(out, 32767u);
+    ASSERT_FALSE(term.sawText("invalid"));
+
+    const char *refused[] = { "32768", "4294967296", "-1", "x", "1x", " 1", "99999999999999999999" };
+    for (const char *word : refused)
+    {
+        term.forget();
+        ASSERT_EQ(command.takeNumber("invalid pid : ", word, (int16_t)strlen(word), 0, 32767, out), CMD_ERROR_INVAL);
+        ASSERT_TRUE(term.sawText((std::string("invalid pid : ") + word + " (0 to 32767)").c_str()));
+    }
+
+    term.forget();
+    ASSERT_EQ(command.takeNumber("invalid count : ", "0", 1, 1, 10, out), CMD_ERROR_INVAL);
+    ASSERT_EQ(command.takeNumber("invalid count : ", "", 0, 0, 10, out), CMD_ERROR_INVAL);
+}
+
+TEST(cmdbase, a_failure_names_what_failed_and_why_in_words)
+{
+    TestCommand command;
+    pditest::StringTerminal term;
+    command.SetTerminal(&term);
+
+    command.writeFailure("cp: ", "/a", PDI_ERR_EXISTS);
+    ASSERT_EQ(term.captured(), std::string("cp: /a : File exists"));
+
+    term.forget();
+    command.writeFailure("cp: ", "", PDI_ERR_NOT_FOUND);
+    ASSERT_EQ(term.captured(), std::string("cp: '' : Not found"));
+
+    term.forget();
+    command.writeFailure("cp: ", "/a", -32000);
+    ASSERT_EQ(term.captured(), std::string("cp: /a : -32000"));
+
+    term.forget();
+    command.writeName(nullptr);
+    ASSERT_EQ(term.captured(), std::string("''"));
+}
+

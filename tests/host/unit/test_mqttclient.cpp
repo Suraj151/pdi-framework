@@ -75,6 +75,13 @@ public:
      */
     uint32_t m_limit;
 
+    /**
+     * Whether a write would be taken now; false stands for a send buffer still full of unacknowledged bytes.
+     */
+    bool m_writable = true;
+
+    bool availableforwrite(uint32_t size) override { return m_writable; }
+
     int32_t available() override { return (int32_t)(m_limit > m_at ? m_limit - m_at : 0); }
 
     uint8_t read() override
@@ -333,6 +340,104 @@ TEST(mqttclient, a_publish_bigger_than_the_buffer_does_not_garble_the_next)
     ASSERT_TRUE(deliveredAfter(big, 6 + payload));
 }
 
+TEST(mqttclient, a_publish_that_stops_part_way_drops_the_connection_and_is_not_delivered)
+{
+    static const uint8_t answer[] = {0x20, 0x02, 0x00, 0x00,
+                                     0x30, 0x0B, 0x00, 0x01, 't', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'};
+    ScriptedBroker broker(answer, sizeof(answer));
+    broker.m_limit = 4 + 7;
+    MQTTClient mqtt;
+    g_delivered = 0;
+    g_last_data.clear();
+    mqtt.OnData(countDelivery);
+
+    connectAndRead(mqtt, broker);
+    for (int i = 0; i < 5; i++)
+    {
+        mqtt.MQTT_Task();
+    }
+
+    ASSERT_EQ(g_delivered, 0u);
+    ASSERT_EQ((int)broker.connected(), 0);
+}
+
+TEST(mqttclient, a_publish_from_the_broker_bigger_than_the_standing_buffer_is_delivered_whole)
+{
+    static uint8_t answer[4 + MQTT_BUF_SIZE + 300];
+    uint32_t payload = MQTT_BUF_SIZE + 260;
+    uint32_t remaining = payload + 3;
+    static const uint8_t connack[] = {0x20, 0x02, 0x00, 0x00};
+    memcpy(answer, connack, sizeof(connack));
+    answer[4] = 0x30;
+    answer[5] = (uint8_t)(0x80 | (remaining & 0x7F));
+    answer[6] = (uint8_t)(remaining >> 7);
+    answer[7] = 0x00; answer[8] = 0x01; answer[9] = 't';
+    memset(answer + 10, 'y', payload);
+
+    ScriptedBroker broker(answer, 10 + payload);
+    MQTTClient mqtt;
+    g_delivered = 0;
+    g_last_data.clear();
+    mqtt.OnData(countDelivery);
+
+    connectAndRead(mqtt, broker);
+    for (int i = 0; i < 10 && 0 == g_delivered; i++)
+    {
+        mqtt.MQTT_Task();
+    }
+
+    ASSERT_EQ(g_delivered, 1u);
+    ASSERT_EQ(g_last_data.size(), (size_t)payload);
+    ASSERT_EQ(g_last_data, std::string(payload, 'y'));
+}
+
+TEST(mqttclient, a_connection_that_cannot_take_a_packet_yet_keeps_it_queued)
+{
+    static const uint8_t answer[] = {0x20, 0x02, 0x00, 0x00};
+    ScriptedBroker broker(answer, sizeof(answer));
+    MQTTClient mqtt;
+
+    connectAndRead(mqtt, broker);
+    ASSERT_EQ((int)mqtt.m_mqttClient.connState, (int)MQTT_DATA);
+
+    broker.m_writable = false;
+    size_t before = broker.m_written.size();
+    ASSERT_TRUE(mqtt.Publish("q", "held", 4, 0, 0));
+    mqtt.MQTT_Task();
+
+    ASSERT_EQ((int)broker.connected(), 1);
+    ASSERT_EQ(broker.m_written.size(), before);
+    ASSERT_FALSE(mqtt.m_mqttClient.m_sendq.empty());
+
+    broker.m_writable = true;
+    mqtt.MQTT_Task();
+
+    ASSERT_TRUE(mqtt.m_mqttClient.m_sendq.empty());
+    std::string sent(broker.m_written.begin() + before, broker.m_written.end());
+    ASSERT_TRUE(std::string::npos != sent.find("held"));
+}
+
+TEST(mqttclient, a_connection_that_takes_nothing_for_the_send_timeout_is_given_up)
+{
+    static const uint8_t answer[] = {0x20, 0x02, 0x00, 0x00};
+    ScriptedBroker broker(answer, sizeof(answer));
+    MQTTClient mqtt;
+
+    connectAndRead(mqtt, broker);
+    broker.m_writable = false;
+    ASSERT_TRUE(mqtt.Publish("q", "held", 4, 0, 0));
+    mqtt.MQTT_Task();
+    ASSERT_EQ((int)broker.connected(), 1);
+
+    mqtt.m_mqttClient.m_send_stalled_ms = __i_dvc_ctrl.millis_now() - MQTT_SEND_TIMEOUT_MS + 1000;
+    mqtt.MQTT_Task();
+    ASSERT_EQ((int)broker.connected(), 1);
+
+    mqtt.m_mqttClient.m_send_stalled_ms = __i_dvc_ctrl.millis_now() - MQTT_SEND_TIMEOUT_MS;
+    mqtt.MQTT_Task();
+    ASSERT_EQ((int)broker.connected(), 0);
+}
+
 TEST(mqttclient, a_qos2_release_from_the_broker_is_completed)
 {
     static const uint8_t answer[] = {
@@ -395,6 +500,15 @@ bool sawPing(const ScriptedBroker &broker)
 
 } // namespace
 
+/**
+ * Runs the client's timer as if one whole tick of MQTT_TIMER_INTERVAL_MS had passed since the last.
+ */
+static void tickOnce(MQTTClient &mqtt)
+{
+    mqtt.m_mqttClient.m_last_tick_ms = __i_dvc_ctrl.millis_now() - MQTT_TIMER_INTERVAL_MS;
+    mqtt.mqtt_timer();
+}
+
 TEST(mqttclient, the_keepalive_ping_goes_out_after_the_same_time_at_any_tick)
 {
     static const uint8_t answer[] = { 0x20, 0x02, 0x00, 0x00 };
@@ -409,11 +523,11 @@ TEST(mqttclient, the_keepalive_ping_goes_out_after_the_same_time_at_any_tick)
 
     for (uint32_t i = 0; i < due; i++)
     {
-        mqtt.mqtt_timer();
+        tickOnce(mqtt);
     }
     ASSERT_FALSE(sawPing(broker));
 
-    mqtt.mqtt_timer();
+    tickOnce(mqtt);
     ASSERT_TRUE(sawPing(broker));
     ASSERT_EQ((int)mqtt.m_mqttClient.connState, (int)MQTT_PING_SENT);
 }
@@ -441,11 +555,11 @@ TEST(mqttclient, an_unanswered_connect_times_out_after_the_same_time_at_any_tick
 
     for (uint32_t i = 0; i < due; i++)
     {
-        mqtt.mqtt_timer();
+        tickOnce(mqtt);
     }
     ASSERT_EQ(g_timeouts, 0);
 
-    mqtt.mqtt_timer();
+    tickOnce(mqtt);
     ASSERT_EQ(g_timeouts, 1);
 }
 
@@ -465,11 +579,11 @@ TEST(mqttclient, an_unanswered_ping_reconnects_after_the_read_timeout)
     uint32_t due = MQTT_MS_TO_TICKS(MQTT_READ_TIMEOUT_MS);
     for (uint32_t i = 0; i < due; i++)
     {
-        mqtt.mqtt_timer();
+        tickOnce(mqtt);
     }
     ASSERT_EQ(g_timeouts, 0);
 
-    mqtt.mqtt_timer();
+    tickOnce(mqtt);
     ASSERT_EQ(g_timeouts, 1);
 }
 
@@ -488,13 +602,13 @@ TEST(mqttclient, an_answered_ping_does_not_reconnect)
     ASSERT_TRUE(sawPing(broker));
 
     broker.m_limit = sizeof(answer);
-    mqtt.mqtt_timer();
+    tickOnce(mqtt);
     ASSERT_FALSE(mqtt.m_mqttClient.m_ping_awaited);
 
     uint32_t past = MQTT_MS_TO_TICKS(MQTT_READ_TIMEOUT_MS) + 3;
     for (uint32_t i = 0; i < past; i++)
     {
-        mqtt.mqtt_timer();
+        tickOnce(mqtt);
     }
     ASSERT_EQ(g_timeouts, 0);
 }
@@ -558,3 +672,120 @@ TEST(mqttclient, every_refusal_code_is_a_failure)
 }
 
 #endif
+
+TEST(mqttclient, timer_calls_with_no_time_passing_do_not_bring_a_timeout_closer)
+{
+    static const uint8_t answer[] = { 0x00 };
+    ScriptedBroker broker(answer, 0);
+    MQTTClient mqtt;
+    g_timeouts = 0;
+    mqtt.OnTimeout(countTimeout);
+
+    connectAndRead(mqtt, broker);
+    ASSERT_EQ((int)mqtt.m_mqttClient.connState, (int)MQTT_CONNECT_SENT);
+
+    uint32_t due = MQTT_MS_TO_TICKS(MQTT_READ_TIMEOUT_MS);
+    for (uint32_t i = 0; i < 4 * due; i++)
+    {
+        mqtt.m_mqttClient.m_last_tick_ms = __i_dvc_ctrl.millis_now();
+        mqtt.mqtt_timer();
+    }
+    ASSERT_EQ(g_timeouts, 0);
+    ASSERT_EQ(mqtt.m_mqttClient.readTimeout, (uint32_t)0);
+}
+
+namespace {
+
+/**
+ * How many qos 1 publish packets the client has written so far.
+ */
+uint32_t qos1Publishes(const ScriptedBroker &broker)
+{
+    uint32_t count = 0;
+    for (size_t i = 0; i + 1 < broker.m_written.size(); i++)
+    {
+        if (0x32 == broker.m_written[i] && 0x00 == broker.m_written[i + 2] && 0x01 == broker.m_written[i + 3] &&
+            'w' == broker.m_written[i + 4])
+        {
+            count++;
+        }
+    }
+    return count;
+}
+
+} // namespace
+
+TEST(mqttclient, qos1_publishes_go_out_up_to_the_window_before_any_answer)
+{
+    static const uint8_t answer[] = {0x20, 0x02, 0x00, 0x00};
+    ScriptedBroker broker(answer, sizeof(answer));
+    MQTTClient mqtt;
+
+    connectAndRead(mqtt, broker);
+    for (uint32_t i = 0; i < MQTT_INFLIGHT_MAX + 1; i++)
+    {
+        ASSERT_TRUE(mqtt.Publish("w", "m", 1, 1, 0));
+    }
+    for (int i = 0; i < 6; i++)
+    {
+        mqtt.MQTT_Task();
+    }
+
+    ASSERT_EQ(qos1Publishes(broker), (uint32_t)MQTT_INFLIGHT_MAX);
+    ASSERT_EQ((int)broker.connected(), 1);
+}
+
+TEST(mqttclient, an_answer_frees_its_place_in_the_window)
+{
+    static uint8_t answer[4 + 4];
+    static const uint8_t head[] = {0x20, 0x02, 0x00, 0x00};
+    memcpy(answer, head, sizeof(head));
+    ScriptedBroker broker(answer, sizeof(head));
+    MQTTClient mqtt;
+
+    connectAndRead(mqtt, broker);
+    for (uint32_t i = 0; i < MQTT_INFLIGHT_MAX + 1; i++)
+    {
+        ASSERT_TRUE(mqtt.Publish("w", "m", 1, 1, 0));
+    }
+    for (int i = 0; i < 6; i++)
+    {
+        mqtt.MQTT_Task();
+    }
+    ASSERT_EQ(qos1Publishes(broker), (uint32_t)MQTT_INFLIGHT_MAX);
+
+    uint16_t first = broker.m_written.size() > 0 ? mqtt.m_mqttClient.m_inflight_ids[0] : 0;
+    answer[4] = 0x40; answer[5] = 0x02; answer[6] = (uint8_t)(first >> 8); answer[7] = (uint8_t)first;
+    broker.m_limit = sizeof(answer);
+    for (int i = 0; i < 6; i++)
+    {
+        mqtt.MQTT_Task();
+    }
+
+    ASSERT_EQ(qos1Publishes(broker), (uint32_t)MQTT_INFLIGHT_MAX + 1);
+}
+
+TEST(mqttclient, a_qos1_publish_left_unanswered_in_the_window_reconnects_after_the_read_timeout)
+{
+    static const uint8_t answer[] = {0x20, 0x02, 0x00, 0x00};
+    ScriptedBroker broker(answer, sizeof(answer));
+    MQTTClient mqtt;
+    g_timeouts = 0;
+    mqtt.OnTimeout(countTimeout);
+
+    connectAndRead(mqtt, broker);
+    ASSERT_TRUE(mqtt.Publish("w", "m", 1, 1, 0));
+    mqtt.MQTT_Task();
+    ASSERT_EQ(qos1Publishes(broker), 1u);
+
+    uint32_t due = MQTT_MS_TO_TICKS(MQTT_READ_TIMEOUT_MS);
+    for (uint32_t i = 0; i < due; i++)
+    {
+        tickOnce(mqtt);
+    }
+    ASSERT_EQ(g_timeouts, 0);
+
+    tickOnce(mqtt);
+    tickOnce(mqtt);
+    ASSERT_EQ(g_timeouts, 1);
+}

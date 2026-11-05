@@ -46,23 +46,6 @@ struct TestCommand : public CommandBase {
 		return pdiutil::string(opt->optionval, opt->optionvalsize);
 	}
 
-	/**
-	 * Whether every character of the text reads as a decimal number, so a
-	 * numeric comparison is not silently given a word.
-	 */
-	bool isNumber(const pdiutil::string &s){
-		if( s.empty() ) return false;
-
-		pdiutil::string::size_type at = ('-' == s[0]) ? 1 : 0;
-		if( at >= s.size() ) return false;
-
-		while( at < s.size() ){
-			if( !__is_digit(s[at]) ) return false;
-			at++;
-		}
-		return true;
-	}
-
 	pdi_err_t execute(cmd_term_inseq_t terminputaction){
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -137,12 +120,18 @@ struct TestCommand : public CommandBase {
 			return CMD_ERROR_INVAL;
 		}
 
-		if( !isNumber(one) || !isNumber(three) ){
+		int64_t left = 0;
+		int64_t right = 0;
+		const pdiutil::string *bad = !ParseInt64(one.c_str(), (uint16_t)one.size(), left) ? &one
+								   : !ParseInt64(three.c_str(), (uint16_t)three.size(), right) ? &three : nullptr;
+		if( nullptr != bad ){
+			if( nullptr != m_terminal ){
+				m_terminal->putln();
+				m_terminal->write_ro(RODT_ATTR("test: integer expression expected : "));
+				m_terminal->write(bad->c_str());
+			}
 			return CMD_ERROR_INVAL;
 		}
-
-		int32_t left = StringToInt32(one.c_str(), (uint8_t)one.size());
-		int32_t right = StringToInt32(three.c_str(), (uint8_t)three.size());
 
 		bool answer = false;
 		if( two == numeq ) answer = (left == right);

@@ -50,7 +50,7 @@ class Declarations(object):
         self.saved = None
 
     def __enter__(self):
-        listing = self.t.run("ls /etc")
+        listing = self.t.run("ls -la /etc")
         if "devices.conf" in listing:
             self.saved = [line for line in self.t.run("cat %s" % DEVICES_CONF).splitlines()
                           if line.strip()]
@@ -70,6 +70,7 @@ class Declarations(object):
         else:
             for line in lines:
                 self.t.run("echo '%s' >> %s" % (line, temp))
+            self.t.run("rm %s" % DEVICES_CONF)
             self.t.run("mv %s %s" % (temp, DEVICES_CONF))
         self.t.run("udevadm trigger")
 
@@ -106,8 +107,8 @@ def trigger_answers(t):
 
 @test("sysfs lists a bus for the serial port every board has", needs=("ls",), mounts=("/sys",))
 def sysfs_bus(t):
-    expect_in("bus", t.run("ls /sys"), "/sys")
-    expect_in("uart", t.run("ls /sys/bus"), "/sys/bus")
+    expect_in("bus", t.run("ls -la /sys"), "/sys")
+    expect_in("uart", t.run("ls -la /sys/bus"), "/sys/bus")
 
 
 @test("a declared device that is not there is listed as absent",
@@ -151,7 +152,7 @@ def usb_unplugged(t):
     wait_for(t, "udevadm info", "1-4")
     plug([])
     wait_for(t, "udevadm info", "1-4", present=False)
-    expect_not_in("1-4", t.run("ls /sys/bus/usb/devices"), "an unplugged device's directory")
+    expect_not_in("1-4", t.run("ls -la /sys/bus/usb/devices"), "an unplugged device's directory")
 
 
 @test("a declared chip that answers but has no driver is listed as failed",
@@ -189,7 +190,7 @@ def eeprom_plugged(t):
             plug(["i2c0 0x50 70 64 69 21"])
             conf.write([EEPROM_DECLARATION])
             wait_for(t, "udevadm info", "bound")
-            listing = t.run("ls /sys/bus/i2c/devices/0-0050")
+            listing = t.run("ls -la /sys/bus/i2c/devices/0-0050")
             expect_in("eeprom", listing, "the eeprom file of a bound eeprom")
             expect_in("256", listing, "the size of the eeprom file")
             expect_in("pdi!", t.run("hexdump %s" % EEPROM_FILE), "the bytes the eeprom holds")
@@ -208,7 +209,7 @@ def eeprom_unplugged(t):
             wait_for(t, "udevadm info", "bound")
             plug([])
             wait_for(t, "udevadm info", "absent")
-            expect_not_in("0-0050", t.run("ls /sys/bus/i2c/devices"), "an unplugged eeprom's directory")
+            expect_not_in("0-0050", t.run("ls -la /sys/bus/i2c/devices"), "an unplugged eeprom's directory")
         finally:
             plug([])
 
@@ -232,7 +233,7 @@ def eeprom_without_size(t):
 def eeprom_on_board(t):
     if not eeprom_bound(t):
         raise Skip("no eeprom declared and bound on this target")
-    expect_in("eeprom", t.run("ls /sys/bus/i2c/devices/0-0050"), "the eeprom file of the bound eeprom")
+    expect_in("eeprom", t.run("ls -la /sys/bus/i2c/devices/0-0050"), "the eeprom file of the bound eeprom")
     expect_in("0000", t.run("hexdump %s" % EEPROM_FILE), "the first line of the eeprom")
 
 
@@ -261,7 +262,7 @@ def card_plugged(t):
             expect_in("mmcblk0", out, "the card in lsblk")
             expect_in("4194304", out, "the card's size in lsblk")
             expect_in("disk", out, "the card's type in lsblk")
-            expect_in("mmcblk0", t.run("ls /dev"), "the card's node under /dev")
+            expect_in("mmcblk0", t.run("ls -la /dev"), "the card's node under /dev")
             expect_in("8192", t.run("cat /sys/block/mmcblk0/size"), "the card's size in sectors")
         finally:
             plug([])
@@ -290,7 +291,7 @@ def card_missing(t):
         conf.write([CARD_DECLARATION])
         out = wait_for(t, "udevadm info", "absent")
         expect_in("spi0.12", out, "the missing card in udevadm info")
-        expect_not_in("mmcblk0", t.run("ls /dev"), "a disk node for a slot with no card")
+        expect_not_in("mmcblk0", t.run("ls -la /dev"), "a disk node for a slot with no card")
 
 
 @test("the SD card the board has bound is listed by lsblk",
@@ -355,7 +356,7 @@ def mic_bound_with_node(t):
             plug(["i2s0 noise"])
             conf.write([MIC_DECLARATION])
             wait_for(t, "udevadm info", "bound")
-            expect_in("pcmC0D0c", t.run("ls /dev/snd"), "the capture node of a bound mic")
+            expect_in("pcmC0D0c", t.run("ls -la /dev/snd"), "the capture node of a bound mic")
         finally:
             plug([])
 
@@ -401,7 +402,7 @@ def arecord_without_mic(t):
     if mic_bound(t):
         raise Skip("a mic is bound on this target")
     expect_in("no capture device", t.run("arecord -d 1 %s" % RECORDING), "arecord with no mic")
-    expect_not_in("rec.wav", t.run("ls /"), "a recording that never started")
+    expect_not_in("rec.wav", t.run("ls -la /"), "a recording that never started")
 
 
 @test("udevadm monitor prints a device as it comes and goes", needs=("udevadm",))

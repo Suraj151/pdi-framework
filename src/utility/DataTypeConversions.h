@@ -68,6 +68,26 @@ void BytesToSizeString(uint64_t bytes, bool shortform, char *out, uint8_t outsiz
 bool ParseUint32(const char *pString, uint16_t _len, uint32_t &out);
 
 /**
+ * @brief Reads a number written as nothing but octal digits, no larger than max.
+ * @param pString The digits.
+ * @param _len How many characters to read.
+ * @param max The largest value taken.
+ * @param out The number, set only when the digits are one.
+ * @return Whether every character was an octal digit and the number fit max.
+ */
+bool ParseOctal(const char *pString, uint16_t _len, uint32_t max, uint32_t &out);
+
+/**
+ * @brief Reads a whole number, an optional sign then nothing but digits, that
+ *        fits 64 bits.
+ * @param pString The text.
+ * @param _len How many characters to read.
+ * @param out The number, set only when the text is one.
+ * @return Whether the text was a number and it fit.
+ */
+bool ParseInt64(const char *pString, uint16_t _len, int64_t &out);
+
+/**
  * @brief Converts a string to a signed 32-bit integer.
  * @param pString The string to convert.
  * @param _len The maximum length of the string (default is 32).
@@ -107,6 +127,26 @@ uint16_t StringToOctalUint16(const char *pString, uint8_t _len);
  * @return The converted hexadecimal 16-bit integer.
  */
 uint16_t StringToHex16(const char *pString, uint8_t _strlen);
+
+/**
+ * @brief Converts a hexadecimal string to a 32-bit value.
+ *        Leading spaces and quotes are skipped; the first non-hex character ends it.
+ * @param pString The string to convert.
+ * @param _len The maximum length of the string.
+ * @param _digits Where the count of hex digits read is put, when given; more than 8 means the value did not fit.
+ * @return The parsed 32-bit value.
+ */
+uint32_t StringToHex32(const char *pString, uint8_t _len, uint8_t *_digits = nullptr);
+
+/**
+ * @brief Converts a hexadecimal string to a 64-bit value.
+ *        Leading spaces and quotes are skipped; the first non-hex character ends it.
+ * @param pString The string to convert.
+ * @param _len The maximum length of the string.
+ * @param _digits Where the count of hex digits read is put, when given; more than 16 means the value did not fit.
+ * @return The parsed 64-bit value.
+ */
+uint64_t StringToHex64(const char *pString, uint8_t _len, uint8_t *_digits = nullptr);
 
 /**
  * @brief Converts a signed 32-bit integer to a string.
@@ -188,10 +228,10 @@ pdiutil::string BytesToMacString(const uint8_t *bytes, uint8_t bytelen, char sep
  * for example `drwxr-xr-x`.
  *
  * @param perms Permission bits, the low nine of which are used.
- * @param isdir Whether the entry is a directory.
+ * @param type The entry's type, shown as d, c, b, l or -.
  * @param out Destination buffer, must hold at least 11 bytes.
  */
-void FilePermsToString(uint16_t perms, bool isdir, char *out);
+void FilePermsToString(uint16_t perms, file_type_t type, char *out);
 
 /**
  * @brief Names a mounted filesystem's type.
@@ -209,6 +249,13 @@ const char *VfsTypeToString(vfs_type_t type);
  * @return true on success, false if any character was not a hex digit.
  */
 bool HexStringToBytes(const char *hex, uint8_t bytelen, uint8_t *out);
+
+/**
+ * @brief Reads the number a string starts with: blanks, a sign, digits and a fraction.
+ * @param pString The string to read.
+ * @return The number read, or zero when the string starts with none.
+ */
+double StringToDouble(const char *pString);
 
 /**
  * @brief Converts a floating-point value to a string.

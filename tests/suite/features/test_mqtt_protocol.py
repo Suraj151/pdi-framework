@@ -90,13 +90,24 @@ def oversized_inbound_message(t):
 @test("a malformed packet from the broker leaves the client working",
       needs=("service",), services=("MQTT",), slow=True)
 def malformed_inbound_packets(t):
+    """
+    A packet whose fields are wrong but whose framing holds is read past; one
+    whose length cannot be read leaves the stream out of step, so the client
+    closes the connection as MQTT 3.1.1 requires and connects afresh.
+    """
     state = subscribed(t)
+    broker = state.broker
+    since = broker.connect_count()
     for raw in (bytes([0x30, 0x04, 0xFF, 0xFF, 0x61, 0x62]),
                 bytes([0xF0, 0x00]),
-                bytes([0x00, 0x00]),
-                bytes([0x30, 0xFF, 0xFF, 0xFF, 0xFF, 0x01])):
-        state.broker.send_raw(raw)
+                bytes([0x00, 0x00])):
+        broker.send_raw(raw)
         time.sleep(1.5)
+    if broker.connect_count() != since:
+        raise AssertionError("a packet whose framing holds made the client reconnect")
+    broker.send_raw(bytes([0x30, 0xFF, 0xFF, 0xFF, 0xFF, 0x01]))
+    if broker.wait_for_reconnect(since, RECONNECT_WAIT) is None:
+        raise AssertionError("a packet whose length cannot be read did not end the connection")
     back_to_normal(state)
     command_applies(t, state, 1)
 

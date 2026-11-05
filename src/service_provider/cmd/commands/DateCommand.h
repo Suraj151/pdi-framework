@@ -30,6 +30,7 @@ struct DateCommand : public CommandBase {
 	DateCommand(){
 		Clear();
 		SetCommand(CMD_NAME_DATE);
+		setArgs(RODT_ATTR("uns"), 2);
 		setAcceptArgsOptions(true);
 	}
 

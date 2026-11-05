@@ -35,6 +35,7 @@ struct KillCommand : public CommandBase {
 	KillCommand(){
 		Clear();
 		SetCommand(CMD_NAME_KILL);
+		setArgs(RODT_ATTR(""), 2);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
@@ -79,22 +80,22 @@ struct KillCommand : public CommandBase {
 		CommandOption *sOpt = have1 ? a0 : nullptr;
 		CommandOption *pOpt = have1 ? a1 : a0;
 
-		pdiutil::task_id_t pid = (pdiutil::task_id_t)StringToUint16(pOpt->optionval, pOpt->optionvalsize);
-		signal_t sig = SIG_TERM;
-		if( nullptr != sOpt ){
-			sig = (signal_t)StringToUint16(sOpt->optionval, sOpt->optionvalsize);
+		uint32_t pid = 0;
+		pdi_err_t taken = takeNumber(RODT_ATTR("invalid pid : "), pOpt->optionval, pOpt->optionvalsize, 0, INT16_MAX, pid);
+		if( PDI_OK != taken ){
+			return taken;
+		}
+		uint32_t sig = SIG_TERM;
+		if( nullptr != sOpt && !ParseUint32(sOpt->optionval, (uint16_t)sOpt->optionvalsize, sig) ){
+			sig = SIG_NONE;
 		}
 		if( sig != SIG_TERM && sig != SIG_KILL && sig != SIG_STOP && sig != SIG_CONT ){
-			m_terminal->putln();
-			m_terminal->writeln_ro(RODT_ATTR("unsupported signal (9/15/18/19 only)"));
-			return CMD_ERROR_FAILED;
+			return refuseArg(RODT_ATTR("unsupported signal : "), sOpt->optionval, sOpt->optionvalsize, CMD_ERROR_INVAL);
 		}
 
-		task_t *t = __task_scheduler.get_task(pid);
+		task_t *t = __task_scheduler.get_task((pdiutil::task_id_t)pid);
 		if( nullptr == t || t->m_state == TASK_STATE_ZOMBIE ){
-			m_terminal->putln();
-			m_terminal->writeln_ro(RODT_ATTR("no such pid"));
-			return CMD_ERROR_FAILED;
+			return refuseArg(RODT_ATTR("no such pid : "), pOpt->optionval, pOpt->optionvalsize, CMD_ERROR_FAILED);
 		}
 		uint8_t task_owner = t->m_owner;
 
@@ -117,7 +118,7 @@ struct KillCommand : public CommandBase {
 			return CMD_ERROR_FAILED;
 		}
 
-		if( !__task_scheduler.sendSignal(pid, sig) ){
+		if( !__task_scheduler.sendSignal((pdiutil::task_id_t)pid, (signal_t)sig) ){
 			m_terminal->putln();
 			m_terminal->writeln_ro(RODT_ATTR("signal delivery failed"));
 			return CMD_ERROR_FAILED;

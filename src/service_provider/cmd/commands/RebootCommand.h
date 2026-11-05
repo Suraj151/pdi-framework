@@ -24,6 +24,7 @@ struct RebootCommand : public CommandBase {
 	RebootCommand(){
 		Clear();
 		SetCommand(CMD_NAME_REBOOT);
+		setArgs(RODT_ATTR(""), 0);
 	}
 
 	/**

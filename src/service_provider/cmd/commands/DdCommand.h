@@ -24,6 +24,7 @@ struct DdCommand : public CommandBase {
 	DdCommand() : m_handle(PDI_ERR_NOT_SUPPORTED), m_written(0), m_error(0), m_buf(nullptr), m_filled(0){
 		Clear();
 		SetCommand(CMD_NAME_DD);
+		setArgs(RODT_ATTR(""), 6, true);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}

@@ -20,6 +20,7 @@ struct HexdumpCommand : public CommandBase {
 	HexdumpCommand(){
 		Clear();
 		SetCommand(CMD_NAME_HEXDUMP);
+		setArgs(RODT_ATTR(""), 1);
 		setAcceptArgsOptions(true);
 	}
 
@@ -110,7 +111,7 @@ struct HexdumpCommand : public CommandBase {
 
 					if(iStatus < 0){
 						result = CMD_ERROR_FAILED;
-						writeFailure(RODT_ATTR("Failed : "), filename.c_str(), (int32_t)iStatus);
+						writeFailure(RODT_ATTR(CMD_MSG_FAILED), filename.c_str(), (int32_t)iStatus);
 					}
 				}
 			}else{

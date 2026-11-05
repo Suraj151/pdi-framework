@@ -27,6 +27,7 @@ struct UmountCommand : public CommandBase {
 	UmountCommand(){
 		Clear();
 		SetCommand(CMD_NAME_UMOUNT);
+		setArgs(RODT_ATTR(""), 1);
 		setAcceptArgsOptions(true);
 	}
 

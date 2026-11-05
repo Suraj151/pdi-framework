@@ -792,6 +792,7 @@ pdi_err_t LittleFSWrapper::copyFile(const char* sourcePath, const char* destPath
     lfs_file_t destFile;
     fileOpenOrErr = lfs_file_open(&m_lfs, &destFile, destPath, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC);
     if (fileOpenOrErr < 0) {
+        lfs_file_close(&m_lfs, &sourceFile);
         return lfsToPdiErr(fileOpenOrErr); // Failed to open/create file
     }
 
@@ -1010,6 +1011,14 @@ uint64_t LittleFSWrapper::getUsedSize() {
     // }
 
     return usedBlocks * m_lfscfg.block_size;
+}
+
+/**
+ * @brief Gets the size of the unit the file system stores a file in.
+ * @return Bytes per block.
+ */
+uint32_t LittleFSWrapper::getBlockSize() {
+    return m_lfscfg.block_size;
 }
 
 /**

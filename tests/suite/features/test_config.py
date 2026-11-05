@@ -372,7 +372,7 @@ def _register_feature_conf_tests(feature, path, keys):
     def is_not_world_readable(t, path=path):
         _conf_text(t, path)
         directory, name = path.rsplit("/", 1)
-        listing = t.run("ls %s" % directory)
+        listing = t.run("ls -la %s" % directory)
         for line in listing.splitlines():
             if line.split()[-1:] == [name]:
                 expect_in("-rw-------", line, "%s is not readable by others" % path)

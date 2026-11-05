@@ -23,6 +23,7 @@ struct TouchCommand : public CommandBase {
 	TouchCommand(){
 		Clear();
 		SetCommand(CMD_NAME_TOUCH);
+		setArgs(RODT_ATTR(""), 1);
 		setAcceptArgsOptions(true);
 	}
 

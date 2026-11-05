@@ -13,4 +13,10 @@ created Date    : 28th May 2026
 
 int regex_match(const char *pattern, const char *text, int textlen);
 
+/**
+ * True when the pattern can be matched as written: every bracket closed and no
+ * escape left without the character it escapes.
+ */
+bool regex_valid(const char *pattern);
+
 #endif

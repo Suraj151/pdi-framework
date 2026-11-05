@@ -22,6 +22,7 @@ MqttServiceProvider::MqttServiceProvider():
   m_mqtt_timer_cb_id(0),
   m_mqtt_publish_cb_id(0),
   m_mqtt_subscribe_cb_id(0),
+  m_mqtt_draining(false),
   m_mqtt_payload(nullptr),
   m_mqtt_publish_data_cb(nullptr),
   m_mqtt_subscribe_data_cb(nullptr),
@@ -133,6 +134,9 @@ void MqttServiceProvider::handleMqttPublish(bool sync){
       if( ret && sync ){
         this->m_mqtt_client.MQTT_Task();
       }
+      if( ret ){
+        this->startDrain();
+      }
     }
   }
 }
@@ -167,11 +171,48 @@ void MqttServiceProvider::handleMqttSubScribe(){
 }
 
 /**
+ * Runs the client's timer every MQTT_DRAIN_INTERVAL_MS while it has work pending, so
+ * a queue empties at the pace the broker answers rather than once per tick.
+ */
+void MqttServiceProvider::startDrain(void){
+
+  if( !this->m_mqtt_draining && 0 != this->m_mqtt_timer_cb_id && this->m_mqtt_client.has_pending_work() ){
+    this->m_mqtt_draining = __task_scheduler.setTaskInterval( this->m_mqtt_timer_cb_id, MQTT_DRAIN_INTERVAL_MS );
+  }
+}
+
+/**
+ * Puts the timer back to MQTT_TIMER_INTERVAL_MS once nothing is pending; called from the timer itself.
+ */
+void MqttServiceProvider::settleDrain(void){
+
+  if( this->m_mqtt_client.has_pending_work() ){
+    this->startDrain();
+  }else{
+    this->stopDrain();
+  }
+}
+
+/**
+ * Puts the timer back to MQTT_TIMER_INTERVAL_MS whatever is pending, for a client being torn down.
+ */
+void MqttServiceProvider::stopDrain(void){
+
+  if( this->m_mqtt_draining ){
+    if( 0 != this->m_mqtt_timer_cb_id ){
+      __task_scheduler.setTaskInterval( this->m_mqtt_timer_cb_id, MQTT_TIMER_INTERVAL_MS );
+    }
+    this->m_mqtt_draining = false;
+  }
+}
+
+/**
  * stop mqtt client
  *
  */
 void MqttServiceProvider::stop(){
 
+  this->stopDrain();
   this->m_mqtt_client.DeleteClient();
   __task_scheduler.clearInterval( this->m_mqtt_timer_cb_id );
   this->m_mqtt_timer_cb_id = 0;
@@ -207,6 +248,7 @@ void MqttServiceProvider::resetServiceState(){
   this->m_mqtt_timer_cb_id = 0;
   this->m_mqtt_publish_cb_id = 0;
   this->m_mqtt_subscribe_cb_id = 0;
+  this->m_mqtt_draining = false;
 }
 
 /**
@@ -295,6 +337,7 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
 
   if( MQTT_GENERAL_CONFIG == _mqtt_config_type || MQTT_LWT_CONFIG == _mqtt_config_type ){
 
+    this->stopDrain();
     this->m_mqtt_client.DeleteClient();
     int _stat = this->serviceSetTimeout( [&]() {
 
@@ -324,7 +367,7 @@ void MqttServiceProvider::handleMqttConfigChange( int _mqtt_config_type ){
       if( _began ){
         this->m_mqtt_timer_cb_id = this->serviceUpdateInterval(
           this->m_mqtt_timer_cb_id,
-          [&]() { this->m_mqtt_client.mqtt_timer(); },
+          [&]() { this->m_mqtt_client.mqtt_timer(); this->settleDrain(); },
           MQTT_TIMER_INTERVAL_MS
         );
       }else{

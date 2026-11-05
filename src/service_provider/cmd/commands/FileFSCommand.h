@@ -27,6 +27,7 @@ struct FileReadCommand : public CommandBase {
 	FileReadCommand(){
 		Clear();
 		SetCommand(CMD_NAME_FILE_READ);
+		setArgs(RODT_ATTR(""), 1);
 		setAcceptArgsOptions(true);
 	}
 
@@ -40,7 +41,7 @@ struct FileReadCommand : public CommandBase {
 	}
 
 	const char* getUsage() const override {
-		return RODT_ATTR("cat <file>  print file contents to terminal");
+		return RODT_ATTR("cat [<file>]  print a file, or the piped input");
 	}
 
 #ifdef ENABLE_AUTH_SERVICE
@@ -73,7 +74,7 @@ struct FileReadCommand : public CommandBase {
 				m_terminal->putln();
 				int iStatus = readCommandInput(filename, m_terminal, [&](char* data, uint32_t size)->bool{
 					if( onterminal ){
-						writeShown(data, size, previous);
+						writeShownBytes(m_terminal, data, size, previous);
 					}else{
 						m_terminal->writeData((const uint8_t *)data, size);
 					}
@@ -84,38 +85,15 @@ struct FileReadCommand : public CommandBase {
 				if (iStatus < 0) {
 					result = CMD_ERROR_FAILED;
 					m_terminal->putln();
-					writeFailure(RODT_ATTR("Failed : "), filename.c_str(), (int32_t)iStatus);
+					writeFailure(RODT_ATTR(CMD_MSG_FAILED), filename.c_str(), (int32_t)iStatus);
 				}
 				result = stoppedResult(result);
 			}else{
-				result = CMD_ERROR_INVAL;
+				result = ( nullptr == cmdoptn->optionval || 0 >= cmdoptn->optionvalsize ) ? CMD_ERROR_ARGS_MISSING : CMD_ERROR_INVAL;
 			}
 		}
 
 		return result;
-	}
-
-private:
-
-	/**
-	 * Writes file bytes to the terminal, a bare newline sent as a line end; previous
-	 * carries the last byte across reads.
-	 */
-	void writeShown(const char *data, uint32_t size, char &previous){
-		uint32_t from = 0;
-		for( uint32_t i = 0; i < size; i++ ){
-			if( '\n' == data[i] && '\r' != previous ){
-				if( i > from ){
-					m_terminal->write(data + from, i - from);
-				}
-				m_terminal->putln();
-				from = i + 1;
-			}
-			previous = data[i];
-		}
-		if( size > from ){
-			m_terminal->write(data + from, size - from);
-		}
 	}
 };
 

@@ -130,6 +130,29 @@ private:
   pdi_err_t writeBlock(uint32_t block, const uint8_t *buf);
 
   /**
+   * Sends one block behind the token given and waits for the card to store it.
+   */
+  pdi_err_t sendBlock(uint8_t token, const uint8_t *buf);
+
+  /**
+   * Ends a multiple block read: CMD12, the byte the card sends before its answer
+   * skipped, then its busy wait.
+   */
+  pdi_err_t stopReading();
+
+  /**
+   * Reads the blocks given with one CMD18, each block's token and CRC checked, a
+   * yield between blocks.
+   */
+  pdi_err_t readRun(uint32_t block, uint8_t *buf, uint32_t count);
+
+  /**
+   * Stores the blocks given with one CMD25, each block's response and busy wait
+   * checked, ended by the stop token.
+   */
+  pdi_err_t writeRun(uint32_t block, const uint8_t *buf, uint32_t count);
+
+  /**
    * Lets the chip select go and clocks once more so the card lets go of its
    * data line.
    */

@@ -237,12 +237,10 @@ int32_t TcpClientInterface::write(const uint8_t* c_str, uint32_t size) {
 
     if (push) {
         TCP_GUARD_BEGIN
-        err = m_pcb ? tcp_output(m_pcb) : ERR_CLSD;
-        TCP_GUARD_END
-
-        if (err != ERR_OK) {
-            return PDI_ERR_FROM_LWIP(err);
+        if (m_pcb) {
+            tcp_output(m_pcb);
         }
+        TCP_GUARD_END
     }
 
     __i_dvc_ctrl.yield();
@@ -364,10 +362,17 @@ void TcpClientInterface::readStringUntil(pdiutil::string &_outstr, char _delimit
                 }
             }
 
+            uint32_t before = _outstr.size();
             _outstr.append((const char *)head, blocklen);
-            consumeRxBuffer(blocklen + (delimiterfound ? 1 : 0));
-            len += blocklen;
-            blockread = true;
+            uint32_t stored = _outstr.size() - before;
+            delimiterfound = delimiterfound && (stored == blocklen);
+            if (delimiterfound && _keepdelimiterinstr) {
+                _outstr += _delimiter;
+                delimiterfound = (_outstr.size() == before + blocklen + 1);
+            }
+            consumeRxBuffer(stored + (delimiterfound ? 1 : 0));
+            len += stored;
+            blockread = (stored == blocklen);
         }
         TCP_GUARD_END
 
@@ -376,9 +381,6 @@ void TcpClientInterface::readStringUntil(pdiutil::string &_outstr, char _delimit
         }
 
         if (delimiterfound) {
-            if (_keepdelimiterinstr) {
-                _outstr += _delimiter;
-            }
             break;
         }
 
@@ -434,9 +436,9 @@ err_t TcpClientInterface::onReceive(void* arg, struct tcp_pcb* tpcb, struct pbuf
             return err;
         }
 
-        // The chain is kept as delivered, so nothing is copied and no heap is
-        // taken. The tcp window stays closed until the reader consumes it, which
-        // is what holds the sender back.
+        // The data is held in a heap copy so the driver's receive buffer is free at
+        // once; the tcp window stays closed until the reader consumes it.
+        p = pdiOwnReceived(p);
         TCP_GUARD_BEGIN
         if (client->m_rxBuf != nullptr) {
 

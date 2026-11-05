@@ -27,7 +27,8 @@ HttpServerInterfaceImpl::HttpServerInterfaceImpl() :
     m_client(nullptr),
     m_currentclient_lastactivity_timestamp(0),
     m_handlingclientfromcb(false),
-    m_close_after_response(false)
+    m_close_after_response(false),
+    m_responded(false)
 #ifdef ENABLE_TLS_SERVICE
     , m_secure(false)
 #endif
@@ -170,9 +171,11 @@ void HttpServerInterfaceImpl::handleClient(){
 
             // Parse the incoming request
             parseRequest();
+            m_close_after_response = false;
+            m_responded = false;
 
             #if defined(ENABLE_HTTPS_SERVER) && defined(ENABLE_TLS_SERVICE)
-            if( m_client && !m_client->isSecure() ){
+            if( m_client && !m_client->isSecure() && __i_instance.getFileSystemInstance().isFileExist(m_serverCertPath.c_str()) ){
                 sendHttpsRedirect();
                 if( !m_clientRequest.isPending ){
                     dropUnclaimedUploads();
@@ -184,8 +187,6 @@ void HttpServerInterfaceImpl::handleClient(){
                 return;
             }
             #endif
-
-            m_close_after_response = false;
 
             pdiutil::string method_get = CHARPTR_WRAP("GET"), method_post = CHARPTR_WRAP("POST"), method_head = CHARPTR_WRAP("HEAD");
             bool uriFound = !(m_clientRequest.method == method_get || m_clientRequest.method == method_post ||
@@ -216,6 +217,11 @@ void HttpServerInterfaceImpl::handleClient(){
             }
 
             bool _finished = !m_clientRequest.isPending;
+            if( _finished && !m_responded ){
+                LogW("HTTP: no response was built, answering 503\n");
+                m_close_after_response = true;
+                send(HTTP_RESP_SERVICE_UNAVAILABLE);
+            }
             if(_finished){
                 dropUnclaimedUploads();
                 m_clientRequest.clear();
@@ -790,16 +796,36 @@ void HttpServerInterfaceImpl::parseRequest(){
                             // If the file already exists, delete it
                             __i_instance.getFileSystemInstance().deleteFile(tempFilePath.c_str());
                         }
+                        size_t gathercap = 0;
+                        size_t gathered = 0;
+                        bool stagefailed = false;
+                        char *gather = stage ? pdiutil::safe_new_array_upto<char>(HTTP_UPLOAD_WRITE_BLOCK_SIZE, HTTP_UPLOAD_WRITE_BLOCK_MIN, gathercap) : nullptr;
+                        auto stageWrite = [&](const char *data, uint32_t len){
+                            if( nullptr == gather || gathered + len > gathercap ){
+                                if( gathered > 0 ){
+                                    if( __i_instance.getFileSystemInstance().writeFile(tempFilePath.c_str(), gather, gathered, true) < 0 ){
+                                        stagefailed = true;
+                                    }
+                                    gathered = 0;
+                                }
+                                if( nullptr == gather || len > gathercap ){
+                                    if( __i_instance.getFileSystemInstance().writeFile(tempFilePath.c_str(), data, len, true) < 0 ){
+                                        stagefailed = true;
+                                    }
+                                    return;
+                                }
+                            }
+                            memcpy(gather + gathered, data, len);
+                            gathered += len;
+                        };
                         #else
                         pdiutil::string tempFilePath = argfilename;
                         #endif
-                        uint8_t filewritecounter = 0;
-                        
                         bool found_boundary = false;
                         part.clear();
                         argvalue.clear();
                         pdiutil::string lastread;
-                        pdiutil::string held;
+                        uint32_t blen = boundary.length();
                         uint32_t maxreadinonecall = HTTP_UPLOAD_READ_BLOCK_SIZE;
                         uint32_t lastprogressat = __i_instance.getUtilityInstance().millis_now();
                         uint32_t uploadedbytes = 0;
@@ -851,70 +877,62 @@ void HttpServerInterfaceImpl::parseRequest(){
                                 break;
                             }
 
-                            pdiutil::string::size_type _endboundaryfound = lastread.find(end_boundary);
-                            if(_endboundaryfound != pdiutil::string::npos){
-                                lastread = lastread.substr(0, _endboundaryfound);
-                                found_end = true;
-
-                                // check for last write
-                                if( filewritecounter == 0 && _endboundaryfound > maxreadinonecall ){
-                                    lastread = lastread.substr(maxreadinonecall);
-                                    filewritecounter = 1;
-                                }
+                            const char *window = lastread.c_str();
+                            uint32_t wlen = lastread.length();
+                            uint32_t datalen = wlen;
+                            int32_t _boundaryfound = __strstr(window, wlen, boundary.c_str(), blen);
+                            while( _boundaryfound >= 0 && (_boundaryfound < 2 || window[_boundaryfound - 2] != '\r' || window[_boundaryfound - 1] != '\n') ){
+                                _boundaryfound = __strstr(window, wlen, boundary.c_str(), blen, (uint32_t)_boundaryfound + 1);
                             }
-                            
-                            pdiutil::string::size_type _boundaryfound = lastread.find(boundary);
-                            if(_boundaryfound != pdiutil::string::npos){
-                                // the two bytes skipped past the boundary are its
-                                // trailing CRLF, which may not have arrived yet
-                                // when the boundary ends the block
-                                pdiutil::string::size_type _partat = _boundaryfound + boundary.length() + 2;
-                                if( _partat > lastread.length() ){
-                                    _partat = lastread.length();
-                                }
-                                part = lastread.substr(_partat);
-                                lastread = lastread.substr(0, _boundaryfound);
-                                found_boundary = true;
-                                parthaslastread = true;
 
-                                // check for last write
-                                if( filewritecounter == 0 && _boundaryfound > maxreadinonecall ){
-                                    lastread = lastread.substr(maxreadinonecall);
-                                    filewritecounter = 1;
+                            if( _boundaryfound >= 0 ){
+                                uint32_t after = (uint32_t)_boundaryfound + blen;
+                                datalen = (uint32_t)_boundaryfound - 2;
+                                if( after + 2 <= wlen ){
+                                    found_end = ( '-' == window[after] && '-' == window[after + 1] );
+                                    found_boundary = !found_end;
                                 }
+                            }else{
+                                uint32_t keep = (wlen < blen + 1) ? wlen : blen + 1;
+                                for( ; keep > 0; keep-- ){
+                                    uint32_t j = 0;
+                                    for( ; j < keep; j++ ){
+                                        char expect = (j < 2) ? ((0 == j) ? '\r' : '\n') : boundary[j - 2];
+                                        if( window[wlen - keep + j] != expect ) break;
+                                    }
+                                    if( j == keep ) break;
+                                }
+                                datalen = wlen - keep;
                             }
 
                             #ifdef ENABLE_STORAGE_SERVICE
-                            if(++filewritecounter == 2){
-                                if( stage && !held.empty() ){
-                                    __i_instance.getFileSystemInstance().writeFile(tempFilePath.c_str(), held.c_str(), held.length(), true);
-                                    held.clear();
-                                }
-                                uint32_t llen = lastread.length();
-                                if( !stage ){
-                                    held.clear();
-                                }else if( llen >= 2 ){
-                                    held += lastread[llen - 2];
-                                    held += lastread[llen - 1];
-                                    __i_instance.getFileSystemInstance().writeFile(tempFilePath.c_str(), lastread.c_str(), llen - 2, true);
-                                }else{
-                                    held += lastread;
-                                }
-                                filewritecounter = 0;
+                            if( stage && datalen > 0 ){
+                                stageWrite(window, datalen);
+                            }
+                            if( stagefailed ){
+                                SysLogE("HTTP upload: staging write refused at %u bytes, heap=%u\n",
+                                    (unsigned)uploadedbytes,
+                                    (unsigned)__i_instance.getUtilityInstance().get_free_heap());
+                                upload_aborted = true;
+                                break;
                             }
                             #else
                             // without file system support
-                            if(argvalue.length() < 500 && ++filewritecounter == 2){
-                                argvalue += lastread;
+                            if( argvalue.length() < 500 ){
+                                argvalue.append(window, datalen);
                             }
                             #endif
 
-                            // If we found a boundary, we can stop reading further
+                            if( found_boundary ){
+                                part = lastread.substr((uint32_t)_boundaryfound + blen + 2);
+                                parthaslastread = true;
+                            }
+
                             if (found_boundary || found_end) {
                                 break;
                             }
 
-                            lastread = part; // Store the last read part
+                            lastread = lastread.substr(datalen);
                             part.clear();
 
                             __i_instance.getUtilityInstance().yield();
@@ -927,6 +945,14 @@ void HttpServerInterfaceImpl::parseRequest(){
                         // An abandoned transfer leaves a partial file, which must
                         // not be handed on as if it were the uploaded one.
                         #ifdef ENABLE_STORAGE_SERVICE
+                        if( stage && !upload_aborted && gathered > 0 &&
+                            __i_instance.getFileSystemInstance().writeFile(tempFilePath.c_str(), gather, gathered, true) < 0 ){
+                            SysLogE("HTTP upload: staging write refused at %u bytes, heap=%u\n",
+                                (unsigned)uploadedbytes,
+                                (unsigned)__i_instance.getUtilityInstance().get_free_heap());
+                            upload_aborted = true;
+                        }
+                        pdiutil::safe_delete_array(gather);
                         if( stage && upload_aborted ){
                             __i_instance.getFileSystemInstance().deleteFile(tempFilePath.c_str());
                         }else if( stage ){
@@ -981,7 +1007,8 @@ void HttpServerInterfaceImpl::prepareResponseHeader(pdiutil::string& _header, in
     pdiutil::string connection_key = CHARPTR_WRAP(HTTP_HEADER_KEY_CONNECTION);
     pdiutil::string conn_close = CHARPTR_WRAP("close");
     pdiutil::string keepalive = header(connection_key);
-    m_close_after_response = (keepalive.empty() || keepalive == conn_close);
+    m_responded = true;
+    m_close_after_response = (m_close_after_response || keepalive.empty() || keepalive == conn_close);
     if (m_close_after_response) {
         addHeader(connection_key, CHARPTR_WRAP("close"));
     } else {
@@ -1037,7 +1064,7 @@ void HttpServerInterfaceImpl::sendResponse(int code, mimetype_t content_type, co
 }
 
 /**
- * @brief handle file request.
+ * @brief serve the file the request names; 401 when the session user may not read it.
  */
 bool HttpServerInterfaceImpl::handleStaticFileRequest(){
 
@@ -1054,6 +1081,11 @@ bool HttpServerInterfaceImpl::handleStaticFileRequest(){
 
         // Check if the request URI is a static file
         if (__i_instance.getFileSystemInstance().isFileExist(filePath.c_str())) {
+
+            if (!__i_fs.checkAccess(filePath.c_str(), VfsDispatcher::VFS_ACCESS_R)) {
+                send(HTTP_RESP_UNAUTHORIZED);
+                return true;
+            }
 
             if (filetype == MIME_TYPE_MAX) {
                 filetype = MIME_TYPE_TEXT_PLAIN;

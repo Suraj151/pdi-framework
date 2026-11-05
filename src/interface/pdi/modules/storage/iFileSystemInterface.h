@@ -143,7 +143,7 @@ public:
      * @param linedata A string to store the line data found.
      * @param pattern Optional pattern to match in the line.
      * @param yield Optional callback function to yield control during long operations.
-     * @return number of bytes read, or -1 on failure.
+     * @return number of bytes read, PDI_ERR_NO_MEM for a line the heap could not hold whole, or another negative error code.
      */
     virtual int readLineInFile(const char* path, int32_t linenumber, pdiutil::string &linedata, const char* pattern = nullptr, CallBackVoidArgFn yield = nullptr) = 0;
 
@@ -248,6 +248,12 @@ public:
      * @return The free size of the file system in bytes.
      */
     virtual uint64_t getFreeSize() = 0;
+
+    /**
+     * @brief Gets the size of the unit the file system stores a file in.
+     * @return Bytes per block, or 0 when its files take no storage.
+     */
+    virtual uint32_t getBlockSize() { return 0; }
 
     /**
      * @brief Gets the present working directory.
@@ -470,6 +476,12 @@ public:
      * @brief Told once its mount point is gone, so it can let go of what the mount held.
      */
     virtual void unmounted() {}
+
+    /**
+     * @brief Whether the disk the filesystem was read from is still there.
+     * @return True while the disk answers, and always for a filesystem with no disk.
+     */
+    virtual bool diskPresent() { return true; }
 protected:
     /**
      * @brief Get current wall-clock time as seconds since Unix epoch, or 0

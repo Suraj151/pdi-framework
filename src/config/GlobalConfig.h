@@ -16,9 +16,11 @@ created Date    : 1st June 2019
  * common default configurations for all stack
  */
 #define CONFIG_START      5
+#define PDI_VERSION       "1.3.12" /* library release, the same as library.properties and library.json */
 #define CONFIG_VERSION    "1.1"
 #define FIRMWARE_VERSION  2019041100
-#define RELEASE           "uEOS-A"
+#define RELEASE           "uEOS"
+#define PDI_RELEASE       PDI_VERSION "-" RELEASE /* what the boot banner, uname -r and /proc/version print */
 #define LAUNCH_YEAR       19
 #define LAUNCH_UNIX_TIME  1546300800  // 2019 Unix time stamp
 

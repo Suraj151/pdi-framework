@@ -787,6 +787,7 @@ pdi_err_t ScriptRunner::runScheduledScript(const char *path)
     return CMD_ERROR_PERM;
   }
 
+  session_t *previous = SessionManager::current();
   iTerminalInterface *terminal = __cmd_service.m_terminal;
   session_t *session = beginDetached(uid, terminal);
 
@@ -797,6 +798,8 @@ pdi_err_t ScriptRunner::runScheduledScript(const char *path)
   pdi_err_t res = run(path, true);
 
   endDetached(terminal);
+  SessionManager::setCurrent(previous);
+  ServiceProvider::setTerminal(terminal);
 
   return res;
 }
@@ -811,12 +814,16 @@ pdi_err_t ScriptRunner::runDetachedLine(const char *line, uint16_t uid)
     return PDI_OK;
   }
 
+  session_t *previous = SessionManager::current();
+  iTerminalInterface *shell = ServiceProvider::getTerminal();
   iTerminalInterface *terminal = &__i_null_terminal;
   session_t *session = beginDetached(uid, terminal);
 
   if( nullptr == session ){
     return CMD_ERROR_FAILED;
   }
+
+  ServiceProvider::setTerminal(terminal);
 
   pdiutil::string statement = line;
   bool named_noent = false;
@@ -836,6 +843,8 @@ pdi_err_t ScriptRunner::runDetachedLine(const char *line, uint16_t uid)
 
   __cmd_service.reapFinishedCommands();
   endDetached(terminal);
+  SessionManager::setCurrent(previous);
+  ServiceProvider::setTerminal(shell);
 
   return res;
 }

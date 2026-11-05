@@ -52,17 +52,13 @@ cursor:pointer;\
 static const char WEB_SERVER_STORAGE_LIST_PAGE_BOTTOM_SCRIPT1[] PROG_RODT_ATTR = "\
 <script>\
 var rq=new XMLHttpRequest();\
-function fsz(b){\
-b=+b;\
-if(b<1024)return b+' B';\
-if(b<1048576)return (b/1024).toFixed(1)+' K';\
-return (b/1048576).toFixed(1)+' M';\
-}\
 function rql(){\
-if(this.status!=200){location.href='/login';return;}\
-var r=JSON.parse(this.responseText);\
+if(this.status==401||(this.responseURL&&this.responseURL.indexOf('/storage-filelist')<0)){location.href='/login';return;}\
 const tbl=document.getElementById('strg-tbl');\
 tbl.deleteRow(tbl.rows.length-1);\
+var r=null;\
+try{if(this.status==200)r=JSON.parse(this.responseText);}catch(e){}\
+if(!r||!r.lst){rerr(tbl,this.status);return;}\
 const hd=tbl.insertRow();\
 hd.className='hdr';\
 hd.innerHTML='<td></td><td>Name</td><td>Permissions</td><td>Owner</td><td>Group</td><td class=\"num\">Size</td><td></td>';\
@@ -72,7 +68,9 @@ const ntr=tbl.insertRow();\
 ntr.insertCell().innerHTML=it.t==\"D\"?r.dsvg:r.fsvg;\
 const lk=document.createElement('a');\
 lk.href=it.l;\
-lk.textContent=it.n.substring(0,28);\
+lk.textContent=it.n;\
+lk.title=it.n;\
+lk.style.wordBreak='break-all';\
 ntr.insertCell().appendChild(lk);\
 const cd=document.createElement('code');\
 cd.textContent=it.p||'';\
@@ -84,10 +82,24 @@ sc.className='num';\
 sc.textContent=it.t==\"D\"?'-':fsz(it.s);\
 ard(ntr,it,r);\
 }\
+rempty(tbl,r);\
 }\
 ";
 
 static const char WEB_SERVER_STORAGE_LIST_PAGE_ROW_SCRIPT[] PROG_RODT_ATTR = "\
+function fsz(b){\
+b=+b;\
+const u=['B','K','M','G','T','P','E'];\
+let i=0;\
+while(b>=1024&&i<6){b/=1024;i++;}\
+return i?b.toFixed(1)+' '+u[i]:b+' B';\
+}\
+function rmsg(tbl,m){\
+const c=tbl.insertRow().insertCell();\
+c.colSpan=7;c.textContent=m;\
+}\
+function rerr(tbl,st){rmsg(tbl,'The list could not be read ('+st+'). Reload the page to try again.');}\
+function rempty(tbl,r){if(!r.lst.some(function(e){return e.n!='..';}))rmsg(tbl,'This directory is empty.');}\
 function ard(ntr,it,r){\
 const dc=ntr.insertCell();\
 if(it.n==\"..\")return;\

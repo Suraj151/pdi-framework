@@ -119,7 +119,12 @@ public:
 			}
 			else
 			{
-				_response = CHARPTR_WRAP("{\"status\":false,\"remark\":\"Device id or host is too long !\"}");
+				bool _id_long = _device_iot_duid.size() >= DEVICE_IOT_DUID_MAX_LENGTH;
+				_response = CHARPTR_WRAP("{\"status\":false,\"remark\":\"");
+				_response += _id_long ? CHARPTR_WRAP("Device id") : CHARPTR_WRAP("Registry host");
+				_response += CHARPTR_WRAP(" is too long: up to ");
+				_response += pdiutil::to_string((uint32_t)(_id_long ? DEVICE_IOT_DUID_MAX_LENGTH - 1 : DEVICE_IOT_HOST_BUF_SIZE - 1));
+				_response += CHARPTR_WRAP(" characters.\"}");
 			}
 
 			this->m_web_resource->m_server->addHeader(CHARPTR_WRAP_RO(HTTP_HEADER_KEY_CACHE_CONTROL), CHARPTR_WRAP_RO(HTTP_HEADER_VALUE_NO_CACHE));

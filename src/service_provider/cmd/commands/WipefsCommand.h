@@ -26,6 +26,7 @@ struct WipefsCommand : public CommandBase {
 	WipefsCommand(){
 		Clear();
 		SetCommand(CMD_NAME_WIPEFS);
+		setArgs(RODT_ATTR("a"), 1);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}

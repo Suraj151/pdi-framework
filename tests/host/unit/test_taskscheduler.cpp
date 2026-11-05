@@ -540,3 +540,39 @@ TEST(scheduler, a_due_task_is_taken_before_one_that_owes_less_but_is_not_due)
     ASSERT_EQ(s_counter_b, 0);
     ASSERT_GT(s_counter_a, before);
 }
+
+TEST(scheduler, a_task_changes_its_own_pace_and_keeps_running)
+{
+    TaskScheduler scheduler;
+    pditest::FakeClock clock;
+    scheduler.setUtilityInterface(&clock);
+    resetCounters();
+
+    static TaskScheduler *s_scheduler = nullptr;
+    static pdiutil::task_id_t s_id = 0;
+    s_scheduler = &scheduler;
+    s_id = scheduler.setInterval([]() {
+        s_counter_a++;
+        if (1 == s_counter_a)
+        {
+            s_scheduler->setTaskInterval(s_id, 10);
+        }
+    }, 100, clock.millis_now());
+
+    runFor(scheduler, clock, 100);
+    ASSERT_EQ(s_counter_a, 1);
+
+    runFor(scheduler, clock, 100);
+    ASSERT_GE(s_counter_a, 9);
+    ASSERT_LE(s_counter_a, 12);
+    ASSERT_GE(scheduler.is_registered_task(s_id), 0);
+}
+
+TEST(scheduler, set_task_interval_rejects_an_unknown_id)
+{
+    TaskScheduler scheduler;
+    pditest::FakeClock clock;
+    scheduler.setUtilityInterface(&clock);
+
+    ASSERT_FALSE(scheduler.setTaskInterval(4242, 10));
+}

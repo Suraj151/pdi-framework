@@ -30,6 +30,7 @@ struct DatabaseCommand : public CommandBase {
 	DatabaseCommand(){
 		Clear();
 		SetCommand(CMD_NAME_DB);
+		setArgs(RODT_ATTR(""), 1);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
@@ -101,7 +102,7 @@ struct DatabaseCommand : public CommandBase {
 			return ok ? PDI_OK : CMD_ERROR_FAILED;
 		}
 
-		return CMD_ERROR_OPT;
+		return refuseArg(RODT_ATTR(CMD_MSG_UNKNOWN_SUBCOMMAND), verbOpt->optionval, verbOpt->optionvalsize, CMD_ERROR_OPT);
 	}
 
 private:

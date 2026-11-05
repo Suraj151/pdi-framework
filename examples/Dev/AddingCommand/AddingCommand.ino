@@ -9,7 +9,7 @@
 
 #if defined(ENABLE_CMD_SERVICE)
 
-#define CMD_NAME_HELLO  "hello"		/* shell name, keep it 7 characters or less */
+#define CMD_NAME_HELLO  "hello"		/* shell name, 15 characters at most */
 
 /**
  * HelloCommand must be derived from CommandBase
@@ -19,12 +19,18 @@ struct HelloCommand : public CommandBase {
 	/**
 	 * HelloCommand constructor.
 	 * construct with the name the user will type.
-	 * setAcceptArgsOptions tells the parser to hand us whatever was typed after it.
+	 * setArgs declares the words the command takes: no -x flags and at most one
+	 * operand, so the shell refuses `hello -x` (invalid option) and `hello a b`
+	 * (extra operand) before execute runs. A quoted word is one operand.
+	 * setAcceptArgsOptions tells the parser to hand us whatever was typed after it,
+	 * split on spaces.
 	 */
 	HelloCommand(){
 		Clear();
 		SetCommand(CMD_NAME_HELLO);
+		setArgs(RODT_ATTR(""), 1);
 		setAcceptArgsOptions(true);
+		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
 
 	/**

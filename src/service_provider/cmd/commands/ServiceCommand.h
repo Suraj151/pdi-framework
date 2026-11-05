@@ -64,6 +64,7 @@ struct ServiceCommand : public CommandBase {
 	ServiceCommand(){
 		Clear();
 		SetCommand(CMD_NAME_SERVICE);
+		setArgs(RODT_ATTR(""), 2);
 		setAcceptArgsOptions(true);
 		setCmdOptionSeparator(CMD_OPTION_SEPERATOR_SPACE);
 	}
@@ -109,7 +110,7 @@ struct ServiceCommand : public CommandBase {
 
 		ServiceSubverb verb = parseVerb(verbOpt->optionval, verbOpt->optionvalsize);
 		if( SVC_VERB_UNKNOWN == verb ){
-			return CMD_ERROR_OPT;
+			return refuseArg(RODT_ATTR(CMD_MSG_UNKNOWN_SUBCOMMAND), verbOpt->optionval, verbOpt->optionvalsize, CMD_ERROR_OPT);
 		}
 
 		if( SVC_VERB_LIST == verb ){
