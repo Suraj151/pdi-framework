@@ -5,8 +5,8 @@ This is free software. you can redistribute it and/or modify it but without any
 warranty.
 
 The sftp framing: bytes arrive split across ssh channel data, get accumulated,
-and are cut back into requests on a length the peer supplies. Defect AO lived
-in the bolus path, where a short chunk was discarded instead of dispatched.
+and are cut back into requests on a length the peer supplies; a write's data is
+streamed to its file, and requests held back are taken again on a later turn.
 
 Author          : Suraj I.
 created Date    : 26th Aug 2026
@@ -32,19 +32,18 @@ namespace
 
     public:
         /**
-         * @brief Feed one chunk in as either channel data or a bolus chunk.
+         * @brief Feed one chunk in as channel data, then optionally the empty turn
+         *        that takes held requests again.
          */
-        void feed(LWSSHSession *session, pdiutil::vector<uint8_t> &chunk, bool bolus)
+        void feed(LWSSHSession *session, pdiutil::vector<uint8_t> &chunk, bool resume)
         {
             m_session = session;
 
-            if (bolus)
+            handleChannelSubsystemRequest(chunk);
+            if (resume && session->m_state != LWSSHSession::SESSION_STATE_SESSION_CLOSE)
             {
-                handleChannelSftpBolusChunks(chunk);
-            }
-            else
-            {
-                handleChannelSubsystemRequest(chunk);
+                pdiutil::vector<uint8_t> none;
+                handleChannelSubsystemRequest(none);
             }
 
             m_session = nullptr;
@@ -72,7 +71,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     readyStorage();
 
     pdifuzz::FuzzInput input(data, size);
-    bool bolus = 0 != input.pick(2);
+    bool resume = 0 != input.pick(2);
     uint8_t chunks = 1 + input.pick(4);
 
     // the session takes ownership of the client and closes it on the way out,
@@ -96,7 +95,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     {
         size_t take = each < left ? each : left;
         pdiutil::vector<uint8_t> chunk(cursor, cursor + take);
-        server.feed(&session, chunk, bolus);
+        server.feed(&session, chunk, resume);
         cursor += take;
         left -= take;
     }

@@ -39,7 +39,8 @@ namespace pdistd{
 		distance(InputIterator first, InputIterator last)
 	{
 		typename iterator_traits<InputIterator>::difference_type d = 0;
-		while(first++ !=last){
+		while(first != last){
+			++first;
 			d++;
 		}
 		return d;

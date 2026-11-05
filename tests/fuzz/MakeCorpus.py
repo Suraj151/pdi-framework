@@ -88,14 +88,20 @@ def sftp_seeds():
     close = sftp_packet(4, 4, ssh_string("handle"))
     stat = sftp_packet(17, 5, ssh_string("/etc"))
 
+    open_write = sftp_packet(3, 6, ssh_string("/fuzz.bin") + struct.pack(">II", 0x1a, 0))
+    write = sftp_packet(6, 7, ssh_string("handle") + struct.pack(">Q", 0) + ssh_string("x" * 600))
+
     session = init + realpath + opendir + readdir + close
+    upload = init + open_write + write + close
 
     return {
         "channel_stream": bytes([0, 0]) + session,
         "channel_split": bytes([0, 3]) + session,
-        "bolus_stream": bytes([1, 0]) + session,
-        "bolus_short_close": bytes([1, 0]) + close,
+        "resume_stream": bytes([1, 0]) + session,
+        "resume_short_close": bytes([1, 0]) + close,
         "stat": bytes([0, 0]) + init + stat,
+        "write_split": bytes([0, 3]) + upload,
+        "write_split_resume": bytes([1, 3]) + upload,
     }
 
 
