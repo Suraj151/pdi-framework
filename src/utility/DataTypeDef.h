@@ -249,6 +249,7 @@ typedef uint8_t follow_redirects_t;
  * Callback function typedefs
  */
 typedef pdiutil::function<void(int)> CallBackIntArgFn;
+typedef pdiutil::function<void(bool)> CallBackBoolArgFn;
 typedef pdiutil::function<void(void)> CallBackVoidArgFn;
 typedef pdiutil::function<void(void *)> CallBackVoidPointerArgFn;
 typedef pdiutil::function<void *(void *)> CallBackVoidPointerArgVoidPointerRetFn;

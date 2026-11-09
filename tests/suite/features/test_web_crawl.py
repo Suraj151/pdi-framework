@@ -335,6 +335,60 @@ def malformed_request_line(t):
     still_answers(portal, "malformed request lines")
 
 
+@test("a request line past the limit is answered 414 and closed, one under it is served")
+def request_line_too_long(t):
+    portal = t.portal(login=False)
+    raw = Raw(portal)
+    sock = raw.open()
+    try:
+        sock.sendall(("GET /%s HTTP/1.1\r\nHost: pdi\r\n\r\n" % ("a" * 2000)).encode())
+        reply = raw.read_all(sock, 5.0)
+    finally:
+        sock.close()
+    if 414 != status_of(reply):
+        raise AssertionError("a 2000-byte request line was answered %r" % reply[:80])
+    if b"close" not in reply.split(b"\r\n\r\n", 1)[0].lower():
+        raise AssertionError("the 414 did not say the connection closes:\n%r" % reply[:300])
+    reply = raw.exchange("GET /login?pad=%s HTTP/1.1\r\nHost: pdi\r\n\r\n" % ("a" * 900), read_for=3.0)
+    if status_of(reply) in (None, 414):
+        raise AssertionError("a 914-byte request line was answered %r" % reply[:80])
+    still_answers(portal, "a request line past the limit")
+
+
+@test("long requests, again and again, leave the heap where it was", slow=True)
+def long_requests_keep_nothing(t):
+    """
+    Each round sends request lines under the limit and past it and a body close
+    to the body limit, then the heap is read over the board's own spread. Every
+    round has to come back to where the heap stood before the first one, and the
+    rounds must not fall further each time: storage a request keeps shows as a
+    fall after the first round, and storage it keeps growing as a fall that
+    deepens round by round.
+    """
+    from .test_shell import heap_band
+
+    portal = t.portal(login=False)
+    raw = Raw(portal)
+    top, band = heap_band(t)
+    body = b"b" * 3500
+    falls = []
+    for _ in range(3):
+        for size in (300, 600, 900, 2000, 3000):
+            raw.exchange("GET /%s HTTP/1.1\r\nHost: pdi\r\n\r\n" % ("a" * size), read_for=3.0)
+        raw.exchange("POST /nosuchpage HTTP/1.1\r\nHost: pdi\r\nContent-Type: text/plain\r\n"
+                     "Content-Length: %d\r\n\r\n" % len(body), body=body, read_for=3.0)
+        after, after_band = heap_band(t)
+        falls.append(top - after)
+        allowed = max(band, after_band) + 512
+        if top - after > allowed:
+            raise AssertionError("after round %d of long requests the heap stood %d bytes below where it "
+                                 "started (%d -> %d), past the %d this board moves on its own plus 512; "
+                                 "falls so far %r" % (len(falls), top - after, top, after, allowed - 512, falls))
+    if falls[2] - falls[0] > max(band, 512):
+        raise AssertionError("the heap fell further each round of long requests: %r" % falls)
+    still_answers(portal, "rounds of long requests")
+
+
 @test("an oversized header is refused and the portal keeps answering")
 def oversized_header(t):
     portal = t.portal(login=False)

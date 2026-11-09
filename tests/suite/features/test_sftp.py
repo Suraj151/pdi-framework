@@ -334,11 +334,14 @@ def sftp_download_with_many_reads_in_flight(t):
     need_room(t, len(body))
     client, sftp = sftp_open(t)
     try:
-        with sftp.open("/%s" % name, "wb") as fh:
-            fh.set_pipelined(True)
-            fh.write(body)
-        with sftp.open("/%s" % name, "rb") as fh:
-            pieces = list(fh.readv([(offset, 16384) for offset in range(0, len(body), 16384)]))
+        def transfer():
+            with sftp.open("/%s" % name, "wb") as fh:
+                fh.set_pipelined(True)
+                fh.write(body)
+            with sftp.open("/%s" % name, "rb") as fh:
+                return list(fh.readv([(offset, 16384) for offset in range(0, len(body), 16384)]))
+
+        pieces = t.keep_awake_while(transfer)
         got = b"".join(pieces)
         if hashlib.md5(got).hexdigest() != hashlib.md5(body).hexdigest():
             raise AssertionError("%d reads in flight gave %d bytes back, not the %d written"
@@ -359,15 +362,23 @@ def sftp_upload_with_many_writes_in_flight(t):
     need_room(t, len(body))
     client, sftp = sftp_open(t)
     try:
-        with sftp.open("/%s" % name, "wb") as fh:
-            fh.set_pipelined(True)
-            for offset in range(0, len(body), 32768):
-                fh.write(body[offset:offset + 32768])
-        if sftp.stat("/%s" % name).st_size != len(body):
-            raise AssertionError("the upload stored %d bytes, not %d" % (sftp.stat("/%s" % name).st_size, len(body)))
-        with sftp.open("/%s" % name, "rb") as fh:
-            fh.prefetch()
-            got = fh.read()
+        def upload():
+            with sftp.open("/%s" % name, "wb") as fh:
+                fh.set_pipelined(True)
+                for offset in range(0, len(body), 32768):
+                    fh.write(body[offset:offset + 32768])
+            return sftp.stat("/%s" % name).st_size
+
+        stored = t.keep_awake_while(upload)
+        if stored != len(body):
+            raise AssertionError("the upload stored %d bytes, not %d" % (stored, len(body)))
+
+        def download():
+            with sftp.open("/%s" % name, "rb") as fh:
+                fh.prefetch()
+                return fh.read()
+
+        got = t.keep_awake_while(download)
         if hashlib.md5(got).hexdigest() != hashlib.md5(body).hexdigest():
             raise AssertionError("a pipelined upload read back as %d different bytes" % len(got))
     finally:

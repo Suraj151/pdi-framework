@@ -492,9 +492,10 @@ ROOT_ONLY = [
     ("useradd", "useradd u=accmallory p=AccMallory5Tz", lambda t: present(t, "%s/accmallory" % HOMES)
      or "accmallory" in t.run("cat /etc/passwd")),
     ("userdel", "userdel u=%s" % BOB, lambda t: BOB not in t.run("cat /etc/passwd")),
-    ("service stop", "service stop cron", lambda t: "inactive" in t.run("service status cron")),
+    ("service stop", "service stop Cron", lambda t: "inactive" in t.run("service status Cron")),
     ("umount", "umount /tmp", lambda t: "/tmp" not in t.run("mount")),
     ("db restore", "db restore", None),
+    ("reboot", "reboot", None),
 ]
 
 
@@ -503,7 +504,7 @@ def root_only_case(label, command, changed):
         setup(t)
         if command.split()[0] not in t.caps.commands:
             raise Skip("the target has no %s" % command.split()[0])
-        if command.startswith("service") and "cron" not in t.run("service list"):
+        if command.startswith("service") and "Cron" not in t.run("service list"):
             raise Skip("the target runs no cron service")
         as_user(t, ALICE, ALICE_PW)
         out = t.run(command)
@@ -514,7 +515,7 @@ def root_only_case(label, command, changed):
         if "userdel" in command and did:
             scratch_user(t, BOB, BOB_PW)
         if command.startswith("service") and did:
-            t.run("service start cron")
+            t.run("service start Cron")
         if "umount" in command and did:
             raise AssertionError("%s unmounted /tmp; the target needs a restart to get it back"
                                  % ALICE)

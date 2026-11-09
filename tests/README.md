@@ -83,12 +83,20 @@ ok   meta.cd into a missing directory leaves us where we were [serial]
 ```
 
 It is roughly as many times faster as there are transports, because each assertion runs once rather
-than once each. Two details make it behave:
+than once each. These details make it behave:
 
 - **A test the assigned transport cannot do is offered to the others before it is called a skip**, so
   the session tests still run when the rotation hands them to a serial cable — they move to ssh.
-- **A transport that dies drops out of the rotation** (`serial is gone; 2 transport(s) left`) and the
-  remaining tests redistribute, rather than the run ending.
+- **The transports a test is not using are kept awake while it runs.** A board reclaims a shell left
+  idle (telnet after 3 minutes), and several tests run longer than that, so each waiting transport is
+  given a `pwd` once it has been idle 60 seconds — between tests and during them.
+- **A transport that dies is dialled again** (`telnet was dropped and has been reconnected`). One that
+  cannot be reopened drops out of the rotation (`serial is gone; 2 transport(s) left`) and the
+  remaining tests redistribute; it is dialled again at each suite boundary, up to five times, so a
+  board that restarted mid-run gets its transports back (`serial is back; 3 transport(s)`).
+- **A suite's cleanup runs when the suite ends.** What a test registers with `t.at_exit()` — a
+  service config pointed at a test server, a user, a file — is undone after the suite's last test,
+  so no suite leaves a service working against a server that is gone for the suites after it.
 
 The trade is redundancy for time: an assertion runs on one transport, so a fault specific to another
 can hide. Use it for a fast confidence pass; use `sequential` before a release.

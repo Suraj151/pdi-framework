@@ -5,8 +5,7 @@ This is free software. you can redistribute it and/or modify it but without any
 warranty.
 
 What a block device carries, read from its first blocks: the filesystem its
-signature names, read the way linux blkid reads it, and the partitions a dos
-partition table lists.
+signature names and the partitions a dos partition table lists.
 
 Author          : Suraj I.
 created Date    : 21st Oct 2026
@@ -25,7 +24,7 @@ uint8_t blockFsType(const uint8_t *first, const uint8_t *third);
 
 /**
  * The partition table the first block holds and its partitions that fit the device,
- * each at its linux slot.
+ * each at its slot in the table.
  */
 uint8_t blockTable(const uint8_t *first, uint32_t blocks, block_partition_t *out, uint8_t max, uint8_t &count);
 

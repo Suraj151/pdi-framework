@@ -45,6 +45,15 @@ created Date    : 25th July 2026
 #define SYSLOG_LINE_MAX 200
 #endif
 
+#define SYSLOG_PRIORITY_EMERG   "emerg"
+#define SYSLOG_PRIORITY_ALERT   "alert"
+#define SYSLOG_PRIORITY_CRIT    "crit"
+#define SYSLOG_PRIORITY_ERR     "err"
+#define SYSLOG_PRIORITY_WARNING "warning"
+#define SYSLOG_PRIORITY_NOTICE  "notice"
+#define SYSLOG_PRIORITY_INFO    "info"
+#define SYSLOG_PRIORITY_DEBUG   "debug"
+
 // per-line timestamp prefix in the syslog files (strftime-style, NTP-backed;
 // dashes when the clock is unsynced). Every file line starts with this.
 #ifndef SYSLOG_FILE_TS_FMT

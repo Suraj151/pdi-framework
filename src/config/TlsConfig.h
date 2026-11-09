@@ -56,7 +56,7 @@ created Date    : 3rd June 2026
 
 
 /**
- * Default filesystem paths for TLS material (Linux FHS-inspired layout).
+ * Default filesystem paths for TLS material.
  *
  * Callers are expected to drop PEM files at these paths on the device's
  * filesystem (LittleFS on ESP8266). The HTTP server / TLS client

@@ -198,7 +198,7 @@ void MdnsServiceProvider::buildHostname() {
   m_hostname = buf;
 
 #ifdef ENABLE_STORAGE_SERVICE
-  // persist to /etc/hostname (overwrite), Linux-style, without the .local suffix
+  // persist to /etc/hostname (overwrite), without the .local suffix
   pdiutil::string content = m_hostname + "\n";
   pdiutil::string hostname_path = CHARPTR_WRAP(HOSTNAME_FILE_PATH);
   if (__i_fs.writeFile(hostname_path.c_str(), content.c_str(), content.length(), false) != (int)content.length()) {

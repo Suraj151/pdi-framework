@@ -50,6 +50,7 @@ static rofn::ROPTR getHttpStatusString(int code) {
         case HTTP_RESP_NOT_FOUND: return ROPTR_WRAP("Not Found");
         case HTTP_RESP_METHOD_NOT_ALLOWED: return ROPTR_WRAP("Method Not Allowed");
         case HTTP_RESP_REQUEST_TIMEOUT: return ROPTR_WRAP("Request Timeout");
+        case HTTP_RESP_URI_TOO_LONG: return ROPTR_WRAP("URI Too Long");
         case HTTP_RESP_INTERNAL_SERVER_ERROR: return ROPTR_WRAP("Internal Server Error");
         case HTTP_RESP_NOT_IMPLEMENTED: return ROPTR_WRAP("Not Implemented");
         case HTTP_RESP_BAD_GATEWAY: return ROPTR_WRAP("Bad Gateway");

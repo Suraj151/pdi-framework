@@ -191,7 +191,7 @@ protected:
 
     /**
      * Adds an entry for each mount whose mount point sits directly in the listed
-     * directory, the way a linux listing shows a mount point as a directory.
+     * directory, so a mount point lists as a directory.
      */
     void addMountPoints(const char* path, pdiutil::vector<file_info_t>& items, const char* pattern);
 

@@ -65,6 +65,9 @@ Its CSRF token no longer matches the session, which is what happens when a page 
 **A page arrives truncated mid-HTML.**
 A `send()` went out without chunking and exceeded the per-send buffer. Compose in header, body and footer ([§8.7](web-server.md#87-composing-a-response)).
 
+**MQTT never connects.**
+The client starts only with a client id and a keepalive above 5 seconds; with either missing it does not try at all and `/var/log/syslog.warning` says `MQTT: not connecting, a client id and a keepalive above 5 s are needed`. Set both on the MQTT page — `[mac]` in the client id is replaced with the board's mac. With them set, a broker that refuses the connection is logged in `/var/log/syslog.error`.
+
 **MQTT connects but no callbacks fire.**
 Wait for the subscribed callback before publishing on that topic — `Subscribe` reports enqueue, not acknowledgement ([§10.2](transports.md#102-mqtt)).
 
@@ -73,6 +76,9 @@ The device only updates when the server's version is strictly newer than the fir
 
 **Email sends time out.**
 SMTP goes out in plaintext, so providers that require TLS on submission will not complete. Use a relay that accepts plain SMTP, or a test sink ([§10.3](transports.md#103-smtp)).
+
+**A mail is not sent.**
+`cat /var/log/syslog.error` and look for `Email: not sent, ...`: it names the step the server refused and the code it answered — `the login: 535` is a wrong username or password, `the recipient: 550` an address the server will not deliver to, `no ready answer from <host>:<port>` a server that is not there or not listening. A relay that takes mail without a login needs the username left empty; with a username set the board always logs in.
 
 **HTTPS refuses connections or fails the handshake.**
 The certificate and key are missing from the filesystem or sitting at different paths than configured. Upload them to `/etc/http/server.crt` and `/etc/http/server.key`; under mTLS the client CA is needed too ([§8.7.1](web-server.md#871-https-wiring-and-certificates)).

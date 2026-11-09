@@ -49,11 +49,22 @@ public:
     return _n;
   }
 
-  bool sendMail(pdiutil::string &mail_body);
-  bool sendMail(char *mail_body);
-  bool sendMail(const char * mail_body);
+  /**
+   * Starts sending a mail and returns at once: true when it was taken, false
+   * when it was refused. done, when given, is called with whether the server
+   * took the mail once the last step is answered.
+   */
+  bool sendMail(pdiutil::string &mail_body, CallBackBoolArgFn done = nullptr);
+  bool sendMail(char *mail_body, CallBackBoolArgFn done = nullptr);
+  bool sendMail(const char * mail_body, CallBackBoolArgFn done = nullptr);
   // template <typename T> bool sendMail( T mail_body );
   void handleEmail(void);
+
+  /**
+   * Ends a mail still going out when the service stops, and forgets the
+   * periodic mail's task.
+   */
+  void resetServiceState() override;
   void printConfigToTerminal(iTerminalInterface *terminal) override;
 
   /**
@@ -63,11 +74,35 @@ public:
 
 protected:
   /**
-   * True when no http request holds the shared client this service sends over.
+   * True when the settings name a server, a domain, a sender and a recipient.
+   * Missing settings are logged.
    */
-  bool isClientFree();
+  bool canSend(email_config_table &_email_config);
+
+  /**
+   * Takes a copy of the mail and its settings, connects, and leaves the rest of
+   * the conversation to stepMail.
+   */
+  bool startMail(const char *body, uint32_t size, CallBackBoolArgFn done);
+
+  /**
+   * Reads the reply to the step in flight and, once it is complete, sends the
+   * next step or ends the mail with the step that was refused logged.
+   */
+  void stepMail(void);
+
+  /**
+   * Closes the connection, lets go of the mail and tells its sender the result.
+   */
+  void finishMail(bool sent);
 
   iClientInterface *m_client;
+  iClientInterface *m_mail_client;
+  email_config_table *m_mail_config;
+  pdiutil::string m_mail_body;
+  CallBackBoolArgFn m_mail_done;
+  pdiutil::task_id_t m_mail_step_cb_id;
+  email_step_t m_mail_step;
   SMTPClient m_smtp;
 };
 

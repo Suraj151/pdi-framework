@@ -1487,6 +1487,198 @@ TEST(tmpfs, a_config_file_in_memory_parses_a_line_at_a_time)
     fs->deleteFile("/tmp/probe.conf");
 }
 
+TEST(tmpfs, a_missing_path_is_told_from_a_directory_or_a_file)
+{
+    VfsDispatcher *fs = mountedVfs();
+    removeIfPresent(fs, "/tmp/gone.txt");
+    fs->createDirectory("/tmp/adir");
+    ASSERT_GE(fs->createFile("/tmp/afile.txt", "f"), 0);
+
+    ASSERT_EQ((int)fs->deleteFile("/tmp/gone.txt"), (int)STORAGE_ERROR_NO_ENTRY);
+    ASSERT_EQ((int)fs->deleteFile("/tmp/nodir/gone.txt"), (int)STORAGE_ERROR_NO_ENTRY);
+    ASSERT_EQ((int)fs->getFileSize("/tmp/gone.txt"), (int)STORAGE_ERROR_NO_ENTRY);
+    ASSERT_EQ(fs->editFile("/tmp/gone.txt", 0, "x", 1), (int)STORAGE_ERROR_NO_ENTRY);
+    ASSERT_EQ((int)fs->copyFile("/tmp/gone.txt", "/tmp/copy.txt"), (int)STORAGE_ERROR_NO_ENTRY);
+    ASSERT_EQ((int)fs->rename("/tmp/gone.txt", "/tmp/moved.txt"), (int)STORAGE_ERROR_NO_ENTRY);
+    ASSERT_EQ((int)fs->deleteDirectory("/tmp/nodir"), (int)STORAGE_ERROR_NO_ENTRY);
+    pdiutil::vector<file_info_t> items;
+    ASSERT_EQ(fs->getDirFileList("/tmp/nodir", items), (int)STORAGE_ERROR_NO_ENTRY);
+    ASSERT_STREQ(slurp(fs, "/tmp/gone.txt").c_str(), "");
+    ASSERT_EQ(fs->readFile("/tmp/gone.txt", 16, [](char *, uint32_t){ return true; }), (int)STORAGE_ERROR_NO_ENTRY);
+
+    ASSERT_EQ((int)fs->deleteFile("/tmp/adir"), (int)STORAGE_ERROR_NOT_A_FILE);
+    ASSERT_EQ((int)fs->getFileSize("/tmp/adir"), (int)STORAGE_ERROR_NOT_A_FILE);
+    ASSERT_EQ(fs->readFile("/tmp/adir", 16, [](char *, uint32_t){ return true; }), (int)STORAGE_ERROR_NOT_A_FILE);
+    ASSERT_EQ((int)fs->deleteDirectory("/tmp/afile.txt"), (int)STORAGE_ERROR_NOT_A_DIRECTORY);
+    ASSERT_EQ(fs->getDirFileList("/tmp/afile.txt", items), (int)STORAGE_ERROR_NOT_A_DIRECTORY);
+
+    fs->deleteFile("/tmp/afile.txt");
+    fs->deleteDirectory("/tmp/adir");
+}
+
+TEST(tmpfs, opening_to_write_creates_a_file_or_empties_one)
+{
+    VfsDispatcher *fs = mountedVfs();
+    removeIfPresent(fs, "/tmp/opened.txt");
+
+    pdi_fhandle_t h = fs->openFile("/tmp/opened.txt", FILE_OPEN_WRITE | FILE_OPEN_CREATE | FILE_OPEN_TRUNCATE);
+    ASSERT_GE((int)h, 0);
+    ASSERT_TRUE(fs->isFileExist("/tmp/opened.txt"));
+    ASSERT_EQ((int)fs->getFileSize("/tmp/opened.txt"), 0);
+    ASSERT_EQ((int)fs->closeFile(h), 0);
+
+    ASSERT_GE(fs->writeFile("/tmp/opened.txt", "old content", 11), 0);
+    h = fs->openFile("/tmp/opened.txt", FILE_OPEN_WRITE | FILE_OPEN_CREATE | FILE_OPEN_TRUNCATE);
+    ASSERT_GE((int)h, 0);
+    ASSERT_EQ((int)fs->getFileSize("/tmp/opened.txt"), 0);
+    ASSERT_EQ((int)fs->closeFile(h), 0);
+
+    ASSERT_GE(fs->writeFile("/tmp/opened.txt", "kept", 4), 0);
+    h = fs->openFile("/tmp/opened.txt", FILE_OPEN_WRITE | FILE_OPEN_CREATE | FILE_OPEN_APPEND);
+    ASSERT_GE((int)h, 0);
+    ASSERT_EQ((int)fs->closeFile(h), 0);
+    ASSERT_STREQ(slurp(fs, "/tmp/opened.txt").c_str(), "kept");
+
+    h = fs->openFile("/tmp/opened.txt", FILE_OPEN_READ | FILE_OPEN_TRUNCATE);
+    ASSERT_GE((int)h, 0);
+    ASSERT_EQ((int)fs->closeFile(h), 0);
+    ASSERT_STREQ(slurp(fs, "/tmp/opened.txt").c_str(), "kept");
+
+    fs->deleteFile("/tmp/opened.txt");
+}
+
+TEST(tmpfs, an_open_names_a_missing_file_and_refuses_a_directory)
+{
+    VfsDispatcher *fs = mountedVfs();
+    removeIfPresent(fs, "/tmp/absent.txt");
+    fs->createDirectory("/tmp/opendir");
+
+    ASSERT_EQ((int)fs->openFile("/tmp/absent.txt", FILE_OPEN_READ), (int)STORAGE_ERROR_NO_ENTRY);
+    ASSERT_EQ((int)fs->openFile("/tmp/absent.txt", FILE_OPEN_WRITE), (int)STORAGE_ERROR_NO_ENTRY);
+    ASSERT_FALSE(fs->isFileExist("/tmp/absent.txt"));
+    ASSERT_EQ((int)fs->openFile("/tmp/opendir", FILE_OPEN_READ), (int)STORAGE_ERROR_NOT_A_FILE);
+    ASSERT_EQ((int)fs->openFile("/tmp/opendir", FILE_OPEN_WRITE | FILE_OPEN_CREATE | FILE_OPEN_TRUNCATE), (int)STORAGE_ERROR_NOT_A_FILE);
+    ASSERT_EQ((int)fs->openFile("/tmp/nodir/x.txt", FILE_OPEN_WRITE | FILE_OPEN_CREATE), (int)STORAGE_ERROR_NO_PARENT);
+
+    fs->deleteDirectory("/tmp/opendir");
+}
+
+TEST(tmpfs, a_handle_reads_writes_and_seeks_like_a_file)
+{
+    VfsDispatcher *fs = mountedVfs();
+    removeIfPresent(fs, "/tmp/seek.txt");
+
+    pdi_fhandle_t h = fs->openFile("/tmp/seek.txt", FILE_OPEN_READ | FILE_OPEN_WRITE | FILE_OPEN_CREATE);
+    ASSERT_GE((int)h, 0);
+    ASSERT_EQ(fs->writeFileHandle(h, "hello world", 11), 11);
+    ASSERT_EQ((int)fs->seekFile(h, 0, FILE_SEEK_SET), 0);
+
+    char buf[16];
+    memset(buf, 0, sizeof(buf));
+    ASSERT_EQ(fs->readFileHandle(h, buf, 5), 5);
+    ASSERT_STREQ(buf, "hello");
+    ASSERT_EQ((int)fs->seekFile(h, 1, FILE_SEEK_CUR), 6);
+    memset(buf, 0, sizeof(buf));
+    ASSERT_EQ(fs->readFileHandle(h, buf, sizeof(buf)), 5);
+    ASSERT_STREQ(buf, "world");
+    ASSERT_EQ(fs->readFileHandle(h, buf, sizeof(buf)), 0);
+
+    ASSERT_EQ((int)fs->seekFile(h, -5, FILE_SEEK_END), 6);
+    ASSERT_EQ(fs->writeFileHandle(h, "WORLD", 5), 5);
+    ASSERT_EQ((int)fs->seekFile(h, 13, FILE_SEEK_SET), 13);
+    ASSERT_EQ(fs->writeFileHandle(h, "!", 1), 1);
+    ASSERT_EQ((int)fs->getFileSize("/tmp/seek.txt"), 14);
+    ASSERT_EQ((int)fs->seekFile(h, -1, FILE_SEEK_SET), (int)PDI_ERR_INVALID_ARG);
+    ASSERT_EQ((int)fs->syncFile(h), 0);
+    ASSERT_EQ((int)fs->closeFile(h), 0);
+
+    pdiutil::string got = slurp(fs, "/tmp/seek.txt");
+    ASSERT_EQ((uint32_t)got.size(), 14u);
+    ASSERT_EQ(memcmp(got.c_str(), "hello WORLD\0\0!", 14), 0);
+
+    h = fs->openFile("/tmp/seek.txt", FILE_OPEN_WRITE);
+    ASSERT_GE((int)h, 0);
+    ASSERT_EQ(fs->readFileHandle(h, buf, sizeof(buf)), (int)PDI_ERR_INVALID_ARG);
+    ASSERT_EQ((int)fs->closeFile(h), 0);
+    h = fs->openFile("/tmp/seek.txt", FILE_OPEN_READ);
+    ASSERT_GE((int)h, 0);
+    ASSERT_EQ(fs->writeFileHandle(h, "x", 1), (int)PDI_ERR_INVALID_ARG);
+    ASSERT_EQ((int)fs->closeFile(h), 0);
+
+    fs->deleteFile("/tmp/seek.txt");
+}
+
+TEST(tmpfs, an_append_handle_writes_at_the_end_wherever_it_was_moved)
+{
+    VfsDispatcher *fs = mountedVfs();
+    removeIfPresent(fs, "/tmp/log.txt");
+    ASSERT_GE(fs->createFile("/tmp/log.txt", "one\n"), 0);
+
+    pdi_fhandle_t h = fs->openFile("/tmp/log.txt", FILE_OPEN_WRITE | FILE_OPEN_APPEND);
+    ASSERT_GE((int)h, 0);
+    ASSERT_EQ(fs->writeFileHandle(h, "two\n", 4), 4);
+    ASSERT_EQ((int)fs->seekFile(h, 0, FILE_SEEK_SET), 0);
+    ASSERT_EQ(fs->writeFileHandle(h, "three\n", 6), 6);
+    ASSERT_EQ((int)fs->closeFile(h), 0);
+
+    ASSERT_STREQ(slurp(fs, "/tmp/log.txt").c_str(), "one\ntwo\nthree\n");
+    fs->deleteFile("/tmp/log.txt");
+}
+
+TEST(tmpfs, a_handle_follows_its_file_through_a_rename)
+{
+    VfsDispatcher *fs = mountedVfs();
+    removeIfPresent(fs, "/tmp/before.txt");
+    removeIfPresent(fs, "/tmp/after.txt");
+    removeIfPresent(fs, "/tmp/rdir/in.txt");
+    fs->deleteDirectory("/tmp/rdir");
+    fs->deleteDirectory("/tmp/rdir2");
+
+    pdi_fhandle_t h = fs->openFile("/tmp/before.txt", FILE_OPEN_WRITE | FILE_OPEN_CREATE);
+    ASSERT_GE((int)h, 0);
+    ASSERT_EQ((int)fs->rename("/tmp/before.txt", "/tmp/after.txt"), 0);
+    ASSERT_EQ(fs->writeFileHandle(h, "moved", 5), 5);
+    ASSERT_EQ((int)fs->closeFile(h), 0);
+    ASSERT_STREQ(slurp(fs, "/tmp/after.txt").c_str(), "moved");
+
+    ASSERT_EQ((int)fs->createDirectory("/tmp/rdir"), 0);
+    h = fs->openFile("/tmp/rdir/in.txt", FILE_OPEN_WRITE | FILE_OPEN_CREATE);
+    ASSERT_GE((int)h, 0);
+    ASSERT_EQ((int)fs->rename("/tmp/rdir", "/tmp/rdir2"), 0);
+    ASSERT_EQ(fs->writeFileHandle(h, "inside", 6), 6);
+    ASSERT_EQ((int)fs->closeFile(h), 0);
+    ASSERT_STREQ(slurp(fs, "/tmp/rdir2/in.txt").c_str(), "inside");
+
+    fs->deleteFile("/tmp/after.txt");
+    fs->deleteDirectory("/tmp/rdir2");
+}
+
+TEST(tmpfs, open_files_are_bounded_and_a_closed_slot_is_used_again)
+{
+    removeIfPresent(mountedVfs(), "/tmp/many.txt");
+    ASSERT_EQ((int)__i_tmpfs.openCount(), 0);
+
+    pdi_fhandle_t h[VFS_MAX_OPEN_FILES];
+    for (uint8_t i = 0; i < VFS_MAX_OPEN_FILES; ++i) {
+        h[i] = __i_tmpfs.openFile("many.txt", FILE_OPEN_READ | FILE_OPEN_CREATE);
+        ASSERT_GE((int)h[i], 0);
+    }
+    ASSERT_EQ((int)__i_tmpfs.openCount(), (int)VFS_MAX_OPEN_FILES);
+    ASSERT_EQ((int)__i_tmpfs.openFile("many.txt", FILE_OPEN_READ), (int)STORAGE_ERROR_NODE_LIMIT);
+
+    ASSERT_EQ((int)__i_tmpfs.closeFile(h[1]), 0);
+    ASSERT_EQ((int)__i_tmpfs.closeFile(h[1]), (int)PDI_ERR_INVALID_ARG);
+    ASSERT_EQ((int)__i_tmpfs.openFile("many.txt", FILE_OPEN_READ), (int)h[1]);
+
+    for (uint8_t i = 0; i < VFS_MAX_OPEN_FILES; ++i) {
+        ASSERT_EQ((int)__i_tmpfs.closeFile(h[i]), 0);
+    }
+    ASSERT_EQ((int)__i_tmpfs.openCount(), 0);
+    ASSERT_EQ((int)__i_tmpfs.closeFile(-1), (int)PDI_ERR_INVALID_ARG);
+    ASSERT_EQ((int)__i_tmpfs.closeFile(VFS_MAX_OPEN_FILES), (int)PDI_ERR_INVALID_ARG);
+    __i_tmpfs.deleteFile("many.txt");
+}
+
 /* ------------------------------------------------------------- cross mount */
 
 TEST(vfs, a_file_copies_from_the_flash_to_memory)

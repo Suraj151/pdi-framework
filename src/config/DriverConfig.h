@@ -259,7 +259,7 @@ struct block_signature_t {
 };
 
 /**
- * The name a filesystem type goes by, as linux blkid gives it, empty for none.
+ * The name a filesystem type goes by, as blkid prints it, empty for none.
  */
 inline pdiutil::string blockFsTypeName(uint8_t type) {
   switch( type ){
@@ -275,7 +275,7 @@ inline pdiutil::string blockFsTypeName(uint8_t type) {
 }
 
 /**
- * The name a partition table type goes by, as linux blkid gives it, empty for none.
+ * The name a partition table type goes by, as blkid prints it, empty for none.
  */
 inline pdiutil::string blockTableName(uint8_t type) {
   switch( type ){

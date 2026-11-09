@@ -55,34 +55,40 @@ class TestController : public Controller {
 
       /**
        * take new dynamic array to build html response page
-       * PAGE_HTML_MAX_SIZE is defined in framework as 1800, a page larger than
-       * that is sent in chunks the way the framework controllers do
+       * PAGE_HTML_MAX_SIZE is defined in framework as 1800 bytes, and the
+       * framework's header and footer alone take most of it. So never build a whole
+       * page in one buffer : send it in chunks, flushing the buffer with
+       * CONTINUE_SEND_IN_CHUNK after each piece, the way the framework controllers
+       * do. A page built in one buffer fits only until you add a little more, and
+       * then it writes past the end of the buffer and corrupts memory.
        */
       char* _page = pdiutil::safe_new_array<char>(PAGE_HTML_MAX_SIZE);
       if( nullptr == _page ) return;
 
       /**
-       * first append header part of html to reponse
+       * start the response, then send the header part of html
   		 */
+      BEGIN_SEND_IN_CHUNK( HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page );
 			strcat_ro( _page, WEB_SERVER_HEADER_HTML );
+      CONTINUE_SEND_IN_CHUNK( _page );
 
       /**
-       * then append body part of html to response
-       * for demo purpose, dashboard card added with the help of html helpers available in framework
+       * then the body part of html
+       * for demo purpose, dashboard card added with the help of html helpers available in framework.
+       * add your own pieces the same way, each followed by CONTINUE_SEND_IN_CHUNK
   		 */
 			strcat_ro( _page, WEB_SERVER_MENU_CARD_PAGE_WRAP_TOP );
 			concat_svg_menu_card( _page, WEB_SERVER_HOME_MENU_TITLE_DASHBOARD, SVG_ICON48_PATH_DASHBOARD, WEB_SERVER_DASHBOARD_ROUTE );
+      CONTINUE_SEND_IN_CHUNK( _page );
 			strcat_ro( _page, WEB_SERVER_MENU_CARD_PAGE_WRAP_BOTTOM );
+      CONTINUE_SEND_IN_CHUNK( _page );
 
       /**
-       * lastely append footer part of html to response
+       * lastely the footer part of html, then end the response and deallocate page
   		 */
 			strcat_ro( _page, WEB_SERVER_FOOTER_HTML );
-
-      /**
-       * finally send response and deallocate page
-  		 */
-      this->m_web_resource->m_server->send( HTTP_RESP_OK, MIME_TYPE_TEXT_HTML, _page );
+      CONTINUE_SEND_IN_CHUNK( _page );
+      END_SENDING_CHUNK();
       pdiutil::safe_delete_array(_page);
     }
 };

@@ -226,6 +226,8 @@ public:
   bool m_ultra_capacity;
   bool m_never_ready;
   int m_ready_after;
+  int m_powering_up;
+  bool m_wrong_csd_class;
   uint8_t m_read_error;
   bool m_bad_crc;
   uint8_t m_write_response;

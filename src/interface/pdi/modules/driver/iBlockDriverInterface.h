@@ -106,7 +106,7 @@ public:
   uint8_t partitionCount() { return (PDI_OK == scanLayout()) ? m_parts : 0; }
 
   /**
-   * One partition, numbered by its slot from 1 as linux numbers them, nullptr
+   * One partition, numbered by its slot from 1, nullptr
    * for an unused slot or one past the last.
    */
   const block_partition_t *partition(uint8_t number) {

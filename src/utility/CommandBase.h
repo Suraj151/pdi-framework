@@ -64,11 +64,19 @@ typedef enum cmd_status cmd_status_t;
 /**
  * CommandExecutionInterface class
  */
+struct CommandBase;
+
 class CommandExecutionInterface
 {
 public:
 
 	virtual pdi_err_t executeCommand(pdiutil::string *cmd = nullptr, cmd_term_inseq_t inseq = CMD_TERM_INSEQ_ENTER) = 0;
+
+	/**
+	 * Runs a command that is waiting again on its own session, as if its answer
+	 * had come in, for a command that waits for time rather than for input.
+	 */
+	virtual void wakeCommand(struct CommandBase *cmd) {}
 };
 
 /**
@@ -975,6 +983,25 @@ typedef struct CommandBase {
      *        the command can preload it (e.g. an in-place line editor).
      */
     virtual bool preservesLineBuffer() { return false; }
+
+    /**
+     * @brief Whether a waiting command leaves typed keys for the shell. When true
+     *        the input loop only looks for ctrl+c and keeps every other key until
+     *        the command is done (e.g. a timed wait).
+     */
+    virtual bool holdsInput() { return false; }
+
+    /**
+     * @brief Keeps what follows this command on its line, for a command that
+     *        waits for time, so the shell can run it once the wait is over.
+     */
+    virtual void keepLineTail(const pdiutil::string &line, uint16_t next) {}
+
+    /**
+     * @brief Hands back the line kept by keepLineTail and the pipeline to go on
+     *        from; false when nothing was kept.
+     */
+    virtual bool takeLineTail(pdiutil::string &line, uint16_t &next) { return false; }
 
     /**
      * @brief Whether a waiting command paints the active input line itself.

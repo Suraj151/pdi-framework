@@ -40,7 +40,9 @@ have authenticated.
 With several `--device` targets, `--mode interleave` opens all of them at once and gives each test
 the next transport in rotation. It is roughly three times faster than running the suite per
 transport, and it is the only mode where the transports contend for the board, which is where
-session and pool defects show up.
+session and pool defects show up. The transports a test is not using are kept awake while it runs,
+one the board dropped is dialled again, and each suite's cleanup runs when that suite ends; the
+details are in `tests/README.md`.
 
 ## 17.2 How the host build works
 

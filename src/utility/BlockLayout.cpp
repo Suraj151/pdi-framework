@@ -176,7 +176,7 @@ uint8_t blockFsType(const uint8_t *first, const uint8_t *third)
 
 /**
  * The partition table the first block holds and its partitions that fit the device,
- * each at its linux slot.
+ * each at its slot in the table.
  */
 uint8_t blockTable(const uint8_t *first, uint32_t blocks, block_partition_t *out, uint8_t max, uint8_t &count)
 {

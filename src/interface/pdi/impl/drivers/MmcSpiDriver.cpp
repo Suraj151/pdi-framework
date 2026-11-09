@@ -32,6 +32,8 @@ const uint8_t s_sd_alive_tries = 3;
 const uint8_t s_sd_polls_per_yield = 32;
 const uint32_t s_sd_v2_check = 0x1AA;
 const uint32_t s_sd_high_capacity = 0x40000000UL;
+const uint8_t s_sd_ocr_powered = 0x80;
+const uint8_t s_sd_ocr_high_capacity = 0x40;
 
 /**
  * Makes a driver for a device that was declared.
@@ -268,14 +270,25 @@ pdi_err_t MmcSpiDriver::start()
 
   m_highcapacity = false;
   if( v2 ){
-    r1 = command(58, 0);
-    if( 0 != r1 ){
-      finish();
-      return answerError(r1);
-    }
+    uint32_t began = __i_dvc_ctrl.millis_now();
     uint8_t ocr[4] = {0, 0, 0, 0};
-    m_bus->exchange(nullptr, ocr, sizeof(ocr));
-    m_highcapacity = (0 != (ocr[0] & 0x40));
+    while( true ){
+      r1 = command(58, 0);
+      if( 0 != r1 ){
+        finish();
+        return answerError(r1);
+      }
+      m_bus->exchange(nullptr, ocr, sizeof(ocr));
+      if( 0 != (ocr[0] & s_sd_ocr_powered) ){
+        break;
+      }
+      if( (__i_dvc_ctrl.millis_now() - began) >= SD_READY_TIMEOUT_MS ){
+        finish();
+        return PDI_ERR_TIMEOUT;
+      }
+      __i_dvc_ctrl.yield();
+    }
+    m_highcapacity = (0 != (ocr[0] & s_sd_ocr_high_capacity));
   }
 
   if( !m_highcapacity ){
@@ -301,6 +314,10 @@ pdi_err_t MmcSpiDriver::start()
   uint8_t structure = csd[0] >> 6;
   if( structure > 1 ){
     return PDI_ERR_NOT_SUPPORTED;
+  }
+  if( v2 && (1 == structure) != m_highcapacity ){
+    SysLogW("SD: card size register does not fit its capacity class, not bound\n");
+    return PDI_ERR_IO;
   }
   if( 1 == structure ){
     uint32_t size = ((uint32_t)(csd[7] & 0x3F) << 16) | ((uint32_t)csd[8] << 8) | csd[9];

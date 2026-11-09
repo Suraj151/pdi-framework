@@ -4,7 +4,7 @@ This file is part of the pdi stack.
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
 
-Prints the host name, the way linux hostname does with no argument: the name in
+Prints the host name with no argument: the name in
 /etc/hostname, which mDNS writes from the board's mac when it starts.
 
 Author          : Suraj I.

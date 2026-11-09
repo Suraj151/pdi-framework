@@ -45,7 +45,7 @@ uint32_t taskCpuShare(uint64_t exec_us, uint64_t created_ms, uint64_t now_ms);
 
 /**
  * The one line a task reads as, leading with the pid, the bracketed name and
- * the state the way linux orders them.
+ * then the state.
  */
 void taskStatLine(const task_t *task, pdiutil::string &out);
 

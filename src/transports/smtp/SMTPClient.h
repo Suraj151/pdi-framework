@@ -148,27 +148,68 @@ public:
    SMTPClient();
    ~SMTPClient();
 
+   /**
+    * Connects to the server and starts reading its greeting. False when the
+    * connection could not be made.
+    */
    bool begin(iClientInterface *_client, char *_host, uint16_t _port, bool _isSecure = false);
-   void readResponse(void);
-   void flushClient(void);
-   void startReadResponse(uint16_t _timeOut = SMTP_DEFAULT_TIMEOUT);
-   void waitForResponse(uint16_t _timeOut = SMTP_DEFAULT_TIMEOUT);
-   bool waitForExpectedResponse(char *expectedResponse, uint16_t _timeOut = SMTP_DEFAULT_TIMEOUT);
-   bool sendCommandAndExpect(char *command, char *expectedResponse, uint16_t _timeOut = SMTP_DEFAULT_TIMEOUT);
-   int16_t sendCommandAndGetCode(char *command, uint16_t _timeOut = SMTP_DEFAULT_TIMEOUT);
-   int16_t sendCommandAndGetCode(const char * command, uint16_t _timeOut = SMTP_DEFAULT_TIMEOUT);
 
-   bool sendHello(char *domain);
-   bool sendAuthLogin(char *username, char *password);
-   bool sendFrom(char *sender);
-   bool sendTo(char *recipient);
-   bool sendDataCommand(void);
-   void sendDataHeader(char *sender, char *recipient, char *subject);
-   bool sendDataBody(pdiutil::string &body);
-   bool sendDataBody(char *body);
-   bool sendDataBody(const char * body);
-   bool sendQuit(void);
+   /**
+    * Reads what the server has sent of the reply being waited for, without
+    * waiting for more. The reply code is kept once the reply is complete.
+    */
+   smtp_command_status pollResponse(void);
+
+   /**
+    * Sends EHLO with the domain the board greets as, and starts reading its reply.
+    */
+   void startHello(char *domain);
+
+   /**
+    * Sends AUTH LOGIN, and starts reading the reply that asks for the username.
+    */
+   void startAuthLogin(void);
+
+   /**
+    * Sends the username of an AUTH LOGIN, and starts reading its reply.
+    */
+   void startAuthUser(char *username);
+
+   /**
+    * Sends the password of an AUTH LOGIN, and starts reading its reply.
+    */
+   void startAuthPass(char *password);
+
+   /**
+    * Sends MAIL FROM with the sender address, and starts reading its reply.
+    */
+   void startFrom(char *sender);
+
+   /**
+    * Sends RCPT TO with the recipient address, and starts reading its reply.
+    */
+   void startTo(char *recipient);
+
+   /**
+    * Sends DATA, and starts reading the reply that asks for the message.
+    */
+   void startDataCommand(void);
+
+   /**
+    * Writes the message headers and body, then the line that ends the message.
+    */
+   void startDataBody(char *sender, char *recipient, char *subject, const char *body, uint32_t size);
+
+   /**
+    * Sends QUIT, and starts reading its reply.
+    */
+   void startQuit(void);
    void end(void);
+
+   /**
+    * the code of the server's last reply, 0 when none was read
+    */
+   int16_t lastResponseCode(void) const { return m_lastResponseCode; }
 
 protected:
    /**
@@ -176,17 +217,44 @@ protected:
     */
    void writeBody(const char *body, uint32_t size);
 
+   /**
+    * Sends one command line, dropping what is left of an earlier reply, and
+    * starts reading its reply.
+    */
+   void startCommand(const char *command);
+
+   /**
+    * Writes a command made of a verb and an address in angle brackets.
+    */
+   void startAddressCommand(const char *verb, char *address);
+
+   /**
+    * Writes a credential encoded in base64 as the next line of a login.
+    */
+   void startEncoded(char *text);
+
+   /**
+    * Reads what has arrived of the reply. A reply ends with the line whose code
+    * is not followed by a dash; only its first SMTP_RESPONSE_BUFFER_SIZE bytes
+    * are kept, which is where the code is. A connection the server closed ends
+    * the wait at once.
+    */
+   void readResponse(void);
+   void flushClient(void);
+   void startReadResponse(uint16_t _timeOut = SMTP_DEFAULT_TIMEOUT);
+
    iClientInterface *m_client;
    uint16_t m_port;
    int16_t m_lastResponseCode;
    uint16_t m_responseBufferIndex;
+   uint16_t m_lineLen;
    uint32_t m_lastReceive;
    uint32_t m_timeOut;
    smtp_command_status m_responseReaderStatus;
    char *m_responseBuffer;
    char *m_host;
    char m_crlfBuf[2];
-   char m_crlfFound;
+   char m_lineHead[4];
    bool m_isSecure;
 };
 

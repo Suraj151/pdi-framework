@@ -752,6 +752,35 @@ def secure_without_trust_anchors_warns(t):
         hand_back(t, state)
 
 
+@test("a client id left empty is reported instead of the client staying silent",
+      needs=("service", "cat"), services=("MQTT",), slow=True)
+def empty_client_id_warns(t):
+    """
+    The client does not start without a client id; nothing else on the board
+    says so, so the reason has to be in the system log.
+    """
+    state = fixture(t)
+    log = "/var/log/syslog.warning"
+    wanted = "MQTT: not connecting"
+    before_log = t.run("cat %s" % log).count(wanted)
+    before_connects = state.broker.connect_count()
+    try:
+        write_form(portal_for(t), GENERAL, {
+            "hst": state.address, "prt": str(state.broker.port),
+            "clid": "", "usrn": "pdiuser", "pswd": "pdipass",
+            "kpalv": str(KEEPALIVE), "cln": "clean",
+        })
+        deadline = time.time() + 20.0
+        while time.time() < deadline and t.run("cat %s" % log).count(wanted) <= before_log:
+            time.sleep(1.0)
+        if t.run("cat %s" % log).count(wanted) <= before_log:
+            raise AssertionError("no %r line in %s after the client id was emptied" % (wanted, log))
+        if state.broker.connect_count() != before_connects:
+            raise AssertionError("the board connected with an empty client id")
+    finally:
+        hand_back(t, state)
+
+
 def put_trust_anchors(t, certpath):
     """Place the broker's certificate where the client looks for trust anchors."""
     try:

@@ -547,12 +547,13 @@ void GpioServiceProvider::setHttpHost(const char* _host){
 
 #ifdef ENABLE_EMAIL_SERVICE
 /**
- * handle gpio email event
- * @return bool
+ * handle gpio email event; the event counts as delivered once the server takes the mail
+ * @return bool true when the mail was taken to send
  */
-bool GpioServiceProvider::handleGpioEventOverEmail(){
+bool GpioServiceProvider::handleGpioEventOverEmail(uint8_t _evtidx){
 
   bool status = false;
+  __gpio_event_track.is_last_event_succeed[_evtidx] = false;
 
   LogI("Handling GPIO email event\n");
 
@@ -569,7 +570,9 @@ bool GpioServiceProvider::handleGpioEventOverEmail(){
       *_payload += __i_dvc_ctrl.getDeviceMac().c_str();
     }
 
-    status = __email_service.sendMail( *_payload );
+    status = __email_service.sendMail( *_payload, [_evtidx](bool sent){
+      __gpio_event_track.is_last_event_succeed[_evtidx] = sent;
+    });
 
     pdiutil::safe_delete(_payload);
   }
@@ -704,7 +707,7 @@ void GpioServiceProvider::handleGpioOperations(){
 
           #ifdef ENABLE_EMAIL_SERVICE
           case EMAIL:{
-            __gpio_event_track.is_last_event_succeed[_evtidx] = this->handleGpioEventOverEmail();
+            this->handleGpioEventOverEmail(_evtidx);
             break;
           }
           #endif

@@ -941,6 +941,7 @@ bool MQTTClient::begin(iClientInterface *_client, mqtt_general_config_table *_mq
   }
   else
   {
+    SysLogW("MQTT: not connecting, a client id and a keepalive above 5 s are needed (keepalive %u)\n", (unsigned)_mqtt_general_configs->keepalive);
     this->mqtt_client_delete();
     return false;
   }

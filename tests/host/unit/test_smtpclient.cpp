@@ -27,6 +27,20 @@ using pditest::ScriptedSmtp;
 namespace {
 
 /**
+ * Polls until the reply in flight is complete, and whether it carried the code
+ * expected.
+ */
+bool reply(SMTPClient &smtp, int16_t expected)
+{
+    smtp_command_status status;
+    while (SMTP_RESPONSE_STARTING == (status = smtp.pollResponse()) || SMTP_RESPONSE_WAITING == status)
+    {
+        __i_dvc_ctrl.wait(1);
+    }
+    return SMTP_RESPONSE_FINISHED == status && expected == smtp.lastResponseCode();
+}
+
+/**
  * Walks the client through a whole message, stopping at the first refusal,
  * and reports how far it got.
  */
@@ -42,23 +56,32 @@ int sendWholeMessage(SMTPClient &smtp, ScriptedSmtp &server, const char *text = 
     char subject[] = "Alarm";
 
     int step = 0;
-    if (!smtp.begin(&server, host, 587)) return step;
+    if (!smtp.begin(&server, host, 587) || !reply(smtp, SMTP_STATUS_SERVER_READY)) return step;
     step++;
-    if (!smtp.sendHello(domain)) return step;
+    smtp.startHello(domain);
+    if (!reply(smtp, SMTP_STATUS_ACTION_COMPLETED)) return step;
     step++;
-    if (!smtp.sendAuthLogin(user, pass)) return step;
+    smtp.startAuthLogin();
+    if (!reply(smtp, SMTP_STATUS_AUTH_CONTINUE)) return step;
+    smtp.startAuthUser(user);
+    if (!reply(smtp, SMTP_STATUS_AUTH_CONTINUE)) return step;
+    smtp.startAuthPass(pass);
+    if (!reply(smtp, SMTP_STATUS_AUTH_SUCCEEDED)) return step;
     step++;
-    if (!smtp.sendFrom(from)) return step;
+    smtp.startFrom(from);
+    if (!reply(smtp, SMTP_STATUS_ACTION_COMPLETED)) return step;
     step++;
-    if (!smtp.sendTo(to)) return step;
+    smtp.startTo(to);
+    if (!reply(smtp, SMTP_STATUS_ACTION_COMPLETED)) return step;
     step++;
-    if (!smtp.sendDataCommand()) return step;
+    smtp.startDataCommand();
+    if (!reply(smtp, SMTP_STATUS_START_MAIL_INPUT)) return step;
     step++;
-    smtp.sendDataHeader(name, to, subject);
-    pdiutil::string body = text;
-    if (!smtp.sendDataBody(body)) return step;
+    smtp.startDataBody(name, to, subject, text, (uint32_t)strlen(text));
+    if (!reply(smtp, SMTP_STATUS_ACTION_COMPLETED)) return step;
     step++;
-    if (!smtp.sendQuit()) return step;
+    smtp.startQuit();
+    if (!reply(smtp, SMTP_STATUS_SERVER_ENDING_CON)) return step;
     step++;
     return step;
 }
@@ -245,8 +268,12 @@ TEST(smtpclient, a_reply_longer_than_the_buffer_is_read_safely)
     char domain[] = "device.test";
 
     ASSERT_TRUE(smtp.begin(&server, host, 587));
-    ASSERT_TRUE(smtp.sendHello(domain));
-    ASSERT_TRUE(smtp.sendFrom((char *)"user@device.test"));
+    ASSERT_TRUE(reply(smtp, SMTP_STATUS_SERVER_READY));
+    smtp.startHello(domain);
+    ASSERT_TRUE(reply(smtp, SMTP_STATUS_ACTION_COMPLETED));
+    smtp.startFrom((char *)"user@device.test");
+    ASSERT_TRUE(reply(smtp, SMTP_STATUS_ACTION_COMPLETED));
+    ASSERT_TRUE(has(server.m_conversation, "MAIL FROM:<user@device.test>\r\n"));
     smtp.end();
 }
 
@@ -269,11 +296,34 @@ TEST(smtpclient, a_server_that_never_answers_times_out)
     char host[] = "mail.test";
 
     uint32_t began = __i_dvc_ctrl.millis_now();
-    ASSERT_FALSE(smtp.begin(&server, host, 587));
+    ASSERT_TRUE(smtp.begin(&server, host, 587));
+    ASSERT_FALSE(reply(smtp, SMTP_STATUS_SERVER_READY));
     uint32_t took = __i_dvc_ctrl.millis_now() - began;
 
     ASSERT_GE(took, (uint32_t)(SMTP_DEFAULT_TIMEOUT - 100));
     ASSERT_LT(took, (uint32_t)(SMTP_DEFAULT_TIMEOUT * 3));
+    smtp.end();
+}
+
+TEST(smtpclient, a_poll_returns_at_once_while_the_reply_has_not_arrived)
+{
+    ScriptedSmtp server;
+    server.m_reply["MAIL"] = "";
+    SMTPClient smtp;
+    char host[] = "mail.test";
+
+    ASSERT_TRUE(smtp.begin(&server, host, 587));
+    ASSERT_TRUE(reply(smtp, SMTP_STATUS_SERVER_READY));
+    smtp.startFrom((char *)"user@device.test");
+
+    uint32_t began = __i_dvc_ctrl.millis_now();
+    for (int i = 0; i < 20; i++)
+    {
+        ASSERT_EQ((int)smtp.pollResponse(), (int)SMTP_RESPONSE_WAITING);
+    }
+    ASSERT_LT(__i_dvc_ctrl.millis_now() - began, (uint32_t)50);
+
+    server.m_reply["MAIL"] = "250 OK\r\n";
     smtp.end();
 }
 

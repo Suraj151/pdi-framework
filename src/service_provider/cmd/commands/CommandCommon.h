@@ -130,6 +130,15 @@ created Date    : 1st June 2019
 #define CMD_NAME_SORT			    "sort"
 #define CMD_NAME_TEE			    "tee"
 #define CMD_NAME_DIFF			    "diff"
+#define CMD_NAME_FREE			    "free"
+#define CMD_NAME_LOGGER			    "logger"
+#define CMD_NAME_WHICH			    "which"
+#define CMD_NAME_TYPE			    "type"
+#define CMD_NAME_BASENAME		    "basename"
+#define CMD_NAME_DIRNAME		    "dirname"
+#define CMD_NAME_SEQ			    "seq"
+#define CMD_NAME_HISTORY		    "history"
+#define CMD_NAME_SLEEP			    "sleep"
 
 /* find predicates */
 #define CMD_FIND_PRED_NAME		    "-name"

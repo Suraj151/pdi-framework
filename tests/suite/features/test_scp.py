@@ -48,8 +48,8 @@ def ssh_client(t, attempts=3):
 
 
 def _scp_once(binary, pexpect, t, source, dest, timeout):
-    command = ("%s -s -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
-               "-o PubkeyAuthentication=no %s %s" % (binary, source, dest))
+    command = ("%s -s -P %d -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
+               "-o PubkeyAuthentication=no %s %s" % (binary, ssh_port(t), source, dest))
 
     child = pexpect.spawn(command, timeout=timeout, encoding="latin-1")
     try:

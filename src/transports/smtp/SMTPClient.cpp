@@ -22,16 +22,17 @@ SMTPClient::SMTPClient() :
   m_port(0),
   m_lastResponseCode(-1),
   m_responseBufferIndex(0),
+  m_lineLen(0),
   m_lastReceive(0),
   m_timeOut(0),
   m_responseReaderStatus(SMTP_RESPONSE_MAX),
   m_responseBuffer(nullptr),
   m_host(nullptr),
-  m_crlfFound(0),
   m_isSecure(false)
 {
   this->m_crlfBuf[0] = 0;
   this->m_crlfBuf[1] = 0;
+  memset( this->m_lineHead, 0, sizeof(this->m_lineHead) );
 }
 
 /**
@@ -41,17 +42,22 @@ SMTPClient::~SMTPClient(){
   this->end();
 }
 
+/**
+ * Connects to the server and starts reading its greeting. False when the
+ * connection could not be made.
+ */
 bool SMTPClient::begin( iClientInterface *_client, char *_host, uint16_t _port, bool _isSecure ){
 
   this->m_client = _client;
   this->m_isSecure = _isSecure;
+  this->m_lastResponseCode = SMTP_STATUS_SERVICE_UNAVAILABLE;
 
   if( this->m_isSecure && nullptr != this->m_client && !this->m_client->isSecure() ){
     SysLogE("SMTP: secure mode requested but client is not TLS-capable\n");
     return false;
   }
 
-    size_t _host_len = strlen(_host);
+  size_t _host_len = strlen(_host);
   this->m_host = pdiutil::safe_new_array<char>( _host_len + 1 );
   if( nullptr != this->m_host ){
 
@@ -61,75 +67,86 @@ bool SMTPClient::begin( iClientInterface *_client, char *_host, uint16_t _port, 
   this->m_port = _port;
 
   this->m_responseBuffer = pdiutil::safe_new_array<char>( SMTP_RESPONSE_BUFFER_SIZE );
-  if( nullptr != this->m_responseBuffer ){
 
-    memset( this->m_responseBuffer, 0, SMTP_RESPONSE_BUFFER_SIZE );
+  if( nullptr == this->m_client || nullptr == this->m_host || nullptr == this->m_responseBuffer ||
+      !connectToServer( this->m_client, this->m_host, this->m_port, 3000 ) ){
+    return false;
   }
 
-  int16_t respcode = SMTP_STATUS_SERVICE_UNAVAILABLE;
-  if( nullptr != this->m_client && nullptr != this->m_host ){
-
-    if( connectToServer( this->m_client, this->m_host, this->m_port, 3000 ) ){
-      respcode = this->sendCommandAndGetCode( (char*)"" );
-    }
-  }
-  return ( SMTP_STATUS_SERVER_READY == respcode );
+  this->startReadResponse();
+  return true;
 }
 
+/**
+ * Reads what has arrived of the reply. A reply ends with the line whose code
+ * is not followed by a dash; only its first SMTP_RESPONSE_BUFFER_SIZE bytes
+ * are kept, which is where the code is. A connection the server closed ends
+ * the wait at once.
+ */
 void SMTPClient::readResponse(){
 
   if( SMTP_RESPONSE_STARTING == this->m_responseReaderStatus ){
-		this->m_responseReaderStatus = SMTP_RESPONSE_WAITING;
-	}
-
-	if( __i_dvc_ctrl.millis_now() - this->m_lastReceive >= this->m_timeOut ){
-		this->m_responseReaderStatus = SMTP_RESPONSE_TIMEOUT;
-		return;
-	}
-
-  if( nullptr != this->m_client && nullptr != this->m_responseBuffer ){
-
-    int32_t availableBytes = this->m_client->available();
-  	while(availableBytes) {
-
-  		char nextChar = (char)this->m_client->read();
-  		--availableBytes;
-		this->m_lastReceive = __i_dvc_ctrl.millis_now();
-      if(this->m_responseBufferIndex < SMTP_RESPONSE_BUFFER_SIZE - 1) {
-  			this->m_responseBuffer[this->m_responseBufferIndex++] = nextChar;
-  		}else{
-        this->m_responseReaderStatus = SMTP_RESPONSE_BUFFER_FULL;
-        return;
-      }
-
-  		this->m_crlfBuf[0] = this->m_crlfBuf[1];
-  		this->m_crlfBuf[1] = nextChar;
-
-  		if( '\r' == this->m_crlfBuf[0] && '\n' == this->m_crlfBuf[1] ) {
-
-  			if(++this->m_crlfFound == 1) {
-
-          while ( this->m_client->available() ) {
-            if(this->m_responseBufferIndex < SMTP_RESPONSE_BUFFER_SIZE - 1) {
-        			this->m_responseBuffer[this->m_responseBufferIndex++] = (char)this->m_client->read();
-              this->m_lastReceive = __i_dvc_ctrl.millis_now();
-            }else{
-              (void)this->m_client->read();
-            }
-            if( (__i_dvc_ctrl.millis_now() - this->m_lastReceive) >= this->m_timeOut ){
-          		this->m_responseReaderStatus = SMTP_RESPONSE_TIMEOUT;
-          		return;
-          	}
-            __i_dvc_ctrl.wait(1);
-          }
-  				this->m_responseReaderStatus = SMTP_RESPONSE_FINISHED;
-  				return;
-  			}
-  		}
-      __i_dvc_ctrl.wait(1);
-  	}
+    this->m_responseReaderStatus = SMTP_RESPONSE_WAITING;
   }
-  __i_dvc_ctrl.wait(1);
+
+  if( nullptr == this->m_client || nullptr == this->m_responseBuffer ){
+    this->m_responseReaderStatus = SMTP_RESPONSE_ERROR;
+    return;
+  }
+
+  while( SMTP_RESPONSE_WAITING == this->m_responseReaderStatus && this->m_client->available() > 0 ){
+
+    char nextChar = (char)this->m_client->read();
+    this->m_lastReceive = __i_dvc_ctrl.millis_now();
+
+    if( this->m_responseBufferIndex < SMTP_RESPONSE_BUFFER_SIZE - 1 ){
+      this->m_responseBuffer[this->m_responseBufferIndex++] = nextChar;
+    }
+    if( this->m_lineLen < sizeof(this->m_lineHead) ){
+      this->m_lineHead[this->m_lineLen] = nextChar;
+    }
+    this->m_lineLen++;
+
+    this->m_crlfBuf[0] = this->m_crlfBuf[1];
+    this->m_crlfBuf[1] = nextChar;
+
+    if( '\r' == this->m_crlfBuf[0] && '\n' == this->m_crlfBuf[1] ){
+
+      bool last = this->m_lineLen <= sizeof(this->m_lineHead) || '-' != this->m_lineHead[3];
+      this->m_lineLen = 0;
+      this->m_crlfBuf[1] = 0;
+      if( last ){
+        this->m_responseReaderStatus = SMTP_RESPONSE_FINISHED;
+      }
+    }
+  }
+
+  if( SMTP_RESPONSE_WAITING == this->m_responseReaderStatus && !isConnected( this->m_client ) ){
+    this->m_responseReaderStatus = SMTP_RESPONSE_CONN_ERR;
+    this->m_lastResponseCode = 0;
+  }else if( SMTP_RESPONSE_WAITING == this->m_responseReaderStatus &&
+      __i_dvc_ctrl.millis_now() - this->m_lastReceive >= this->m_timeOut ){
+    this->m_responseReaderStatus = SMTP_RESPONSE_TIMEOUT;
+  }
+}
+
+/**
+ * Reads what the server has sent of the reply being waited for, without
+ * waiting for more. The reply code is kept once the reply is complete.
+ */
+smtp_command_status SMTPClient::pollResponse(){
+
+  if( SMTP_RESPONSE_STARTING == this->m_responseReaderStatus ||
+      SMTP_RESPONSE_WAITING == this->m_responseReaderStatus ){
+
+    this->readResponse();
+
+    if( SMTP_RESPONSE_FINISHED == this->m_responseReaderStatus ||
+        SMTP_RESPONSE_TIMEOUT == this->m_responseReaderStatus ){
+      this->m_lastResponseCode = (int16_t)StringToUint16( this->m_responseBuffer );
+    }
+  }
+  return this->m_responseReaderStatus;
 }
 
 void SMTPClient::flushClient(){
@@ -150,236 +167,153 @@ void SMTPClient::startReadResponse( uint16_t _timeOut ) {
 	this->m_timeOut = _timeOut;
   this->m_crlfBuf[0] = 0;
   this->m_crlfBuf[1] = 0;
-  this->m_crlfFound = 0;
+  this->m_lineLen = 0;
+  memset( this->m_lineHead, 0, sizeof(this->m_lineHead) );
   if( nullptr != this->m_responseBuffer ){
     memset(this->m_responseBuffer, 0, SMTP_RESPONSE_BUFFER_SIZE);
   }
 }
 
-void SMTPClient::waitForResponse( uint16_t _timeOut ) {
+/**
+ * Sends one command line, dropping what is left of an earlier reply, and
+ * starts reading its reply.
+ */
+void SMTPClient::startCommand( const char *command ){
 
-	this->startReadResponse( _timeOut );
-	do {
- 		this->readResponse();
-	} while( SMTP_RESPONSE_WAITING == this->m_responseReaderStatus );
-
-	LogI("SMTP status: %d\n", this->m_responseReaderStatus);
-	LogI("SMTP response: %s\n", nullptr != this->m_responseBuffer ? this->m_responseBuffer : " ");
-}
-
-bool SMTPClient::waitForExpectedResponse(	char *expectedResponse, uint16_t _timeOut ){
-
-  bool status = false;
-
-	this->waitForResponse( _timeOut );
-
-	LogI("SMTP espected response: %s\n", expectedResponse);
-
-  if( nullptr != this->m_responseBuffer ){
-    status = ( __strstr( (char*)this->m_responseBuffer, expectedResponse ) > 0 );
+  if( nullptr == this->m_client || !isConnected( this->m_client ) ){
+    this->m_responseReaderStatus = SMTP_RESPONSE_CONN_ERR;
+    this->m_lastResponseCode = SMTP_STATUS_MAX;
+    return;
   }
 
-	return ( SMTP_RESPONSE_TIMEOUT != this->m_responseReaderStatus ) && status ;
+  this->flushClient();
+  this->m_client->write((const uint8_t*)command);
+  this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
+  this->startReadResponse();
 }
 
-bool SMTPClient::sendCommandAndExpect( char *command, char *expectedResponse, uint16_t _timeOut ){
+/**
+ * Writes a command made of a verb and an address in angle brackets.
+ */
+void SMTPClient::startAddressCommand( const char *verb, char *address ){
 
-  bool status = false;
-
-	LogI("SMTP sending command: %s\n", command);
-
-  if( nullptr != this->m_client ){
-
-    if( !isConnected( this->m_client ) ){
-
-      this->m_responseReaderStatus = SMTP_RESPONSE_CONN_ERR;
-    }else{
-
-      this->flushClient();
-      this->m_client->write((const uint8_t*)command);
-      this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
-      status = this->waitForExpectedResponse( expectedResponse, _timeOut );
-    }
-  }
-	return status;
+  pdiutil::string cmd = verb;
+  cmd += SMTP_COMMAND_SEPARATOR;
+  cmd += SMTP_COMMAND_OPENING_ANG_BRACKET;
+  cmd += address;
+  cmd += SMTP_COMMAND_CLOSING_ANG_BRACKET;
+  this->startCommand( cmd.c_str() );
 }
 
-int16_t SMTPClient::sendCommandAndGetCode( const char * command, uint16_t _timeOut ){
+/**
+ * Writes a credential encoded in base64 as the next line of a login.
+ */
+void SMTPClient::startEncoded( char *text ){
 
-  int16_t respcode = SMTP_STATUS_MAX;
+  uint32_t len = strlen( text );
+  uint32_t size = 4 * ((len + 2) / 3) + 1;
+  char *encoded = pdiutil::safe_new_array<char>( size );
 
-	LogI("SMTP sending command: %s\n", command);
-
-  if( nullptr != this->m_client ){
-
-    if( isConnected( this->m_client ) ){
-
-      this->flushClient();
-      if( strlen(command) > 0 ){
-        this->m_client->write((const uint8_t*)command);
-        this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
-      }
-      this->waitForResponse( _timeOut );
-
-      if( nullptr != this->m_responseBuffer ){
-        respcode = (int16_t)StringToUint16( this->m_responseBuffer );
-      }
-    }else{
-
-      this->m_responseReaderStatus = SMTP_RESPONSE_CONN_ERR;
-    }
-  }
-  this->m_lastResponseCode = respcode;
-	return respcode;
-}
-
-int16_t SMTPClient::sendCommandAndGetCode( char *command, uint16_t _timeOut ){
-
-  int16_t respcode = SMTP_STATUS_MAX;
-
-	LogI("SMTP sending command: %s\n", command);
-
-  if( nullptr != this->m_client ){
-
-    if( isConnected( this->m_client ) ){
-
-      this->flushClient();
-      if( strlen(command) > 0 ){
-        this->m_client->write((const uint8_t*)command);
-        this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
-      }
-      this->waitForResponse( _timeOut );
-
-      if( nullptr != this->m_responseBuffer ){
-        respcode = (int16_t)StringToUint16( this->m_responseBuffer );
-      }
-    }else{
-
-      this->m_responseReaderStatus = SMTP_RESPONSE_CONN_ERR;
-    }
-  }
-  this->m_lastResponseCode = respcode;
-	return respcode;
-}
-
-bool SMTPClient::sendHello( char *domain ){
-
-  int16_t respcode = SMTP_STATUS_MAX;
-  char *cmd = pdiutil::safe_new_array<char>(100);
-
-  if( nullptr != cmd ){
-
-    pdiutil::string ehlo_cmd = CHARPTR_WRAP(SMTP_COMMAND_EHLO);
-    memset( cmd, 0, 100 );
-    strcpy( cmd, ehlo_cmd.c_str() );
-    strcat( cmd, " " );
-    strcat( cmd, domain );
-    respcode = this->sendCommandAndGetCode( cmd );
-
-    pdiutil::safe_delete_array(cmd);
-  }
-	return ( SMTP_STATUS_ACTION_COMPLETED == respcode );
-}
-
-bool SMTPClient::sendAuthLogin( char *username, char *password ){
-
-  char *_username = pdiutil::safe_new_array<char>(400);
-  char *_password = pdiutil::safe_new_array<char>(400);
-  int16_t respcode = SMTP_STATUS_MAX;
-
-  if( nullptr != _username && nullptr != _password ){
-
-    memset( _username, 0, 400 );
-    memset( _password, 0, 400 );
-    base64Encode( username, strlen(username), _username );
-    base64Encode( password, strlen(password), _password );
-
-    pdiutil::string auth_cmd = CHARPTR_WRAP(SMTP_COMMAND_AUTH);
-    respcode = this->sendCommandAndGetCode( auth_cmd.c_str() );
-
-    if( SMTP_STATUS_AUTH_CONTINUE == respcode ){
-      respcode = this->sendCommandAndGetCode( _username );
-    }
-
-    if( SMTP_STATUS_AUTH_CONTINUE == respcode ){
-      respcode = this->sendCommandAndGetCode( _password );
-    }
+  if( nullptr == encoded ){
+    this->m_responseReaderStatus = SMTP_RESPONSE_ERROR;
+    this->m_lastResponseCode = SMTP_STATUS_MAX;
+    return;
   }
 
-  pdiutil::safe_delete_array( _username );
-  pdiutil::safe_delete_array( _password );
-
-	return ( SMTP_STATUS_AUTH_SUCCEEDED == respcode );
+  memset( encoded, 0, size );
+  base64Encode( text, len, encoded );
+  this->startCommand( encoded );
+  memset( encoded, 0, size );
+  pdiutil::safe_delete_array( encoded );
 }
 
-bool SMTPClient::sendFrom( char *sender ){
+/**
+ * Sends EHLO with the domain the board greets as, and starts reading its reply.
+ */
+void SMTPClient::startHello( char *domain ){
 
-  int16_t respcode = SMTP_STATUS_MAX;
-  char *cmd = pdiutil::safe_new_array<char>(128);
+  pdiutil::string cmd = CHARPTR_WRAP(SMTP_COMMAND_EHLO);
+  cmd += " ";
+  cmd += domain;
+  this->startCommand( cmd.c_str() );
+}
 
-  if( nullptr != cmd ){
+/**
+ * Sends AUTH LOGIN, and starts reading the reply that asks for the username.
+ */
+void SMTPClient::startAuthLogin(){
+  pdiutil::string cmd = CHARPTR_WRAP(SMTP_COMMAND_AUTH);
+  this->startCommand( cmd.c_str() );
+}
 
-    pdiutil::string from_cmd = CHARPTR_WRAP(SMTP_COMMAND_FROM);
-    memset( cmd, 0, 128 );
-    strcpy( cmd, from_cmd.c_str() );
-    strcat( cmd, SMTP_COMMAND_SEPARATOR );
-    strcat( cmd, SMTP_COMMAND_OPENING_ANG_BRACKET );
-    strcat( cmd, sender );
-    strcat( cmd, SMTP_COMMAND_CLOSING_ANG_BRACKET );
-    respcode = this->sendCommandAndGetCode( cmd );
+/**
+ * Sends the username of an AUTH LOGIN, and starts reading its reply.
+ */
+void SMTPClient::startAuthUser( char *username ){
+  this->startEncoded( username );
+}
 
-    pdiutil::safe_delete_array(cmd);
+/**
+ * Sends the password of an AUTH LOGIN, and starts reading its reply.
+ */
+void SMTPClient::startAuthPass( char *password ){
+  this->startEncoded( password );
+}
+
+/**
+ * Sends MAIL FROM with the sender address, and starts reading its reply.
+ */
+void SMTPClient::startFrom( char *sender ){
+  pdiutil::string verb = CHARPTR_WRAP(SMTP_COMMAND_FROM);
+  this->startAddressCommand( verb.c_str(), sender );
+}
+
+/**
+ * Sends RCPT TO with the recipient address, and starts reading its reply.
+ */
+void SMTPClient::startTo( char *recipient ){
+  pdiutil::string verb = CHARPTR_WRAP(SMTP_COMMAND_TO);
+  this->startAddressCommand( verb.c_str(), recipient );
+}
+
+/**
+ * Sends DATA, and starts reading the reply that asks for the message.
+ */
+void SMTPClient::startDataCommand(){
+  pdiutil::string cmd = CHARPTR_WRAP(SMTP_COMMAND_DATA);
+  this->startCommand( cmd.c_str() );
+}
+
+/**
+ * Writes the message headers and body, then the line that ends the message.
+ */
+void SMTPClient::startDataBody( char *sender, char *recipient, char *subject, const char *body, uint32_t size ){
+
+  if( nullptr == this->m_client || !isConnected( this->m_client ) ){
+    this->m_responseReaderStatus = SMTP_RESPONSE_CONN_ERR;
+    this->m_lastResponseCode = SMTP_STATUS_MAX;
+    return;
   }
-	return ( SMTP_STATUS_ACTION_COMPLETED == respcode );
-}
 
-bool SMTPClient::sendTo( char *recipient ){
+  pdiutil::string header_to = CHARPTR_WRAP(SMTP_COMMAND_DATA_HEADER_TO);
+  pdiutil::string header_from = CHARPTR_WRAP(SMTP_COMMAND_DATA_HEADER_FROM);
+  pdiutil::string header_subject = CHARPTR_WRAP(SMTP_COMMAND_DATA_HEADER_SUBJECT);
+  this->m_client->write((const uint8_t*)header_to.c_str());
+  this->m_client->write((const uint8_t*)recipient);
+  this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
 
-  int16_t respcode = SMTP_STATUS_MAX;
-  char *cmd = pdiutil::safe_new_array<char>(128);
+  this->m_client->write((const uint8_t*)header_from.c_str());
+  this->m_client->write((const uint8_t*)sender);
+  this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
 
-  if( nullptr != cmd ){
+  this->m_client->write((const uint8_t*)header_subject.c_str());
+  this->m_client->write((const uint8_t*)subject);
+  this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
+  this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
 
-    pdiutil::string to_cmd = CHARPTR_WRAP(SMTP_COMMAND_TO);
-    memset( cmd, 0, 128 );
-    strcpy( cmd, to_cmd.c_str() );
-    strcat( cmd, SMTP_COMMAND_SEPARATOR );
-    strcat( cmd, SMTP_COMMAND_OPENING_ANG_BRACKET );
-    strcat( cmd, recipient );
-    strcat( cmd, SMTP_COMMAND_CLOSING_ANG_BRACKET );
-    respcode = this->sendCommandAndGetCode( cmd );
-
-    pdiutil::safe_delete_array(cmd);
-  }
-	return ( SMTP_STATUS_ACTION_COMPLETED == respcode );
-}
-
-bool SMTPClient::sendDataCommand(){
-
-  pdiutil::string data_cmd = CHARPTR_WRAP(SMTP_COMMAND_DATA);
-  int respcode = this->sendCommandAndGetCode( data_cmd.c_str() );
-  return ( SMTP_STATUS_START_MAIL_INPUT == respcode );
-}
-
-void SMTPClient::sendDataHeader( char *sender, char *recipient, char *subject ){
-
-  if( nullptr != this->m_client ){
-    pdiutil::string header_to = CHARPTR_WRAP(SMTP_COMMAND_DATA_HEADER_TO);
-    pdiutil::string header_from = CHARPTR_WRAP(SMTP_COMMAND_DATA_HEADER_FROM);
-    pdiutil::string header_subject = CHARPTR_WRAP(SMTP_COMMAND_DATA_HEADER_SUBJECT);
-    this->m_client->write((const uint8_t*)header_to.c_str());
-    this->m_client->write((const uint8_t*)recipient);
-    this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
-
-    this->m_client->write((const uint8_t*)header_from.c_str());
-    this->m_client->write((const uint8_t*)sender);
-    this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
-
-    this->m_client->write((const uint8_t*)header_subject.c_str());
-    this->m_client->write((const uint8_t*)subject);
-    this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
-    this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
-  }
+  this->writeBody( body, size );
+  this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
+  this->startCommand( SMTP_COMMAND_DATA_TERMINATOR );
 }
 
 /**
@@ -408,53 +342,12 @@ void SMTPClient::writeBody( const char *body, uint32_t size ){
   }
 }
 
-bool SMTPClient::sendDataBody( pdiutil::string &body ){
-
-  int16_t respcode = SMTP_STATUS_MAX;
-
-	LogI("SMTP sending data: %s\n", body.c_str());
-
-  if( nullptr != this->m_client ){
-    this->writeBody( body.c_str(), body.size() );
-    this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
-    respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA_TERMINATOR );
-  }
-  return ( SMTP_STATUS_ACTION_COMPLETED == respcode );
-}
-
-bool SMTPClient::sendDataBody( char *body ){
-
-  int16_t respcode = SMTP_STATUS_MAX;
-
-	LogI("SMTP sending data: %s\n", body);
-
-  if( nullptr != this->m_client ){
-    this->writeBody( body, strlen(body) );
-    this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
-    respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA_TERMINATOR );
-  }
-  return ( SMTP_STATUS_ACTION_COMPLETED == respcode );
-}
-
-bool SMTPClient::sendDataBody( const char * body ){
-
-  int16_t respcode = SMTP_STATUS_MAX;
-
-	LogI("SMTP sending data: %s\n", body);
-
-  if( nullptr != this->m_client ){
-    this->writeBody( body, strlen(body) );
-    this->m_client->write((const uint8_t*)SMTP_COMMAND_CRLF);
-    respcode = this->sendCommandAndGetCode( SMTP_COMMAND_DATA_TERMINATOR );
-  }
-  return ( SMTP_STATUS_ACTION_COMPLETED == respcode );
-}
-
-bool SMTPClient::sendQuit(){
-
-  pdiutil::string quit_cmd = CHARPTR_WRAP(SMTP_COMMAND_QUIT);
-  int respcode = this->sendCommandAndGetCode( quit_cmd.c_str() );
-  return ( SMTP_STATUS_SERVER_ENDING_CON == respcode );
+/**
+ * Sends QUIT, and starts reading its reply.
+ */
+void SMTPClient::startQuit(){
+  pdiutil::string cmd = CHARPTR_WRAP(SMTP_COMMAND_QUIT);
+  this->startCommand( cmd.c_str() );
 }
 
 void SMTPClient::end(){
@@ -465,6 +358,7 @@ void SMTPClient::end(){
   }
   pdiutil::safe_delete_array( this->m_host );
   pdiutil::safe_delete_array( this->m_responseBuffer );
+  this->m_responseReaderStatus = SMTP_RESPONSE_MAX;
 }
 
 #endif

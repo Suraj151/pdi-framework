@@ -4,7 +4,7 @@ This file is part of the pdi stack.
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
 
-Lists the signatures a disk or partition carries, the way linux wipefs does:
+Lists the signatures a disk or partition carries:
 the offset and the name of each filesystem and partition table signature.
 wipefs -a <node> erases them, one line per signature with the bytes it held,
 leaving the disk blank with no partition table.

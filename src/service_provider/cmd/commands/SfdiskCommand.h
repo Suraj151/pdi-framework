@@ -4,8 +4,8 @@ This file is part of the pdi stack.
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
 
-Writes a disk's dos partition table from a script on its input, the way linux
-sfdisk does: one "start, size, type, bootable" line per partition, any field
+Writes a disk's dos partition table from a script on its input:
+one "start, size, type, bootable" line per partition, any field
 left empty for its default. sfdisk -l [disk] lists the table and
 sfdisk --delete <disk> [n] empties one slot, or every slot.
 

@@ -114,19 +114,21 @@ protected:
     pdiutil::vector<http_query_t> formdata; // Form data parameters
     pdiutil::vector<http_file_t> files; // Uploaded files
     bool isPending; // Indicates if the request is still being processed
+    bool lineTooLong;
 
     void clear() {
-      method.clear();
-      version.clear();
-      uri.clear();
-      body.clear();
+      pdiutil::string().swap(method);
+      pdiutil::string().swap(version);
+      pdiutil::string().swap(uri);
+      pdiutil::string().swap(body);
       for (auto &header : headers) {
         header.setvalue((const char*)header.key, nullptr);
       }
-      queries.clear();
-      formdata.clear();
-      files.clear();
+      pdiutil::vector<http_query_t>().swap(queries);
+      pdiutil::vector<http_query_t>().swap(formdata);
+      pdiutil::vector<http_file_t>().swap(files);
       isPending = false;
+      lineTooLong = false;
     }
 
   } m_clientRequest;

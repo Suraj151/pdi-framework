@@ -18,6 +18,7 @@ import importlib
 import os
 import pkgutil
 import re
+import threading
 import time
 
 from ..driver.shell import PROMPT, CTRL_C, ShellError, strip_ansi
@@ -162,12 +163,13 @@ class Target(object):
 
     def at_exit(self, fn):
         """
-        Run fn once, after the last test, instead of after this one.
+        Run fn once, after the last test of the suite that registered it,
+        instead of after this one.
 
         For state that is expensive to set up and has to be put back: a suite
         that reconfigures a persistent setting registers the restore here so
-        the tests in between share one setup and the board is still left as it
-        was found.
+        the tests in between share one setup, and the suites after it find the
+        board as it was, with nothing of this suite's still running on it.
         """
         self._finalizers.append(fn)
         if self not in _UNFINISHED:
@@ -301,6 +303,34 @@ class Target(object):
 
     def run(self, command, timeout=None):
         return self.shell.run(command, timeout or self.timeout)
+
+    def keep_awake_while(self, work):
+        """
+        Run work, a call that holds this test on a connection of its own for a
+        long time, such as a large transfer, while this lane's shell is given
+        something harmless to do every KEEPALIVE_AFTER seconds. The target is
+        entitled to reclaim a shell left idle, and the test is still using it.
+        Returns what work returned and raises what it raised.
+        """
+        outcome = {}
+
+        def body():
+            try:
+                outcome["value"] = work()
+            except BaseException as err:
+                outcome["error"] = err
+
+        worker = threading.Thread(target=body, daemon=True)
+        worker.start()
+        while True:
+            worker.join(KEEPALIVE_AFTER)
+            if not worker.is_alive():
+                break
+            self.run("pwd", min(self.timeout, 10.0))
+
+        if "error" in outcome:
+            raise outcome["error"]
+        return outcome.get("value")
 
     def workspace(self, name):
         """
@@ -594,14 +624,18 @@ def run_interleaved(lanes, only=None, verbose=False):
     started = time.time()
     touched = dict((lane.label, time.time()) for lane in lanes)
     declined = dict((lane.label, 0) for lane in lanes)
+    revived = {}
 
     for item in TESTS:
         if not selected(only, item.full_name):
             continue
 
-        if watch is not None and alive and current is not None and item.feature != current:
-            watch.target = alive[0].target
-            watch.suite_done(current)
+        if current is not None and item.feature != current:
+            _finish_suite(alive, lanes)
+            if watch is not None and alive:
+                watch.target = alive[0].target
+                watch.suite_done(current)
+            _revive(alive, lanes, revived)
         current = item.feature
 
         if not alive:
@@ -624,8 +658,10 @@ def run_interleaved(lanes, only=None, verbose=False):
                 continue
 
             began = time.time()
+            others = _OthersAwake(alive, lane, touched)
             try:
-                item.fn(target)
+                with others:
+                    item.fn(target)
                 took = (time.time() - began) * 1000.0
                 passed += 1
                 ran = True
@@ -657,6 +693,10 @@ def run_interleaved(lanes, only=None, verbose=False):
                     if isinstance(err, ShellError):
                         _recover(alive, lane)
 
+            for other in others.failed:
+                if other in alive:
+                    _recover(alive, other)
+
             if ran:
                 touched[label] = time.time()
                 break
@@ -670,19 +710,7 @@ def run_interleaved(lanes, only=None, verbose=False):
             print("  %sskip%s %s %s(%s)%s"
                   % (YELLOW, RESET, item.full_name, DIM, note, RESET), flush=True)
 
-    # every lane's cleanup runs on a lane that is still connected: the lane that
-    # set a fixture up may have been closed and re-dialled since
-    if alive:
-        keeper = alive[0].target
-        for lane in lanes:
-            if lane.target is not keeper and lane.target._finalizers:
-                keeper._finalizers = lane.target._finalizers + keeper._finalizers
-                lane.target._finalizers = []
-                if lane.target in _UNFINISHED:
-                    _UNFINISHED.remove(lane.target)
-        keeper.finish()
-    for lane in lanes:
-        lane.target.finish()
+    _finish_suite(alive, lanes)
 
     if watch is not None and alive and current is not None:
         watch.target = alive[0].target
@@ -734,6 +762,91 @@ def run_interleaved(lanes, only=None, verbose=False):
 # slow suite can leave one untouched for longer than the window. Well inside it,
 # each waiting transport is given something harmless to do.
 KEEPALIVE_AFTER = 60.0
+
+
+def _finish_suite(alive, lanes):
+    """
+    Undo what the suite that just ended set up. Every lane's cleanup runs on a
+    lane that is still connected: the lane that set a fixture up may have been
+    closed and re-dialled since.
+    """
+    if alive:
+        keeper = alive[0].target
+        for lane in lanes:
+            if lane.target is not keeper and lane.target._finalizers:
+                keeper._finalizers = lane.target._finalizers + keeper._finalizers
+                lane.target._finalizers = []
+                if lane.target in _UNFINISHED:
+                    _UNFINISHED.remove(lane.target)
+        keeper.finish()
+    for lane in lanes:
+        lane.target.finish()
+
+
+class _OthersAwake(object):
+    """
+    While one test runs, the lanes it is not using are given something harmless
+    to do once they have been idle for KEEPALIVE_AFTER, so a test that runs past
+    the target's idle window does not cost them their shells. One test runs at a
+    time, so those lanes are free. A lane that does not answer is handed back
+    once the test is over, to be recovered there.
+    """
+
+    def __init__(self, alive, busy, touched):
+        self.others = [lane for lane in alive if lane is not busy]
+        self.touched = touched
+        self.failed = []
+        self.done = threading.Event()
+        self.worker = threading.Thread(target=self._loop, daemon=True)
+
+    def __enter__(self):
+        if self.others:
+            self.worker.start()
+        return self
+
+    def __exit__(self, *exc):
+        self.done.set()
+        if self.worker.is_alive():
+            self.worker.join()
+        return False
+
+    def _loop(self):
+        while not self.done.wait(5.0):
+            for lane in self.others:
+                if lane in self.failed:
+                    continue
+                if time.time() - self.touched.get(lane.label, time.time()) < KEEPALIVE_AFTER:
+                    continue
+                try:
+                    lane.target.run("pwd", min(lane.target.timeout, 10.0))
+                except Exception:
+                    self.failed.append(lane)
+                self.touched[lane.label] = time.time()
+
+
+# A lane given up on is dialled again at a suite boundary, so a target that
+# restarted mid-run gets its transports back; this many times at most.
+REVIVE_ATTEMPTS = 5
+
+
+def _revive(alive, lanes, attempts):
+    """
+    Dial each lane that left the rotation again, and put it back when it
+    answers. The finalizers it carried have already moved to a live lane.
+    """
+    for lane in lanes:
+        if lane in alive or lane.reopen is None:
+            continue
+        if attempts.get(lane.label, 0) >= REVIVE_ATTEMPTS:
+            continue
+        attempts[lane.label] = attempts.get(lane.label, 0) + 1
+        try:
+            lane.target = lane.reopen()
+        except Exception as err:
+            print("       %s%s is still gone: %s%s" % (DIM, lane.label, err, RESET), flush=True)
+            continue
+        alive.append(lane)
+        print("       %s%s is back; %d transport(s)%s" % (DIM, lane.label, len(alive), RESET), flush=True)
 
 
 def _keep_awake(alive, touched):
@@ -810,6 +923,7 @@ def run(shell, caps, username, password, only=None, verbose=False, timeout=20.0,
             continue
 
         if current is not None and item.feature != current:
+            target.finish()
             watch.suite_done(current)
         current = item.feature
 

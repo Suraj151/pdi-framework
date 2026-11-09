@@ -75,7 +75,15 @@ public:
    */
   static pdi_err_t runDetachedLine(const char *line, uint16_t uid);
 
+  /**
+   * Whether the line running now is detached work, a scheduled job or the boot
+   * script, which nothing can come back to once it returns.
+   */
+  static bool detached();
+
 private:
+
+  static bool s_detached;
 
   /**
    * Opens a session on the given terminal under the identity named, refusing

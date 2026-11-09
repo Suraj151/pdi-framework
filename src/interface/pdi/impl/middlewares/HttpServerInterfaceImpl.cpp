@@ -18,6 +18,60 @@ created Date    : 1st June 2025
 
 CallBackVoidArgFn HttpServerInterfaceImpl::UriToHandlerMap::notFoundHandler = nullptr;
 
+namespace {
+
+/**
+ * @brief Reads one whole line without its line ending, waiting while the rest of a
+ *        line cut across network reads arrives; a line longer than maxlen keeps its
+ *        first maxlen bytes and the rest of it up to the newline is dropped.
+ * @return false when the peer left, or sent nothing for stallms, before the line ended.
+ */
+bool readWholeLine(iClientInterface *client, pdiutil::string &line, const CallBackVoidArgFn &yield, uint32_t maxlen, uint32_t stallms)
+{
+    line.clear();
+    uint32_t cap = (maxlen > 0) ? maxlen : IO_READ_SPAN_MAX;
+    uint32_t progressat = __i_instance.getUtilityInstance().millis_now();
+    pdiutil::string rest;
+    pdiutil::string *into = &line;
+
+    while (true) {
+
+        size_t had = into->size();
+        uint32_t room = (into == &line) ? cap - (uint32_t)had : IO_READ_SPAN_MAX;
+        client->readStringUntil(*into, '\n', true, yield, room);
+
+        if (!into->empty() && '\n' == (*into)[into->size() - 1]) {
+            if (into == &line) {
+                line.pop_back();
+                if (!line.empty() && '\r' == line[line.size() - 1]) {
+                    line.pop_back();
+                }
+            }
+            return true;
+        }
+
+        uint32_t now = __i_instance.getUtilityInstance().millis_now();
+        if (into->size() > had) {
+            progressat = now;
+        } else if (!client->connected() || (now - progressat) > stallms) {
+            return false;
+        }
+
+        if (into == &line && line.size() >= cap) {
+            into = &rest;
+        }
+        if (into == &rest) {
+            rest.clear();
+        }
+
+        if (yield != nullptr) {
+            yield();
+        }
+    }
+}
+
+} // namespace
+
 
 /**
  * HttpServerInterfaceImpl constructor.
@@ -191,7 +245,10 @@ void HttpServerInterfaceImpl::handleClient(){
             pdiutil::string method_get = CHARPTR_WRAP("GET"), method_post = CHARPTR_WRAP("POST"), method_head = CHARPTR_WRAP("HEAD");
             bool uriFound = !(m_clientRequest.method == method_get || m_clientRequest.method == method_post ||
                               m_clientRequest.method == method_head);
-            if (uriFound) {
+            if (m_clientRequest.lineTooLong) {
+                m_close_after_response = true;
+                send(HTTP_RESP_URI_TOO_LONG);
+            } else if (uriFound) {
                 addHeader(CHARPTR_WRAP(HTTP_HEADER_KEY_ALLOW), CHARPTR_WRAP("GET, POST, HEAD"));
                 send(HTTP_RESP_METHOD_NOT_ALLOWED);
             }
@@ -528,10 +585,16 @@ void HttpServerInterfaceImpl::parseRequest(){
     };
 
     // Read the request line
-    m_client->readLine(request_line, readLineYield);
-
-    if (request_line.empty()) {
+    if (m_client->available() <= 0 ||
+        !readWholeLine(m_client, request_line, readLineYield, HTTP_REQUEST_LINE_MAX, HTTP_CLIENT_MAX_READ_MS) ||
+        request_line.empty()) {
         return; // No request line received
+    }
+
+    if (request_line.size() >= HTTP_REQUEST_LINE_MAX) {
+        SysLogE("HTTP request: request line refused, limit is %u bytes\n", (unsigned)HTTP_REQUEST_LINE_MAX);
+        m_clientRequest.lineTooLong = true;
+        return;
     }
 
     // Parse the request line
@@ -569,8 +632,10 @@ void HttpServerInterfaceImpl::parseRequest(){
         // a peer that keeps sending without ever ending the headers stops here
         if ((__i_instance.getUtilityInstance().millis_now() - start) > IO_READ_SPAN_TIMEOUT_MAX) break;
 
-        m_client->readLine(header_line, readLineYield, 256);
-        if(header_line.empty()) break; // Exit if no more headers
+        if (!readWholeLine(m_client, header_line, readLineYield, HTTP_HEADER_LINE_MAX, HTTP_CLIENT_MAX_READ_MS) ||
+            header_line.empty()) {
+            break; // Exit if no more headers
+        }
 
         // Split header line into key and value
         pdiutil::string::size_type colon_pos = header_line.find(':');
@@ -690,24 +755,16 @@ void HttpServerInterfaceImpl::parseRequest(){
         bool upload_aborted = false;
 
         // Read until the end boundary is found
-        uint32_t partprogressat = __i_instance.getUtilityInstance().millis_now();
-        while (1) {
-
-            pdiutil::string line;
-            m_client->readLine(line, readLineYield);
+        while (!found_end) {
 
             // The same rule as the body reader: a socket that yields nothing is
             // only worth waiting on while the peer is still there and the wait
             // is short, otherwise this loop would never end.
-            if( line.empty() ){
-                if( !m_client->connected() ||
-                    (__i_instance.getUtilityInstance().millis_now() - partprogressat) > HTTP_UPLOAD_STALL_TIMEOUT_MS ){
-                    LogE("HTTP upload: part stalled, connected=%d\n", (int)m_client->connected());
-                    upload_aborted = true;
-                    break;
-                }
-            }else{
-                partprogressat = __i_instance.getUtilityInstance().millis_now();
+            pdiutil::string line;
+            if( !readWholeLine(m_client, line, readLineYield, 0, HTTP_UPLOAD_STALL_TIMEOUT_MS) ){
+                LogE("HTTP upload: part stalled, connected=%d\n", (int)m_client->connected());
+                upload_aborted = true;
+                break;
             }
 
             if(parthaslastread){
@@ -758,7 +815,11 @@ void HttpServerInterfaceImpl::parseRequest(){
                         // a peer that never ends this part's headers stops here
                         if ((__i_instance.getUtilityInstance().millis_now() - parthdrat) > IO_READ_SPAN_TIMEOUT_MAX) break;
 
-                        m_client->readLine(part, readLineYield); // Read the next line after Content-Disposition
+                        // Read the next line after Content-Disposition
+                        if( !readWholeLine(m_client, part, readLineYield, 0, HTTP_UPLOAD_STALL_TIMEOUT_MS) ){
+                            upload_aborted = true;
+                            break;
+                        }
                         if (!part.empty()) {
                             pdiutil::string::size_type argtypeStart = part.find(ROPTR_WRAP("Content-Type: "));
                             if (argtypeStart != pdiutil::string::npos) {
@@ -770,9 +831,16 @@ void HttpServerInterfaceImpl::parseRequest(){
                         }
                     }
 
+                    if( upload_aborted ){
+                        break;
+                    }
+
                     if( argfilename.empty() ){
                         // Read the argument value
-                        m_client->readLine(argvalue, readLineYield, 128);
+                        if( !readWholeLine(m_client, argvalue, readLineYield, 128, HTTP_UPLOAD_STALL_TIMEOUT_MS) ){
+                            upload_aborted = true;
+                            break;
+                        }
 
                         // Store the argument in the request
                         m_clientRequest.formdata.push_back({argname.c_str(), argvalue.c_str()});

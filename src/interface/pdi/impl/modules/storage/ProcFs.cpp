@@ -41,7 +41,8 @@ const char* const s_proc_files[] = {
     "version",
     "meminfo",
     "mounts",
-    "stat"
+    "stat",
+    "cpuinfo"
 };
 
 const uint8_t s_proc_file_count = sizeof(s_proc_files) / sizeof(s_proc_files[0]);
@@ -262,6 +263,10 @@ pdiutil::string ProcFs::render(const char* path) {
             return renderStat();
         }
 
+        if (strcmp_ro(norm, RODT_ATTR("cpuinfo")) == 0) {
+            return renderCpuInfo();
+        }
+
         // RELEASE / CONFIG_VERSION land in IROM on esp8266; __vsnprintf's %s
         // reads char-by-char with plain *p and faults there. Marshal to RAM
         // first via CHARPTR_WRAP (same trick already used for format strings).
@@ -356,6 +361,45 @@ pdiutil::string ProcFs::renderMemInfo() {
 }
 
 /**
+ * The processor the stack runs on, one block per core, then the program flash
+ * and the platform beneath the stack; unknown for what the port cannot report.
+ */
+pdiutil::string ProcFs::renderCpuInfo() {
+    device_info_t info;
+    __i_dvc_ctrl.getDeviceInfo(info);
+    pdiutil::string unknown = CHARPTR_WRAP(UNAME_UNKNOWN);
+    uint8_t cores = (0 == info.m_cores) ? 1 : info.m_cores;
+
+    pdiutil::string out;
+    for (uint8_t core = 0; core < cores; ++core) {
+        appendKey(out, RODT_ATTR("processor"));
+        appendNumber(out, (int64_t)core);
+        out += TERMINAL_NEW_LINE;
+        appendKey(out, RODT_ATTR("model name"));
+        out += info.m_model.empty() ? unknown : info.m_model;
+        out += TERMINAL_NEW_LINE;
+        appendKey(out, RODT_ATTR("cpu MHz"));
+        if (0 == info.m_cpu_freq_mhz) out += unknown;
+        else appendNumber(out, (int64_t)info.m_cpu_freq_mhz);
+        out += TERMINAL_NEW_LINE TERMINAL_NEW_LINE;
+    }
+    appendKey(out, RODT_ATTR("cpu cores"));
+    appendNumber(out, (int64_t)cores);
+    out += TERMINAL_NEW_LINE;
+    if (0 == info.m_flash_size) {
+        appendKey(out, RODT_ATTR("flash size"));
+        out += unknown;
+        out += TERMINAL_NEW_LINE;
+    } else {
+        appendMemLine(out, RODT_ATTR("flash size"), info.m_flash_size);
+    }
+    appendKey(out, RODT_ATTR("platform"));
+    out += info.m_platform_version.empty() ? unknown : info.m_platform_version;
+    out += TERMINAL_NEW_LINE;
+    return out;
+}
+
+/**
  * One line per mount, in the order the dispatcher searches them.
  */
 pdiutil::string ProcFs::renderMounts() {
@@ -376,7 +420,7 @@ pdiutil::string ProcFs::renderMounts() {
 
 /**
  * Cumulative scheduler counters. The cpu figures are microseconds rather than
- * the jiffies linux counts in, because every reader turns them into a ratio.
+ * jiffies, because every reader turns them into a ratio.
  */
 pdiutil::string ProcFs::renderStat() {
     uint64_t busy = 0;

@@ -52,6 +52,8 @@ class MailServer(object):
 
     def __exit__(self, *exc):
         try:
+            if self.server.sessions and not self.server.hang:
+                self.server.wait_for_session(SEND_WAIT, after=len(self.server.sessions) - 1)
             write_form(self.t.portal(), PAGE, self.saved)
         finally:
             self.server.stop()
@@ -156,6 +158,48 @@ def refused_recipient(t):
             raise AssertionError("the board sent DATA after a refused recipient: %r" % session["commands"])
 
 
+@test("with no login set, a mail goes through a server that offers none", needs=("cat",))
+def no_login(t):
+    """
+    A relay on the local network usually takes mail without a login and offers
+    no AUTH at all. With the username left empty the board must not try to log in.
+    """
+    with MailServer(t) as mail:
+        mail.server.replies["EHLO"] = "250-pditest greets you\r\n250 SIZE 1048576"
+        mail.server.replies["AUTH"] = "502 5.5.1 no login here"
+        after = mail.send_test_mail(ml_usr="", ml_psw="")
+        session = mail.conversation(after)
+        got = mail.server.wait_for_mail(SEND_WAIT)
+        if any(c.upper().startswith("AUTH") for c in session["commands"]):
+            raise AssertionError("the board tried to log in with no username set: %r" % session["commands"])
+        if got is None:
+            raise AssertionError("no mail arrived through a server that needs no login: %r" % session["commands"])
+        if TEST_MESSAGE not in got.body:
+            raise AssertionError("the body was %r" % got.body)
+
+
+@test("a send the server refuses names the refused step in the system log", needs=("cat", "rm"))
+def refused_step_logged(t):
+    """
+    A mail that is not sent leaves nothing behind but a page that did not say;
+    the system log is where an operator looks for why.
+    """
+    log = "/var/log/syslog.error"
+    with MailServer(t) as mail:
+        mail.server.replies["RCPT"] = "550 5.1.1 no such user"
+        before = t.run("cat %s" % log)
+        after = mail.send_test_mail()
+        mail.conversation(after)
+        deadline = time.time() + SEND_WAIT
+        wanted = "Email: not sent, the server refused the recipient: 550"
+        while time.time() < deadline:
+            now = t.run("cat %s" % log)
+            if now.count(wanted) > before.count(wanted):
+                return
+            time.sleep(1.0)
+        raise AssertionError("no %r line in %s after a refused recipient:\n%s" % (wanted, log, t.run("cat %s" % log)[-600:]))
+
+
 @test("a server that does not greet ready is not talked to")
 def refused_greeting(t):
     with MailServer(t) as mail:
@@ -214,6 +258,8 @@ def two_mails(t):
         mail.send_test_mail()
         if mail.server.wait_for_mail(SEND_WAIT) is None:
             raise AssertionError("the first mail never arrived")
+        if mail.server.wait_for_session(SEND_WAIT) is None:
+            raise AssertionError("the first mail's session never ended")
         mail.send_test_mail()
         if mail.server.wait_for_mail(SEND_WAIT, after=1) is None:
             raise AssertionError("the second mail never arrived")

@@ -21,6 +21,7 @@ from .test_portal import upload
 from .test_sftp import sftp_open, patterned
 
 READ_BLOCK = 2048
+ANSWER_WITHIN = 5.0
 BOUNDARY_TAIL = b"----pdiTestBoundary7d91"
 
 
@@ -201,10 +202,11 @@ def binary_uploads_are_exact(t):
         raise AssertionError("; ".join(wrong))
 
 
-def split_upload(t, portal, name, blob, cut, between=None):
+def split_upload(t, portal, name, blob, cut, between=None, at=None):
     """
     Upload through a raw socket, pausing after `cut` bytes of the closing delimiter,
-    or `-cut` bytes into the file when cut is negative; `between` runs in the pause.
+    or `-cut` bytes into the file when cut is negative, or before the first byte of
+    `at` when it is given; `between` runs in the pause.
     """
     boundary = "----pdiTestBoundary7d91c4"
     head = b"".join([
@@ -221,6 +223,8 @@ def split_upload(t, portal, name, blob, cut, between=None):
                "Content-Type: multipart/form-data; boundary=%s\r\nContent-Length: %d\r\n\r\n"
                % (portal.host, cookie, boundary, len(body))).encode()
     split = len(request) + len(head) + (-cut if cut < 0 else len(blob) + cut)
+    if at is not None:
+        split = (request + body).index(at)
 
     raw = socket.create_connection((portal.host, portal.port), timeout=20)
     try:
@@ -272,7 +276,53 @@ def delimiter_split_across_reads(t):
                 if got is None:
                     wrong.append("%s: not on the target" % name)
                 elif got != blob:
-                    wrong.append("%s: %d bytes sent, %d stored" % (name, len(blob), len(got)))
+                    at = next((i for i in range(min(len(got), len(blob))) if got[i] != blob[i]), min(len(got), len(blob)))
+                    wrong.append("%s: %d bytes sent, %d stored, first difference at %d: %r"
+                                 % (name, len(blob), len(got), at, got[at:at + 40]))
+        finally:
+            sftp.close()
+            client.close()
+    finally:
+        for name, _, _ in cases:
+            t.run("rm /%s" % name)
+
+    if wrong:
+        raise AssertionError("; ".join(wrong))
+
+
+@test("an upload whose header lines arrive cut in two is stored byte for byte", needs=("rm",))
+def header_lines_split_across_reads(t):
+    """
+    A read ends wherever the network stops handing bytes over, so any line of the
+    request can arrive in two pieces: a request header, a part header, the blank
+    line that ends them, a field value or a boundary. Each must be read whole.
+    """
+    portal = t.portal()
+    cuts = (b"ookie: ", b"ontent-Length", b"ent-Type: application", b"cation/octet-stream\r\n\r\n",
+            b"\n\r\n\x00", b"orage\r\n", b"TestBoundary7d91c4\r\nContent-Disposition: form-data; name=\"nf\"")
+    cases = [("up_line_%d.bin" % i, patterned(700), cut) for i, cut in enumerate(cuts)]
+    wrong = []
+    try:
+        for name, blob, cut in cases:
+            t.run("rm /%s" % name)
+            began = time.time()
+            status = split_upload(t, portal, name, blob, 0, at=cut)
+            took = time.time() - began - 0.5
+            if not status.startswith(b"HTTP/1.1 3") and not status.startswith(b"HTTP/1.1 200"):
+                wrong.append("%s: the upload cut before %r answered %r" % (name, cut, status))
+            elif took > ANSWER_WITHIN:
+                wrong.append("%s: the upload cut before %r was answered %.1f s after its last byte" % (name, cut, took))
+
+        client, sftp = sftp_open(t)
+        try:
+            for name, blob, cut in cases:
+                got = read_back(sftp, "/" + name)
+                if got is None:
+                    wrong.append("%s: cut before %r, not on the target" % (name, cut))
+                elif got != blob:
+                    at = next((i for i in range(min(len(got), len(blob))) if got[i] != blob[i]), min(len(got), len(blob)))
+                    wrong.append("%s: cut before %r, %d bytes sent, %d stored, first difference at %d: %r"
+                                 % (name, cut, len(blob), len(got), at, got[at:at + 40]))
         finally:
             sftp.close()
             client.close()

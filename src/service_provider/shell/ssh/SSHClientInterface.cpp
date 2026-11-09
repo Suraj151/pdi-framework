@@ -112,14 +112,16 @@ void SSHClientInterface::scheduleCommit(uint32_t delayms){
     if( m_writeCommitTaskId >= 0 ){
         return;
     }
-    m_writeCommitTaskId = __task_scheduler.setTimeout( [&]() {
+    CallBackVoidArgFn commitfn = [&]() {
         m_writeCommitTaskId = -1;
         this->commit();
-    }, delayms, __i_dvc_ctrl.millis_now() );
+    };
 
     ServiceProvider *sshsvc = ServiceProvider::getService(SERVICE_SSH);
     if( nullptr != sshsvc ){
-        sshsvc->trackServiceTask(m_writeCommitTaskId);
+        m_writeCommitTaskId = sshsvc->serviceSetTimeout( commitfn, delayms, __i_dvc_ctrl.millis_now() );
+    }else{
+        m_writeCommitTaskId = __task_scheduler.setTimeout( commitfn, delayms, __i_dvc_ctrl.millis_now() );
     }
 }
 

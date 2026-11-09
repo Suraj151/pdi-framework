@@ -20,6 +20,7 @@ TEST(errortext, names_the_codes_a_file_command_meets)
     ASSERT_STREQ(ErrorToText(STORAGE_ERROR_NOT_A_FILE), "Is a directory");
     ASSERT_STREQ(ErrorToText(STORAGE_ERROR_NOT_A_DIRECTORY), "Not a directory");
     ASSERT_STREQ(ErrorToText(STORAGE_ERROR_NOT_EMPTY), "Directory not empty");
+    ASSERT_STREQ(ErrorToText(STORAGE_ERROR_NO_ENTRY), "No such file or directory");
     ASSERT_STREQ(ErrorToText(STORAGE_ERROR_NAME_TOO_LONG), "File name too long");
     ASSERT_STREQ(ErrorToText(STORAGE_ERROR_READ_ONLY), "Read-only file system");
 }

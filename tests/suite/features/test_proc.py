@@ -381,7 +381,10 @@ def watch_runs_and_stops(t):
 
 @test("renice changes a task's nice value", needs=("renice", "ps"))
 def renice_changes_nice(t):
-    rows = _ps_rows(_read_ps(t))
+    # A task listed twice in a row is one that stays; a one-shot task, such as
+    # the one an ssh session sends its output with, is gone by the next listing.
+    again = set(row[0] for row in _ps_rows(_read_ps(t)))
+    rows = [row for row in _ps_rows(_read_ps(t)) if row[0] in again]
     if not rows:
         raise Skip("no tasks to renice")
 

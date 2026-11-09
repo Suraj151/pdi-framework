@@ -45,6 +45,7 @@ const char *ErrorToText(int32_t code)
     case STORAGE_ERROR_NODE_LIMIT:        return RODT_ATTR("Too many files");
     case STORAGE_ERROR_NOT_MOUNTED:       return RODT_ATTR("Not mounted");
     case STORAGE_ERROR_NOT_EMPTY:         return RODT_ATTR("Directory not empty");
+    case STORAGE_ERROR_NO_ENTRY:          return RODT_ATTR("No such file or directory");
     case PDI_ERR_FROM_LFS(-5):          return RODT_ATTR("Input/output error");
     case PDI_ERR_FROM_LFS(-84):     return RODT_ATTR("File system corrupt");
     case PDI_ERR_FROM_LFS(-2):       return RODT_ATTR("No such file or directory");

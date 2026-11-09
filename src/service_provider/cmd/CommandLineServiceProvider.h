@@ -50,6 +50,13 @@ created Date    : 1st June 2019
 #include "commands/DeviceIotCommand.h"
 #include "commands/HelpCommand.h"
 #include "commands/UptimeCommand.h"
+#include "commands/FreeCommand.h"
+#include "commands/LoggerCommand.h"
+#include "commands/WhichCommand.h"
+#include "commands/BasenameCommand.h"
+#include "commands/SeqCommand.h"
+#include "commands/HistoryCommand.h"
+#include "commands/SleepCommand.h"
 #include "commands/UnameCommand.h"
 #include "commands/HostnameCommand.h"
 #include "commands/EchoCommand.h"
@@ -102,7 +109,7 @@ created Date    : 1st June 2019
 /**
  * Defines constants for cmd history file path.
  */
-static const char 		CMD_TERMINAL_HISTORY_STATIC_FILEPATH   []PROG_RODT_ATTR = "/.term_history";
+static const char 		CMD_TERMINAL_HISTORY_STATIC_FILEPATH   []PROG_RODT_ATTR = CMD_TERMINAL_HISTORY_FILEPATH;
 static const uint16_t 	CMD_TERMINAL_HISTORY_MAX_LINES     = 25;
 static const uint16_t 	CMD_TERMINAL_HISTORY_ROTATE_SLACK  = 8;
 
@@ -134,6 +141,12 @@ public:
 
 	pdi_err_t processTerminalInput(iTerminalInterface *terminal);
 	pdi_err_t executeCommand(pdiutil::string *cmd = nullptr, cmd_term_inseq_t inseq = CMD_TERM_INSEQ_NONE) override;
+
+	/**
+	 * Runs a command that is waiting again on its own session, as if its answer
+	 * had come in, for a command that waits for time rather than for input.
+	 */
+	void wakeCommand(cmd_t *cmd) override;
 	static void startInteraction();
     bool useTerminal(iTerminalInterface *terminal);
 	void releaseSession(session_t *session);
@@ -228,7 +241,13 @@ private:
 	 * prompt that an interactively typed line carries around it.
 	 */
 	pdi_err_t runLine(pdiutil::string &line, bool &named_noent, iTerminalInterface *sink = nullptr,
-	                  uint8_t depth = 0);
+	                  uint8_t depth = 0, uint16_t from = 0, pdi_err_t prior = CMD_ERROR_NOENT);
+
+	/**
+	 * Answers the command waiting on this session and, once it is done, runs
+	 * what followed it on its line unless it was cancelled.
+	 */
+	pdi_err_t answerWaiting(int16_t index, pdiutil::string *cmd, cmd_term_inseq_t inseq);
 
 	/**
 	 * Releases every command that has finished, leaving the ones still waiting

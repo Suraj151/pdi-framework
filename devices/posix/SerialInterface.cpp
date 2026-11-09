@@ -629,7 +629,7 @@ SdSlot s_sd_slots[s_sd_max_cards] = {};
  */
 SdCardSim::SdCardSim(bool highcapacity, uint32_t blocks)
     : m_present(true), m_v1(false), m_mmc(false), m_no_crc_command(false), m_wrong_voltage(false),
-      m_ultra_capacity(false), m_never_ready(false), m_ready_after(2),
+      m_ultra_capacity(false), m_never_ready(false), m_ready_after(2), m_powering_up(0), m_wrong_csd_class(false),
       m_read_error(0), m_bad_crc(false), m_write_response(s_sd_accepted), m_busy_bytes(3),
       m_never_done(false), m_silent_command(-1), m_silent_count(-1), m_refused_command(-1), m_bad_echo(false), m_no_token(false),
       m_no_write_response(false), m_fail_read_at(0), m_reads(0), m_writes(0), m_clocks_deselected(0),
@@ -786,7 +786,7 @@ void SdCardSim::csd(uint8_t *out) const
         out[0] = 0x80;
         return;
     }
-    if (m_highcapacity)
+    if (m_highcapacity != m_wrong_csd_class)
     {
         uint32_t size = m_blocks / 1024 - 1;
         out[0] = 0x40;
@@ -902,7 +902,12 @@ void SdCardSim::command()
         break;
     case 58:
     {
-        uint32_t ocr = 0x00FF8000UL | (m_idle ? 0 : 0x80000000UL) | ((m_highcapacity && !m_idle) ? 0x40000000UL : 0);
+        bool powered = !m_idle && m_powering_up <= 0;
+        if (!m_idle && m_powering_up > 0)
+        {
+            m_powering_up--;
+        }
+        uint32_t ocr = 0x00FF8000UL | (powered ? 0x80000000UL : 0) | ((m_highcapacity && powered) ? 0x40000000UL : 0);
         queue(r1);
         queue((uint8_t)(ocr >> 24));
         queue((uint8_t)(ocr >> 16));

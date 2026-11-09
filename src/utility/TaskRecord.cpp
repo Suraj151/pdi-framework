@@ -91,7 +91,7 @@ pdiutil::string taskDisplayName(const task_t *task) {
 
 /**
  * The one line a task reads as, leading with the pid, the bracketed name and
- * the state the way linux orders them.
+ * then the state.
  */
 void taskStatLine(const task_t *task, pdiutil::string &out) {
     out.clear();

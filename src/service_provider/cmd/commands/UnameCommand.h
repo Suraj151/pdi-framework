@@ -4,7 +4,7 @@ This file is part of the pdi stack.
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
 
-Prints what the system is, the way linux uname does: the system name with no
+Prints what the system is: the system name with no
 option, and with -s -n -r -v -m the system name, host name, release, version
 and machine, in that order whatever order they are given in; -a prints all of
 them.

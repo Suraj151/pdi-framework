@@ -86,7 +86,7 @@ public:
   iDriverInterface *bound(uint8_t cls) const;
 
   /**
-   * The name a device goes by under /sys/bus, the way linux names it.
+   * The name a device goes by under /sys/bus.
    */
   static bool deviceId(const driver_device_t &dev, pdiutil::string &out);
 
@@ -205,8 +205,7 @@ private:
   void announce(event_name_t event, driver_device_t &dev);
 
   /**
-   * Logs a newly bound disk's partition table and each partition in it, as linux
-   * does.
+   * Logs a newly bound disk's partition table and each partition in it.
    */
   void logLayout(driver_device_t &dev);
 

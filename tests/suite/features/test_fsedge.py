@@ -62,6 +62,57 @@ def each_mount_round_trips(t):
         expect_in("MOUNTOK", out, "a file on %s" % prefix)
 
 
+@test("a redirect of a command that prints nothing creates the file or empties it, on every writable mount",
+      needs=("true", "echo", "cat", "wc", "rm"))
+def silent_redirect_each_mount(t):
+    for prefix in writable_mounts(t):
+        base = "" if prefix == "/" else prefix
+        path = "%s/fe_silent.txt" % base
+        t.run("rm %s" % path)
+
+        t.run("true > %s" % path)
+        expect_in("0 0 0 %s" % path, t.run("wc %s" % path), "a new file from a silent redirect on %s" % prefix)
+
+        t.run("echo OLDLINE > %s" % path)
+        t.run("true > %s" % path)
+        out = t.run("wc %s" % path)
+        expect_in("0 0 0 %s" % path, out, "a file a silent redirect replaced on %s" % prefix)
+
+        t.run("echo KEPTLINE > %s" % path)
+        t.run("true >> %s" % path)
+        expect_in("KEPTLINE", t.run("cat %s" % path), "a file a silent append left alone on %s" % prefix)
+
+        t.run("rm %s" % path)
+        t.run("true >> %s" % path)
+        expect_in("0 0 0 %s" % path, t.run("wc %s" % path), "a new file from a silent append on %s" % prefix)
+        t.run("rm %s" % path)
+
+
+@test("a missing path is named missing and a directory a directory, on every writable mount",
+      needs=("rm", "cat", "ls", "mkdir", "echo"))
+def missing_or_directory_each_mount(t):
+    for prefix in writable_mounts(t):
+        base = "" if prefix == "/" else prefix
+        gone = "%s/fe_gone.txt" % base
+        deep = "%s/fe_nodir/fe_gone.txt" % base
+        folder = "%s/fe_folder" % base
+        t.run("rm %s" % gone)
+        t.run("rm -r %s" % folder)
+
+        expect_in("%s : No such file or directory" % gone, t.run("rm %s" % gone), "rm of a missing file on %s" % prefix)
+        expect_in("%s : No such file or directory" % gone, t.run("cat %s" % gone), "cat of a missing file on %s" % prefix)
+        expect_in("%s : No such file or directory" % deep, t.run("cat %s" % deep), "cat under a missing directory on %s" % prefix)
+        expect_in("%s : No such file or directory" % gone, t.run("ls %s" % gone), "ls of a missing path on %s" % prefix)
+
+        t.run("mkdir %s" % folder)
+        out = t.run("cat %s" % folder)
+        expect_in("%s : Is a directory" % folder, out, "cat of a directory on %s" % prefix)
+        expect_not_in("No such file", out, "cat of a directory on %s" % prefix)
+        expect_in("cannot write %s : Is a directory" % folder, t.run("echo x > %s" % folder),
+                  "a redirect onto a directory on %s" % prefix)
+        t.run("rm -r %s" % folder)
+
+
 @test("a rename over an existing file is refused and both files stay", needs=("echo", "cat", "mv", "rm"))
 def rename_over_existing(t):
     ws = t.workspace("fe_rename")

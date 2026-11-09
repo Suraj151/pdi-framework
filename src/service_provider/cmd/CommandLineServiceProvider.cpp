@@ -113,6 +113,7 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
   TeeCommand::RegisterCommand();
   DiffCommand::RegisterCommand();
   ReadCommand::RegisterCommand();
+  HistoryCommand::RegisterCommand();
 
   m_termhistoryfile = CHARPTR_WRAP_RO(CMD_TERMINAL_HISTORY_STATIC_FILEPATH);
   #endif
@@ -163,11 +164,21 @@ CommandLineServiceProvider::CommandLineServiceProvider() :
 
   HelpCommand::RegisterCommand();
   UptimeCommand::RegisterCommand();
+  FreeCommand::RegisterCommand();
+#ifdef ENABLE_SYSLOG_SERVICE
+  LoggerCommand::RegisterCommand();
+#endif
   UnameCommand::RegisterCommand();
   HostnameCommand::RegisterCommand();
 #ifdef ENABLE_MQTT_SERVICE
 #endif
   EchoCommand::RegisterCommand();
+  WhichCommand::RegisterCommand();
+  TypeCommand::RegisterCommand();
+  BasenameCommand::RegisterCommand();
+  DirnameCommand::RegisterCommand();
+  SeqCommand::RegisterCommand();
+  SleepCommand::RegisterCommand();
   EnvCommand::RegisterCommand();
   ExportCommand::RegisterCommand();
   UnsetCommand::RegisterCommand();
@@ -367,6 +378,14 @@ pdi_err_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface *t
         ownRender = true;
       }
     }
+
+    for (int16_t i = 0; i < m_cmdlist.size(); i++){
+      if( nullptr != m_cmdlist[i] && m_cmdlist[i]->m_owner == session &&
+          m_cmdlist[i]->isWaitingForOption() && m_cmdlist[i]->holdsInput() &&
+          !SessionManager::interruptRequested() ){
+        return CMD_ERROR_AGAIN;
+      }
+    }
     
     while (keyWaiting(session, terminal))
     {
@@ -404,7 +423,7 @@ pdi_err_t CommandLineServiceProvider::processTerminalInput(iTerminalInterface *t
           session->m_cursor--;
 
           if(!ownRender){
-            // putty can visualize 0x7F but not every terminal like linux.
+            // putty can visualize 0x7F but not every terminal can.
             // so sending backspace irespective of incoming char
             terminal->write('\b');  // echo
 
@@ -708,9 +727,10 @@ void CommandLineServiceProvider::reapFinishedCommands()
  * prompt that an interactively typed line carries around it.
  */
 pdi_err_t CommandLineServiceProvider::runLine(pdiutil::string &line, bool &named_noent,
-                                              iTerminalInterface *sink, uint8_t depth)
+                                              iTerminalInterface *sink, uint8_t depth,
+                                              uint16_t from, pdi_err_t prior)
 {
-  pdi_err_t res = CMD_ERROR_NOENT;
+  pdi_err_t res = prior;
 
   #if defined(ENABLE_STORAGE_SERVICE)
   ShellParser::Line parsed = ShellParser::parse(line.c_str(), (int16_t)line.size());
@@ -720,7 +740,7 @@ pdi_err_t CommandLineServiceProvider::runLine(pdiutil::string &line, bool &named
     m_terminal->writeln();
     m_terminal->writeln_ro(RODT_ATTR("syntax error"));
     res = CMD_ERROR_INVAL;
-  }else if( nullptr == sink && parsed.isPlain() && !ShellParser::expandable(line.c_str(), (int16_t)line.size()) ){
+  }else if( 0 == from && nullptr == sink && parsed.isPlain() && !ShellParser::expandable(line.c_str(), (int16_t)line.size()) ){
 
     // one command, nothing to wire up and nothing to expand, so run it
     // where it lies rather than copying the line
@@ -751,7 +771,7 @@ pdi_err_t CommandLineServiceProvider::runLine(pdiutil::string &line, bool &named
     }
   }else{
 
-    for( uint16_t p = 0; p < parsed.m_pipelines.size(); p++ ){
+    for( uint16_t p = from; p < parsed.m_pipelines.size(); p++ ){
 
       if( !ShellParser::shouldRun(parsed.m_pipelines[p].m_join, res) ){
         continue;
@@ -771,6 +791,11 @@ pdi_err_t CommandLineServiceProvider::runLine(pdiutil::string &line, bool &named
       // a command that stopped for input owns the terminal, so what
       // follows on the line cannot run behind it
       if( CMD_ERROR_AGAIN == res || CMD_ERROR_HOLD_BUFFER == res ){
+        int16_t waiting = getCommandWaitingForUserInput();
+        if( CMD_ERROR_AGAIN == res && nullptr == sink && (uint16_t)(p + 1) < parsed.m_pipelines.size() &&
+            waiting >= 0 && m_cmdlist[waiting]->holdsInput() ){
+          m_cmdlist[waiting]->keepLineTail(line, (uint16_t)(p + 1));
+        }
         break;
       }
 
@@ -912,7 +937,7 @@ pdi_err_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cmd_t
     // first check whether any last command is incomplete and waiting for user input
     if(is_executing_lastcommand){
 
-      res = m_cmdlist[waitingCmdIndex]->executeCommand((char*)cmd->c_str(), cmd->size(), true, inseq);
+      res = answerWaiting(waitingCmdIndex, cmd, inseq);
     }else{
 
       res = runLine(*cmd, reported_noent);
@@ -964,7 +989,7 @@ pdi_err_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cmd_t
           int iStatus = __i_instance.getFileSystemInstance().readFile(m_termhistoryfile.c_str(), 100, [&](char* data, uint32_t size)->bool{
             copied = ( __i_instance.getFileSystemInstance().writeFile(tempFilePath.c_str(), data, size, true) == (int)size );
             return copied;
-          }, remove_upto_index+1);
+          }, remove_upto_index+2);
 
           if( iStatus < 0 || !copied ){
             __i_instance.getFileSystemInstance().deleteFile(tempFilePath.c_str());
@@ -1009,7 +1034,7 @@ pdi_err_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cmd_t
 
       /* Perform terminal input actions if any */
       if( inseq > CMD_TERM_INSEQ_NONE && inseq < CMD_TERM_INSEQ_MAX ){
-        res = m_cmdlist[waitingCmdIndex]->executeCommand((char*)cmd->c_str(), cmd->size(), true, inseq);
+        res = answerWaiting(waitingCmdIndex, cmd, inseq);
       }
     }
   }
@@ -1071,6 +1096,59 @@ pdi_err_t CommandLineServiceProvider::executeCommand(pdiutil::string *cmd, cmd_t
   SessionManager::setLastExit(res);
 
   return res;
+}
+
+/**
+ * Answers the command waiting on this session and, once it is done, runs
+ * what followed it on its line unless it was cancelled.
+ */
+pdi_err_t CommandLineServiceProvider::answerWaiting(int16_t index, pdiutil::string *cmd, cmd_term_inseq_t inseq)
+{
+  cmd_t *waiting = m_cmdlist[index];
+  pdi_err_t res = waiting->executeCommand((char*)cmd->c_str(), cmd->size(), true, inseq);
+
+  pdiutil::string tail;
+  uint16_t next = 0;
+  if( CMD_ERROR_AGAIN != res && CMD_ERROR_HOLD_BUFFER != res && waiting->takeLineTail(tail, next) &&
+      CMD_ERROR_CANCELED != res && CMD_ERROR_INTR != res ){
+    bool named_noent = false;
+    SessionManager::setLastExit(res);
+    res = runLine(tail, named_noent, nullptr, 0, next, res);
+  }
+  return res;
+}
+
+/**
+ * Runs a command that is waiting again on its own session, as if its answer
+ * had come in, for a command that waits for time rather than for input.
+ */
+void CommandLineServiceProvider::wakeCommand(cmd_t *cmd)
+{
+  bool listed = false;
+  for (int16_t i = 0; !listed && i < m_cmdlist.size(); i++){
+    listed = ( m_cmdlist[i] == cmd );
+  }
+  if( !listed || !cmd->isWaitingForOption() || nullptr == cmd->m_owner || nullptr == cmd->m_owner->m_terminal ){
+    return;
+  }
+
+  session_t *previous = SessionManager::current();
+  iTerminalInterface *shell = ServiceProvider::getTerminal();
+  SessionManager::setCurrent(cmd->m_owner);
+  setTerminal(cmd->m_owner->m_terminal);
+
+  session_t *session = cmd->m_owner;
+  iTerminalInterface *terminal = session->m_terminal;
+  pdiutil::string none;
+  executeCommand(&none, CMD_TERM_INSEQ_ENTER);
+  terminal->flush();
+
+  if( keyWaiting(session, terminal) ){
+    processTerminalInput(terminal);
+  }
+
+  SessionManager::setCurrent(previous);
+  ServiceProvider::setTerminal(shell);
 }
 
 /**

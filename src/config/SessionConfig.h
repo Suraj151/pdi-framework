@@ -51,9 +51,8 @@ created Date    : 18th July 2026
 #endif
 
 /**
- * Bytes a pipe carries between two stages. A pipe is fixed capacity the way a
- * linux one is; a stage that outruns it marks the pipe overflowed rather than
- * growing without bound.
+ * Bytes a pipe carries between two stages. A pipe is fixed capacity; a stage
+ * that outruns it marks the pipe overflowed rather than growing without bound.
  */
 #ifndef PDI_PIPE_CAPACITY
 #define PDI_PIPE_CAPACITY 1024
@@ -68,6 +67,11 @@ created Date    : 18th July 2026
 #endif
 
 #define CMD_INTERRUPT_CHAR 0x03 /* the byte ctrl+c sends */
+#define CMD_TERMINAL_HISTORY_FILEPATH "/.term_history" /* where the shell keeps the lines typed */
+#define SLEEP_MAX_SECONDS 2147483 /* longest sleep, so its milliseconds fit the scheduler */
+#ifndef SLEEP_DETACHED_MAX_MS
+#define SLEEP_DETACHED_MAX_MS 10000 /* longest a sleep may hold the board where nothing can resume its session */
+#endif
 
 #define CMD_MSG_ROOT_REQUIRED "root required" /* what a command prints when only root may run it */
 #define CMD_MSG_NOT_FOUND "Not found : " /* what a command prints before a path that is not there */

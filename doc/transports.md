@@ -78,7 +78,7 @@ Handshake, verification, record framing and the same response parsing all come a
 
 Because the choice is made per request, OTA, device-IoT and GPIO posting all share one client and none of them has to pick anything; with TLS on, a plain `http://` address still goes out as plain HTTP.
 
-**One shared client means one request at a time.** `Http_Client::GetStaticInstance()` is that client, and mail goes out over the same socket. While an async request is still waiting for its callback, `Begin()` returns false and `DownloadStream` returns `PDI_ERR_BUSY`, so nothing takes the socket out from under a request in flight. The built-in users take their turn: a GPIO alert raised while the client is busy goes out on the next tick, a mail is not started until the client is free and its send reports failure, and `wget` answers "http client busy, try again".
+**One shared client means one request at a time.** `Http_Client::GetStaticInstance()` is that client. Mail does not use it: each mail opens a connection of its own for as long as it goes out. While an async request is still waiting for its callback, `Begin()` returns false and `DownloadStream` returns `PDI_ERR_BUSY`, so nothing takes the socket out from under a request in flight. The built-in users take their turn: a GPIO alert raised while the client is busy goes out on the next tick, and `wget` answers "http client busy, try again".
 
 There is no HTTP *server* class here. The server side lives at the interface layer with a portable default implementation, plumbed through the web server, and `begin(port, secure)` is what flips it into TLS ([§8.7.1](web-server.md#871-https-wiring-and-certificates)).
 
@@ -118,26 +118,23 @@ The tick itself runs every `MQTT_TIMER_INTERVAL_MS`, 200 by default. While a mes
 
 ## 10.3 SMTP
 
-A blocking, command-response client. Each helper issues one verb and waits for the reply code it expects.
+A command-response client that never waits for a reply. Each `start*` call writes one command and starts reading its reply; `pollResponse()` reads whatever has arrived and returns at once, `SMTP_RESPONSE_WAITING` until the reply's last line is in (the line whose code is not followed by `-`), then `SMTP_RESPONSE_FINISHED` with the code in `lastResponseCode()`. A reply that sends nothing for `SMTP_DEFAULT_TIMEOUT` (5 s) ends as `SMTP_RESPONSE_TIMEOUT`, and one whose connection the server closed as `SMTP_RESPONSE_CONN_ERR`.
 
 ```cpp
 SMTPClient smtp;
-smtp.begin(client, host, port);        // stores parameters; connects on first send
+smtp.begin(client, host, port);        // connects, then reads the greeting (220)
 
-smtp.sendHello(domain);
-smtp.sendAuthLogin(username, password);
-smtp.sendFrom(sender);
-smtp.sendTo(recipient);                // once per recipient
-smtp.sendDataCommand();
-smtp.sendDataHeader(sender, recipient, subject);
-smtp.sendDataBody(body);
-smtp.sendQuit();
+smtp.startHello(domain);               // 250
+smtp.startAuthLogin();                 // 334, then startAuthUser(user) 334, startAuthPass(pass) 235
+smtp.startFrom(sender);                // 250
+smtp.startTo(recipient);               // 250
+smtp.startDataCommand();               // 354
+smtp.startDataBody(name, recipient, subject, body, size);  // 250
+smtp.startQuit();                      // 221
 smtp.end();
 ```
 
-Lower-level primitives are exposed too — read a response, wait for an expected one, send a command and get its code — for callers that want to drive the protocol themselves.
-
-Every verb blocks on the wire with a five-second timeout, so a flaky link can add up across a single message. That is why the email service schedules sending off the critical path rather than calling it from a request handler. The body goes out as given, so anything that needs encoding gets encoded by the caller.
+After each `start*` call, poll until the reply is complete before the next one. The email service does this one step per scheduler tick, so a mail never holds the loop for a reply; only the connect itself waits, up to 3 s. The body goes out as given, with each line ended in CRLF and a leading dot doubled, so anything that needs encoding gets encoded by the caller.
 
 ## 10.4 Helpers
 

@@ -79,7 +79,7 @@ public:
   void setHttpHost(const char* _host);
   #endif
   #ifdef ENABLE_EMAIL_SERVICE
-  bool handleGpioEventOverEmail(void);
+  bool handleGpioEventOverEmail(uint8_t _evtidx);
 #endif
   void handleGpioOperations(void);
   void handleGpioModes(int _gpio_config_type = GPIO_MODE_CONFIG);

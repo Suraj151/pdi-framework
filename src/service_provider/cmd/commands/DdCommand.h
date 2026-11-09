@@ -4,10 +4,10 @@ This file is part of the pdi stack.
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
 
-Copies blocks from one file to another, at the block offsets given, the way
-linux dd does: dd if=<file> of=<file> [bs=] [count=] [skip=] [seek=]. A
-regular output file is written through a handle, replaced unless a seek is
-given; a device node is written in place at the offset.
+Copies blocks from one file to another, at the block offsets given:
+dd if=<file> of=<file> [bs=] [count=] [skip=] [seek=]. A regular output file
+is written through a handle, replaced unless a seek is given; a device node is
+written in place at the offset.
 
 Author          : Suraj I.
 created Date    : 21st Oct 2026

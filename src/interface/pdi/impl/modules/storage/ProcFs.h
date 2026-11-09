@@ -56,6 +56,12 @@ private:
   pdiutil::string renderMemInfo();
 
   /**
+   * The processor the stack runs on, one block per core, then the program flash
+   * and the platform beneath the stack; unknown for what the port cannot report.
+   */
+  pdiutil::string renderCpuInfo();
+
+  /**
    * One line per mount, in the order the dispatcher searches them.
    */
   pdiutil::string renderMounts();

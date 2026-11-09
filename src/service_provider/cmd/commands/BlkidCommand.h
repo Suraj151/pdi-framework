@@ -4,7 +4,7 @@ This file is part of the pdi stack.
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
 
-Names what each disk and partition carries, the way linux blkid does: the
+Names what each disk and partition carries: the
 filesystem as TYPE and the partition table as PTTYPE, one line per node that
 carries either. blkid <node> names only that one.
 

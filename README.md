@@ -8,7 +8,7 @@ PDI is a set of libraries tied together — WiFi, storage, networking, schedulin
 
 **Small on the device, big in what it gives you.** It fits in the flash of an ordinary microcontroller and still hands you the things you would otherwise build yourself every time: remote login, file transfer, scheduled jobs, firmware updates over WiFi, a configuration UI, and an API to your own hardware. You write normal Arduino code on top, and the same sketch moves from one board to another.
 
-**Stability comes from staying inside the board's limits.** Enable the services the hardware can carry — flash and RAM are the budget — and the device keeps running without resets or dropped connections. That is what the test suite checks: 2000+ unit tests, and 700+ feature tests driven on real hardware — two different boards at once, each over serial, Telnet and SSH at the same time.
+**Stability comes from staying inside the board's limits.** Enable the services the hardware can carry — flash and RAM are the budget — and the device keeps running without resets or dropped connections. That is what the test suite checks: 2100+ unit tests, and 800+ feature tests driven on real hardware — two different boards at once, each over serial, Telnet and SSH at the same time.
 
 ## Quick Start
 
@@ -141,11 +141,11 @@ useradd u=alice p=<her-password>
 su alice
 ```
 
-Then open the portal in a browser for the same things with switches and forms, and look at the [examples](doc/examples.md) to add your own command, page, settings table or service.
+Then open the portal in a browser for the same things with switches and forms, and look at the [examples](doc/examples.md): driving pins, files and an SD card from a sketch, sending a mail, adding your own command, page, settings table or service, and three small complete devices — a sensor logger, a relay switched from the shell, the portal and MQTT, and a board that checks its own memory and flash from a cron job.
 
 ## What You Can Do With It
 
-**Log in to your board like a computer.** Open a serial monitor, or `ssh` in, or `telnet` in — you get the same login prompt and the same 75+ commands either way. `ls`, `cat`, `grep`, `ps`, `top`, `kill`, `df`, `chmod`, `ping`, `wget` and the rest all behave the way you expect, with tab completion, command history, an in-place file editor and Ctrl+C. Commands pipe into each other and redirect to files, so `ps | grep ssh` and `cat /proc/meminfo > /tmp/mem.txt` do exactly what they look like.
+**Log in to your board like a computer.** Open a serial monitor, or `ssh` in, or `telnet` in — you get the same login prompt and the same 80+ commands either way. `ls`, `cat`, `grep`, `ps`, `top`, `kill`, `df`, `chmod`, `ping`, `wget` and the rest all behave the way you expect, with tab completion, command history, an in-place file editor and Ctrl+C. Commands pipe into each other and redirect to files, so `ps | grep ssh` and `cat /proc/meminfo > /tmp/mem.txt` do exactly what they look like.
 
 **Run it from a browser.** The device serves its own web portal: a live dashboard, a settings page for each service, GPIO switches, a file browser, MQTT and email testers, and firmware upload. Users sign in with their own accounts and see only what their permissions allow — the same rules the shell uses. It works on a phone and follows your light or dark theme.
 
@@ -176,7 +176,7 @@ Per-service reference in [§6 Service Providers](doc/services.md#6-service-provi
 
 **Things the services are built on**, rather than services themselves — TLS/HTTPS · SFTP and scp · link-layer mesh.
 
-**75+ shell commands** — the full list is in [§7.8 Built-in command inventory](doc/shell.md#78-built-in-command-inventory).
+**80+ shell commands** — the full list is in [§7.8 Built-in command inventory](doc/shell.md#78-built-in-command-inventory).
 
 **Storage** — one filesystem tree covering flash, `/proc`, `/sys`, `/dev` and `/tmp`, with Unix-style permissions and multi-user access control. An SD card is partitioned, formatted FAT or littlefs, and mounted with the linux commands for it — `sfdisk`, `mkfs`, `wipefs`, `mount` — and `/etc/fstab` mounts it whenever it is put in.
 Details in [§6.2.12](doc/services.md#6212-storage-interface-init-no-provider).

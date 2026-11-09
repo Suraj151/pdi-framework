@@ -105,7 +105,7 @@ def _fields(text):
 def proc_lists_nodes(t):
     out = t.run("ls /proc")
 
-    for node in ("uptime", "version", "meminfo", "mounts", "stat"):
+    for node in ("uptime", "version", "meminfo", "mounts", "stat", "cpuinfo"):
         expect_in(node, out, "/proc holds %s" % node)
 
 
@@ -144,6 +144,38 @@ def meminfo_agrees_with_ps(t):
     if abs(free - reported) > max(4096, reported // 4):
         raise AssertionError(
             "meminfo says %d bytes free, ps says %d" % (free, reported))
+
+
+@test("cpuinfo names the processor uname names, one block per core, its flash and platform",
+      needs=("cat", "uname", "echo"), mounts=("/proc",))
+def cpuinfo_describes_processor(t):
+    out = t.run("cat /proc/cpuinfo")
+    lines = [line for line in out.splitlines() if line.strip()]
+    blocks = [line for line in lines if line.startswith("processor:")]
+    if not blocks:
+        raise AssertionError("cpuinfo holds no processor block:\n%s" % out)
+    numbers = [line.split(":", 1)[1].strip() for line in blocks]
+    if numbers != [str(i) for i in range(len(blocks))]:
+        raise AssertionError("cpuinfo numbers its processors %r" % numbers)
+    keys = _fields(out)
+    if keys.get("cpu cores") != str(len(blocks)):
+        raise AssertionError("cpu cores says %r for %d blocks" % (keys.get("cpu cores"), len(blocks)))
+    machine = [line.strip() for line in t.run("uname -m").splitlines() if line.strip()][-1]
+    models = [line.split(":", 1)[1].strip() for line in lines if line.startswith("model name:")]
+    if len(models) != len(blocks) or any(model != machine for model in models):
+        raise AssertionError("cpuinfo names %r where uname -m says %r" % (models, machine))
+    mhz = [line.split(":", 1)[1].strip() for line in lines if line.startswith("cpu MHz:")]
+    if any(not (value.isdigit() or value == "unknown") for value in mhz):
+        raise AssertionError("cpu MHz reads %r" % mhz)
+    flash = keys.get("flash size", "")
+    if not (flash == "unknown" or (flash.endswith(" B") and flash[:-2].isdigit())):
+        raise AssertionError("flash size reads %r" % flash)
+    if not keys.get("platform"):
+        raise AssertionError("cpuinfo names no platform:\n%s" % out)
+    columns = set(len(line) - len(line.split(":", 1)[1].lstrip()) for line in lines if ":" in line)
+    if len(columns) != 1:
+        raise AssertionError("the cpuinfo values do not start in one column:\n%s" % out)
+    expect_in("Not supported", t.run("echo x > /proc/cpuinfo"), "writing cpuinfo")
 
 
 @test("mounts lists the same filesystems the mount command does",

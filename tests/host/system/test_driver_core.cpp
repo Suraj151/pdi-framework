@@ -2677,6 +2677,45 @@ TEST(driver_core, mmc_spi_gives_up_on_a_card_that_never_gets_ready)
     ASSERT_EQ((int)probeCard(bench, &bench.m_spi), (int)PDI_ERR_TIMEOUT);
 }
 
+TEST(driver_core, mmc_spi_reads_the_capacity_class_only_once_the_card_says_it_is_powered_up)
+{
+    SdBench bench;
+    bench.m_card->m_powering_up = 3;
+    fillCard(bench.m_card);
+    writeDevicesConf(SD_LINE);
+    DeviceManager mgr;
+    mgr.trigger();
+    iBlockDriverInterface *card = boundCard(mgr);
+    ASSERT_NOT_NULL(card);
+    ASSERT_EQ((int)card->blocks(), (int)SD_BLOCKS);
+
+    uint8_t block[SD_BLOCK_SIZE];
+    ASSERT_EQ((int)card->readBlocks(3, block, 1), 1);
+    ASSERT_EQ(0, memcmp(block, bench.m_card->data() + 3 * SD_BLOCK_SIZE, SD_BLOCK_SIZE));
+}
+
+TEST(driver_core, mmc_spi_gives_up_on_a_card_that_never_says_it_is_powered_up)
+{
+    SdBench bench;
+    bench.m_card->m_powering_up = 1 << 30;
+
+    ASSERT_EQ((int)probeCard(bench, &bench.m_spi), (int)PDI_ERR_TIMEOUT);
+}
+
+TEST(driver_core, mmc_spi_refuses_a_size_register_that_does_not_fit_the_capacity_class)
+{
+    SdBench high;
+    high.m_card->m_wrong_csd_class = true;
+    ASSERT_EQ((int)probeCard(high, &high.m_spi), (int)PDI_ERR_IO);
+
+    SdBench standard(false, 4096);
+    standard.m_card->m_wrong_csd_class = true;
+    ASSERT_EQ((int)probeCard(standard, &standard.m_spi), (int)PDI_ERR_IO);
+
+    SdBench healthy;
+    ASSERT_EQ((int)probeCard(healthy, &healthy.m_spi), (int)PDI_OK);
+}
+
 TEST(driver_core, mmc_spi_refuses_an_mmc_card_as_not_supported)
 {
     SdBench bench;

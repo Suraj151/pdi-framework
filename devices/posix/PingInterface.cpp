@@ -320,7 +320,7 @@ bool PingInterface::openSocket()
         return true;
     }
 
-    // linux serves echo requests on a datagram socket to anyone inside
+    // the host kernel serves echo requests on a datagram socket to anyone inside
     // net.ipv4.ping_group_range; a raw socket needs CAP_NET_RAW
     m_raw = false;
     int fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_ICMP);

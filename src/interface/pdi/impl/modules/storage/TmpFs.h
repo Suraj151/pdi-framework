@@ -36,10 +36,16 @@ struct tmpfs_node_t {
   uint32_t m_mtime;
 };
 
+struct tmpfs_open_t {
+  pdiutil::string m_path;
+  uint32_t m_pos;
+  uint8_t m_flags;
+};
+
 class TmpFs : public iFileSystemInterface {
 public:
   TmpFs();
-  virtual ~TmpFs() {}
+  virtual ~TmpFs();
 
   pdi_err_t init() override { return 0; }
 
@@ -114,6 +120,14 @@ public:
   int setFileOwner(const char *path, uint16_t uid, uint16_t gid) override;
   pdi_err_t touch(const char *path) override;
 
+  pdi_fhandle_t openFile(const char *path, uint8_t flags) override;
+  int readFileHandle(pdi_fhandle_t handle, char *buffer, uint32_t size) override;
+  int writeFileHandle(pdi_fhandle_t handle, const char *content, uint32_t size) override;
+  int64_t seekFile(pdi_fhandle_t handle, int64_t offset, file_seek_t whence) override;
+  pdi_err_t syncFile(pdi_fhandle_t handle) override;
+  pdi_err_t closeFile(pdi_fhandle_t handle) override;
+  uint16_t openCount() const override;
+
 protected:
   uint32_t nowEpoch() override;
   void currentOwner(uint16_t &uid, uint16_t &gid) override;
@@ -121,6 +135,7 @@ protected:
 
 private:
   pdiutil::vector<tmpfs_node_t> m_nodes;
+  tmpfs_open_t *m_open[VFS_MAX_OPEN_FILES];
 
   pdiutil::string normalize(const char *path) const;
   int findNode(const pdiutil::string &norm) const;
@@ -129,6 +144,12 @@ private:
   uint32_t usedBytes() const;
   void stampNew(tmpfs_node_t &n, uint16_t defperms);
   int putContent(const pdiutil::string &norm, const char *content, uint32_t size, bool append);
+
+  /**
+   * The open file a handle names, or null when the handle is out of range or
+   * names no open file.
+   */
+  tmpfs_open_t *openSlot(pdi_fhandle_t handle) const;
 };
 
 extern TmpFs __i_tmpfs;

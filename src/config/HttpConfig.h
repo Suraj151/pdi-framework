@@ -30,6 +30,7 @@ enum http_resp_code : uint16_t {
     HTTP_RESP_NOT_FOUND = 404,
     HTTP_RESP_METHOD_NOT_ALLOWED = 405,
     HTTP_RESP_REQUEST_TIMEOUT = 408,
+    HTTP_RESP_URI_TOO_LONG = 414,
     HTTP_RESP_INTERNAL_SERVER_ERROR = 500,
     HTTP_RESP_NOT_IMPLEMENTED = 501,
     HTTP_RESP_BAD_GATEWAY = 502,
@@ -110,6 +111,14 @@ typedef enum http_method http_method_t;
  */
 #ifndef HTTP_UPLOAD_STALL_TIMEOUT_MS
 #define HTTP_UPLOAD_STALL_TIMEOUT_MS 10000
+#endif
+
+#ifndef HTTP_HEADER_LINE_MAX
+#define HTTP_HEADER_LINE_MAX 512 /* bytes of one request header line kept; the rest of a longer line is dropped */
+#endif
+
+#ifndef HTTP_REQUEST_LINE_MAX
+#define HTTP_REQUEST_LINE_MAX 1024 /* bytes a request line may take; a longer one is answered 414 and the connection closed */
 #endif
 
 /**

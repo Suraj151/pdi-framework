@@ -32,7 +32,13 @@ TmpFsNullStorage s_tmp_null_storage;
 
 TmpFs __i_tmpfs;
 
-TmpFs::TmpFs() : iFileSystemInterface(s_tmp_null_storage) {}
+TmpFs::TmpFs() : iFileSystemInterface(s_tmp_null_storage) {
+    for (uint8_t i = 0; i < VFS_MAX_OPEN_FILES; ++i) m_open[i] = nullptr;
+}
+
+TmpFs::~TmpFs() {
+    for (uint8_t i = 0; i < VFS_MAX_OPEN_FILES; ++i) pdiutil::safe_delete(m_open[i]);
+}
 
 // ---- path helpers ---------------------------------------------------------
 
@@ -172,7 +178,8 @@ int TmpFs::editFile(const char* path, uint64_t offset, const char* content, uint
     pdiutil::string norm = normalize(path);
     int idx = findNode(norm);
     if (!content) return PDI_ERR_NULL_PTR;
-    if (idx < 0 || m_nodes[idx].m_type != FILE_TYPE_REG) return STORAGE_ERROR_NOT_A_FILE;
+    if (idx < 0) return STORAGE_ERROR_NO_ENTRY;
+    if (m_nodes[idx].m_type != FILE_TYPE_REG) return STORAGE_ERROR_NOT_A_FILE;
 
     tmpfs_node_t& node = m_nodes[idx];
     uint32_t oldlen = (uint32_t)node.m_data.length();
@@ -196,7 +203,8 @@ int TmpFs::readFile(const char* path, uint64_t size, pdiutil::function<bool(char
     if (!path || !readbackfn) return PDI_ERR_INVALID_ARG;
     pdiutil::string norm = normalize(path);
     int idx = findNode(norm);
-    if (idx < 0 || m_nodes[idx].m_type != FILE_TYPE_REG) return STORAGE_ERROR_NOT_A_FILE;
+    if (idx < 0) return STORAGE_ERROR_NO_ENTRY;
+    if (m_nodes[idx].m_type != FILE_TYPE_REG) return STORAGE_ERROR_NOT_A_FILE;
 
     pdiutil::string& data = m_nodes[idx].m_data;
     if (offset >= data.length()) return 0;
@@ -245,7 +253,8 @@ pdi_err_t TmpFs::createDirectory(const char* path) {
 pdi_err_t TmpFs::deleteFile(const char* path) {
     pdiutil::string norm = normalize(path);
     int idx = findNode(norm);
-    if (idx < 0 || m_nodes[idx].m_type != FILE_TYPE_REG) return STORAGE_ERROR_NOT_A_FILE;
+    if (idx < 0) return STORAGE_ERROR_NO_ENTRY;
+    if (m_nodes[idx].m_type != FILE_TYPE_REG) return STORAGE_ERROR_NOT_A_FILE;
     m_nodes.erase(m_nodes.begin() + idx);
     return 0;
 }
@@ -254,7 +263,8 @@ pdi_err_t TmpFs::deleteDirectory(const char* path) {
     pdiutil::string norm = normalize(path);
     if (norm.empty()) return STORAGE_ERROR_BAD_PATH;
     int idx = findNode(norm);
-    if (idx < 0 || m_nodes[idx].m_type != FILE_TYPE_DIR) return STORAGE_ERROR_NOT_A_DIRECTORY;
+    if (idx < 0) return STORAGE_ERROR_NO_ENTRY;
+    if (m_nodes[idx].m_type != FILE_TYPE_DIR) return STORAGE_ERROR_NOT_A_DIRECTORY;
 
     // Remove the directory and every descendant (prefix "norm/").
     pdiutil::string prefix = norm;
@@ -273,7 +283,7 @@ pdi_err_t TmpFs::rename(const char* oldPath, const char* newPath) {
     pdiutil::string newn = normalize(newPath);
     if (oldn.empty() || newn.empty()) return STORAGE_ERROR_BAD_PATH;
     int oidx = findNode(oldn);
-    if (oidx < 0) return PDI_ERR_NOT_FOUND;
+    if (oidx < 0) return STORAGE_ERROR_NO_ENTRY;
     if (findNode(newn) >= 0) return PDI_ERR_EXISTS;
     if (!parentExists(newn)) return STORAGE_ERROR_NO_PARENT;
     if (newn.length() > TMPFS_MAX_PATH) return STORAGE_ERROR_NAME_TOO_LONG;
@@ -281,9 +291,19 @@ pdi_err_t TmpFs::rename(const char* oldPath, const char* newPath) {
     bool isdir = (m_nodes[oidx].m_type == FILE_TYPE_DIR);
     m_nodes[oidx].m_path = newn;
 
+    pdiutil::string oldprefix = oldn; oldprefix += "/";
+    pdiutil::string newprefix = newn; newprefix += "/";
+    for (uint8_t i = 0; i < VFS_MAX_OPEN_FILES; ++i) {
+        if (nullptr == m_open[i]) continue;
+        pdiutil::string& p = m_open[i]->m_path;
+        if (p == oldn) {
+            p = newn;
+        } else if (isdir && p.length() > oldprefix.length() && p.compare(0, oldprefix.length(), oldprefix) == 0) {
+            p = newprefix + p.substr(oldprefix.length());
+        }
+    }
+
     if (isdir) {
-        pdiutil::string oldprefix = oldn; oldprefix += "/";
-        pdiutil::string newprefix = newn; newprefix += "/";
         for (uint32_t i = 0; i < m_nodes.size(); ++i) {
             pdiutil::string& p = m_nodes[i].m_path;
             if (p.length() > oldprefix.length() && p.compare(0, oldprefix.length(), oldprefix) == 0) {
@@ -302,7 +322,8 @@ pdi_err_t TmpFs::copyFile(const char* sourcePath, const char* destPath, CallBack
     pdiutil::string src = normalize(sourcePath);
     pdiutil::string dst = normalize(destPath);
     int sidx = findNode(src);
-    if (sidx < 0 || m_nodes[sidx].m_type != FILE_TYPE_REG) return STORAGE_ERROR_NOT_A_FILE;
+    if (sidx < 0) return STORAGE_ERROR_NO_ENTRY;
+    if (m_nodes[sidx].m_type != FILE_TYPE_REG) return STORAGE_ERROR_NOT_A_FILE;
     if (dst.empty()) return STORAGE_ERROR_BAD_PATH;
     if (findNode(dst) >= 0) return PDI_ERR_EXISTS;
     if (!parentExists(dst)) return STORAGE_ERROR_NO_PARENT;
@@ -337,12 +358,129 @@ pdi_err_t TmpFs::touch(const char* path) {
     return createFile(path, nullptr, 0);
 }
 
+/**
+ * The open file a handle names, or null when the handle is out of range or
+ * names no open file.
+ */
+tmpfs_open_t* TmpFs::openSlot(pdi_fhandle_t handle) const {
+    if (handle < 0 || handle >= VFS_MAX_OPEN_FILES) return nullptr;
+    return m_open[handle];
+}
+
+pdi_fhandle_t TmpFs::openFile(const char* path, uint8_t flags) {
+    pdiutil::string norm = normalize(path);
+    if (norm.empty() || norm.length() > TMPFS_MAX_PATH) return STORAGE_ERROR_BAD_PATH;
+
+    int8_t slot = -1;
+    for (uint8_t i = 0; i < VFS_MAX_OPEN_FILES && slot < 0; ++i) {
+        if (nullptr == m_open[i]) slot = (int8_t)i;
+    }
+    if (slot < 0) return STORAGE_ERROR_NODE_LIMIT;
+
+    int idx = findNode(norm);
+    if (idx >= 0 && m_nodes[idx].m_type != FILE_TYPE_REG) return STORAGE_ERROR_NOT_A_FILE;
+    if (idx < 0 && !(flags & FILE_OPEN_CREATE)) return STORAGE_ERROR_NO_ENTRY;
+
+    tmpfs_open_t* entry = pdiutil::safe_new<tmpfs_open_t>();
+    if (nullptr == entry) return PDI_ERR_NO_MEM;
+    entry->m_path = norm;
+    entry->m_pos = 0;
+    entry->m_flags = flags;
+    if (entry->m_path.length() != norm.length()) {
+        pdiutil::safe_delete(entry);
+        return PDI_ERR_NO_MEM;
+    }
+
+    bool writes = (0 != (flags & (FILE_OPEN_WRITE | FILE_OPEN_APPEND)));
+    if (idx < 0 || (writes && (flags & FILE_OPEN_TRUNCATE))) {
+        int put = putContent(norm, nullptr, 0, false);
+        if (put < 0) {
+            pdiutil::safe_delete(entry);
+            return put;
+        }
+    }
+
+    m_open[slot] = entry;
+    return (pdi_fhandle_t)slot;
+}
+
+int TmpFs::readFileHandle(pdi_fhandle_t handle, char* buffer, uint32_t size) {
+    tmpfs_open_t* entry = openSlot(handle);
+    if (nullptr == entry || nullptr == buffer) return PDI_ERR_INVALID_ARG;
+    if (!(entry->m_flags & FILE_OPEN_READ) && (entry->m_flags & (FILE_OPEN_WRITE | FILE_OPEN_APPEND))) return PDI_ERR_INVALID_ARG;
+
+    int idx = findNode(entry->m_path);
+    if (idx < 0) return STORAGE_ERROR_NO_ENTRY;
+
+    const pdiutil::string& data = m_nodes[idx].m_data;
+    uint32_t len = (uint32_t)data.length();
+    if (entry->m_pos >= len) return 0;
+
+    uint32_t n = len - entry->m_pos;
+    if (n > size) n = size;
+    memcpy(buffer, data.c_str() + entry->m_pos, n);
+    entry->m_pos += n;
+    return (int)n;
+}
+
+int TmpFs::writeFileHandle(pdi_fhandle_t handle, const char* content, uint32_t size) {
+    tmpfs_open_t* entry = openSlot(handle);
+    if (nullptr == entry || nullptr == content) return PDI_ERR_INVALID_ARG;
+    if (!(entry->m_flags & (FILE_OPEN_WRITE | FILE_OPEN_APPEND))) return PDI_ERR_INVALID_ARG;
+
+    int idx = findNode(entry->m_path);
+    if (idx < 0) return STORAGE_ERROR_NO_ENTRY;
+    if (entry->m_flags & FILE_OPEN_APPEND) entry->m_pos = (uint32_t)m_nodes[idx].m_data.length();
+
+    int wrote = editFile(entry->m_path.c_str(), entry->m_pos, content, size);
+    if (wrote > 0) entry->m_pos += (uint32_t)wrote;
+    return wrote;
+}
+
+int64_t TmpFs::seekFile(pdi_fhandle_t handle, int64_t offset, file_seek_t whence) {
+    tmpfs_open_t* entry = openSlot(handle);
+    if (nullptr == entry) return PDI_ERR_INVALID_ARG;
+
+    int64_t base = 0;
+    if (FILE_SEEK_CUR == whence) {
+        base = entry->m_pos;
+    } else if (FILE_SEEK_END == whence) {
+        int idx = findNode(entry->m_path);
+        if (idx < 0) return STORAGE_ERROR_NO_ENTRY;
+        base = (int64_t)m_nodes[idx].m_data.length();
+    }
+
+    int64_t pos = base + offset;
+    if (pos < 0 || pos > TMPFS_MAX_BYTES) return PDI_ERR_INVALID_ARG;
+    entry->m_pos = (uint32_t)pos;
+    return pos;
+}
+
+pdi_err_t TmpFs::syncFile(pdi_fhandle_t handle) {
+    return (nullptr == openSlot(handle)) ? (pdi_err_t)PDI_ERR_INVALID_ARG : (pdi_err_t)PDI_OK;
+}
+
+pdi_err_t TmpFs::closeFile(pdi_fhandle_t handle) {
+    if (nullptr == openSlot(handle)) return PDI_ERR_INVALID_ARG;
+    pdiutil::safe_delete(m_open[handle]);
+    return PDI_OK;
+}
+
+uint16_t TmpFs::openCount() const {
+    uint16_t count = 0;
+    for (uint8_t i = 0; i < VFS_MAX_OPEN_FILES; ++i) {
+        count += (nullptr != m_open[i]) ? 1 : 0;
+    }
+    return count;
+}
+
 // ---- query API ------------------------------------------------------------
 
 int64_t TmpFs::getFileSize(const char* path) {
     pdiutil::string norm = normalize(path);
     int idx = findNode(norm);
-    if (idx < 0 || m_nodes[idx].m_type != FILE_TYPE_REG) return STORAGE_ERROR_NOT_A_FILE;
+    if (idx < 0) return STORAGE_ERROR_NO_ENTRY;
+    if (m_nodes[idx].m_type != FILE_TYPE_REG) return STORAGE_ERROR_NOT_A_FILE;
     return (int64_t)m_nodes[idx].m_data.length();
 }
 
@@ -365,6 +503,7 @@ bool TmpFs::isDirectory(const char* path) {
 
 int TmpFs::getDirFileList(const char* path, pdiutil::vector<file_info_t>& items, const char* pattern) {
     pdiutil::string norm = normalize(path);
+    if (!norm.empty() && findNode(norm) < 0) return STORAGE_ERROR_NO_ENTRY;
     if (!isDirExist(path)) return STORAGE_ERROR_NOT_A_DIRECTORY;
 
     for (uint32_t i = 0; i < m_nodes.size(); ++i) {

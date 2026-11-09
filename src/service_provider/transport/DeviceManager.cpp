@@ -313,7 +313,7 @@ const driver_device_t *DeviceManager::find(serial_iface_t bus, uint32_t target) 
 }
 
 /**
- * The name a device goes by under /sys/bus, the way linux names it.
+ * The name a device goes by under /sys/bus.
  */
 bool DeviceManager::deviceId(const driver_device_t &dev, pdiutil::string &out)
 {
@@ -1081,8 +1081,7 @@ void DeviceManager::announce(event_name_t event, driver_device_t &dev)
 }
 
 /**
- * Logs a newly bound disk's partition table and each partition in it, as linux
- * does.
+ * Logs a newly bound disk's partition table and each partition in it.
  */
 void DeviceManager::logLayout(driver_device_t &dev)
 {

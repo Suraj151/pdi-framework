@@ -98,6 +98,24 @@ struct email_config {
 
 const size_t email_config_size = sizeof(email_config) + 5;
 
+#ifndef EMAIL_STEP_INTERVAL_MS
+#define EMAIL_STEP_INTERVAL_MS 50 /* how often a mail going out reads its server's reply */
+#endif
+
+enum email_step_t : uint8_t {
+  EMAIL_STEP_IDLE = 0,
+  EMAIL_STEP_GREETING,
+  EMAIL_STEP_HELLO,
+  EMAIL_STEP_AUTH,
+  EMAIL_STEP_AUTH_USER,
+  EMAIL_STEP_AUTH_PASS,
+  EMAIL_STEP_FROM,
+  EMAIL_STEP_TO,
+  EMAIL_STEP_DATA,
+  EMAIL_STEP_BODY,
+  EMAIL_STEP_QUIT
+};
+
 using email_config_table = email_config;
 
 #endif

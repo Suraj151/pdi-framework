@@ -4,7 +4,7 @@ This file is part of the pdi stack.
 This is free software. you can redistribute it and/or modify it but without any
 warranty.
 
-Makes a filesystem on a disk or partition, the way linux mkfs does:
+Makes a filesystem on a disk or partition:
 mkfs -t vfat|littlefs <node>. A whole disk that carries a partition table is
 refused, as mkfs.vfat refuses one without -I; wipefs -a clears it first.
 

@@ -26,9 +26,8 @@ created Date    : 19th July 2026
  *   scheduler if out of range.
  *
  * Permission: same as kill. Root can renice any task; other users only tasks
- * owned by their session. Non-root cannot lower nice below the current value
- * (Linux behaviour) — deferred for now; today any allowed caller can set any
- * value in range.
+ * owned by their session. Refusing non-root a nice below the current value is
+ * deferred for now; today any allowed caller can set any value in range.
  *
  * After updating the nice, calls rebaseAndRestartPrioTasks() so the reordered
  * priority takes effect on the next tick.

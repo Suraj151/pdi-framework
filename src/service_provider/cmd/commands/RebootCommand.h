@@ -53,6 +53,14 @@ struct RebootCommand : public CommandBase {
 		if( needauth() && !__auth_service.getAuthorized()){
 			return CMD_ERROR_PERM;
 		}
+
+		if( !SessionManager::isRoot() ){
+			if( nullptr != m_terminal ){
+				m_terminal->putln();
+				m_terminal->writeln_ro(RODT_ATTR(CMD_MSG_ROOT_REQUIRED));
+			}
+			return CMD_ERROR_PERM;
+		}
 #endif
 
 		pdi_err_t result = PDI_OK;

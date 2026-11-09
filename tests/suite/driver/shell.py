@@ -203,30 +203,16 @@ class Shell(object):
                 self._buffer += chunk
                 self._log += chunk
 
-    def answer(self, line, pattern, timeout=DEFAULT_TIMEOUT, retries=1):
+    def answer(self, line, pattern, timeout=DEFAULT_TIMEOUT):
         """
         Reply to a prompt and wait for what should follow.
 
-        A line sent the moment a prompt appears is sometimes not seen by the
-        target at all, and the command then waits for input that will never
-        arrive. The echo tells the two cases apart: a line that was received is
-        echoed straight back, so silence for a beat means the line was dropped
-        and can be sent again. A line that was echoed is never resent, however
-        slow the rest of the answer is.
+        The line is sent once. A command waiting at a prompt takes the next line
+        it receives, so a line sent again because its echo was slow would answer
+        the prompt after it, a masked password prompt included.
         """
-        for attempt in range(retries + 1):
-            self.send_line(line)
-
-            echoed = self._recv(1.5)
-            if echoed:
-                self._buffer += echoed
-                self._log += echoed
-                return self.expect(pattern, timeout)
-
-            if attempt == retries:
-                return self.expect(pattern, timeout)
-
-        raise ShellError("unreachable")
+        self.send_line(line)
+        return self.expect(pattern, timeout)
 
     def login(self, username, password, timeout=DEFAULT_TIMEOUT, attempts=2):
         """

@@ -611,6 +611,17 @@ const pdiutil::vector<pdiutil::string> *ScriptRunner::arguments()
   return nullptr;
 }
 
+bool ScriptRunner::s_detached = false;
+
+/**
+ * Whether the line running now is detached work, a scheduled job or the boot
+ * script, which nothing can come back to once it returns.
+ */
+bool ScriptRunner::detached()
+{
+  return s_detached;
+}
+
 /**
  * Carries on with the script the session stopped in, once whatever asked
  * for input has been answered.
@@ -757,6 +768,7 @@ session_t *ScriptRunner::beginDetached(uint16_t uid, iTerminalInterface *termina
   SessionManager::setPWD(__i_fs.getRootDirectory());
 #endif
 
+  s_detached = true;
   return session;
 }
 
@@ -766,6 +778,7 @@ session_t *ScriptRunner::beginDetached(uint16_t uid, iTerminalInterface *termina
  */
 void ScriptRunner::endDetached(iTerminalInterface *terminal)
 {
+  s_detached = false;
   SessionManager::detach(terminal);
   SessionManager::setCurrent(nullptr);
 }
