@@ -54,9 +54,29 @@ class MailServer(object):
         try:
             if self.server.sessions and not self.server.hang:
                 self.server.wait_for_session(SEND_WAIT, after=len(self.server.sessions) - 1)
+                self.wait_board_done(SEND_WAIT)
             write_form(self.t.portal(), PAGE, self.saved)
         finally:
             self.server.stop()
+        return False
+
+    def wait_board_done(self, timeout):
+        """
+        True once the board has finished its mail: the Email service runs a step
+        task only while a mail is going out, and it ends after the server's last
+        reply is read, a moment after the server has seen the conversation end.
+        """
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            for line in self.t.run("service list").splitlines():
+                parts = line.split()
+                if len(parts) >= 4 and "Email" == parts[0] and parts[3].isdigit():
+                    if 0 == int(parts[3]):
+                        return True
+                    break
+            else:
+                return True
+            time.sleep(0.2)
         return False
 
     def send_test_mail(self, **overrides):
@@ -260,6 +280,8 @@ def two_mails(t):
             raise AssertionError("the first mail never arrived")
         if mail.server.wait_for_session(SEND_WAIT) is None:
             raise AssertionError("the first mail's session never ended")
+        if not mail.wait_board_done(SEND_WAIT):
+            raise AssertionError("the board never finished the first mail")
         mail.send_test_mail()
         if mail.server.wait_for_mail(SEND_WAIT, after=1) is None:
             raise AssertionError("the second mail never arrived")
