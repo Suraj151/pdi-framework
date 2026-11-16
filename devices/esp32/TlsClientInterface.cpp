@@ -551,9 +551,13 @@ int8_t TlsClientInterface::connected() {
 int TlsClientInterface::bioSend(void* ctx, const unsigned char* buf, size_t len) {
 
     TlsClientInterface* self = static_cast<TlsClientInterface*>(ctx);
-    if (!self || !self->m_pcb || !self->m_isConnected) return MBEDTLS_ERR_SSL_CONN_EOF;
+    if (!self) return MBEDTLS_ERR_SSL_CONN_EOF;
 
     TCP_GUARD_BEGIN
+    if (!self->m_pcb || !self->m_isConnected) {
+        TCP_GUARD_END
+        return MBEDTLS_ERR_SSL_CONN_EOF;
+    }
     uint16_t sndbuf = tcp_sndbuf(self->m_pcb);
     if (sndbuf == 0) {
         TCP_GUARD_END

@@ -42,6 +42,10 @@ created Date    : 1st Jan 2026
 
 #define SERIAL_BOOT_RX_QUIET_MS       (MILLISECOND_DURATION_1000/20)
 
+#define WIFI_STA_PHY_DEFAULT          PHY_MODE_11G  /* radio standard the station joins with first */
+#define WIFI_PHY_FALLBACK_FAILS       3   /* failed joins before the other radio standard is tried */
+#define WIFI_DISCONNECT_LOGS_MAX      4   /* disconnect reasons logged between two joins */
+
 #define PDI_NET_STACK_LWIP
 
 #define CMD_SIZE_MAX                  16  /* longest command name plus its terminator */

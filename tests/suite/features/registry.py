@@ -788,8 +788,9 @@ class _OthersAwake(object):
     While one test runs, the lanes it is not using are given something harmless
     to do once they have been idle for KEEPALIVE_AFTER, so a test that runs past
     the target's idle window does not cost them their shells. One test runs at a
-    time, so those lanes are free. A lane that does not answer is handed back
-    once the test is over, to be recovered there.
+    time, so those lanes are free. A lane that answers late or not at all keeps
+    its turns, since a line it was sent still counts as activity on the target,
+    and is handed back once the test is over to be resynced or recovered there.
     """
 
     def __init__(self, alive, busy, touched):
@@ -813,14 +814,13 @@ class _OthersAwake(object):
     def _loop(self):
         while not self.done.wait(5.0):
             for lane in self.others:
-                if lane in self.failed:
-                    continue
                 if time.time() - self.touched.get(lane.label, time.time()) < KEEPALIVE_AFTER:
                     continue
                 try:
                     lane.target.run("pwd", min(lane.target.timeout, 10.0))
                 except Exception:
-                    self.failed.append(lane)
+                    if lane not in self.failed:
+                        self.failed.append(lane)
                 self.touched[lane.label] = time.time()
 
 

@@ -150,9 +150,19 @@ def log_has(t, level, marker):
     return [line for line in rows(t.run("cat %s%s" % (LOG, level))) if marker in line]
 
 
+def fresh_logs(t, *levels):
+    """Remove the log files a test reads, so none starts over at its size limit mid-test."""
+    for level in levels:
+        t.run("rm %s%s" % (LOG, level))
+    left = [level for level in levels if "syslog.%s" % level in t.run("ls /var/log")]
+    if left:
+        raise AssertionError("the %s log could not be removed before the test" % ", ".join(left))
+
+
 @test("logger writes the words as one line tagged with the user, into the notice log by default",
-      needs=("logger", "cat", "whoami"))
+      needs=("logger", "cat", "whoami", "rm", "ls"))
 def logger_default(t):
+    fresh_logs(t, "success", "error", "warning", "info")
     user = rows(t.run("whoami"))[-1].strip()
     word = mark("lgdef")
     out = t.run("logger %s one two three" % word)
@@ -166,8 +176,9 @@ def logger_default(t):
 
 
 @test("logger -p sends each priority to its log, given alone, joined or after a facility",
-      needs=("logger", "cat"))
+      needs=("logger", "cat", "rm", "ls"))
 def logger_priorities(t):
+    fresh_logs(t, "success", "error", "warning", "info")
     cases = (("-p err", "error", mark("lgerr")), ("-p crit", "error", mark("lgcrit")),
              ("-p emerg", "error", mark("lgemerg")), ("-p alert", "error", mark("lgalert")),
              ("-p warning", "warning", mark("lgwarn")), ("-p user.warning", "warning", mark("lgfac")),
@@ -182,8 +193,9 @@ def logger_priorities(t):
 
 
 @test("logger -- takes a message that starts with a dash, and an empty message is still a line",
-      needs=("logger", "cat", "whoami"))
+      needs=("logger", "cat", "whoami", "rm", "ls"))
 def logger_dash_and_empty(t):
+    fresh_logs(t, "success")
     word = "-" + mark("lgdash")
     t.run("logger -- %s degrees" % word)
     if len(log_has(t, "success", "%s degrees" % word)) != 1:
@@ -196,8 +208,9 @@ def logger_dash_and_empty(t):
         raise AssertionError("logger '' did not leave an empty message last: %r" % last)
 
 
-@test("logger with no message logs each line of a redirected file or a pipe", needs=("logger", "cat", "echo", "rm"))
+@test("logger with no message logs each line of a redirected file or a pipe", needs=("logger", "cat", "echo", "rm", "ls"))
 def logger_input(t):
+    fresh_logs(t, "error", "warning")
     first, second = mark("lgin1"), mark("lgin2")
     t.run("echo %s > /tmp/lgin.txt" % first)
     t.run("echo %s >> /tmp/lgin.txt" % second)
@@ -213,8 +226,9 @@ def logger_input(t):
 
 
 @test("logger refuses an unknown option, an unknown priority and a missing one, logging nothing",
-      needs=("logger", "cat"))
+      needs=("logger", "cat", "rm", "ls"))
 def logger_refusals(t):
+    fresh_logs(t, "success", "error", "warning", "info")
     word = mark("lgbad")
     out = t.run("logger -x %s" % word)
     expect_in("invalid option : -x", out, "logger -x")
@@ -230,8 +244,9 @@ def logger_refusals(t):
 
 
 @test("logger cuts a message longer than a log line and the next line still starts on its own",
-      needs=("logger", "cat"))
+      needs=("logger", "cat", "rm", "ls"))
 def logger_long(t):
+    fresh_logs(t, "info")
     word = mark("lglong")
     after = mark("lgafter")
     t.run("logger -p info %s%s" % (word, "x" * 400))
@@ -557,8 +572,9 @@ def sleep_in_script(t):
 
 
 @test("sleep waits inside a pipe, a capture and a redirect, and refuses there past the limit",
-      needs=("sleep", "wc", "echo", "cat"))
+      needs=("sleep", "wc", "echo", "cat", "rm", "ls"))
 def sleep_where_it_cannot_resume(t):
+    fresh_logs(t, "warning")
     try:
         for command in ("sleep 1 | wc", "echo $(sleep 1)slcap", "sleep 1 > /tmp/slred; echo slred"):
             out, took = timed(t, command)

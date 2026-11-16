@@ -66,10 +66,17 @@ wifi_status_t toWifiStatus(wl_status_t stat)
   return _wifi_status;
 }
 
+struct CoreWiFiEvents : public ESP8266WiFiGenericClass
+{
+  using ESP8266WiFiGenericClass::_eventCallback;
+};
+
 /**
  * WiFiInterface constructor.
  */
-WiFiInterface::WiFiInterface() : m_wifi(&WiFi), m_wifi_led(0), m_napt_status(false)
+WiFiInterface::WiFiInterface() : m_wifi(&WiFi), m_wifi_led(0), m_napt_status(false),
+  m_sta_phy(WIFI_STA_PHY_DEFAULT), m_sta_joined(false), m_sta_join_fails(0),
+  m_sta_reason_logged(0), m_sta_reason_logs(0), m_phy_switch_logged(0)
 {
   wifi_set_event_handler_cb( (wifi_event_handler_cb_t)&WiFiInterface::wifi_event_handler_cb );
 }
@@ -91,6 +98,7 @@ void WiFiInterface::init()
   setSleepMode(WIFI_NONE_SLEEP);  // WIFI_NONE_SLEEP = 0, WIFI_LIGHT_SLEEP = 1, WIFI_MODEM_SLEEP = 2
   setOutputPower(21.0);  // dBm max: +20.5dBm  min: 0dBm
   persistent(false);
+  wifi_set_phy_mode((phy_mode_t)this->m_sta_phy);
 }
 
 /**
@@ -792,6 +800,9 @@ void WiFiInterface::wifi_event_handler_cb(System_Event_t *_event)
 {
   if( nullptr != _event ){
 
+    CoreWiFiEvents::_eventCallback(_event);
+    __i_wifi.handleStationEvent(_event);
+
     // #if ( defined(ENABLE_CONSOLE_LOG_INFO) || defined(ENABLE_CONSOLE_LOG_ALL) )
     // // sdk callback context, write straight to the uart under a guard so no
     // // task owned lock is taken and no ownership is attributed to this context
@@ -819,6 +830,51 @@ void WiFiInterface::wifi_event_handler_cb(System_Event_t *_event)
       __utl_event.execute_event(e, _event);
     }
   }
+}
+
+/**
+ * Keeps the station's reason for each lost link in the system log and, until the
+ * first join, alternates the radio standard after repeated failed joins.
+ */
+void WiFiInterface::handleStationEvent( System_Event_t * _event )
+{
+  if( EVENT_STAMODE_GOT_IP == _event->event ){
+    this->m_sta_joined = true;
+    this->m_sta_join_fails = 0;
+    this->m_sta_reason_logged = 0;
+    this->m_sta_reason_logs = 0;
+    return;
+  }
+
+  if( EVENT_STAMODE_DISCONNECTED != _event->event ){
+    return;
+  }
+
+  uint8_t reason = _event->event_info.disconnected.reason;
+  if( reason != this->m_sta_reason_logged && this->m_sta_reason_logs < WIFI_DISCONNECT_LOGS_MAX ){
+    this->m_sta_reason_logged = reason;
+    this->m_sta_reason_logs++;
+    __task_scheduler.setTimeout( [reason]() {
+      SysLogW("WiFi: station disconnected, reason %u\n", (unsigned)reason);
+    }, 1, __i_dvc_ctrl.millis_now() );
+  }
+
+  if( this->m_sta_joined || ++this->m_sta_join_fails < WIFI_PHY_FALLBACK_FAILS ){
+    return;
+  }
+
+  this->m_sta_join_fails = 0;
+  this->m_sta_phy = ( PHY_MODE_11G == this->m_sta_phy ) ? PHY_MODE_11N : PHY_MODE_11G;
+  uint8_t phy = this->m_sta_phy;
+  bool first = ( 0 == ( this->m_phy_switch_logged & ( 1 << phy ) ) );
+  this->m_phy_switch_logged |= ( 1 << phy );
+  __task_scheduler.setTimeout( [phy, first]() {
+    wifi_set_phy_mode((phy_mode_t)phy);
+    if( first ){
+      SysLogW("WiFi: no join after %u attempts, trying 802.11%c\n",
+        (unsigned)WIFI_PHY_FALLBACK_FAILS, ( PHY_MODE_11N == phy ) ? 'n' : 'g');
+    }
+  }, 1, __i_dvc_ctrl.millis_now() );
 }
 
 /**

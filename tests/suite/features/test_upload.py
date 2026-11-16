@@ -105,7 +105,8 @@ def awkward_uploads_are_exact(t):
 @test("an empty file uploaded through the portal lands as an empty file", needs=("rm",))
 def empty_upload(t):
     if os.environ.get("PDI_KNOWN_FINDINGS", "") != "1":
-        raise Skip("open finding F20, recorded in TESTING_PLAN.md; set PDI_KNOWN_FINDINGS=1 to run it")
+        raise Skip("an empty upload is not stored, accepted by the author 2026-10-31 (was F20); "
+                   "set PDI_KNOWN_FINDINGS=1 to run it")
     portal = t.portal()
     name = "up_empty.bin"
     t.run("rm /%s" % name)

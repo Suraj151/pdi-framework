@@ -528,6 +528,11 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
       LogI("WiFi recovered after %u ms (attempts=%u)\n",
         (unsigned)(this->m_disconnect_start_ms ? (now - this->m_disconnect_start_ms) : 0),
         (unsigned)this->m_reconnect_attempt);
+      if( 0 != this->m_disconnect_start_ms && __status_wifi.wifi_joined_since_boot ){
+        SysLogS("WiFi: station back after %u s, %u attempts\n",
+          (unsigned)((now - this->m_disconnect_start_ms) / 1000),
+          (unsigned)this->m_reconnect_attempt);
+      }
       this->m_disconnect_start_ms = 0;
       this->m_last_reconnect_attempt_ms = 0;
       this->m_reconnect_attempt = 0;
@@ -545,6 +550,9 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
   // ---------- Disconnected branch ----------
   // Edge: just became disconnected — start the timer
   if( __status_wifi.wifi_connected || 0 == this->m_disconnect_start_ms ){
+    if( __status_wifi.wifi_connected ){
+      SysLogW("WiFi: station lost its network, reconnecting\n");
+    }
     this->m_disconnect_start_ms = now;
     this->m_last_reconnect_attempt_ms = 0;
     this->m_reconnect_attempt = 0;
@@ -650,6 +658,7 @@ void WiFiServiceProvider::handleWiFiConnectivity(){
     case 5: {
 
       LogI("WiFi tier 5: device reset\n");
+      SysLogE("WiFi: no network for %u s, restarting the device\n", (unsigned)(down_ms / 1000));
       __i_dvc_ctrl.resetDevice();
       break;
     }

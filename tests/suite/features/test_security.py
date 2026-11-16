@@ -13,6 +13,7 @@ few that would need a second account or a writable store skip where they cannot.
 
 import socket
 import ssl
+import struct
 import time
 
 from .registry import test, Skip, expect_in, expect_not_in
@@ -256,6 +257,74 @@ def oversized_headers(t):
     alive_after(t)
     if t.portal(login=False).get("/").status >= 500:
         raise AssertionError("the portal answered 5xx after oversized headers")
+
+
+RESET_ROUNDS = 120
+RESET_DELAYS = (0.0, 0.002, 0.01, 0.03, 0.06, 0.1, 0.2)
+
+
+def seconds_up(t):
+    """The target's uptime in seconds, from /proc/uptime."""
+    for word in t.run("cat /proc/uptime").split():
+        try:
+            return float(word)
+        except ValueError:
+            continue
+    raise AssertionError("/proc/uptime gave no number")
+
+
+def reset_after_request(host, port, secure, request, delay, timeout):
+    """Send one request, wait, then drop the connection with a reset instead of a close."""
+    raw = None
+    sock = None
+    try:
+        raw = socket.create_connection((host, port), timeout=timeout)
+        raw.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+        sock = raw
+        if secure:
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            sock = ctx.wrap_socket(raw)
+        sock.sendall(request)
+        if delay:
+            time.sleep(delay)
+    except (socket.timeout, OSError):
+        pass
+    finally:
+        try:
+            if sock is not None:
+                sock.close()
+            elif raw is not None:
+                raw.close()
+        except OSError:
+            pass
+
+
+@test("a client that resets while its reply is being sent does not restart the board")
+def reset_while_replying(t):
+    """
+    Each round asks for a page the portal does not have and resets the connection
+    at a different moment of the reply, so the reset lands while the server is
+    still writing. The board must keep its uptime and go on serving.
+    """
+    host, port, secure = portal_endpoint(t)
+    before = seconds_up(t)
+    started = time.time()
+    for index in range(RESET_ROUNDS):
+        keep_shell(t, index)
+        request = (b"GET /pdi-no-such-page-%d HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n"
+                   % index)
+        reset_after_request(host, port, secure, request,
+                            RESET_DELAYS[index % len(RESET_DELAYS)], min(t.timeout, 6.0))
+    alive_after(t)
+    after = seconds_up(t)
+    if after < before + (time.time() - started) * 0.5:
+        raise AssertionError("the board restarted while replies were being reset: uptime %.0f s "
+                             "before, %.0f s after %.0f s of resets"
+                             % (before, after, time.time() - started))
+    if t.portal(login=False).get("/").status >= 500:
+        raise AssertionError("the portal answered 5xx after replies were reset")
 
 
 @test("a slow trickle of a request does not wedge the server")

@@ -99,6 +99,12 @@ public:
 
 private:
   /**
+   * Keeps the station's reason for each lost link in the system log and, until the
+   * first join, alternates the radio standard after repeated failed joins.
+   */
+  void handleStationEvent( System_Event_t * _event );
+
+  /**
    * @var	ESP8266WiFiClass*|&WiFi m_wifi
    */
   ESP8266WiFiClass *m_wifi;
@@ -112,6 +118,13 @@ private:
    * @var	bool napt status
    */
   int16_t   m_napt_status;
+
+  uint8_t   m_sta_phy;
+  bool      m_sta_joined;
+  uint8_t   m_sta_join_fails;
+  uint8_t   m_sta_reason_logged;
+  uint8_t   m_sta_reason_logs;
+  uint8_t   m_phy_switch_logged;
 
   // #ifdef ENABLE_CONTEXTUAL_EXECUTION
   // PreemptiveMutex m_mutex;

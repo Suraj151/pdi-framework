@@ -3431,6 +3431,29 @@ TEST(driver_core, the_text_commands_read_lines_on_the_card_as_on_the_flash)
 }
 
 /**
+ * A directory on the card is named a directory and a missing path missing, for
+ * a read, a write through a redirect and a call into the filesystem alike.
+ */
+TEST(driver_core, a_directory_on_the_card_is_named_a_directory_and_a_missing_path_missing)
+{
+    FatCardBench bench;
+    ASSERT_EQ((int)FatFsInterfaceImpl::mountDisk("/dev/mmcblk0", "/mnt"), (int)PDI_OK);
+    pditest::Shell sh;
+    sh.run("mkdir /mnt/fe_dir");
+
+    ASSERT_TRUE(pditest::saw(sh.run("cat /mnt/fe_dir"), "Is a directory"));
+    ASSERT_TRUE(pditest::saw(sh.run("cat /mnt/fe_none"), "No such file or directory"));
+    ASSERT_TRUE(pditest::saw(sh.run("echo x > /mnt/fe_dir"), "Is a directory"));
+    ASSERT_TRUE(__i_fs.isDirExist("/mnt/fe_dir"));
+
+    bool matched = false;
+    int got = __i_fs.readFile("/mnt/fe_dir", 64, [](char *, uint32_t) { return true; }, 0, nullptr, &matched);
+    ASSERT_EQ(got, (int)STORAGE_ERROR_NOT_A_FILE);
+    got = __i_fs.readFile("/mnt/fe_none", 64, [](char *, uint32_t) { return true; }, 0, nullptr, &matched);
+    ASSERT_EQ(got, (int)PDI_ERR_FROM_FAT(FR_NO_FILE));
+}
+
+/**
  * A copy off the card is streamed into one open file on the flash, so it has
  * to arrive whole however many chunks it takes, and an empty one has to arrive
  * as an empty file.

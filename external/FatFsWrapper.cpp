@@ -71,6 +71,20 @@ int FatFsWrapper::fatErr(FRESULT fr) const {
 }
 
 /**
+ * The error for a file that could not be opened, naming a directory as one
+ * where FatFs answers it as missing or refused.
+ */
+int FatFsWrapper::openErr(const pdiutil::string &fatpath, FRESULT fr) const {
+    if (FR_NO_FILE == fr || FR_DENIED == fr) {
+        FILINFO info;
+        if (FR_OK == f_stat(fatpath.c_str(), &info) && 0 != (info.fattrib & AM_DIR)) {
+            return STORAGE_ERROR_NOT_A_FILE;
+        }
+    }
+    return fatErr(fr);
+}
+
+/**
  * A file opened on the heap, since a FatFs file can carry a whole sector of
  * cache.
  */
@@ -80,7 +94,8 @@ FIL *FatFsWrapper::openFat(const pdiutil::string &fatpath, uint8_t mode, int &er
         err = PDI_ERR_NO_MEM;
         return nullptr;
     }
-    err = fatErr(f_open(file, fatpath.c_str(), (BYTE)mode));
+    FRESULT fr = f_open(file, fatpath.c_str(), (BYTE)mode);
+    err = (FR_OK == fr) ? 0 : openErr(fatpath, fr);
     if (0 != err) {
         pdiutil::safe_delete(file);
     }
@@ -807,7 +822,13 @@ pdi_fhandle_t FatFsWrapper::openFile(const char* path, uint8_t flags) {
     if (nullptr == entry) {
         return (pdi_fhandle_t)PDI_ERR_NO_MEM;
     }
-    FRESULT fr = f_open(&entry->m_file, volumePath(path).c_str(), mode);
+    pdiutil::string fatpath = volumePath(path);
+    FRESULT fr = f_open(&entry->m_file, fatpath.c_str(), mode);
+    if (FR_NO_FILE == fr || FR_DENIED == fr) {
+        int refused = openErr(fatpath, fr);
+        pdiutil::safe_delete(entry);
+        return (pdi_fhandle_t)refused;
+    }
     if (FR_OK == fr && (flags & FILE_OPEN_TRUNCATE) && !(flags & FILE_OPEN_CREATE)) {
         fr = f_truncate(&entry->m_file);
     }

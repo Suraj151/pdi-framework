@@ -174,6 +174,12 @@ private:
     int fatErr(FRESULT fr) const;
 
     /**
+     * The error for a file that could not be opened, naming a directory as one
+     * where FatFs answers it as missing or refused.
+     */
+    int openErr(const pdiutil::string &fatpath, FRESULT fr) const;
+
+    /**
      * A file opened on the heap, since a FatFs file can carry a whole sector of
      * cache.
      */

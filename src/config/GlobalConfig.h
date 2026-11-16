@@ -16,7 +16,7 @@ created Date    : 1st June 2019
  * common default configurations for all stack
  */
 #define CONFIG_START      5
-#define PDI_VERSION       "1.3.12" /* library release, the same as library.properties and library.json */
+#define PDI_VERSION       "1.3.14" /* library release, the same as library.properties and library.json */
 #define CONFIG_VERSION    "1.1"
 #define FIRMWARE_VERSION  2019041100
 #define RELEASE           "uEOS"
